@@ -1,0 +1,11 @@
+# The one secrets home (K29): keep the folder, never track its contents.
+_meta/secrets/*
+!_meta/secrets/.gitkeep
+
+# Rendered outputs are disposable and regenerated (K7) — track the markdown source, not these.
+# deliverables/**/*.pdf
+# deliverables/**/*.docx
+# deliverables/**/*.pptx
+
+# OS litter
+.DS_Store
