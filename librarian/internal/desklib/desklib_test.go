@@ -81,12 +81,12 @@ func TestIgnoredFailClosed(t *testing.T) {
 func TestIsIgnoredPrefixAndExact(t *testing.T) {
 	list := []string{"_meta/", "CLAUDE.md", "_structure/decisions/"}
 	cases := map[string]bool{
-		"_meta/HANDOFF.md":                    true,  // prefix (trailing /)
-		"_meta":                               false, // "_meta/" requires the slash prefix
-		"CLAUDE.md":                           true,  // exact
-		"CLAUDE.md.bak":                       false, // not exact, not entry+"/"
-		"_structure/decisions/0001-foo.md":    true,  // prefix
-		"tasks/x.md":                          false,
+		"_meta/HANDOFF.md":                 true,  // prefix (trailing /)
+		"_meta":                            false, // "_meta/" requires the slash prefix
+		"CLAUDE.md":                        true,  // exact
+		"CLAUDE.md.bak":                    false, // not exact, not entry+"/"
+		"_structure/decisions/0001-foo.md": true,  // prefix
+		"tasks/x.md":                       false,
 	}
 	for rel, want := range cases {
 		if got := IsIgnored(rel, list); got != want {

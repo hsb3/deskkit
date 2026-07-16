@@ -19,6 +19,7 @@ import (
 	"github.com/pocketbase/pocketbase/plugins/migratecmd"
 	"github.com/spf13/cobra"
 
+	"github.com/example/pocket-librarian/internal/agent"
 	"github.com/example/pocket-librarian/internal/config"
 	"github.com/example/pocket-librarian/internal/desklib"
 	"github.com/example/pocket-librarian/internal/prompt"
@@ -59,14 +60,40 @@ func main() {
 
 	registerToolCommands(app, cfg, cfgErr)
 
+	// PocketBase's Execute() runs RootCmd.Execute() in a goroutine and discards its
+	// error (upstream: "leave to the commands to decide whether to print their error"),
+	// so a failing RunE would exit 0. Wrap every registered subcommand's RunE to record
+	// the first error, and exit non-zero after Start() returns (post-cleanup).
+	var cmdErr error
+	for _, c := range app.RootCmd.Commands() {
+		if f := c.RunE; f != nil {
+			c.RunE = func(cmd *cobra.Command, args []string) error {
+				err := f(cmd, args)
+				if err != nil && cmdErr == nil {
+					cmdErr = err
+				}
+				return err
+			}
+		}
+	}
+
 	if err := app.Start(); err != nil {
 		log.Fatal(err)
+	}
+	if cmdErr != nil {
+		os.Exit(1)
 	}
 }
 
 func requireConfig(cfg *config.Config, cfgErr error) (*config.Config, error) {
 	if cfgErr != nil {
 		return nil, cfgErr
+	}
+	// "First run" auto-creation (spec §10.1) applies to every entry point, not just
+	// serve: one-shot CLI tools would otherwise fail closed on the missing default
+	// ignore file. A present-but-unreadable file still fails closed in desklib.
+	if err := desklib.EnsureIgnoreFile(cfg.IgnoreConfig, cfg.DeskRoot); err != nil {
+		return nil, err
 	}
 	return cfg, nil
 }
@@ -179,6 +206,25 @@ func registerToolCommands(app *pocketbase.PocketBase, cfg *config.Config, cfgErr
 	}
 	queryCmd.Flags().IntVar(&queryDays, "days", 7, "window for 'recent'")
 	app.RootCmd.AddCommand(queryCmd)
+
+	// agent <instruction> — Phase-1 MANUAL trigger for the eino ReAct loop (spec §6;
+	// agent_runs.trigger="manual"). One-shot separate process, like sweep/patrol: requires the
+	// DB already migrated (a prior `serve` or `migrate up`). INTERPRETATION (see handoff): the
+	// §3.3 CLI table lists no agent subcommand, but §8 Phase 1 requires a driveable loop and the
+	// trigger enum includes "manual"; confirm this surface against §8 Phase 1.
+	agentCmd := &cobra.Command{
+		Use:   "agent <instruction>",
+		Short: "Run the agent loop once on an instruction (manual trigger)",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			c, err := requireConfig(cfg, cfgErr)
+			if err != nil {
+				return err
+			}
+			return agent.Run(cmd.Context(), app, c, "manual", args[0])
+		},
+	}
+	app.RootCmd.AddCommand(agentCmd)
 
 	// gui — convenience: open the admin GUI then serve (spawns `serve` as a child so it
 	// does not depend on PocketBase serve-command internals; single-writer rule holds).
