@@ -1,0 +1,26 @@
+# --- personalization: the real profile never ships; the example does ---
+_knowledge/profile.yaml
+_knowledge/profile.json
+_knowledge/profile.md
+!_knowledge/profile.example.yaml
+
+# --- secrets / env ---
+.env
+.env.*
+!.env.example
+
+# --- Go (librarian/) ---
+/librarian/librarian
+/librarian/dist/
+*.o
+*.test
+
+# --- Node / TS (plugin/opencode, plugin/claude-plugin) ---
+node_modules/
+dist/
+build/
+*.tsbuildinfo
+bun.lockb
+
+# --- OS / editor litter ---
+.DS_Store

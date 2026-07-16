@@ -1,0 +1,40 @@
+# _knowledge/profile.example.yaml — the personalization profile, ALL PLACEHOLDER VALUES.
+# Copy to _knowledge/profile.yaml (or .json, or .md-with-frontmatter) and fill in.
+# The system substitutes {{profile.<dotted.path>}} into prompts in place of hardcoded literals.
+# This file ships in the repo; a real, populated profile does NOT (it is the consumer's).
+# Holds identifiers and preferences only — NEVER credentials (those stay in env / a secrets
+# store and are referenced indirectly via secrets_ref).
+schema_version: 1
+
+desk:
+  name: "<desk name>"                 # e.g. what the agent calls this workspace
+  root: "<repo-relative root marker>" # discovered by walking up; never an absolute path
+
+github:
+  personal: "<github-handle>"
+  work: "<work-github-handle>"
+
+repos:
+  - name: "<owner/repo>"
+    role: "<product | incubation | reference | ...>"
+  board: "<project board url or id>"
+
+machines:
+  - name: "<machine label>"
+    paths:
+      developer: "<repo-relative or ~-relative dir>"
+
+models:
+  provider: "<anthropic | openai | gemini>"
+  default: "<model-id>"
+
+secrets_ref:
+  # names of env vars / secret keys the agent may need — values live elsewhere, never here
+  api_key_env: "<ENV_VAR_NAME>"
+
+preferences:
+  # free-form key/value preferences the prompts may reference
+  register: "<plain-english-first | terse | ...>"
+
+custom:
+  # open-ended escape hatch for anything without a first-class key (0013 item 6 "other" type)
