@@ -369,7 +369,7 @@ go build -o pocket-librarian ./cmd/pocket-librarian
 ./pocket-librarian propose-fix --run <run_id>    # plan + record originals; NO fs writes
 ./pocket-librarian apply-fix --run <run_id>      # supervised commit; never a Makefile default target
 ./pocket-librarian restore --revision <id>
-./pocket-librarian restore --by-path <path>      # finds the latest applied, unrestored revision for <path>
+./pocket-librarian restore --by-path <path>      # latest applied, unrestored revision for <path>; falls back to an FS-confirmed half-applied move (§5.4)
 ./pocket-librarian query recent --days 7
 
 # Admin GUI + migrations.
@@ -1211,12 +1211,21 @@ CLI/supervised (recovery is a human action).
 **Half-applied move recovery (make the window explicit and non-silent).** The ordering is:
 revision insert (`propose_fix`) → FS write → DB patch (`applied: true`, finding `fixed`). The FS
 write is **outside** the DB transaction (the filesystem is not transactional), so a crash between
-the FS move and the `applied: true` patch can leave the file moved while the revision still reads
-`applied: false`. Because `restore` keys off `applied == true`, such a row would not auto-restore.
-Handle it explicitly, at-most-once: on the failing patch, log a WARNING naming the revision id and
-the moved path, and provide a `restore --by-path <path>` safety (§3.3, §5.5) that finds the latest
-applied, not-yet-restored revision whose `path` or `new_path` matches and completes or rolls it
-back. Do not paper over the window silently.
+the FS move and the `applied: true` patch can leave the file moved (gone from `path`, present at
+`new_path`) while the revision still reads `applied: false`. Handle it explicitly, at-most-once,
+on both ends. On the failing patch, log a WARNING naming the revision id and the moved path. For
+recovery, `restore` (§3.3, §5.5) is taught the window: `restore --by-path <path>` first looks for
+the latest applied, not-yet-restored match, and if none exists **falls back** to an
+`applied == false`, not-yet-restored `move` for that path and **confirms the crash state on the
+filesystem** — the file absent at `path` and present at `new_path` — before acting. On
+confirmation it catches the DB up (`applied: true`, the patch the crash skipped) and then reverses
+the move exactly (remove `new_path`, rewrite the recorded original at `path`, `restored: true`,
+reopen the finding). An operator handed the id by the WARNING log can call `restore` on that id
+directly; it runs the same filesystem confirmation. Only a `move` produces an FS-confirmable
+window — a half-applied `edit` leaves the file in place at `path`, indistinguishable from a
+concurrent user edit, so it is not auto-recovered. If the filesystem does **not** confirm (the
+file is still at `path`, missing at both, or the action is not a `move`), `restore` errors loudly
+naming the revision — it never guesses. Do not paper over the window silently.
 
 ### 5.5 `restore` — reverse a change exactly
 
@@ -1241,9 +1250,17 @@ type RestoreResult struct {
 
 0. **By-path resolution (only when `RevisionID` is empty and `Path` is set).** Query `revisions`
    where `applied == true && restored == false && (path == Path || new_path == Path)`, ordered by
-   `-created`; take the first match as the working `RevisionID`. No match → error `"no applied,
-   unrestored revision for path"`. Proceed to step 1 with the resolved id.
-1. Get the revision; if `applied == false` → error; if `restored == true` → error.
+   `-created`; take the first match as the working `RevisionID`. If there is **no** applied match,
+   fall back to the §5.4 half-applied-move recovery: scan `applied == false && restored == false`
+   `move` rows for that path, newest first, and take the first whose filesystem state confirms the
+   crash window (file absent at `path`, present at `new_path`). Still no match → error `"no
+   applied, unrestored revision for path"` (or, if unapplied rows exist but none confirm, an error
+   naming that). Proceed to step 1 with the resolved id.
+1. Get the revision; if `restored == true` → error. If `applied == false`, error **unless** the
+   filesystem confirms the §5.4 half-applied-move window for it (`action == move`, file absent at
+   `path`, present at `new_path`) — in that case treat the move as committed, patch `applied: true`
+   (the DB catch-up the crash skipped, saved with `restored` in step 5's transaction), and
+   continue. A not-applied row the filesystem does not confirm is a hard error (never guess).
 2. Verify `sha256hex(original_content) == original_checksum`; on mismatch → error `"refusing to
    restore"`. (Guards against a corrupted ledger row.)
 3. If `action == move` and `new_path` is set: if the moved file exists at `new_path`, remove it.
@@ -1254,8 +1271,10 @@ type RestoreResult struct {
 **DB reads/writes.** Reads `revisions` (+ related finding); writes the filesystem; patches
 `revisions` and `patrol_findings`.
 
-**Errors.** Not-applied, already-restored, and checksum-mismatch are hard errors returned to the
-agent as a JSON error field; the file is untouched on any error.
+**Errors.** Already-restored and checksum-mismatch are hard errors; a not-applied revision is a
+hard error **unless** the filesystem confirms the §5.4 half-applied-move window (then it is
+recovered, not refused). All are returned to the agent as a JSON error field; the file is
+untouched on any error.
 
 ### 5.6 `query` — read-only questions over files and findings
 
@@ -2274,9 +2293,13 @@ Each is a default chosen to make the spec build-ready with zero clarifications.
   §5.6).** Defaults `_meta/HANDOFF.md` and the `_meta/` / `SECRETS_DIR` prefix set. **Why:**
   identity-neutrality consistency — no desk-specific path is hardcoded.
 - **Decision: the half-applied-move window is made explicit and non-silent (§5.4).** FS write is
-  outside the DB transaction; on a post-move patch failure the binary logs a WARNING and offers
-  `restore --by-path`. **Why:** the FS is not transactional, so the at-most-once window is real;
-  it must be recoverable and loud, never silently inconsistent.
+  outside the DB transaction; on a post-move patch failure the binary logs a WARNING, and `restore`
+  recovers it — by-path (or by the logged id) it falls back past the `applied == true` filter to an
+  `applied == false` move, confirms the crash state on the filesystem (file absent at `path`,
+  present at `new_path`), catches the DB up, and reverses the move exactly; an unconfirmed state
+  errors rather than guessing. **Why:** the FS is not transactional, so the at-most-once window is
+  real; it must be recoverable and loud, never silently inconsistent — and recovery must not act on
+  an unverified filesystem.
 - **Decision: rebuild reproducibility = same file count + same per-path checksum set (§9.4 check
   7).** Not full row equality, since git-derived and `last_seen` fields vary. **Why:** aligns the
   reproducibility gate with what is actually deterministic.
