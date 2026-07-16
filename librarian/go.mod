@@ -10,7 +10,7 @@ require (
 	github.com/cloudwego/eino-ext/components/model/gemini v0.1.33
 	github.com/cloudwego/eino-ext/components/model/openai v0.1.13
 	github.com/google/jsonschema-go v0.4.2
-	github.com/modelcontextprotocol/go-sdk v1.3.1
+	github.com/modelcontextprotocol/go-sdk v1.4.1
 	github.com/pocketbase/dbx v1.12.0
 	github.com/pocketbase/pocketbase v0.39.6
 	github.com/spf13/cobra v1.10.2
