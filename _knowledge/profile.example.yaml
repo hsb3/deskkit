@@ -4,37 +4,57 @@
 # This file ships in the repo; a real, populated profile does NOT (it is the consumer's).
 # Holds identifiers and preferences only — NEVER credentials (those stay in env / a secrets
 # store and are referenced indirectly via secrets_ref).
+# Validates against schema/profile.schema.yaml (schema v1).
 schema_version: 1
 
-desk:
-  name: "<desk name>"                 # e.g. what the agent calls this workspace
-  root: "<repo-relative root marker>" # discovered by walking up; never an absolute path
-
-github:
-  personal: "<github-handle>"
-  work: "<work-github-handle>"
+identity:
+  name: "<display name>"
+  github:
+    personal: "<personal-github-handle>"
+    work: "<work-github-handle>"
+  email: "you@example.com"
 
 repos:
-  - name: "<owner/repo>"
-    role: "<product | incubation | reference | ...>"
-  board: "<project board url or id>"
+  default: "owner/repo"
+  by_role:
+    product: "owner/repo-product"
+    incubation: "owner/repo-incubation"
+  shorthand:
+    issue_default: "owner/repo"
+
+board:
+  provider: "github-projects"
+  url: "https://example.com/board"
+  number: 0
+
+desk:
+  name: "<desk name>"
+  root: "."
+  paths:
+    decisions: "_structure/decisions"
+    tasks: "tasks"
+    analyses: "analyses"
+    journal: "journal"
+    secrets: "_meta/secrets"
+    handoff: "_meta/HANDOFF.md"
+    knowledge: "_knowledge"
 
 machines:
-  - name: "<machine label>"
-    paths:
-      developer: "<repo-relative or ~-relative dir>"
+  - name: "<hostname>"
+    role: "primary"
+    projects_root: "<repo-relative-or-~-relative-dir>"
 
 models:
-  provider: "<anthropic | openai | gemini>"
-  default: "<model-id>"
+  provider: "anthropic"
+  model: "<model-id>"
+  alternates: ["<model-id>", "<model-id>"]
 
 secrets_ref:
-  # names of env vars / secret keys the agent may need — values live elsewhere, never here
-  api_key_env: "<ENV_VAR_NAME>"
+  llm_api_key: "<ENV_VAR_NAME>"
 
 preferences:
-  # free-form key/value preferences the prompts may reference
-  register: "<plain-english-first | terse | ...>"
+  commit_style: "<conventional | ...>"
+  register: "<explanatory | terse | ...>"
 
-custom:
-  # open-ended escape hatch for anything without a first-class key (0013 item 6 "other" type)
+# open-ended escape hatch for anything without a first-class key (0013 item 6 "other" type)
+custom: {}
