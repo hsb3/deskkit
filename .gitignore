@@ -24,3 +24,6 @@ bun.lockb
 
 # --- OS / editor litter ---
 .DS_Store
+
+
+logs/

@@ -242,7 +242,9 @@ This brief makes it a **required CI check**, wired to the M-05 design
 - **What it flags:** (1) every literal scalar value in `_knowledge/profile.yaml` (the profile
   doubles as the lint's denylist — the self-closing design), and (2) structural identifier
   patterns — bare issue refs (`#\d+`, reusing the librarian's `ISSUE_REF_RE`,
-  `pocket-librarian-v1-spec.md:989`, §11.2), `github.com/owner/repo` slugs, `project N`
+  `pocket-librarian-v1-spec.md:989`, §11.2), **host-qualified** `github.com/owner/repo` slugs &
+  URLs only (bare hostless `owner/repo` slugs are deliberately NOT matched — they collide with
+  file paths / import paths; the profile denylist covers real ones), `project N`
   references (`m-05-data-surfaces.md` "Token patterns it flags").
 - **The sanctioned escape:** a would-be-flagged token passes **iff** it is inside a
   `{{profile.<path>}}` or `{{env.<VAR>}}` placeholder resolved from the M-05 profile, OR lives

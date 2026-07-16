@@ -296,8 +296,18 @@ Two families. The first is **self-closing** — it uses surface (i) as its own d
    - **Bare issue refs:** `(?<![\w&])#\d+` — reuse the librarian's `ISSUE_REF_RE`
      (`pocket-librarian-v1-spec.md` §11.2; RE2 has no lookbehind, so match `#\d+` with a
      preceding-byte rejection check).
-   - **GitHub owner/repo slugs & URLs:** `github\.com/[\w.-]+/[\w.-]+` and bare `\b[\w-]+/[\w-]+\b`
-     slugs in prose/prompt context that resolve to a real-looking owner/repo.
+   - **GitHub owner/repo slugs & URLs — host-form only:** `github\.com/[\w.-]+/[\w.-]+`,
+     `git@github\.com:[\w.-]+/[\w.-]+`, and full `https?://github\.com/…` URLs. **Bare,
+     hostless `owner/repo` slugs are deliberately NOT structurally matched** — a raw
+     `[\w-]+/[\w-]+` is indistinguishable from a file path or a language import (`plugin/core`,
+     `os/exec`, `encoding/json`) and would match pervasively across the shipped tree, making the
+     "returns zero on a clean tree" criterion (D8) unsatisfiable. The real identifiers that
+     matter — the deployment's actual owner/repo — are already caught by the **profile-value
+     denylist** (family 1 above), which flags the literal wherever it appears, host or not.
+     Residual gap (accepted): a hostless slug that is neither in the profile nor host-qualified
+     cannot be caught by regex without also flagging every path; the profile denylist +
+     host-form patterns + review cover it, and any such leak found is remediated by adding it
+     to the profile (which then makes it a hard-fail via the denylist).
    - **Project-number references:** `project\s+\d+` / `projects/\d+`.
    - **Known-handle seeds (optional, tiny):** an allowlist-managed short list of obvious
      personal handles/orgs to catch leaks even before a profile exists.
