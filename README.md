@@ -35,12 +35,31 @@ Bun `1.3.14` / Node `26.5.0` (either runs `plugin/`).
 Known, intentional gaps — not bugs:
 
 - **OpenCode adapter** — not built (see above).
-- **Marketplace packaging** — wired for local development
-  (`claude --plugin-dir ./plugin/claude-plugin`) only, not yet packaged for distribution.
 - **Hooks and agents surfaces** — the Claude plugin ships skills only; no `hooks/` or
   `agents/` definitions yet.
-- **Schema distribution** — the MCP server locates `schema/profile.schema.yaml` by walking
-  up from the repo; a distributed build must ship or embed the schema instead.
+
+Marketplace packaging and schema distribution are now wired (see below); they are no longer gaps.
+
+## Install as a marketplace plugin
+
+This repo is its own Claude Code plugin marketplace (`.claude-plugin/marketplace.json`). From
+any project:
+
+```bash
+claude plugin marketplace add hsb3/desk-standard
+claude plugin install desk-standard@desk-standard
+```
+
+The install copies only `plugin/claude-plugin/` into the plugin cache, so the plugin is
+self-contained: `bun run package` (in `plugin/`) bundles the MCP server and its npm + `plugin/core`
+dependencies into the committed `plugin/claude-plugin/mcp/server.js` and copies the schema to
+`plugin/claude-plugin/schema/profile.schema.yaml`. Both are generated artifacts — never
+hand-edited; a CI drift guard regenerates and fails on any diff. For an installed plugin the
+schema ships inside it (found by the same walk-up from the server module); running from source is
+unchanged (walk-up to the repo `schema/`, overridable via `DESK_SCHEMA_PATH`).
+
+For local development you can still point Claude Code straight at the source tree with
+`claude --plugin-dir ./plugin/claude-plugin`.
 
 ## Quick start
 

@@ -13,7 +13,8 @@
     "test": "bun test core mcp",
     "check:purity": "node scripts/check-core-purity.mjs",
     "check:neutrality": "node ../scripts/check-neutrality.mjs",
-    "mcp": "bun mcp/server.ts"
+    "mcp": "bun mcp/server.ts",
+    "package": "mkdir -p claude-plugin/mcp claude-plugin/schema && bun build mcp/server.ts --target=node --outfile claude-plugin/mcp/server.js && cp ../schema/profile.schema.yaml claude-plugin/schema/profile.schema.yaml"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.0",

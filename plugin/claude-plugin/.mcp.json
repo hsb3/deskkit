@@ -1,6 +1,6 @@
 {
   "desk-standard": {
     "command": "bun",
-    "args": ["${CLAUDE_PLUGIN_ROOT}/../mcp/server.ts"]
+    "args": ["${CLAUDE_PLUGIN_ROOT}/mcp/server.js"]
   }
 }

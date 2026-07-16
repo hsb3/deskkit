@@ -1,0 +1,200 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "schema/profile.schema.yaml"
+title: "desk-standard schema v1 — profile block"
+description: >-
+  Validates a _knowledge/profile.{yaml,json,md-frontmatter} personalization profile
+  (M-05 surface i). Every key is optional except schema_version; unplanned top-level
+  keys are rejected — anything not yet a first-class field belongs under `custom`.
+type: object
+additionalProperties: false
+required:
+  - schema_version
+properties:
+
+  schema_version:
+    description: "Ties the profile to schema v1; must be the literal integer 1."
+    type: integer
+    const: 1
+
+  identity:
+    description: "Who this profile belongs to — display name, GitHub handles, email."
+    type: object
+    additionalProperties: false
+    properties:
+      name:
+        description: "Display name; used only where a human name is unavoidable."
+        type: string
+      github:
+        description: "GitHub handles, split by account context."
+        type: object
+        additionalProperties: false
+        properties:
+          personal:
+            description: "Personal GitHub handle."
+            type: string
+          work:
+            description: "Work/org GitHub handle."
+            type: string
+      email:
+        description: "Optional contact email."
+        type: string
+        format: email
+
+  repos:
+    description: "The code repos prompts can address by default, by role, or by shorthand."
+    type: object
+    additionalProperties: false
+    required:
+      - default
+    properties:
+      default:
+        description: "The primary code repo, as owner/repo."
+        type: string
+        pattern: "^[\\w.-]+/[\\w.-]+$"
+      by_role:
+        description: "Named roles the prompts can address by role, not literal."
+        type: object
+        additionalProperties: false
+        properties:
+          product:
+            description: "The product repo, as owner/repo."
+            type: string
+            pattern: "^[\\w.-]+/[\\w.-]+$"
+          incubation:
+            description: "The incubation repo, as owner/repo."
+            type: string
+            pattern: "^[\\w.-]+/[\\w.-]+$"
+      shorthand:
+        description: "Repos that bare shorthand references resolve against."
+        type: object
+        additionalProperties: false
+        properties:
+          issue_default:
+            description: "The repo a bare \"#N\" resolves against, as owner/repo."
+            type: string
+            pattern: "^[\\w.-]+/[\\w.-]+$"
+
+  board:
+    description: "The work-tracking board this deployment uses."
+    type: object
+    additionalProperties: false
+    required:
+      - number
+    properties:
+      provider:
+        description: "Generic provider tag for the board (e.g. github-projects)."
+        type: string
+      url:
+        description: "The board's URL."
+        type: string
+        format: uri
+      number:
+        description: "The board/project number."
+        type: integer
+
+  desk:
+    description: "This deployment's name, root, and entity-directory paths."
+    type: object
+    additionalProperties: false
+    properties:
+      name:
+        description: "Stamped where a desk/deployment name is needed."
+        type: string
+      root:
+        description: "Repo-relative root; \".\" means the discovered profile's directory."
+        type: string
+      paths:
+        description: "Entity-dir map the librarian's path constants resolve against."
+        type: object
+        additionalProperties: false
+        properties:
+          decisions:
+            description: "Where decision docs live."
+            type: string
+          tasks:
+            description: "Where task docs live."
+            type: string
+          analyses:
+            description: "Where analysis docs live."
+            type: string
+          journal:
+            description: "Where journal entries live."
+            type: string
+          secrets:
+            description: "Where secrets/operational material lives (never tracked)."
+            type: string
+          handoff:
+            description: "Path to the cold-start handoff file."
+            type: string
+          knowledge:
+            description: "Path to the _knowledge/ personalization root."
+            type: string
+
+  machines:
+    description: "Zero or more machines this deployment runs on, matched by hostname at runtime."
+    type: array
+    items:
+      type: object
+      additionalProperties: false
+      required:
+        - role
+      properties:
+        name:
+          description: "Hostname."
+          type: string
+        role:
+          description: "Whether this machine is the primary or a secondary."
+          type: string
+          enum:
+            - primary
+            - secondary
+        projects_root:
+          description: "Where this machine keeps working repos."
+          type: string
+
+  models:
+    description: "The default model/provider and its alternates."
+    type: object
+    additionalProperties: false
+    properties:
+      provider:
+        description: "The default model provider."
+        type: string
+        enum:
+          - anthropic
+          - openai
+          - gemini
+      model:
+        description: "The default model id."
+        type: string
+      alternates:
+        description: "Alternate model ids, in preference order."
+        type: array
+        items:
+          type: string
+
+  secrets_ref:
+    description: "Names of env vars holding secrets — never the secret values themselves."
+    type: object
+    additionalProperties: false
+    properties:
+      llm_api_key:
+        description: "Name of the env var holding the LLM API key."
+        type: string
+
+  preferences:
+    description: "Deployment-wide preferences prompts may reference."
+    type: object
+    additionalProperties: false
+    properties:
+      commit_style:
+        description: "Preferred commit message convention."
+        type: string
+      register:
+        description: "Preferred communication register."
+        type: string
+
+  custom:
+    description: "Open-ended escape hatch: ad-hoc keys agents add without a schema bump."
+    type: object
+    additionalProperties: true

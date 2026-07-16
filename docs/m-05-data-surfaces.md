@@ -340,6 +340,16 @@ the name" — de-identification means *reference the config surface*, per
   acceptance gate for that pass.
 - Runs alongside the S3 plugin-lint set and the INS-01 unquoted-`synopsis` YAML check
   (`_meta/improvement-log.md`).
+- **Scanned surface boundary:** the lint scans `plugin/` and `librarian/` — the *shipped
+  definition* content. The root `.claude-plugin/marketplace.json` is deliberately outside that
+  surface: it is distribution metadata whose whole job is to carry the marketplace owner's
+  identity (name/email), not a shipped definition a consumer runs, so it legitimately holds
+  a real name and is not a neutrality target. The generated bundle
+  `plugin/claude-plugin/mcp/server.js` (produced by `bun run package`) stays inside the scanned
+  surface — its authored sources (`plugin/core`, `plugin/mcp`) remain in scope; only its
+  inlined third-party dependency code is generated, and if a future dependency ever injects a
+  structural-identity literal into it, exclude that one path in `check-neutrality.mjs` rather
+  than loosening a detector.
 
 ---
 
