@@ -35,6 +35,10 @@
 // `github.com/o/r` import form is NOT structurally matched; URL and SSH-remote forms (which do
 // not collide with imports) are. A deployment's real owner in bare form is still caught by the
 // profile-value denylist (family 1), which is the spec's designated primary mechanism.
+//
+// Known latent false positive (review N1): family 2d (`owner/repo#N`) also matches numeric
+// path anchors like `docs/guide.md#42`. None exist in the scanned tree today; if a shipped
+// doc ever needs one, add a targeted `neutrality-lint.allow` entry rather than loosening 2d.
 
 import { readdirSync, readFileSync, statSync, existsSync, mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
