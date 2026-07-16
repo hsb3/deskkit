@@ -1,0 +1,17 @@
+(version 1)
+(deny default)                                   ; default-deny everything
+
+;; minimum to exec the binary + load its dylibs
+(allow process-fork process-exec)
+(allow file-read* (subpath "/usr/lib") (subpath "/System") (subpath "/usr/bin") (subpath "/private/var/db/dyld"))
+
+;; filesystem: read+write ONLY inside the three trusted subtrees (passed via -D)
+(allow file-read* file-write*
+    (subpath (param "DESK_ROOT"))                ; the desk the librarian stewards
+    (subpath (param "PB_DATA"))                  ; the PocketBase SQLite data dir
+    (subpath (param "BIN_DIR")))                 ; the pocket-librarian binary's own dir
+
+;; network: outbound ONLY to the configured provider host (derived from the base URL) + DNS
+(allow network-outbound
+    (remote tcp (param "PROVIDER_HOSTPORT")))    ; e.g. api.anthropic.com:443
+(allow network-outbound (remote udp "*:53"))     ; DNS resolution for that host only
