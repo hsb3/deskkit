@@ -31,6 +31,72 @@ make findings        # or: summary / adoption / orphans / uncollapsed
 
 `make help` lists every target.
 
+## Choosing the LLM and setting the API key
+
+Only the `agent` command (and an MCP client driving the tools) needs an LLM. `sweep`,
+`patrol`, `propose-fix`, `apply-fix`, `restore`, and `query` are LLM-free — they run with no
+provider configured and no API key set.
+
+Provider and model resolve with precedence **env var → profile → default**:
+
+| Setting | Env var | Profile key (`_knowledge/profile.yaml`) | Default |
+|---|---|---|---|
+| Provider | `LLM_PROVIDER` | `models.provider` | `anthropic` |
+| Model | `LLM_MODEL` | `models.model` | `claude-opus-4-8` |
+
+Each provider reads its own key from a fixed env var — `anthropic` → `ANTHROPIC_API_KEY`,
+`openai` → `OPENAI_API_KEY`, `gemini` → `GEMINI_API_KEY`. A missing key fails loud with an
+actionable message; nothing silently falls back. (The profile's `secrets_ref.llm_api_key`
+field is not yet read by the binary — the per-provider env vars above are the mechanism.)
+
+```bash
+export LLM_PROVIDER=anthropic     # or set models.provider in your profile
+export ANTHROPIC_API_KEY=sk-...
+./pocket-librarian agent "patrol the desk and summarize what you find"
+```
+
+`agent` runs the librarian's reasoning loop once over the tool set and exits (one-shot,
+manual trigger; step-bounded by `AGENT_MAX_STEP`, default 12). There is no interactive
+chat/watch mode yet — richer interaction surfaces are tracked in the repo issues.
+
+## The admin console
+
+The embedded PocketBase serves its full React admin console — browse the `files` index,
+patrol `findings`, and `revisions` (recorded originals) directly:
+
+```bash
+make gui             # builds, starts serve, opens http://127.0.0.1:8090/_/
+```
+
+or by hand: `./pocket-librarian serve` then open `http://127.0.0.1:8090/_/`. On a fresh
+database the console's first-run screen creates the superuser account, or create one
+non-interactively:
+
+```bash
+./pocket-librarian superuser create you@example.com <password>
+```
+
+The console is read/write over the database (records, collections) — it does not write
+desk files; the `apply-fix` boundary below still holds.
+
+## Using it from an agent session (MCP)
+
+`mcp-serve` exposes the tool core over stdio MCP: `sweep`, `patrol`, `propose_fix`, and
+`query` always; `apply_fix` only when `LIBRARIAN_AUTONOMOUS_WRITES=true` (default false);
+`restore` is deliberately CLI-only. Wire it into a Claude Code project via `.mcp.json`:
+
+```json
+{
+  "mcpServers": {
+    "pocket-librarian": {
+      "command": "/path/to/pocket-librarian",
+      "args": ["mcp-serve"],
+      "env": { "DESK_ROOT": "/path/to/your/desk", "DESK_NAME": "my-desk" }
+    }
+  }
+}
+```
+
 ## The write path — supervised only
 
 Fixing a finding is split into two steps (decision recorded in the spec §11.2):

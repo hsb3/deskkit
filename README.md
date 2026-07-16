@@ -88,8 +88,12 @@ make patrol   # flag rule violations — dry-run, never writes
 ```
 
 `apply-fix` is deliberately not a Makefile target — it's supervised-only, run by hand, and
-every fix it applies can be reversed with `./pocket-librarian restore --by-path <path>`. See
-`librarian/README.md`.
+every fix it applies can be reversed with `./pocket-librarian restore --by-path <path>`.
+
+Beyond the CLI: `make gui` opens the embedded PocketBase admin console
+(`http://127.0.0.1:8090/_/`) over the desk's index, and `mcp-serve` exposes the tool core to
+agent sessions. LLM provider selection, API keys, console setup, and MCP wiring are covered
+in `librarian/README.md`.
 
 ## Structure
 
