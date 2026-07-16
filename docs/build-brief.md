@@ -151,6 +151,12 @@ plugin formats.
 
 ---
 
+> **Scope change (2026-07-16, Henry):** v1 ships Claude Code only. D4 (OpenCode adapter) is
+> descoped — superseded by a common-core fan-out build that produces both harness instances,
+> tracked at `hsb3/dotfiles-agents-workbench#50`; a frozen partial-adapter spike is preserved
+> unwired at `plugin/opencode/`. AC1's OpenCode half and AC3's cross-format clause apply to
+> that endeavor, not v1.
+
 ## 4. Dual-format requirement
 
 Henry ruled the plugin ships **Claude Code AND OpenCode formats** (`README.md`, 2026-07-15).
@@ -183,7 +189,7 @@ claude-plugin/
 ```
 
 Marketplace distribution is supported (`GUIDE:24`). Smoke-test with `claude --plugin-dir
-./packages/claude-plugin`; validate with `claude plugin validate` (`GUIDE:190-194,235`).
+./plugin/claude-plugin`; validate with `claude plugin validate` (`GUIDE:190-194,235`).
 
 ### 4.2 Shared-once vs re-authored-per-format
 

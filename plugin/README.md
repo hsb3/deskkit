@@ -10,7 +10,10 @@ The plugin-side implementation of the shared data-surface loader (D7) and its MC
   `profile_validate`, `template_render`, `knowledge_index`) whose schemas + behavior are defined
   once in `core/` and imported here.
 
-Later adapters (`opencode/`, `claude-plugin/`) wrap the same `core/` seam.
+The `claude-plugin/` adapter wraps the same `core/` seam. **Scope change (2026-07-16, Henry):**
+v1 ships Claude Code only — `opencode/` holds a frozen, unwired adapter spike (see its own
+README), superseded by a separate common-core fan-out build tracked at
+`hsb3/dotfiles-agents-workbench#50`.
 
 ## Commands (run from `plugin/`)
 
