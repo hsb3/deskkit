@@ -169,24 +169,27 @@ func jsonResult[T any](r T, err error) (string, error) {
 // running), builds the provider model + gated tool slice + agent, registers the single
 // persistence callback, drives the ReAct loop with agent.Generate, persists the final
 // assistant message, and finalizes the run row (succeeded | failed | blocked, step_count).
-func Run(ctx context.Context, app core.App, cfg *config.Config, trigger, input string) error {
+// Run executes one agent loop. On success the final assistant text is returned
+// so callers (the CLI) can print it; the full transcript is in the messages
+// collection either way.
+func Run(ctx context.Context, app core.App, cfg *config.Config, trigger, input string) (string, error) {
 	run, err := createAgentRun(app, trigger, input, cfg)
 	if err != nil {
-		return err
+		return "", err
 	}
 	rc := &runCtx{app: app, cfg: cfg, runID: run.Id}
 
 	chatModel, err := provider.NewChatModel(ctx, cfg)
 	if err != nil {
-		return failRun(app, run, rc, err)
+		return "", failRun(app, run, rc, err)
 	}
 	toolset, err := buildTools(app, cfg)
 	if err != nil {
-		return failRun(app, run, rc, err)
+		return "", failRun(app, run, rc, err)
 	}
 	ag, err := newAgent(ctx, app, chatModel, toolset, cfg)
 	if err != nil {
-		return failRun(app, run, rc, err)
+		return "", failRun(app, run, rc, err)
 	}
 
 	handler := rc.persistHandler() // the ONE persistence mechanism (persist.go)
@@ -202,5 +205,9 @@ func Run(ctx context.Context, app core.App, cfg *config.Config, trigger, input s
 			app.Logger().Error("persist final message", "run", run.Id, "err", perr)
 		}
 	}
-	return finishRun(app, run, rc, out, genErr)
+	final := ""
+	if genErr == nil && out != nil {
+		final = out.Content
+	}
+	return final, finishRun(app, run, rc, out, genErr)
 }

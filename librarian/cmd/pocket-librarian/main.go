@@ -222,7 +222,14 @@ func registerToolCommands(app *pocketbase.PocketBase, cfg *config.Config, cfgErr
 			if err != nil {
 				return err
 			}
-			return agent.Run(cmd.Context(), app, c, "manual", args[0])
+			final, err := agent.Run(cmd.Context(), app, c, "manual", args[0])
+			if err != nil {
+				return err
+			}
+			if final != "" {
+				fmt.Println(final)
+			}
+			return nil
 		},
 	}
 	app.RootCmd.AddCommand(agentCmd)
