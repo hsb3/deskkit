@@ -1,0 +1,55 @@
+name: Claude Code
+
+on:
+  issue_comment:
+    types: [created]
+  pull_request_review_comment:
+    types: [created]
+  issues:
+    types: [opened, assigned]
+  pull_request_review:
+    types: [submitted]
+
+jobs:
+  claude:
+    if: |
+      (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@claude')) ||
+      (github.event_name == 'pull_request_review_comment' && contains(github.event.comment.body, '@claude')) ||
+      (github.event_name == 'pull_request_review' && contains(github.event.review.body, '@claude')) ||
+      (github.event_name == 'issues' && (contains(github.event.issue.body, '@claude') || contains(github.event.issue.title, '@claude')))
+    runs-on: ubuntu-latest
+    # Pick the auth path by which secret is set (the OAuth step no-ops/succeeds on
+    # an empty token, so the API-key fallback can't rely on outcome alone).
+    env:
+      HAS_OAUTH: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN != '' }}
+    permissions:
+      contents: write # so @claude can push branches with its changes
+      pull-requests: write # so @claude can open PRs from those branches
+      issues: write # so @claude can maintain its tracking comment
+      id-token: write
+      actions: read # Required for Claude to read CI results on PRs
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 1
+
+      # Auth fallback: prefer the subscription OAuth token; if it's missing or
+      # fails to start (e.g. usage limit exhausted), fall back to the API key.
+      - name: Run Claude Code (subscription token)
+        id: claude_oauth
+        if: ${{ env.HAS_OAUTH == 'true' }}
+        continue-on-error: true
+        uses: anthropics/claude-code-action@v1.0.158
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          additional_permissions: |
+            actions: read
+
+      - name: Run Claude Code (API key fallback)
+        if: ${{ env.HAS_OAUTH != 'true' || steps.claude_oauth.outcome == 'failure' }}
+        uses: anthropics/claude-code-action@v1.0.158
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          additional_permissions: |
+            actions: read

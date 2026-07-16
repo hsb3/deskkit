@@ -1,0 +1,52 @@
+name: Bug
+description: Something is broken or behaves wrong.
+title: "fix: "
+labels: [bug]
+body:
+  - type: textarea
+    id: tracking
+    attributes:
+      label: Tracking
+      description: "Related issue #, origin / how found, one-line framing."
+      placeholder: "#<n>, <origin / how found>. <one-line framing>."
+    validations:
+      required: false
+  - type: textarea
+    id: whats-wrong
+    attributes:
+      label: What's wrong
+      description: >-
+        The observed behavior vs the expected behavior, grounded in source (`path:line`)
+        or a repro.
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Repro
+      description: "Steps / inputs that trigger it; the environment if it matters."
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance-criteria
+    attributes:
+      label: Acceptance criteria
+      description: >-
+        How we know it's fixed — independently verifiable (a regression test that fails
+        before and passes after; the bad output no longer occurs).
+      value: |
+        - [ ]
+        - [ ]
+    validations:
+      required: true
+  - type: textarea
+    id: dependencies-gates
+    attributes:
+      label: Dependencies & gates
+      description: >-
+        Which repo gates fire for this fix (CI: neutrality lint, plugin bun test/build,
+        librarian go build/vet/test); anything this blocks on.
+      value: |
+        -
+    validations:
+      required: false

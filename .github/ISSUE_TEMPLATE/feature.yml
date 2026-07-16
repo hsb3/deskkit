@@ -1,0 +1,68 @@
+name: Feature
+description: A new capability or enhancement, scoped so a builder can pick it up cold.
+title: "feat: "
+labels: [enhancement]
+body:
+  - type: textarea
+    id: tracking
+    attributes:
+      label: Tracking
+      description: "Related issue #, origin / why now, one-line framing of the outcome."
+      placeholder: "#<n>, <origin / why now>. <one-line framing of the outcome>."
+    validations:
+      required: false
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: >-
+        What's missing or wrong today, grounded in source (`path:line`), a canonical doc,
+        observed behavior, or a linked issue. Describe the problem, not the solution.
+        State the true residual if part has shipped.
+    validations:
+      required: true
+  - type: textarea
+    id: deliverables
+    attributes:
+      label: Deliverables
+      description: >-
+        Concrete, ownable units with their file/endpoint targets named, so no rediscovery
+        is needed.
+      value: |
+        - A —
+        - B —
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance-criteria
+    attributes:
+      label: Acceptance criteria
+      description: >-
+        Each one independently verifiable by someone who didn't write the code ("X returns
+        Y", "test Z passes", "the gate fails on drift") — not "works well".
+      value: |
+        - [ ]
+        - [ ]
+    validations:
+      required: true
+  - type: textarea
+    id: dependencies-gates
+    attributes:
+      label: Dependencies & gates
+      description: >-
+        What this blocks on, and which repo gates fire for this change surface (CI:
+        neutrality lint, plugin bun test/build, librarian go build/vet/test). Be
+        explicit about gates that do NOT fire.
+      value: |
+        -
+    validations:
+      required: false
+  - type: textarea
+    id: out-of-scope
+    attributes:
+      label: Out of scope
+      description: "What this deliberately does not cover."
+      value: |
+        -
+    validations:
+      required: false

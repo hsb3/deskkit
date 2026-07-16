@@ -1,0 +1,96 @@
+name: Claude Code Review
+
+on:
+  pull_request:
+    types: [opened, synchronize, ready_for_review, reopened]
+    # NOTE: dotfiles-agents skips review on docs-only `_meta/**` changes here.
+    # This repo has no _meta/** tree yet, so that paths-ignore is dropped rather
+    # than kept as dead config; re-add it if/when this repo grows a _meta/ desk.
+
+# A new push supersedes the in-flight review of the same PR — cancel it instead of
+# paying for two reviews (Gate-2 pilot finding, adopted from the pilot repo's workflow).
+concurrency:
+  group: claude-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  claude-review:
+    runs-on: ubuntu-latest
+    # Pick the auth path by which secret is actually set. The OAuth step does NOT
+    # fail on an empty token (it no-ops and reports success), so we can't rely on
+    # `outcome == 'failure'` alone to trigger the API-key fallback — gate on this.
+    env:
+      HAS_OAUTH: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN != '' }}
+    permissions:
+      contents: read
+      # write so the review can post its tracking + inline comments
+      pull-requests: write
+      issues: read
+      id-token: write
+      actions: read # so the github_ci MCP server can read CI status on the PR
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          # Full history so the base ref is present locally — claude-code-action
+          # restores trusted config from the base branch via `git fetch origin <base>`,
+          # which fails under a shallow checkout.
+          fetch-depth: 0
+
+      # ── Review config (shared by both auth steps) ──────────────────────────
+      # track_progress: true → tag mode. Posts a tracking PR comment and updates it
+      #   with the review. REQUIRED — without it the run completes but posts nothing.
+      # claude_args --allowedTools → enables the inline-comment tool + gh + read tools
+      #   so the agent posts line-anchored inline comments, not just a summary.
+      #
+      # Auth fallback: prefer the subscription OAuth token; if it's missing or fails
+      # to start (e.g. usage limit exhausted) the next step retries with the API key.
+
+      - name: Run Claude Code Review (subscription token)
+        id: review_oauth
+        if: ${{ env.HAS_OAUTH == 'true' }}
+        continue-on-error: true
+        uses: anthropics/claude-code-action@v1.0.158
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          track_progress: true
+          prompt: |
+            REPO: ${{ github.repository }}
+            PR NUMBER: ${{ github.event.pull_request.number }}
+
+            Perform a focused code review of this PR. Cover:
+            1. Code quality — clean-code, error handling, edge cases, readability.
+            2. Security — vulnerabilities, input validation, authz/authn logic.
+            3. Performance — bottlenecks, inefficient queries, resource/leak issues.
+            4. Testing — adequate coverage, edge cases, missing scenarios.
+            5. Docs — code comments, README/API doc accuracy for new features.
+
+            Use INLINE comments for specific line-level issues. Use a top-level
+            comment for general observations or praise. Be concise; skip nits on
+            generated or vendored files.
+          claude_args: |
+            --allowedTools "mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Read,Grep,Glob"
+
+      - name: Run Claude Code Review (API key fallback)
+        if: ${{ env.HAS_OAUTH != 'true' || steps.review_oauth.outcome == 'failure' }}
+        uses: anthropics/claude-code-action@v1.0.158
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          track_progress: true
+          prompt: |
+            REPO: ${{ github.repository }}
+            PR NUMBER: ${{ github.event.pull_request.number }}
+
+            Perform a focused code review of this PR. Cover:
+            1. Code quality — clean-code, error handling, edge cases, readability.
+            2. Security — vulnerabilities, input validation, authz/authn logic.
+            3. Performance — bottlenecks, inefficient queries, resource/leak issues.
+            4. Testing — adequate coverage, edge cases, missing scenarios.
+            5. Docs — code comments, README/API doc accuracy for new features.
+
+            Use INLINE comments for specific line-level issues. Use a top-level
+            comment for general observations or praise. Be concise; skip nits on
+            generated or vendored files.
+          claude_args: |
+            --allowedTools "mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Read,Grep,Glob"

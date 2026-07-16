@@ -1,0 +1,41 @@
+name: Epic
+description: A rollup that tracks a set of child issues toward one promise.
+title: "epic: "
+labels: [epic]
+body:
+  - type: textarea
+    id: tracking
+    attributes:
+      label: Tracking
+      description: "Rollup over child issues / theme, one-line framing of the promise."
+      placeholder: "rollup over <child issues / theme>. <one-line framing of the promise>."
+    validations:
+      required: false
+  - type: textarea
+    id: why
+    attributes:
+      label: Why
+      description: "The outcome this epic delivers, and why it's grouped as one promise."
+    validations:
+      required: true
+  - type: textarea
+    id: children
+    attributes:
+      label: Children
+      description: "The issues this tracks (native sub-issues or a checklist)."
+      value: |
+        - [ ] #
+        - [ ] #
+    validations:
+      required: true
+  - type: textarea
+    id: close-when
+    attributes:
+      label: Close when
+      description: >-
+        The condition under which this epic is done — the promise is safe to make.
+        Independently checkable, not "everything's finished".
+      value: |
+        -
+    validations:
+      required: true

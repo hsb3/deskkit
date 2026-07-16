@@ -415,6 +415,6 @@ Henry picks; all three are project-agnostic (no person/org/repo token):
 - `_meta/plans/desk-tooling/m-05-data-surfaces.md` — the three data surfaces + neutrality lint.
 - `_meta/plans/desk-tooling/pocket-librarian-v1-spec.md` — the librarian build spec.
 - `_structure/decisions/0013-executive-desk-plugin-and-managed-resources.md` — items 1–9 (esp. 8, 9).
-- `_structure/decisions/0015-pocket-librarian-runtime.md` — the librarian runtime ruling (Go in-process + eino).
+- `_structure/decisions/0015-pocket-librarian-runtime.md` — the librarian runtime ruling (Go in-process + eino). (Off-repo executive-desk record; not vendored here.)
 - `~/dotfiles/_docs/reference/opencode/OPENCODE_TO_CLAUDE_CODE_GUIDE.md` — OpenCode↔Claude Code porting facts.
 - `~/.config/opencode/plugins/foreman-kit.ts` — the working OpenCode plugin example.
