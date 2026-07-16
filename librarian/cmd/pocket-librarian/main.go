@@ -22,6 +22,7 @@ import (
 	"github.com/example/pocket-librarian/internal/agent"
 	"github.com/example/pocket-librarian/internal/config"
 	"github.com/example/pocket-librarian/internal/desklib"
+	"github.com/example/pocket-librarian/internal/mcp"
 	"github.com/example/pocket-librarian/internal/prompt"
 	"github.com/example/pocket-librarian/internal/tools"
 
@@ -225,6 +226,26 @@ func registerToolCommands(app *pocketbase.PocketBase, cfg *config.Config, cfgErr
 		},
 	}
 	app.RootCmd.AddCommand(agentCmd)
+
+	// mcp-serve — expose the tool core as an MCP stdio server (spec §7.2 outbound dual-surface;
+	// build-brief §5 / punch-list 4). The model-facing tool set is tools.AgentTools(cfg): the
+	// SAME §5.4 registration-time write gate as the eino loop (apply_fix only when
+	// LIBRARIAN_AUTONOMOUS_WRITES=true), and restore is NEVER exposed (§5.5, supervised CLI-only).
+	// Like the other one-shot tool commands it opens the DB directly; because it holds the DB open
+	// for the session, it MUST NOT run concurrently with `serve` (single-writer SQLite, §10.4).
+	// Termination: the stdio server returns when the MCP client closes stdin (EOF), the normal
+	// stdio-transport lifecycle.
+	app.RootCmd.AddCommand(&cobra.Command{
+		Use:   "mcp-serve",
+		Short: "Expose the six-tool core as an MCP stdio server (model-facing; gated per §5.4)",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			c, err := requireConfig(cfg, cfgErr)
+			if err != nil {
+				return err
+			}
+			return mcp.Serve(cmd.Context(), app, c)
+		},
+	})
 
 	// gui — convenience: open the admin GUI then serve (spawns `serve` as a child so it
 	// does not depend on PocketBase serve-command internals; single-writer rule holds).
