@@ -1,0 +1,27 @@
+{
+  "name": "@desk-standard/plugin",
+  "version": "0.1.0",
+  "private": true,
+  "description": "desk-standard plugin: harness-pure core domain library + stdio MCP server over the D7 data-surface loader.",
+  "type": "module",
+  "exports": {
+    "./core": "./core/index.ts",
+    "./mcp": "./mcp/server.ts"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "bun test",
+    "check:purity": "node scripts/check-core-purity.mjs",
+    "mcp": "bun mcp/server.ts"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "ajv": "^8.17.1",
+    "ajv-formats": "^3.0.1",
+    "yaml": "^2.4.5"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "typescript": "^5.5.0"
+  }
+}
