@@ -16,10 +16,12 @@ Both produce a desk that conforms to the conventions standard (consult the
 `conventions-standard` skill for every rule referenced here). This skill owns the *procedure*
 and the *scaffold*, not the rules.
 
-The full **brownfield-remediation** capability — mechanically bringing a large, non-conformant
-desk all the way up to standard — is **out of scope for v1**; it is a queued design pass. This
-skill covers greenfield setup and the read-only, approval-gated brownfield *adoption* states
-below.
+The full **brownfield-remediation** runbook — mechanically bringing a large, non-conformant desk
+all the way up to standard — is owned by the sibling **`brownfield-adoption`** skill: the
+hardened, phase-by-phase procedure (lock, inventory, approved disposition table, staged
+migration, librarian baseline) that operationalizes the K24 states below. This skill covers
+greenfield setup and defines the read-only, approval-gated brownfield *adoption* states; consult
+`brownfield-adoption` to actually execute a real adoption.
 
 ## The scaffold asset
 

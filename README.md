@@ -10,7 +10,8 @@ org, repo, or issue number:
 - **`plugin/`** — the desk-standard plugin. A harness-pure core (profile loading, schema
   validation, `{{profile.…}}` substitution, `_knowledge/` indexing) behind a stdio MCP server
   (`profile_get`, `profile_validate`, `template_render`, `knowledge_index`), wrapped for Claude
-  Code as a plugin with three skills (`desk-setup`, `conventions-standard`, `harvest-loop`).
+  Code as a plugin with four skills (`desk-setup`, `conventions-standard`, `harvest-loop`,
+  `brownfield-adoption`).
 - **`librarian/`** — pocket-librarian, a single Go binary (embedded PocketBase) that indexes a
   desk's files, flags convention violations, and can propose + apply fixes under a
   record-original-first safety boundary — every applied fix is byte-exact reversible via
