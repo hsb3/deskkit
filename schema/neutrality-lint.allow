@@ -1,0 +1,28 @@
+# neutrality-lint allowlist — the sanctioned-escape list for the D8 lint
+# (scripts/check-neutrality.mjs, M-05 surface iii).
+#
+# Grammar (one entry per line; blank lines and #-comments ignored; paths are repo-relative,
+# forward-slashed; * matches within a segment, ** matches across segments):
+#   <glob>            whole-file exempt
+#   <glob> | <token>  exempt ONLY the literal <token> on matching lines of matching files
+#
+# Keep this list TINY. The remedy for a genuinely hardcoded identifier is to move it into
+# _knowledge/profile.yaml and reference it via {{profile.<path>}} — never to allowlist it.
+# Every entry below is a legitimate literal (test fixture, scaffold sample, or doc ordinal),
+# not a de-identification bypass.
+
+# Scaffold boilerplate: the desk-setup skill ships a sample desk tree a consumer overwrites on
+# init. It legitimately contains instance-shaped sample content (foreman ruling, W3a).
+plugin/claude-plugin/skills/desk-setup/assets/template/**
+
+# Librarian extraction tests: these fixtures MUST contain sample "#N" refs and a github URL to
+# exercise the issue-ref / github-URL extractors (pocket-librarian-v1-spec.md §11.2).
+librarian/internal/tools/sweep_test.go
+
+# Librarian verify gate: builds synthetic R-rule fixtures inline (sample "#N" refs, neutral
+# slugs) to prove the rule engine — a test harness, not a distributed definition.
+librarian/verify.sh
+
+# Doc-internal ordinal: "build-brief punch-list #1" references item 1 of a punch list, not a
+# GitHub issue. (Token-scoped so the rest of the file stays under the lint.)
+librarian/internal/desklib/desklib.go | #1

@@ -12,6 +12,7 @@
     "build": "tsc -p tsconfig.json",
     "test": "bun test",
     "check:purity": "node scripts/check-core-purity.mjs",
+    "check:neutrality": "node ../scripts/check-neutrality.mjs",
     "mcp": "bun mcp/server.ts"
   },
   "dependencies": {
