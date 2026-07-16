@@ -9,6 +9,10 @@ pb_data/
 # but guard against a stray copy in the module root.
 /.librarian-ignore
 
+# Makefile serve/stop runtime artifacts.
+.pocket-librarian.pid
+serve.log
+
 # Local env / secrets — never committed (spec §3.4, §10.1).
 .env
 
