@@ -9,7 +9,7 @@ Status: active (2026-07-16)
 
 Two products over one shared schema, all identity-neutral (nothing shipped carries a
 person/org/repo/issue): **`plugin/`** (harness-pure TS core + stdio MCP server, wrapped as a
-Claude Code plugin with three skills) and **`librarian/`** (pocket-librarian: single Go
+Claude Code plugin with four skills) and **`librarian/`** (pocket-librarian: single Go
 binary, embedded PocketBase, eino agent loop, record-original-first write boundary), with
 **`schema/`** as the contract both read. Personalization is only via `_knowledge/profile.yaml`.
 Root `README.md` is the front door; `docs/build-brief.md` is the build brief this repo was
@@ -27,16 +27,34 @@ plugin marketplace: `claude plugin marketplace add hsb3/desk-standard` →
 `claude plugin install desk-standard@desk-standard` (proven end-to-end).
 
 Open backlog, ranked (rationale posted as comments on each issue, 2026-07-16):
-**#8** (brownfield-adoption skill — next) → **#13** (interactive librarian surfaces:
-TUI/local webapp + the unbuilt trigger layer; fold **#14** config-drift fixes in) →
-**#7** (curl-able install.sh; absorbs remaining distribution work: librarian release
-binaries, configure + post-install verify) → **#12** (dual-format common-core fan-out —
-last; consumes `bun run package` as the seed of the production step).
+**#13** (interactive librarian surfaces — next: TUI/local webapp + the unbuilt trigger
+layer; fold **#14** config-drift fixes in; **#15** — patrol never resolves findings that
+stop firing — is small librarian work that fits the same sitting) → **#7** (curl-able
+install.sh; absorbs remaining distribution work: librarian release binaries, configure +
+post-install verify) → **#12** (dual-format common-core fan-out — last; consumes
+`bun run package` as the seed of the production step).
 
-Before designing #8's migration steps: re-run the field-test patrol on the adopted
-dev-tooling desk — 2 of its 9 recorded findings are resolved by the #11 rule fix.
+## 2. Last substantial session delivered (2026-07-16, later sitting)
 
-## 2. Last substantial session delivered (2026-07-16)
+Closed **#8** (brownfield-adoption skill); one commit on `main` (`eec43eb`), CI green:
+
+- Pre-design condition first: re-ran the field-test patrol on the adopted dev-tooling desk
+  with a post-#11 build, into a **fresh store** (`patrol-20260716T225845Z`, 188 files):
+  8 findings — the 2 upstream `_structure/decisions/README.md` findings are gone (resolved
+  by rule, #11 confirmed in the field); 7 known debt + 1 new genuine R5. Evidence on #8.
+- Discovery → filed **#15**: patrol dedupes against open findings but has no transition for
+  one that stops firing (rule change / hand-fix / deletion) — stale rows sit `flagged`
+  forever; re-baseline after a librarian upgrade needs a fresh store (workaround in issue).
+- `eec43eb` **#8** — `plugin/claude-plugin/skills/brownfield-adoption/` (SKILL.md, ~150
+  lines + `assets/adoption-plan.md` disposition-table template): the hardened K24 runbook —
+  9 phases mapped to K24's status track, librarian baseline as the FINAL gate. All 16 field
+  notes (issue #8 first comment) carried; an adversarial reviewer re-derived N1–N16
+  traceability and verified the librarian-phase claims against the spec + `patrol.go`.
+  desk-setup's scope note now points at the sibling skill; README + marketplace description
+  enumerate four skills; plugin **0.2.0 → 0.3.0**. Issue body updated per N6 (extension of
+  K24, not a new skill from scratch).
+
+## 2b. Prior session same day (2026-07-16)
 
 Closed #9, #10, #11 and addressed the librarian-docs gap; four commits on `main`, CI green:
 
@@ -60,11 +78,11 @@ Closed #9, #10, #11 and addressed the librarian-docs gap; four commits on `main`
 
 ## 3. Where to start building
 
-Start with #8 (its issue body carries the candidate flow + acceptance criteria; decision-0014
-lineage in the spec §5 bounds the librarian's role). The skill ships inside
-`plugin/claude-plugin/skills/` → must pass the neutrality lint. #13's design entry points:
-spec §7.4 (three uncommitted surface options) and §1.3 (stewardship, not general chat —
-Henry's ruling refines, doesn't discard, that boundary).
+Start with #13 (design entry points: spec §7.4 — three uncommitted surface options — and
+§1.3, stewardship not general chat; Henry's ruling refines, doesn't discard, that boundary),
+folding in #14's config-drift fixes and #15's patrol finding-resolution transition as
+same-sitting librarian work. Note the skill files under `plugin/claude-plugin/skills/` are
+neutrality-lint-scanned (no bare issue refs, GitHub URLs, or profile scalars in skill prose).
 
 ## 4. Conventions & gotchas
 
