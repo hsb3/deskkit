@@ -9,6 +9,8 @@ require (
 	github.com/cloudwego/eino-ext/components/model/claude v0.1.22
 	github.com/cloudwego/eino-ext/components/model/gemini v0.1.33
 	github.com/cloudwego/eino-ext/components/model/openai v0.1.13
+	github.com/google/jsonschema-go v0.4.2
+	github.com/modelcontextprotocol/go-sdk v1.3.1
 	github.com/pocketbase/dbx v1.12.0
 	github.com/pocketbase/pocketbase v0.39.6
 	github.com/spf13/cobra v1.10.2
@@ -59,7 +61,7 @@ require (
 	github.com/go-ozzo/ozzo-validation/v4 v4.3.0 // indirect
 	github.com/golang-jwt/jwt/v5 v5.3.1 // indirect
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
-	github.com/google/go-cmp v0.6.0 // indirect
+	github.com/google/go-cmp v0.7.0 // indirect
 	github.com/google/s2a-go v0.1.8 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/googleapis/enterprise-certificate-proxy v0.3.4 // indirect
@@ -81,6 +83,8 @@ require (
 	github.com/pelletier/go-toml/v2 v2.0.9 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
+	github.com/segmentio/asm v1.1.3 // indirect
+	github.com/segmentio/encoding v0.5.4 // indirect
 	github.com/sirupsen/logrus v1.9.3 // indirect
 	github.com/slongfield/pyfmt v0.0.0-20220222012616-ea85ff4c361f // indirect
 	github.com/spf13/cast v1.10.0 // indirect
@@ -93,6 +97,7 @@ require (
 	github.com/twitchyliquid64/golang-asm v0.15.1 // indirect
 	github.com/wk8/go-ordered-map/v2 v2.1.8 // indirect
 	github.com/yargevad/filepathx v1.0.0 // indirect
+	github.com/yosida95/uritemplate/v3 v3.0.2 // indirect
 	go.opencensus.io v0.24.0 // indirect
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.54.0 // indirect
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.54.0 // indirect
@@ -125,3 +130,10 @@ require (
 // transitive deps (dbx, cobra, tools/types, etc.) and writes go.sum. The eino deps
 // (spec §3.2) are deliberately NOT required here: the spine's tool registry is plain Go;
 // the eino ReAct loop + MCP surface are later slices that ADD the eino requires.
+//
+// NOTE (outbound MCP-server slice, 2026-07-16): the internal/mcp surface adds the official
+// MCP Go SDK, github.com/modelcontextprotocol/go-sdk. The v0.2.0 pin is a floor, chosen for
+// its generic mcp.AddTool[In,Out] + ToolHandlerFor + StdioTransport API; run `go mod tidy`
+// (or `go get github.com/modelcontextprotocol/go-sdk@latest && go mod tidy`, honoring the
+// 7-day install cooldown) to resolve go.sum and, if the API has drifted in a newer tag,
+// reconcile against the symbols listed in the slice handoff.

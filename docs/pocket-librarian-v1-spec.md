@@ -389,6 +389,8 @@ into `propose-fix` and `apply-fix` (§5.3/§5.4, §11.2). The complete set:
 | `apply-fix` | Commit recorded revisions byte-exact (supervised) | **yes** |
 | `restore` | Reverse a change to the recorded original | yes (restores) |
 | `query` | Read-only queries (`live_files`/`recent`/`orphans`/`uncollapsed`/`findings`/`summary`/`adoption`) | no |
+| `agent` | Run the agent loop once on an instruction (manual trigger, Phase 1) | via the gated agent only |
+| `mcp-serve` | Expose the six-tool core as an MCP stdio server (model-facing; §7.2) | via gated `apply_fix` only |
 | `migrate up` | Apply migrations explicitly | no (schema) |
 | `gui` | Serve + admin GUI | no |
 
@@ -1730,6 +1732,24 @@ to the loop, adapter, or persistence. These are extension **vectors** the contra
 accommodates; they are named here so a later build does not require re-architecture, and are listed
 as deferred/out-of-scope in §7.4 and §11.1.
 
+**Outbound MCP server — the librarian's "hands" (Added 2026-07-16 per the outbound-MCP ruling,
+build-brief §5, punch-list 4).** The paragraph above is the *inbound* vector (eino consuming an
+external MCP server's tools). The librarian ALSO exposes its own tool core *outbound* as an MCP
+**stdio server** (`pocket-librarian mcp-serve`, §3.3), so a Claude Code or OpenCode session — or the
+dual-format plugin's `plugin/mcp` boundary — can call the librarian's tools directly. This is the
+one-binary "MCP server **and** CLI over a single tool core" pattern (the `hsb3/outlook-mcp`
+architecture): the CLI, the eino agent loop, and this MCP server are three surfaces over the **same**
+`tools.*` functions, with **zero logic duplication** (each MCP tool calls the same function the CLI
+and the loop call; each tool's parameter schema is derived by the SDK from the same input struct,
+§5.1). The model-facing tool set is **gated exactly as the eino loop is** (`tools.AgentTools(cfg)`,
+§5.4): the default set is `sweep`, `patrol`, `propose_fix`, `query`; `apply_fix` is registered
+**only** when `LIBRARIAN_AUTONOMOUS_WRITES=true`; and `restore` is **never** exposed over MCP —
+recovery stays a supervised CLI action (§5.5). The exclusion is **structural** (there is no MCP
+registrar for `restore`, and the exposed-set builder filters it defensively), not a runtime check
+inside a tool. `mcp-serve` opens the DB like any one-shot tool and holds it open for the session, so
+it **must not run concurrently with `serve`** (single-writer SQLite rule, §10.4). Same eino/tool
+contract as the inbound vector — additive, not a contradiction.
+
 ### 7.3 Deferred future capabilities (named, explicitly OUT of scope)
 
 - **Decisions / issues drafting** — author `_structure/decisions/NNNN-*.md` or GitHub issue bodies.
@@ -2021,6 +2041,7 @@ _structure/decisions/     # was decisions/ pre-est-D1
 _meta/HANDOFF.md
 .claude/memory/MEMORY.md
 _meta/                    # blanket: the whole working desk is flag-only
+_knowledge/               # M-05 personalization root: flag-only, like _meta/
 ```
 
 The binding docs (`CLAUDE.md`, `_structure/decisions/`, `_meta/HANDOFF.md`) are protected by
