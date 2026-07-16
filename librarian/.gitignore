@@ -1,0 +1,16 @@
+# PocketBase runtime data (SQLite); created at runtime (spec §2.8).
+pb_data/
+
+# Built binary (root-anchored only — a bare "pocket-librarian" would also
+# ignore the cmd/pocket-librarian/ source directory).
+/pocket-librarian
+
+# Local operator-editable ignore boundary is auto-created under DESK_ROOT, not here,
+# but guard against a stray copy in the module root.
+/.librarian-ignore
+
+# Local env / secrets — never committed (spec §3.4, §10.1).
+.env
+
+# OS litter.
+.DS_Store

@@ -1,0 +1,230 @@
+// Command pocket-librarian is the single Go binary that serves PocketBase, runs the agent
+// loop under `serve` (later slice), and exposes the six tools as CLI subcommands. This
+// spine wires: pocketbase.New(), migratecmd (automigrate), the blank-imported migrations,
+// first-run seeding (ignore boundary + system prompt) on serve, and the Cobra subcommands
+// routed through the tools seam. Tool bodies + the eino loop + MCP are later slices.
+package main
+
+import (
+	"encoding/json"
+	"fmt"
+	"log"
+	"os"
+	"os/exec"
+	"runtime"
+	"strings"
+
+	"github.com/pocketbase/pocketbase"
+	"github.com/pocketbase/pocketbase/core"
+	"github.com/pocketbase/pocketbase/plugins/migratecmd"
+	"github.com/spf13/cobra"
+
+	"github.com/example/pocket-librarian/internal/config"
+	"github.com/example/pocket-librarian/internal/desklib"
+	"github.com/example/pocket-librarian/internal/prompt"
+	"github.com/example/pocket-librarian/internal/tools"
+
+	// Blank-import registers all Go migrations (spec §4.11).
+	_ "github.com/example/pocket-librarian/migrations"
+)
+
+func main() {
+	app := pocketbase.New()
+
+	// Automigrate on startup; also `pocket-librarian migrate up`. See §11.3 open item 1:
+	// confirm the automigrate generated-migration behavior in the run environment.
+	migratecmd.MustRegister(app, app.RootCmd, migratecmd.Config{
+		Automigrate: true,
+	})
+
+	// Config is loaded lazily-tolerant: serve/migrate (schema ops) can run even before
+	// DESK_ROOT/DESK_NAME are set, but the tool subcommands require them (requireConfig).
+	cfg, cfgErr := config.Load()
+
+	// On serve start (after bootstrap/migrations): ensure the ignore boundary exists and
+	// seed the system prompt on first run (spec §10.1, §6.1). These run only under serve.
+	app.OnServe().BindFunc(func(e *core.ServeEvent) error {
+		if cfgErr == nil {
+			if err := desklib.EnsureIgnoreFile(cfg.IgnoreConfig, cfg.DeskRoot); err != nil {
+				app.Logger().Error("ensure .librarian-ignore", "err", err)
+			}
+		} else {
+			app.Logger().Warn("config not fully resolved; skipping .librarian-ignore auto-create", "err", cfgErr)
+		}
+		if err := prompt.Seed(e.App); err != nil {
+			app.Logger().Error("seed system prompt", "err", err)
+		}
+		return e.Next()
+	})
+
+	registerToolCommands(app, cfg, cfgErr)
+
+	if err := app.Start(); err != nil {
+		log.Fatal(err)
+	}
+}
+
+func requireConfig(cfg *config.Config, cfgErr error) (*config.Config, error) {
+	if cfgErr != nil {
+		return nil, cfgErr
+	}
+	return cfg, nil
+}
+
+// registerToolCommands wires the six tool subcommands + gui onto the PocketBase RootCmd.
+// serve, migrate, and superuser are provided by PocketBase / migratecmd. Each tool command
+// routes through the same tools.* function the agent will call (spec §2.6, §3.3). Until the
+// tool-body slice lands these return ErrNotImplemented — expected for the spine.
+func registerToolCommands(app *pocketbase.PocketBase, cfg *config.Config, cfgErr error) {
+	// sweep
+	app.RootCmd.AddCommand(&cobra.Command{
+		Use:   "sweep",
+		Short: "Reindex the desk tree into the files collection",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			c, err := requireConfig(cfg, cfgErr)
+			if err != nil {
+				return err
+			}
+			return printJSON(tools.Sweep(cmd.Context(), app, c, &tools.SweepInput{}))
+		},
+	})
+
+	// patrol
+	var patrolPath string
+	patrolCmd := &cobra.Command{
+		Use:   "patrol",
+		Short: "Dry-run: file rule findings (R1–R6) + one log row; NO fs writes",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			c, err := requireConfig(cfg, cfgErr)
+			if err != nil {
+				return err
+			}
+			return printJSON(tools.Patrol(cmd.Context(), app, c, &tools.PatrolInput{Path: patrolPath}))
+		},
+	}
+	patrolCmd.Flags().StringVar(&patrolPath, "path", "", "restrict patrol to this file/subtree")
+	app.RootCmd.AddCommand(patrolCmd)
+
+	// propose-fix
+	var proposeRun string
+	var proposeRules []string
+	proposeCmd := &cobra.Command{
+		Use:   "propose-fix",
+		Short: "Plan mechanical fixes and record originals to revisions; NO fs writes",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			c, err := requireConfig(cfg, cfgErr)
+			if err != nil {
+				return err
+			}
+			return printJSON(tools.ProposeFix(cmd.Context(), app, c, &tools.ProposeFixInput{RunID: proposeRun, Rules: proposeRules}))
+		},
+	}
+	proposeCmd.Flags().StringVar(&proposeRun, "run", "", "scope to a patrol run id")
+	proposeCmd.Flags().StringSliceVar(&proposeRules, "rules", nil, "rule filter (default R1,R2,R3)")
+	app.RootCmd.AddCommand(proposeCmd)
+
+	// apply-fix (supervised commit; never a Makefile/CI default target)
+	var applyRun string
+	var applyRevs []string
+	applyCmd := &cobra.Command{
+		Use:   "apply-fix",
+		Short: "Commit recorded revisions byte-exact (supervised; writes desk files)",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			c, err := requireConfig(cfg, cfgErr)
+			if err != nil {
+				return err
+			}
+			return printJSON(tools.ApplyFix(cmd.Context(), app, c, &tools.ApplyFixInput{RunID: applyRun, RevisionIDs: applyRevs}))
+		},
+	}
+	applyCmd.Flags().StringVar(&applyRun, "run", "", "apply this run's recorded, un-applied revisions")
+	applyCmd.Flags().StringSliceVar(&applyRevs, "revision-ids", nil, "explicit revision ids to apply")
+	app.RootCmd.AddCommand(applyCmd)
+
+	// restore
+	var restoreRev, restorePath string
+	restoreCmd := &cobra.Command{
+		Use:   "restore",
+		Short: "Reverse a change to the exact recorded original",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			c, err := requireConfig(cfg, cfgErr)
+			if err != nil {
+				return err
+			}
+			return printJSON(tools.Restore(cmd.Context(), app, c, &tools.RestoreInput{RevisionID: restoreRev, Path: restorePath}))
+		},
+	}
+	restoreCmd.Flags().StringVar(&restoreRev, "revision", "", "the revisions row id to reverse")
+	restoreCmd.Flags().StringVar(&restorePath, "by-path", "", "resolve to the latest applied, unrestored revision for this path")
+	app.RootCmd.AddCommand(restoreCmd)
+
+	// query <kind>
+	var queryDays int
+	queryCmd := &cobra.Command{
+		Use:   "query <kind>",
+		Short: "Read-only queries: live_files recent orphans uncollapsed findings summary adoption",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			c, err := requireConfig(cfg, cfgErr)
+			if err != nil {
+				return err
+			}
+			raw, qerr := tools.Query(cmd.Context(), app, c, &tools.QueryInput{Kind: args[0], Days: queryDays})
+			if qerr != nil {
+				return qerr
+			}
+			fmt.Println(string(raw))
+			return nil
+		},
+	}
+	queryCmd.Flags().IntVar(&queryDays, "days", 7, "window for 'recent'")
+	app.RootCmd.AddCommand(queryCmd)
+
+	// gui — convenience: open the admin GUI then serve (spawns `serve` as a child so it
+	// does not depend on PocketBase serve-command internals; single-writer rule holds).
+	app.RootCmd.AddCommand(&cobra.Command{
+		Use:   "gui",
+		Short: "Serve the DB and open the admin GUI in a browser",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			c, err := requireConfig(cfg, cfgErr)
+			url := "http://127.0.0.1:8090/_/"
+			if err == nil {
+				url = strings.TrimRight(c.PBURL, "/") + "/_/"
+			}
+			openBrowser(url)
+			bin, xerr := os.Executable()
+			if xerr != nil {
+				return xerr
+			}
+			child := exec.Command(bin, append([]string{"serve"}, args...)...)
+			child.Stdout, child.Stderr, child.Stdin = os.Stdout, os.Stderr, os.Stdin
+			return child.Run()
+		},
+	})
+}
+
+// printJSON marshals a tool's typed result (or returns its error) to stdout.
+func printJSON[T any](res T, err error) error {
+	if err != nil {
+		return err
+	}
+	b, merr := json.MarshalIndent(res, "", "  ")
+	if merr != nil {
+		return merr
+	}
+	fmt.Println(string(b))
+	return nil
+}
+
+func openBrowser(url string) {
+	var c *exec.Cmd
+	switch runtime.GOOS {
+	case "darwin":
+		c = exec.Command("open", url)
+	case "windows":
+		c = exec.Command("rundll32", "url.dll,FileProtocolHandler", url)
+	default:
+		c = exec.Command("xdg-open", url)
+	}
+	_ = c.Start()
+}

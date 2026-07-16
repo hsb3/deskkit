@@ -1,0 +1,9 @@
+.git/
+logs/
+_meta/secrets/
+CLAUDE.md
+_structure/decisions/
+_meta/HANDOFF.md
+.claude/memory/MEMORY.md
+_meta/
+_knowledge/
