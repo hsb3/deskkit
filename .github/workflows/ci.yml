@@ -58,7 +58,7 @@ jobs:
 
       - name: Plugin — tests (incl. AC8 schema validation)
         working-directory: plugin
-        run: bun test
+        run: bun run test
 
       - name: Plugin — TypeScript build
         working-directory: plugin

@@ -241,6 +241,18 @@ function scanLine(text, lineNo, denylist, out) {
     }
   }
 
+  // family 2d: qualified issue refs owner/repo#N — a real identity even though the bare
+  // hostless slug alone is deliberately unmatched (Go import-path collision, header note),
+  // and family 2a skips the #N because a word character precedes it.
+  {
+    const re = /[A-Za-z0-9][\w.-]*\/[\w.-]+#\d+/g;
+    let m;
+    while ((m = re.exec(text)) !== null) {
+      if (inSpan(m.index, spans)) continue;
+      out.push({ line: lineNo, col: m.index + 1, token: m[0], suggestion: SUGGEST.issue });
+    }
+  }
+
   // family 2c: project / projects number
   {
     PROJECT_RE.lastIndex = 0;
@@ -366,6 +378,7 @@ function runSelfTest() {
         "Maintained by adalovelace at https://github.com/acme-corp/secret-project.",
         "Filed as #42 on project 4242.",
         "Slug: acme-corp/secret-project.",
+        "Qualified ref: acme-corp/secret-project#7 must be caught.",
         "OK line: see {{profile.repos.default}} and issue {{profile.board.number}}.",
         "",
       ].join("\n"),
@@ -382,9 +395,10 @@ function runSelfTest() {
       "structural: bare issue #42": tokens.includes("#42"),
       "structural: github URL": tokens.some((t) => t.startsWith("https://github.com/acme-corp/secret-project")),
       "structural: project 4242": tokens.some((t) => /project\s+4242/.test(t)),
+      "structural: qualified ref owner/repo#7": tokens.includes("acme-corp/secret-project#7"),
     };
-    // escape must hold: no violation on the {{profile.…}} line (line 5)
-    const escapeHeld = !v.some((x) => x.line === 5);
+    // escape must hold: no violation on the {{profile.…}} line (now line 6)
+    const escapeHeld = !v.some((x) => x.line === 6);
 
     let ok = escapeHeld;
     console.log("neutrality --self-test:");

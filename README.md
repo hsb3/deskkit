@@ -14,7 +14,8 @@ org, repo, or issue number:
 - **`librarian/`** — pocket-librarian, a single Go binary (embedded PocketBase) that indexes a
   desk's files, flags convention violations, and can propose + apply fixes under a
   record-original-first safety boundary — every applied fix is byte-exact reversible via
-  `restore`. Exposes its six tools as an MCP server and a CLI over one tool core.
+  `restore`. Exposes its tools as an MCP server (`restore` is deliberately CLI-only, and
+  `apply_fix` is gated behind an env flag) and a CLI over one tool core.
 - **`schema/`** — schema v1: the shared, product-neutral contract both `plugin/` and
   `librarian/` read as their rule/structure source.
 

@@ -27,3 +27,9 @@ bun.lockb
 
 
 logs/
+# --- Claude Code (machine-local; per the desk standard: narrow ignores, track deliberate config) ---
+.claude/settings.local.json
+.claude/worktrees/
+.claude/agent-memory/
+.claude/*.lock
+.claude/**/.DS_Store
