@@ -91,10 +91,12 @@ synopsis: "One-sentence scannable abstract."
   under the schema's open-ended escape (`custom`), so the schema stays the contract.
 
 **Frontmatter-exemption classes.** A small allowlist is exempt from the contract: the entry
-file (`CLAUDE.md`), `_meta/HANDOFF.md`, `_meta/README.md`, template files (the standard-free
-scaffold), briefing sidecar files (e.g. `sources.md`), and drafted GitHub issue bodies (the
-desk drafts these for the owner to file; they follow the issue tracker's shape, not the desk
-contract).
+file (`CLAUDE.md`), `_meta/HANDOFF.md`, `_meta/README.md`, a **directory-index `README.md`
+inside an entity dir** (`_structure/decisions/`, tasks, analyses, journal — the index orients
+the folder, it is not an entity record; the pocket-librarian enforces this by basename, so
+patrol's R1/R4 never fire on it), template files (the standard-free scaffold), briefing sidecar
+files (e.g. `sources.md`), and drafted GitHub issue bodies (the desk drafts these for the owner
+to file; they follow the issue tracker's shape, not the desk contract).
 
 ## Status vocabularies (K4)
 

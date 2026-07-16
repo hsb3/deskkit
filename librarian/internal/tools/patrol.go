@@ -193,6 +193,11 @@ func isDuplicateFinding(open map[findingKey]bool, path, rule, checksum string) b
 var entityDirKinds = map[string]bool{"decisions": true, "tasks": true, "analyses": true, "journal": true}
 
 func isEntityDoc(row fileRow) bool {
+	// An index README.md inside an entity dir is a directory index, not an entity record —
+	// exempt it so R1 (and R5) never fire on it.
+	if filepath.Base(row.Path) == "README.md" {
+		return false
+	}
 	return entityDirKinds[row.DirKind] && strings.HasSuffix(row.Path, ".md")
 }
 
@@ -270,6 +275,11 @@ var decisionStatuses = map[string]bool{"proposed": true, "accepted": true, "reje
 // r4Check is the pure core of R4 (flag-only, no fixer).
 func r4Check(dirKind, relPath, status string) (string, string, bool) {
 	if dirKind != "decisions" || !strings.HasSuffix(relPath, ".md") {
+		return "", "", false
+	}
+	// A decisions-dir README.md is a directory index, not a decision record — never flag it
+	// for a missing decision status.
+	if filepath.Base(relPath) == "README.md" {
 		return "", "", false
 	}
 	if decisionStatuses[status] {

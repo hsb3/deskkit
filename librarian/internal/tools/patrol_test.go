@@ -18,7 +18,10 @@ func TestIsEntityDoc(t *testing.T) {
 		{"journal", "journal/z.md", true},
 		{"meta", "_meta/HANDOFF.md", false},
 		{"other", "README.md", false},
-		{"decisions", "_structure/decisions/0001-foo.txt", false}, // not .md
+		{"decisions", "_structure/decisions/0001-foo.txt", false},  // not .md
+		{"decisions", "_structure/decisions/README.md", false},     // index README, not an entity record
+		{"tasks", "tasks/README.md", false},                        // index README in another entity dir
+		{"decisions", "_structure/decisions/9999-ignore-fixture.md", true}, // non-README decisions-dir .md is still an entity doc
 	}
 	for _, c := range cases {
 		if got := isEntityDoc(fileRow{DirKind: c.dirKind, Path: c.path}); got != c.want {
@@ -144,6 +147,18 @@ func TestR4CheckOnlyAppliesToDecisionsMd(t *testing.T) {
 	}
 	if _, _, hit := r4Check("decisions", "_structure/decisions/x.txt", "draft"); hit {
 		t.Fatalf("R4 only applies to .md files")
+	}
+}
+
+func TestR4CheckExemptsIndexReadme(t *testing.T) {
+	// An index README.md in the decisions dir is a directory index, not a decision record —
+	// it must never flag R4, even with an empty status.
+	if _, _, hit := r4Check("decisions", "_structure/decisions/README.md", ""); hit {
+		t.Fatalf("decisions-dir README.md must not flag R4 (it is a directory index)")
+	}
+	// Regression: a non-README decisions-dir .md with no status still flags R4.
+	if _, _, hit := r4Check("decisions", "_structure/decisions/9999-ignore-fixture.md", ""); !hit {
+		t.Fatalf("a non-README decisions-dir .md with an invalid status must still flag R4")
 	}
 }
 
