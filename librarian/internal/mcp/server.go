@@ -34,7 +34,9 @@ package mcp
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"reflect"
 	"sort"
 	"strings"
@@ -104,12 +106,34 @@ func NewServer(app core.App, cfg *config.Config) (*mcp.Server, error) {
 // Serve builds the gated server and runs it over stdio until the client closes stdin (EOF)
 // or ctx is cancelled. mcp-serve opens the DB like any one-shot tool and holds it for the
 // session, so it must not run concurrently with `serve` (single-writer SQLite rule, §10.4).
+//
+// Clean shutdown is not a failure. A well-behaved stdio client closes stdin after its last
+// request; the SDK's stdio session surfaces that as one of a small family of shutdown errors
+// which isShutdownEOF classifies. Returning any of them would make cobra print a spurious
+// "Error: server is closing: EOF" + a usage dump and exit non-zero — so we swallow them and
+// exit 0/silent instead (field-eval finding).
 func Serve(ctx context.Context, app core.App, cfg *config.Config) error {
 	s, err := NewServer(app, cfg)
 	if err != nil {
 		return err
 	}
-	return s.Run(ctx, &mcp.StdioTransport{})
+	if rerr := s.Run(ctx, &mcp.StdioTransport{}); rerr != nil && !isShutdownEOF(rerr) {
+		return rerr
+	}
+	return nil
+}
+
+// isShutdownEOF reports whether err is the normal end of a stdio MCP session rather than a
+// real failure: a plain io.EOF, a cancelled/expired context, or the SDK's jsonrpc2
+// "server is closing: EOF" — which wraps its (internal, unimportable) ErrServerClosing
+// sentinel via %w and appends io.EOF via %v, so errors.Is(err, io.EOF) does NOT match it and
+// the message must be matched directly. Scoped to the "server is closing" sentinel so a
+// genuine mid-session transport failure still surfaces.
+func isShutdownEOF(err error) bool {
+	if errors.Is(err, io.EOF) || errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+		return true
+	}
+	return strings.Contains(err.Error(), "server is closing")
 }
 
 // register wires one tool onto the server. The tool-level Description comes from the frozen

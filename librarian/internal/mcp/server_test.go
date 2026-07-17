@@ -1,12 +1,45 @@
 package mcp
 
 import (
+	"context"
+	"errors"
+	"fmt"
+	"io"
 	"sort"
 	"strings"
 	"testing"
 
 	"github.com/example/pocket-librarian/internal/config"
 )
+
+// TestIsShutdownEOF pins the clean-shutdown classifier: a stdio client closing stdin after its
+// last request must exit 0/silent, not surface as a cobra "Error: ... EOF" + usage dump. The
+// SDK's jsonrpc2 error wraps its ErrServerClosing sentinel via %w and appends io.EOF via %v,
+// so errors.Is(err, io.EOF) does NOT match it — the "server is closing" message is matched
+// directly. A genuine mid-session failure must still be reported (return false).
+func TestIsShutdownEOF(t *testing.T) {
+	cases := []struct {
+		name string
+		err  error
+		want bool
+	}{
+		{"plain io.EOF", io.EOF, true},
+		{"wrapped io.EOF", fmt.Errorf("read: %w", io.EOF), true},
+		{"context canceled", context.Canceled, true},
+		{"context deadline", context.DeadlineExceeded, true},
+		// The exact shape the SDK returns on stdin close: ErrServerClosing (%w) + io.EOF (%v).
+		{"server is closing: EOF", fmt.Errorf("%w: %v", errors.New("server is closing"), io.EOF), true},
+		{"real transport failure", errors.New("write: broken pipe"), false},
+		{"real decode error", errors.New("invalid JSON-RPC frame"), false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := isShutdownEOF(tc.err); got != tc.want {
+				t.Errorf("isShutdownEOF(%v) = %v, want %v", tc.err, got, tc.want)
+			}
+		})
+	}
+}
 
 // TestExposedTools_GateComposition is the load-bearing test: the MCP surface applies the same
 // §5.4 registration-time write gate as the eino loop, and never exposes restore (§5.5).
