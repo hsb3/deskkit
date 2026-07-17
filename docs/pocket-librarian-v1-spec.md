@@ -251,11 +251,13 @@ operator runs `pocket-librarian sweep`. Registration detail in §5 and §7.
 - **Migrations** run automatically on startup (`Automigrate: true`) and can be invoked explicitly
   via `pocket-librarian migrate up`.
 
-Single deployment artifact: the binary plus its `pb_data/` directory (SQLite). No external
-services beyond the chosen LLM provider's HTTPS API.
+Single deployment artifact: the binary plus its SQLite store directory. The store is **not**
+a cwd-relative `pb_data/` by default — it resolves to the canonical, per-desk location
+described in §10.6, overridable with `--dir`. No external services beyond the chosen LLM
+provider's HTTPS API.
 
-**Single-writer operating rule (SQLite).** `pb_data` is a SQLite database with one writer at a
-time. The one-shot CLI subcommands and `serve` must **not** run against the same `pb_data`
+**Single-writer operating rule (SQLite).** The store is a SQLite database with one writer at
+a time. The one-shot CLI subcommands and `serve` must **not** run against the same store
 concurrently: a one-shot tool assumes `serve` is stopped (or opens the DB in a mode that fails fast
 on a busy lock rather than blocking indefinitely). Operationally: the autonomous path is
 `serve` + the claimer; **supervised fixes stop `serve` first**, run `apply-fix`/`restore`, then
@@ -303,9 +305,13 @@ pocket-librarian/
 ├── .librarian-ignore        # auto-created from embedded defaults on first run (§10.1)
 ├── Makefile                 # task interface (§9.5)
 ├── go.mod
-├── go.sum
-└── pb_data/                 # SQLite; created at runtime, gitignored
+└── go.sum
 ```
+
+The SQLite store is **not** part of this tree — by default it lives outside the repo, at the
+canonical `XDG_DATA_HOME`-derived path (§10.6), not a repo-root `pb_data/`. `--dir` can still
+point a store at a repo-local path (e.g. for a throwaway test desk); such a dir would need its
+own gitignore entry.
 
 ---
 
@@ -422,10 +428,15 @@ walking up from the working directory and never overrides an already-set process
 | `ANTHROPIC_API_KEY` | (none) | Required when provider = anthropic. Secret — env only. |
 | `OPENAI_API_KEY` | (none) | Required when provider = openai. |
 | `GEMINI_API_KEY` | (none) | Required when provider = gemini. |
+| `XDG_DATA_HOME` | (unset) | Base dir for the canonical store location when `--dir` is absent; see §10.6. |
 
 Note the `DESK_ROOT` default in the Python PoC (`/Users/henry/Documents/EXECUTIVE_DESK/Projects/dev-tooling-desk`)
 is **not** carried into the Go binary — per identity-neutrality (§11), `DESK_ROOT`/`DESK_NAME` are
 required config with no personal default.
+
+**Store location is not a `DESK_ROOT`-relative env var; see §10.6** for the canonical
+`XDG_DATA_HOME`-derived default, the `--dir` override, and the desk open-guard — decided in
+[`docs/decisions/0002-multi-desk-topology-store-per-desk.md`](decisions/0002-multi-desk-topology-store-per-desk.md).
 
 ---
 
@@ -763,8 +774,9 @@ if err := app.Save(prompts); err != nil { return err }
 The relation fields (`patrol_findings.file`, `revisions.finding`, `messages.run`, `tasks.result`)
 reference the parent collection's id, so the parent migration must run first. Reproducibility is
 guaranteed by: (a) fixed stable ids on the five existing collections and `prompts`, (b) deterministic
-field order, and (c) the sweep tool's idempotent upsert (§5.1) — deleting `pb_data/` and re-running
-`migrate up` + `sweep` reproduces the identical file index (proven by the verify gate, §9).
+field order, and (c) the sweep tool's idempotent upsert (§5.1) — deleting the store directory
+(§10.6) and re-running `migrate up` + `sweep` reproduces the identical file index (proven by
+the verify gate, §9).
 `Automigrate: true` also captures any GUI-made schema edit as a new migration file so schema drift
 is caught in review.
 
@@ -2126,9 +2138,10 @@ the macOS `sandbox-exec` profile** for local supervised runs, with the Docker co
 portable/CI alternative. Both are owner-overridable.
 
 **Default — macOS `sandbox-exec` (local supervised runs).** Filesystem read/write is permitted
-**only** within three subtrees — `DESK_ROOT`, the PocketBase data dir (`pb_data`), and the binary's
-own directory — and outbound network **only** to the configured LLM provider host(s); everything
-else is denied. The provider host is **derived from the provider base URL** in config: `api.anthropic.com`
+**only** within three subtrees — `DESK_ROOT`, the store dir (the canonical, per-desk store
+location outside `DESK_ROOT` — §10.6/ADR 0002, not a `DESK_ROOT`-relative `pb_data`), and the
+binary's own directory — and outbound network **only** to the configured LLM provider host(s);
+everything else is denied. The provider host is **derived from the provider base URL** in config: `api.anthropic.com`
 for the Anthropic default, and it substitutes when the provider swaps (`api.openai.com` for OpenAI,
 `generativelanguage.googleapis.com` for Gemini) — the profile's network allowance is generated from
 the resolved base URL, not hardcoded. Profile shape (`pocket-librarian.sb`, parameterized so paths
@@ -2145,7 +2158,7 @@ stay identity-neutral):
 ;; filesystem: read+write ONLY inside the three trusted subtrees (passed via -D)
 (allow file-read* file-write*
     (subpath (param "DESK_ROOT"))                ; the desk the librarian stewards
-    (subpath (param "PB_DATA"))                  ; the PocketBase SQLite data dir
+    (subpath (param "PB_DATA"))                  ; the store dir (canonical location, §10.6 — not under DESK_ROOT)
     (subpath (param "BIN_DIR")))                 ; the pocket-librarian binary's own dir
 
 ;; network: outbound ONLY to the configured provider host (derived from the base URL) + DNS
@@ -2155,12 +2168,13 @@ stay identity-neutral):
 ```
 
 Invocation (the `-D` values are computed from config — `PROVIDER_HOSTPORT` from the resolved
-provider base URL):
+provider base URL, `PB_DATA` from the same store-resolution logic the binary itself uses,
+§10.6):
 
 ```bash
 sandbox-exec \
   -D DESK_ROOT="$DESK_ROOT" \
-  -D PB_DATA="$DESK_ROOT/pb_data" \
+  -D PB_DATA="${XDG_DATA_HOME:-$HOME/.local/share}/pocket-librarian/$DESK_NAME" \
   -D BIN_DIR="$(dirname "$(command -v ./pocket-librarian)")" \
   -D PROVIDER_HOSTPORT="api.anthropic.com:443" \
   -f pocket-librarian.sb \
@@ -2185,6 +2199,38 @@ docker run --rm \
 
 The provider host in the Docker egress policy is the same base-URL-derived host as the macOS
 profile, so a provider swap updates one allow-list entry in both.
+
+### 10.6 Store location & the desk open-guard (multi-desk topology)
+
+One store per desk (topology, ruling 1 of
+[`docs/decisions/0002-multi-desk-topology-store-per-desk.md`](decisions/0002-multi-desk-topology-store-per-desk.md)).
+This subsection documents where that store lives on disk and the guard that keeps two desks
+from colliding on one.
+
+**Canonical store home.** When `--dir` is absent, the store resolves to
+**`$XDG_DATA_HOME/pocket-librarian/<DESK_NAME>/`**, falling back to
+**`~/.local/share/pocket-librarian/<DESK_NAME>/`** when `XDG_DATA_HOME` is unset or empty
+(the XDG spec treats an empty value as unset). `--dir`
+remains the explicit override and always wins. There is **no silent fallback to a cwd-relative
+`pb_data/`**: a command that needs to resolve a store location and has neither `--dir` nor a
+configured `DESK_NAME` **errors out** rather than defaulting to the working directory.
+**Why:** stores must live outside the desk tree — the librarian must not index its own DB, and
+SQLite inside an iCloud-synced desk folder is a corruption risk — and `DESK_NAME` is the
+store's directory name, so it must be unique across the estate (ADR 0002, ruling 2).
+
+**Desk open-guard.** On opening a store, if existing rows already carry a `desk` value
+different from the configured `DESK_NAME`, the command **refuses to run**, with an error
+naming both the store's recorded desk and the configured `DESK_NAME`. An empty or brand-new
+store opens fine regardless of `DESK_NAME` — the guard only fires once rows exist. This is
+what catches two desks resolving to the same store directory (a name collision or a
+copied-forward env) before their rows interleave (ADR 0002, ruling 3).
+
+**Moving an existing store.** A store that predates this convention (scattered in a scratch or
+job-tmp dir under the old cwd-relative default) can be relocated in place with
+`mv <old-dir> <canonical-dir>` before the first run against the new default — this preserves
+revision history. Otherwise, stores are rebuildable caches: a fresh `sweep` at the canonical
+location reproduces the same file index (§9.4 check 7), minus the discarded store's revision
+history.
 
 ---
 
@@ -2326,7 +2372,8 @@ Each is a default chosen to make the spec build-ready with zero clarifications.
   the way while remaining operator-editable.
 - **Decision: initial/supervised runs execute inside an OS-level sandbox (§10.5).** Default is a
   macOS `sandbox-exec` profile for local supervised runs (FS read/write confined to `DESK_ROOT` +
-  `pb_data` + the binary dir; outbound network only to the provider host derived from the base URL),
+  the store dir, at its canonical location outside `DESK_ROOT` (§10.6/ADR 0002) + the binary dir;
+  outbound network only to the provider host derived from the base URL),
   with a Docker container (bind-mounted `DESK_ROOT`, provider-only egress) as the portable/CI
   alternative; owner-overridable. **Why:** belt-and-suspenders isolation around the
   record-original-first boundary during early autonomous writes — isolation only, changing neither

@@ -19,6 +19,7 @@ import (
 	"github.com/pocketbase/pocketbase"
 	"github.com/pocketbase/pocketbase/core"
 	"github.com/pocketbase/pocketbase/plugins/migratecmd"
+	"github.com/pocketbase/pocketbase/tools/osutils"
 	"github.com/spf13/cobra"
 
 	"github.com/example/pocket-librarian/internal/agent"
@@ -35,22 +36,92 @@ import (
 )
 
 func main() {
-	app := pocketbase.New()
+	// Config is resolved BEFORE the app is constructed: the store location is derived from
+	// DESK_NAME and seeds PocketBase's --dir default (ADR 0002 §2). config.Load has no
+	// PocketBase dependency, so this reorder is safe. serve/migrate (schema ops) may still run
+	// even before DESK_ROOT/DESK_NAME are fully set, but the store LOCATION must be resolvable —
+	// via DESK_NAME (→ the XDG default) or an explicit --dir (enforced just below). The tool
+	// subcommands additionally require full config (requireConfig).
+	cfg, cfgErr := config.Load()
+
+	// --dir is the explicit store override that wins over the XDG default (both `--dir <path>`
+	// and `--dir=<path>` forms). When present, the location is whatever the operator chose and
+	// the unresolved-location guard does not apply.
+	explicitDir := hasDirFlag(os.Args[1:])
+	storeTouching := isStoreTouchingInvocation(os.Args[1:])
+
+	// Absent --dir, the store defaults to $XDG_DATA_HOME/pocket-librarian/<DESK_NAME>/ (falling
+	// back to ~/.local/share/...), replacing PocketBase's cwd/exe-relative pb_data (ADR 0002 §2).
+	var defaultDataDir string
+	var locErr error
+	if !explicitDir {
+		if cfgErr != nil {
+			locErr = fmt.Errorf(
+				"cannot resolve the store location: %w; set DESK_NAME (env or _knowledge/profile.*) or pass --dir <path>",
+				cfgErr)
+		} else if dir, derr := config.StoreDir(cfg.DeskName); derr != nil {
+			locErr = fmt.Errorf("cannot resolve the store location: %w; pass --dir <path>", derr)
+		} else {
+			defaultDataDir = dir
+			// Pre-create the store dir 0700 so it is not group/world-readable — PocketBase's own
+			// bootstrap would otherwise MkdirAll it 0777. Only when actually about to open the
+			// store: a non-store command (e.g. --help) must not materialize a data dir.
+			if storeTouching {
+				if mkErr := os.MkdirAll(dir, 0o700); mkErr != nil {
+					locErr = fmt.Errorf("cannot create the store directory %s: %w; pass --dir <path>", dir, mkErr)
+				}
+			}
+		}
+	}
+
+	// Fail closed on an unresolvable store LOCATION. This narrows the old "serve/migrate run
+	// config-free" tolerance: they still run without full config, but the store LOCATION must
+	// now resolve (ADR 0002 §2) — no silent fallback to a cwd/exe-relative pb_data. Enforced
+	// HERE, before app.Start()/Bootstrap, because PocketBase opens (and MkdirAll-creates) the
+	// data dir during Bootstrap — earlier than any cobra PersistentPreRunE — so a post-Bootstrap
+	// guard would already have written the stray dir. Gated to real store-touching subcommands
+	// so it never breaks --help, `completion`, the bare usage output, or unknown-command errors.
+	if locErr != nil && storeTouching {
+		fmt.Fprintf(os.Stderr, "pocket-librarian: %v\n", locErr)
+		os.Exit(1)
+	}
+
+	// DefaultDataDir seeds the --dir flag default (override-if---dir-passed-else-XDG); empty
+	// falls back to PocketBase's exe-relative pb_data, reached only when --dir is passed (and
+	// overrides it) or for non-store commands. DefaultDev mirrors pocketbase.New()'s go-run
+	// detection so `go run` still defaults to dev mode.
+	app := pocketbase.NewWithConfig(pocketbase.Config{
+		DefaultDev:     osutils.IsProbablyGoRun(),
+		DefaultDataDir: defaultDataDir,
+	})
 
 	// Automigrate on startup; also `pocket-librarian migrate up`. See §11.3 open item 1:
-	// confirm the automigrate generated-migration behavior in the run environment.
+	// confirm the automigrate generated-migration behavior in the run environment. migrate is
+	// schema-only and deliberately skips the desk open-guard (ADR 0002 §3): it writes no desk
+	// rows, so running it against another desk's store is harmless.
 	migratecmd.MustRegister(app, app.RootCmd, migratecmd.Config{
 		Automigrate: true,
 	})
-
-	// Config is loaded lazily-tolerant: serve/migrate (schema ops) can run even before
-	// DESK_ROOT/DESK_NAME are set, but the tool subcommands require them (requireConfig).
-	cfg, cfgErr := config.Load()
 
 	// On serve start (after bootstrap/migrations): ensure the ignore boundary exists and
 	// seed the system prompt on first run (spec §10.1, §6.1). These run only under serve.
 	app.OnServe().BindFunc(func(e *core.ServeEvent) error {
 		if cfgErr == nil {
+			// Desk open-guard (ADR 0002 §3): refuse to serve a store that already belongs to a
+			// different desk. gui re-execs `serve`, so it is covered here too.
+			//
+			// Print + os.Exit rather than `return err`: serve/superuser are PocketBase system
+			// commands registered inside app.Start(), which runs RootCmd.Execute() in a
+			// goroutine and discards its error (upstream: "leave to the commands to decide
+			// whether to print their error") — so a returned RunE error here would print via
+			// PocketBase's own error writer but the process would still exit 0. Every other
+			// guarded surface (requireConfig's cmdErr wrapper; the unresolved-location guard's
+			// direct os.Exit above) fails closed with a non-zero exit; mirror that here since
+			// normal RunE-error propagation is invisible for this command.
+			if err := bootstrap.CheckDeskGuard(e.App, cfg.DeskName); err != nil {
+				fmt.Fprintf(os.Stderr, "pocket-librarian: %v\n", err)
+				os.Exit(1)
+			}
 			if err := desklib.EnsureIgnoreFile(cfg.IgnoreConfig, cfg.DeskRoot); err != nil {
 				app.Logger().Error("ensure .librarian-ignore", "err", err)
 			}
@@ -116,9 +187,89 @@ func main() {
 	}
 }
 
+// storeTouchingCommands are the subcommands that open the desk's store and therefore require a
+// resolvable store location (ADR 0002 §2). serve/superuser are registered by PocketBase inside
+// Start(), migrate by migratecmd, the tool commands by registerToolCommands — so the set is
+// maintained here explicitly rather than derived from RootCmd (not fully populated pre-Start).
+var storeTouchingCommands = map[string]bool{
+	"serve": true, "migrate": true, "superuser": true,
+	"sweep": true, "patrol": true, "propose-fix": true, "apply-fix": true,
+	"restore": true, "query": true, "agent": true, "chat": true,
+	"mcp-serve": true, "gui": true,
+}
+
+// hasDirFlag reports whether an explicit --dir override is present (both `--dir <path>` and
+// `--dir=<path>`) — the signal that the XDG default is bypassed.
+func hasDirFlag(args []string) bool {
+	for _, a := range args {
+		if a == "--dir" || strings.HasPrefix(a, "--dir=") {
+			return true
+		}
+	}
+	return false
+}
+
+// isStoreTouchingInvocation reports whether os.Args names a subcommand that opens the store, so
+// the unresolved-location guard fires there but never on --help, --version, the bare usage
+// output, or an unknown command (which cobra reports itself).
+func isStoreTouchingInvocation(args []string) bool {
+	// Help/version short-circuit inside cobra before any command body runs; never guard them.
+	for _, a := range args {
+		switch a {
+		case "-h", "--help", "-v", "--version":
+			return false
+		}
+	}
+	return storeTouchingCommands[firstSubcommand(args)]
+}
+
+// globalValueFlags are every value-taking flag this manual pre-parse must recognize so its
+// value token is never mistaken for the subcommand name (the specific bug this list closes:
+// `--hooksDir /some/path serve` previously resolved firstSubcommand to "/some/path", which is
+// not in storeTouchingCommands, so isStoreTouchingInvocation silently returned false and
+// PocketBase's Bootstrap — which runs and MkdirAll-creates the (wrong, exe-relative) data dir
+// BEFORE cobra even reaches the "unknown flag" parse error for `serve` — proceeded unguarded).
+//
+// --dir/--encryptionEnv/--queryTimeout are pocketbase.go's actual registered root persistent
+// flags in THIS build (verified against the vendored source; migratecmd registers none).
+// --hooksDir/--hooksWatch/--hooksPool are NOT currently registered (the jsvm plugin that adds
+// them is not imported here) but are added defensively: they are real PocketBase-ecosystem
+// root flags a future dependency bump could wire in, and — as the bug above shows — an
+// UNREGISTERED flag is exactly as dangerous to this pre-parse as a registered one, since this
+// scan runs before app construction and cannot consult cobra's own flag definitions. This
+// remains an enumerated whitelist, not a structural fix: a genuinely novel unrecognized
+// value-flag not on this list could still shadow the subcommand token the same way.
+var globalValueFlags = map[string]bool{
+	"--dir": true, "--encryptionEnv": true, "--queryTimeout": true,
+	"--hooksDir": true, "--hooksWatch": true, "--hooksPool": true,
+}
+
+// firstSubcommand returns the first non-flag token in args (the invoked subcommand name),
+// skipping any leading global flags and the values of the value-taking ones so a form like
+// `--dir /x serve` still resolves to "serve". Returns "" for the bare (no-subcommand) usage.
+func firstSubcommand(args []string) string {
+	for i := 0; i < len(args); i++ {
+		a := args[i]
+		if strings.HasPrefix(a, "-") {
+			if !strings.Contains(a, "=") && globalValueFlags[a] {
+				i++ // its value is the next token, not the subcommand name
+			}
+			continue
+		}
+		return a
+	}
+	return ""
+}
+
 func requireConfig(app core.App, cfg *config.Config, cfgErr error) (*config.Config, error) {
 	if cfgErr != nil {
 		return nil, cfgErr
+	}
+	// Desk open-guard (ADR 0002 §3): refuse if this store already belongs to another desk.
+	// Checked before any seeding/write so a mismatched desk never mutates the wrong store; the
+	// choke point every tool + agent/chat/mcp-serve/gui RunE reaches first.
+	if err := bootstrap.CheckDeskGuard(app, cfg.DeskName); err != nil {
+		return nil, err
 	}
 	// "First run" auto-creation (spec §10.1) applies to every entry point, not just
 	// serve: one-shot CLI tools would otherwise fail closed on the missing default
@@ -326,17 +477,38 @@ func registerToolCommands(app *pocketbase.PocketBase, cfg *config.Config, cfgErr
 		Use:   "gui",
 		Short: "Serve the DB and open the admin GUI in a browser",
 		RunE: func(cmd *cobra.Command, args []string) error {
+			// Abort BEFORE opening a browser or spawning the serve child when config/the desk
+			// guard fails: gui previously only used requireConfig's error to pick a fallback URL
+			// and pressed on regardless, which meant a mismatched-desk store still popped a
+			// browser tab and re-exec'd `serve` (which then hit its own OnServe guard exit, but
+			// only after the browser had already opened against a store gui had no business
+			// touching). requireConfig runs the same desk-guard check as every other subcommand.
 			c, err := requireConfig(app, cfg, cfgErr)
-			url := "http://127.0.0.1:8090/_/"
-			if err == nil {
-				url = strings.TrimRight(c.PBURL, "/") + "/_/"
+			if err != nil {
+				return err
 			}
-			openBrowser(url)
+			openBrowser(strings.TrimRight(c.PBURL, "/") + "/_/")
 			bin, xerr := os.Executable()
 			if xerr != nil {
 				return xerr
 			}
-			child := exec.Command(bin, append([]string{"serve"}, args...)...)
+			// Forward the resolved --dir to the child so it opens the EXACT SAME store gui just
+			// desk-guarded and is about to display in the browser (chosen over the alternative of
+			// having gui refuse an explicit --dir outright: forwarding is strictly more useful and
+			// gui otherwise behaves like every other subcommand w.r.t. --dir). --dir is a process
+			// flag, not an env var, so unlike DESK_ROOT/DESK_NAME/XDG_DATA_HOME (which DO inherit
+			// via exec.Command's default nil Env) it does NOT propagate to the child on its own.
+			// cmd.Flags().GetString("dir") reads cobra's own resolved value — the operator's
+			// explicit --dir when passed, or otherwise the XDG default this process's main()
+			// computed and handed to pocketbase.NewWithConfig as DefaultDataDir — so forwarding
+			// unconditionally (not only when --dir was passed explicitly) keeps parent and child
+			// aimed at the same store in both cases; there is no scenario where they should diverge.
+			dir, derr := cmd.Flags().GetString("dir")
+			if derr != nil {
+				return derr
+			}
+			childArgs := append([]string{"serve", "--dir", dir}, args...)
+			child := exec.Command(bin, childArgs...)
 			child.Stdout, child.Stderr, child.Stdin = os.Stdout, os.Stderr, os.Stdin
 			return child.Run()
 		},

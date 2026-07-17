@@ -31,6 +31,32 @@ make findings        # or: summary / adoption / orphans / uncollapsed
 
 `make help` lists every target.
 
+## Where the store lives
+
+By default (no `--dir`), the store resolves to
+`$XDG_DATA_HOME/pocket-librarian/<DESK_NAME>/`, falling back to
+`~/.local/share/pocket-librarian/<DESK_NAME>/` when `XDG_DATA_HOME` is unset or empty — not a
+cwd-relative `pb_data/`. `--dir` is the explicit override. A command that can't resolve
+`DESK_NAME` and got no `--dir` errors out rather than silently defaulting to the working
+directory. Stores live outside the desk tree on purpose: the librarian must not index its own
+database, and SQLite inside an iCloud-synced desk folder is a corruption risk. `DESK_NAME`
+must be unique across the estate — it names the store's directory (design in
+`../docs/decisions/0002-multi-desk-topology-store-per-desk.md`).
+
+Opening a store also runs a **desk open-guard**: if the store already has rows stamped with a
+`desk` different from the configured `DESK_NAME`, the command refuses to run, naming both
+values. An empty or brand-new store opens fine.
+
+If you have an existing store from before this convention (scattered in a scratch or job-tmp
+dir), move it to the canonical location before first run at the new default:
+
+```bash
+mv <old-store-dir> "${XDG_DATA_HOME:-$HOME/.local/share}/pocket-librarian/$DESK_NAME"
+```
+
+Otherwise, a store is a rebuildable cache — a fresh `sweep` at the canonical location
+reproduces the same file index, minus that store's revision history.
+
 ## Choosing the LLM and setting the API key
 
 Only the `agent` command (and an MCP client driving the tools) needs an LLM. `sweep`,
@@ -63,8 +89,8 @@ manual trigger; step-bounded by `AGENT_MAX_STEP`, default 12).
 ## Interactive session (`chat`)
 
 `chat` opens a multi-turn REPL over the same agent loop, in the same single binary,
-against the local `pb_data`. It requires a prior `migrate up` (or a prior `serve`) — it
-opens the DB directly, like `agent` and `mcp-serve`:
+against the desk's store (see "Where the store lives" above). It requires a prior
+`migrate up` (or a prior `serve`) — it opens the DB directly, like `agent` and `mcp-serve`:
 
 ```bash
 ./pocket-librarian migrate up   # once, to create/upgrade the DB
