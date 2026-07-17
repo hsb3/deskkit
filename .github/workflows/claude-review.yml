@@ -31,7 +31,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v7
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
         with:
           # Full history so the base ref is present locally — claude-code-action
           # restores trusted config from the base branch via `git fetch origin <base>`,
@@ -51,7 +51,7 @@ jobs:
         id: review_oauth
         if: ${{ env.HAS_OAUTH == 'true' }}
         continue-on-error: true
-        uses: anthropics/claude-code-action@v1.0.158
+        uses: anthropics/claude-code-action@521136812280ae7ef256e06045655b9da02793f0 # v1.0.158
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           track_progress: true
@@ -74,7 +74,7 @@ jobs:
 
       - name: Run Claude Code Review (API key fallback)
         if: ${{ env.HAS_OAUTH != 'true' || steps.review_oauth.outcome == 'failure' }}
-        uses: anthropics/claude-code-action@v1.0.158
+        uses: anthropics/claude-code-action@521136812280ae7ef256e06045655b9da02793f0 # v1.0.158
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           track_progress: true

@@ -30,7 +30,7 @@ jobs:
       actions: read # Required for Claude to read CI results on PRs
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v7
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
         with:
           fetch-depth: 1
 
@@ -40,7 +40,7 @@ jobs:
         id: claude_oauth
         if: ${{ env.HAS_OAUTH == 'true' }}
         continue-on-error: true
-        uses: anthropics/claude-code-action@v1.0.158
+        uses: anthropics/claude-code-action@521136812280ae7ef256e06045655b9da02793f0 # v1.0.158
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           additional_permissions: |
@@ -48,7 +48,7 @@ jobs:
 
       - name: Run Claude Code (API key fallback)
         if: ${{ env.HAS_OAUTH != 'true' || steps.claude_oauth.outcome == 'failure' }}
-        uses: anthropics/claude-code-action@v1.0.158
+        uses: anthropics/claude-code-action@521136812280ae7ef256e06045655b9da02793f0 # v1.0.158
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           additional_permissions: |
