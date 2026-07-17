@@ -10,7 +10,7 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "test": "bun test core mcp",
+    "test": "bun test core mcp opencode",
     "check:purity": "node scripts/check-core-purity.mjs",
     "check:neutrality": "node ../scripts/check-neutrality.mjs",
     "mcp": "bun mcp/server.ts",

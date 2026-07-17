@@ -91,7 +91,8 @@ $ ./pocket-librarian sweep
 }
 ```
 
-(One-time first: `./pocket-librarian migrate up` creates/upgrades the store.)
+(No first step needed — `sweep` creates the store on first run. `./pocket-librarian migrate
+up` is available as an explicit, optional alternative.)
 
 ## 2. Flag violations — `patrol`
 
@@ -274,7 +275,7 @@ guide** because they require a live API key:
 ```bash
 export ANTHROPIC_API_KEY=sk-...
 ./pocket-librarian agent "patrol the desk and summarize what you find"
-./pocket-librarian chat    # multi-turn; needs a prior `migrate up`
+./pocket-librarian chat    # multi-turn; self-initializes the store on first run
 ```
 
 Provider selection, key redirection via `secrets_ref.llm_api_key`, history bounds, and the

@@ -91,3 +91,6 @@ jobs:
       - name: Librarian — tests
         working-directory: librarian
         run: go test ./...
+
+      - name: Librarian — verify gate (integration; self-init, write-boundary, restore, open-guard)
+        run: make verify
