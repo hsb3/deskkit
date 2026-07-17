@@ -26,17 +26,16 @@ v1 (Claude Code only) is built, distributable, and CI-green on `main` — a live
 marketplace: `claude plugin marketplace add hsb3/desk-standard` →
 `claude plugin install desk-standard@desk-standard` (proven end-to-end).
 
-**PR #21 merged** (squash `e004f59`, 2026-07-17; four claude-review passes to a clean bill,
-CI-green on main) — closed **#16 + #17**, the two correctness fixes from the 2026-07-16
-dev-tooling-desk field evaluation (§2). Top priority is now **#18**.
+**All four dev-tooling-desk field-eval findings are now shipped**: **#18 merged** (PR #22,
+squash `f0adc61`, 2026-07-17; CI-green on main, review "Ready to merge") closed the
+field-interaction UX batch; **#16 + #17** landed earlier the same day (PR #21, §2b). Top
+priority is now **#20** (a design ruling that needs your input — see §3) and, in parallel, the
+distribution arc **#7 → #12** (pure build work, no ruling needed).
 
-Open backlog, ranked (field-eval findings interleaved with the distribution arc):
-- **#18** — field-interaction UX batch (orphan noise from infra dirs, R4 severity ambiguity,
-  mcp-serve EOF exit, JSON-only output); non-blocking cleanups. Two of the four are product
-  rulings (orphan taxonomy; R4 mechanical-vs-judgment), two are clear fixes (EOF exit, pretty).
+Open backlog, ranked:
 - **#20** — design session: multi-desk topology (7 desks → 7 stores vs 1; canonical store
   location; resolve the latent-but-forbidden `desk` field). A ruling, not code — gates any
-  serious multi-desk story.
+  serious multi-desk story. **Needs Henry.**
 - **#7** — curl-able install.sh (absorbs librarian release binaries, configure, post-install
   verify; builds on the marketplace flow + `bun run package`).
 - **#12** — dual-format common-core fan-out (Claude + OpenCode instances; consumes
@@ -45,33 +44,40 @@ Open backlog, ranked (field-eval findings interleaved with the distribution arc)
 
 ## 2. Last session delivered (2026-07-17)
 
-**#16 + #17** fixed, proven, and **merged** as **PR #21** (squash `e004f59`). Both were
-findings from the 2026-07-16 dev-tooling-desk field evaluation. The review cycle ran four
-claude-review passes (six findings total — 2 code tidy-ups, 2 test-gap fills, 2 doc/comment
-accuracy) all resolved before merge; commits `2db9bf4` (hoist collection lookup + path in
-errors + batch/seed tests), `4250219` (path-based test lookup + migration-comment asymmetry),
-`59ae0d9` (ProposeFix docstring corrected to the per-file-tolerance contract).
+**#18** — field-interaction UX batch — fixed, proven, and **merged** as **PR #22** (squash
+`f0adc61`). Four independent findings, one commit each; CI-green, three claude-review passes to
+"Ready to merge". Two carried product rulings decided with Henry:
 
-- **#16** — record-original-first was silently capped at PocketBase's 5000-char TextField
-  default: any desk file >5 KB could not have its byte-exact original recorded (the §5.4
-  safety boundary failing on exactly the costly files), and one oversized file hard-aborted
-  the whole propose-fix run. Fix: new migration `0011_widen_content_fields.go` widens the
-  three content-bearing text fields (`revisions.original_content`, `messages.content`,
-  `prompts.content`; `Max=50_000_000`) — applies to EXISTING stores on next migrate, via the
-  0010 alter pattern. `propose_fix` now tolerates per-file failures (an `"error"` outcome
-  mirroring `ApplyOutcome`) instead of aborting; boundary unweakened (an errored finding
-  records no revision row → no fs write can follow). Regression test with a >5 KB fixture;
-  forced-store-failure test rewritten to the tolerant contract. Live-proven: `propose-fix` on
-  a 9512-char file returns `recorded` with the full original stored.
-- **#17** — `prompt.Seed` was `OnServe`-only, so CLI/MCP-only desks never materialized the
-  editable system-prompt row (§4.10). Moved the seed into `requireConfig` (the shared
-  one-shot entry path), non-fatal; the `.librarian-ignore` half was already there. Live-proven:
-  one-shot `sweep` seeds the `prompts` row.
+- **Item 1 — new `infra` dir_kind (RULING: add a dir_kind, not just filter).** `query orphans`
+  was drowned in `.claude/**` / `.agents/**` / `.github/**` noise. `sweep` now buckets dotted
+  infra dirs as `infra` (memory precedence for `.claude/memory/**` preserved); `isOrphan`
+  excludes `dir_kind ∈ {meta, memory, infra}`. Migration `0012_dir_kind_add_infra.go` adds
+  `infra` to the enum for existing stores (0001 decl carries it for fresh). Spec §5.1/§5.6 +
+  schema table updated. Live-proven: infra/memory excluded, a genuine loose `.md` still flagged.
+- **Item 2 — R4 reclassified mechanical → judgment (RULING: reclassify).** R4 detects
+  mechanically but its remediation (which status to pick) is a judgment call; it was already
+  flag-only (absent from `FIXABLE_RULES`). `mechanicalRules` → `{R1,R2,R3}`; patrol files R4 as
+  `judgment`. Spec §5.2 updated.
+- **Item 3 — `mcp-serve` clean EOF exit.** Client stdin-close gave exit 1 + `Error: server is
+  closing: EOF` + usage dump. The SDK wraps its internal `ErrServerClosing` (`%w`) + `io.EOF`
+  (`%v`), so `errors.Is(io.EOF)` misses it — `isShutdownEOF` matches the "server is closing"
+  sentinel alone (deliberately: also covers a broken-pipe writeErr disconnect). Reproduced &
+  fixed: exit 1 → exit 0.
+- **Item 4 — `query --pretty` table output.** Presentation-only; raw JSON stays the default and
+  is the fallback for any kind the renderer doesn't format.
 
-The same field evaluation filed **#16/#17/#18/#20**; #18 and #20 remain open (§1 backlog).
+Review cycle noted one accepted trade-off (migration 0012 down-path `return nil` mirrors the
+0010/0011 precedent — swallows non-not-found errors; fine for a local tool).
 
 ## 2b. Earlier eras (full detail in merged PRs / closed issues / git)
 
+- **2026-07-17 (earlier) — #16 + #17** (PR #21, squash `e004f59`; four review passes).
+  **#16**: record-original-first was silently capped at PocketBase's 5000-char TextField
+  default (>5 KB desk files couldn't be recorded; one oversized file aborted the run). Migration
+  `0011_widen_content_fields.go` widens `revisions.original_content`/`messages.content`/
+  `prompts.content` to `Max=50_000_000` (existing stores on next migrate); `propose_fix`
+  tolerates per-file failures (boundary unweakened). **#17**: `prompt.Seed` was `OnServe`-only —
+  moved into `requireConfig` so CLI/MCP-only desks materialize the editable system-prompt row.
 - **2026-07-16 eve** — #13/#14/#15 via parallel worktree crews: `chat` REPL + trigger wake
   layer (ADR `docs/decisions/0001-interactive-surface-tui-first.md`, TUI-first; webapp
   deferred → #19), `secrets_ref.llm_api_key` indirection, superuser auto-create under serve,
@@ -83,11 +89,13 @@ The same field evaluation filed **#16/#17/#18/#20**; #18 and #20 remain open (§
 
 ## 3. Where to start building
 
-Once PR #21 merges (closes #16/#17), the top code items are **#18** (UX cleanup batch —
-safe, non-blocking) and the distribution arc **#7 → #12**. **#20** is a design session
-(ruling first — store-per-desk vs shared, canonical store location, `desk`-field resolution —
-then code). **#19** (webapp) is the deferred interactive follow-on; ADR 0001 records the
-preferred shape (custom Go route, PB-served, no runtime frontend toolchain). Note the skill
+With all field-eval findings shipped, the open work splits two ways. **Pure build (no ruling
+needed):** the distribution arc **#7** (curl-able install.sh) **→ #12** (dual-format
+common-core fan-out) — safe to start immediately. **Needs a ruling first: #20** is a design
+session (store-per-desk vs shared, canonical store location, `desk`-field resolution — decide,
+then code) — bring this to Henry before building. **#19** (webapp) is the deferred interactive
+follow-on; ADR 0001 records the preferred shape (custom Go route, PB-served, no runtime
+frontend toolchain). Note the skill
 files under `plugin/claude-plugin/skills/` are neutrality-lint-scanned (no bare issue refs,
 GitHub URLs, or profile scalars in skill prose).
 
