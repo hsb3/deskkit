@@ -33,14 +33,45 @@ multi-desk design session was held and recorded as **ADR 0002** (commit `27a37a1
 Open backlog, ranked (no ruling gates any of it):
 - **#7** — curl-able install.sh (absorbs librarian release binaries, configure, post-install
   verify; builds on the marketplace flow + `bun run package`).
-- **#23** — implement ADR 0002: XDG canonical store home (`$XDG_DATA_HOME/pocket-librarian/
-  <DESK_NAME>/` when `--dir` absent) + `desk` open-guard (refuse a store whose rows carry a
-  different desk name). Acceptance criteria in the issue.
 - **#12** — dual-format common-core fan-out (Claude + OpenCode instances; consumes
   `bun run package` as the seed).
 - **#19** — PB-served webapp chat surface (deferred interactive follow-on; ADR 0001).
 
-## 2. Last session delivered (2026-07-17, later)
+**#23 shipped** (PR #24, squash `b723d31`, 2026-07-17): ADR 0002 implemented — XDG canonical
+store home + desk open-guard. See §2.
+
+## 2. Last session delivered (2026-07-17, later still)
+
+**#23** — ADR 0002 implementation, built foreman-style (scout → 2 builders + adversarial
+reviewer → CI-review fix round), merged as **PR #24** (squash `b723d31`; CI + claude-review
+green twice; verify.sh 42→46 checks). What shipped:
+
+- **XDG store home**: no `--dir` → `$XDG_DATA_HOME/pocket-librarian/<DESK_NAME>/` (fallback
+  `~/.local/share/…`, empty XDG = unset), pre-created `0700`. `config.Load()` now runs BEFORE
+  app construction (PocketBase parses `--dir` eagerly inside `NewWithConfig`).
+- **Fail-closed location**: unresolvable DESK_NAME + no `--dir` → exit 1 for every
+  store-touching command (incl. serve/migrate), enforced by a pre-`Start()` argv scan in
+  `main()` — cobra hooks are TOO LATE (PocketBase `Bootstrap()` creates the data dir before
+  any RunE/PreRunE fires). The old "serve/migrate run config-free" tolerance is narrowed:
+  store LOCATION must now resolve.
+- **Desk open-guard** (`internal/bootstrap/deskguard.go`): mismatched `desk` rows
+  (files → patrol_log → adoption_log) refuse with both names; empty store passes; `migrate`
+  exempt. Sites: `requireConfig` + the OnServe hook.
+- **gui** forwards the resolved `--dir` to its serve child unconditionally and aborts before
+  opening a browser on any requireConfig error.
+- verify.sh is hermetic (scratch `XDG_DATA_HOME` exported for the whole run) — never touches
+  a real store.
+
+Review cycle caught 5 real defects post-build (all fixed + live-proven): serve's open-guard
+printed the refusal but exited 0 (PocketBase runs the command goroutine and DISCARDS RunE
+errors for serve/superuser — they're registered inside `Start()`, after the cmdErr wrapper;
+fail-closed there needs a direct `os.Exit(1)`); gui didn't forward `--dir` to its child
+(would serve a different store than the browser targeted); `--hooksDir x serve` bypassed the
+location guard via the argv scan's value-flag list (whitelist extended: hooksDir/hooksWatch/
+hooksPool; residual known limitation — it's an enumerated whitelist by construction, noted
+in code); a verify.sh scratch-dir leak on SIGINT; a missing adoption_log fallthrough test.
+
+## 2a-bis. Earlier same day (2026-07-17, later)
 
 **#20** — multi-desk design session held with Henry; four rulings, all recorded in
 `docs/decisions/0002-multi-desk-topology-store-per-desk.md` (commit `27a37a1`, CI-green;
@@ -105,11 +136,8 @@ Review cycle noted one accepted trade-off (migration 0012 down-path `return nil`
 
 ## 3. Where to start building
 
-Everything open is pure build — no ruling gates anything. Two independent arcs, safe to run
-in parallel: the distribution arc **#7** (curl-able install.sh) **→ #12** (dual-format
-common-core fan-out), and **#23** (ADR 0002 implementation: XDG store-home default +
-`desk` open-guard; acceptance criteria in the issue, rationale in the ADR — remember
-spec §10 + `librarian/README.md` operator docs need the new default-location language).
+Everything open is pure build — no ruling gates anything. Next up is the distribution arc
+**#7** (curl-able install.sh) **→ #12** (dual-format common-core fan-out).
 **#19** (webapp) is the deferred interactive
 follow-on; ADR 0001 records the preferred shape (custom Go route, PB-served, no runtime
 frontend toolchain). Note the skill
@@ -141,6 +169,15 @@ GitHub URLs, or profile scalars in skill prose).
   gates `apply_fix` (MCP and enqueued tasks — checked at execution time); `restore` is
   CLI-only. `serve` extras: `PB_SUPERUSER_EMAIL`/`PB_SUPERUSER_PASSWORD` (idempotent
   first-run superuser), `CLAIMER_POLL_INTERVAL` (wake-layer claimer).
+- **PocketBase bootstrap runs before cobra**: `Execute()` calls `Bootstrap()` (which CREATES
+  the data dir) before `RootCmd.Execute()` dispatches any RunE/PreRunE — anything that must
+  prevent store creation has to run in `main()` before `app.Start()` (the argv-scan location
+  guard does). And PocketBase registers `serve`/`superuser` INSIDE `Start()` then discards
+  their RunE errors (goroutine) — fail-closed behavior in serve paths needs a direct
+  `os.Exit(1)` (see the OnServe desk-guard), not a returned error.
+- **Store location** (since PR #24): no `--dir` → `$XDG_DATA_HOME/pocket-librarian/
+  <DESK_NAME>/`; unresolvable DESK_NAME + no `--dir` → exit 1 (serve/migrate included).
+  verify.sh exports a scratch XDG_DATA_HOME — keep it hermetic when adding checks.
 - **PocketBase bare `TextField` silently caps at 5000 chars** (`Max==0` → default 5000, per
   `core.TextField`). Any field holding full file bodies / transcripts / editable prompts MUST
   set an explicit large `Max` or it truncates at 5 KB — the content fields are widened in
