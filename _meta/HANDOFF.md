@@ -31,16 +31,52 @@ marketplace: `claude plugin marketplace add hsb3/desk-standard` →
 multi-desk design session was held and recorded as **ADR 0002** (commit `27a37a1`, §2).
 
 Open backlog, ranked (no ruling gates any of it):
-- **#7** — curl-able install.sh (absorbs librarian release binaries, configure, post-install
-  verify; builds on the marketplace flow + `bun run package`).
+- **#7** — curl-able install.sh. Its substrate now EXISTS: the tag-driven release workflow
+  (PR #26) publishes cross-compiled librarian binaries + the plugin bundle + sha256 checksums
+  on any `v*` tag — install.sh consumes those artifacts. First release: bump VERSION, run
+  `make release-prep`, follow its printed tag instructions.
 - **#12** — dual-format common-core fan-out (Claude + OpenCode instances; consumes
   `bun run package` as the seed).
+- **#25** — query on a never-swept store errors opaquely (`sql: no rows in result set`);
+  small UX fix, found during clean-install verification.
+- **#27** — SHA-pin GitHub Actions across both workflows (supply-chain hardening; close
+  before the release substrate is used seriously).
 - **#19** — PB-served webapp chat surface (deferred interactive follow-on; ADR 0001).
 
-**#23 shipped** (PR #24, squash `b723d31`, 2026-07-17): ADR 0002 implemented — XDG canonical
-store home + desk open-guard. See §2.
+Shipped 2026-07-17: **#23** (PR #24, `b723d31`) — ADR 0002 implementation; **NOTE.md punch
+list** (PR #26, squash `84d3b6e`) — repo plumbing + user docs, see §2.
 
-## 2. Last session delivered (2026-07-17, later still)
+## 2. Last session delivered (2026-07-17, latest)
+
+**Henry's NOTE.md punch list** (user docs / tests visibility / VERSION / precommit / release
+flow / Makefile / docs-vs-_meta) — built foreman-style (3 parallel builders + adversarial
+reviewer + CI-review hardening round), merged as **PR #26** (squash `84d3b6e`). Rulings taken
+with Henry: build-brief + m-05 → `_meta/` (spec + ADRs STAY in docs/); ONE repo version
+(0.4.0, was plugin 0.3.0 / package.json 0.1.0 drift); guides + VHS recordings. Delivered:
+
+- **Root `Makefile`** — canonical interface (`make help`): build/test/check/verify/package/
+  media/setup/clean/release-prep. Use `make check` + `make test` + `make verify` as the gate
+  suite now.
+- **`VERSION` = 0.4.0** drives plugin.json/package.json/marketplace.json (drift-guarded by
+  `scripts/check-version-sync.mjs` in CI + pre-commit) and the librarian binary via ldflags
+  (`make`-built prints 0.4.0; bare `go build` prints `dev` — RootCmd.Version override in
+  main.go, PocketBase's own Version var isn't ours to -X).
+- **lefthook.yml** — fast pre-commit mirror (neutrality+self-test, version-sync; actionlint/
+  purity path-scoped). `make setup` installs.
+- **`.github/workflows/release.yml`** — tag `v*` → tag==VERSION gate + CI-equivalent checks →
+  darwin/linux × amd64/arm64 pure-Go binaries (CGO_ENABLED=0; linux/arm64 cross-compile
+  proven) → plugin bundle → gh release + sha256 checksums. Empty-dist guard; least-privilege
+  permissions. THE SUBSTRATE FOR #7.
+- **Three user guides** (docs/getting-started, plugin-guide, librarian-guide) in
+  value-and-proof style — every transcript really run; reviewer independently reproduced the
+  librarian guide's whole chain including byte-exact restore checksums. Four VHS
+  tapes + GIFs (648K) in docs/media/, regenerable via `make media` (hermetic script).
+- Review rounds caught: a stale `--version` claim in getting-started (contradicted the new
+  stamp — fixed), a VHS tape teaching that CLI apply-fix needs LIBRARIAN_AUTONOMOUS_WRITES
+  (it doesn't — env gates MCP/agent only; tape re-recorded), + 3 hardening nits (fixed).
+  SHA-pinning actions deferred to **#27**.
+
+## 2-prev. Earlier same day (2026-07-17, later still)
 
 **#23** — ADR 0002 implementation, built foreman-style (scout → 2 builders + adversarial
 reviewer → CI-review fix round), merged as **PR #24** (squash `b723d31`; CI + claude-review
@@ -146,10 +182,11 @@ GitHub URLs, or profile scalars in skill prose).
 
 ## 4. Conventions & gotchas
 
-- **Gates** (run all before claiming done): `node scripts/check-neutrality.mjs` ·
-  `cd plugin && bun run check:purity && bun test && bun run build` ·
-  `cd librarian && go build ./... && go vet ./... && go test ./...` · `bash librarian/verify.sh`
-  (42 checks) · `actionlint`. CI (`ci.yml`) is the aggregate required check.
+- **Gates** (run all before claiming done — via the root Makefile since PR #26):
+  `make check` (neutrality + self-test + purity + actionlint) · `make test` (bun + go) ·
+  `make verify` (verify.sh, 46 checks) · `make package` (drift guard) ·
+  `node scripts/check-version-sync.mjs`. CI (`ci.yml`) is the aggregate required check.
+  Bumping any version = edit root `VERSION` + the three manifests (sync-guarded).
 - **Generated, never hand-edit**: `plugin/claude-plugin/mcp/server.js` and
   `plugin/claude-plugin/schema/profile.schema.yaml` — regen with `cd plugin && bun run package`;
   CI drift-guards them. Bundle output is byte-identical across macOS/linux (proven).
