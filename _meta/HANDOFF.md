@@ -30,29 +30,57 @@ marketplace: `claude plugin marketplace add hsb3/desk-standard` →
 (#16/#17/#18) shipped earlier (PRs #21/#22, §2b), and **#20 closed 2026-07-17** — the
 multi-desk design session was held and recorded as **ADR 0002** (commit `27a37a1`, §2).
 
+**TOP PRIORITY — the release is PREPARED and waiting on one human command.** `make
+release-prep` is green at **v0.4.0** (clean main, all gates rerun). To publish, run:
+`git tag v0.4.0 && git push --tags` — the release workflow then asserts tag==VERSION, reruns
+CI-equivalent gates (now including `verify.sh`, see §2), cross-compiles the four binaries, and
+publishes a GitHub release + `checksums.txt`. This is the first *real* release (only a
+`v0.0.1-alpha` pre-release exists). After it publishes, do the deferred live e2e of `install.sh`
+(`curl | bash` against the real assets) — the one thing no PR could prove pre-release.
+
 Open backlog, ranked (no ruling gates the buildable ones):
 - **#12** — dual-format common-core fan-out (Claude + OpenCode instances; consumes
   `bun run package` as the seed). Architectural — likely needs an OpenCode-target ruling
   before fan-out; scope as its own phased effort, not a flat wave.
-- **#31** — tool commands (sweep/patrol/…) leak the same opaque `sql: no rows` on an
-  *uninitialized* (never-`migrate up`'d) store — follow-up surfaced during the #25 fix.
-  Needs a ruling: per-command error translation (in-pattern, cheap) vs. self-initializing
-  stores that auto-run app migrations on first tool command (nicer UX, ADR-worthy behavior
-  change — today only `serve`/`migrate up` create collections).
+- **#34** — CI hardening: enforce shellcheck (incl. `install.sh`), actionlint, and a SHA-pin
+  drift guard in CI (all exist locally/pre-commit but not in the pipeline). Follow-up from the
+  release-prep audit.
+- **#35** — test coverage: unit-test `requireConfig` self-init for non-`query` commands +
+  a behavioral test for the TS MCP server. Follow-up from the release-prep audit.
 - **#19** — PB-served webapp chat surface (deferred interactive follow-on; ADR 0001).
 
-**Distribution substrate is ready but not yet exercised live.** `install.sh` exists (PR #29)
-and its artifact-name contract is verified against `release.yml`, but its live `curl | bash`
-path can only be proven once a real `v*` release is published — **no release has been cut
-yet**. Next concrete step to make install.sh live: bump `VERSION`, run `make release-prep`,
-follow its printed tag instructions. SHA-pinning (#27) already landed, so the release
-workflow is hardened before its first serious use.
-
-Shipped 2026-07-17: **#7 / #25 / #27** (PRs #29 / #30 / #28) — distribution + hardening wave,
-see §2. Earlier same day: **#23** (PR #24, `b723d31`), **NOTE.md punch list** (PR #26,
-`84d3b6e`).
+Shipped 2026-07-17: **#31** (PR #32, ADR 0003) + **docs/CI release-prep sweep** (PR #33), see
+§2. Earlier same day: **#7 / #25 / #27** (PRs #29 / #30 / #28), **#23** (PR #24), **NOTE.md
+punch list** (PR #26).
 
 ## 2. Last session delivered (2026-07-17, latest)
+
+**#31 self-init ruling + docs/CI release-prep sweep, then release PREPARED.** Two threads:
+
+- **#31 — store self-initialization** (PR #32, **ADR 0003**). Ruling taken: tool commands
+  *self-initialize the store* (not merely translate the error). `requireConfig` now runs
+  `app.RunAppMigrations()` idempotently before the desk-guard, so `sweep`/`query`/`patrol`/
+  `chat`/etc. work on a fresh desk with no manual `migrate up`. Live-proven; `verify.sh` gained
+  a self-init check (46→47). `migrate up` stays as the explicit path; ADR 0002 location
+  fail-closed untouched. Rejected the translate-only option (keeps a papercut that serves no one).
+- **Docs + tests sweep** (PR #33), driven by two read-only audits (docs-accuracy, test-coverage):
+  - Docs: demoted `migrate up` from prerequisite → optional across all four user docs (stale
+    after ADR 0003); dated **correction note on ADR 0001** (its "TUI" is a line-oriented REPL —
+    `chat` = `bufio.Scanner` loop, zero TUI deps; "two commands" → one); de-pinned a stale
+    `v0.4.0` install.sh example → `vX.Y.Z`.
+  - Tests/CI: **wired `verify.sh` into `ci.yml` AND the `release.yml` gate** — the entire
+    integration safety suite (self-init, record-original-first, byte-exact restore, open-guard)
+    previously ran ONLY via a local `make verify`; the pipeline never exercised it (confirmed
+    running green in CI on Linux). Activated 8 orphaned opencode tests (glob was `core mcp`,
+    now `core mcp opencode`; `bun test` 37→45). Filed **#34** (CI hardening) + **#35** (coverage)
+    as non-blocking follow-ups.
+- **Release prepared:** `make release-prep` green at v0.4.0; awaiting `git tag v0.4.0 && git push
+  --tags` (a human go/no-go, not auto-run — publishes a public release).
+
+The `chat` interactive surface is a **line REPL, not a full-screen TUI** (ADR 0001 uses "TUI"
+loosely; corrected in place). A real graphical/web surface is deferred → **#19**.
+
+## 2-prev1. Distribution + hardening wave (2026-07-17)
 
 **Distribution + hardening wave — #7, #25, #27** — built foreman-style as a flat fan-out: three
 parallel worktree builders (disjoint file scopes), foreman adversarial verification + one
@@ -223,9 +251,10 @@ or profile scalars in skill prose).
 ## 4. Conventions & gotchas
 
 - **Gates** (run all before claiming done — via the root Makefile since PR #26):
-  `make check` (neutrality + self-test + purity + actionlint) · `make test` (bun + go) ·
-  `make verify` (verify.sh, 46 checks) · `make package` (drift guard) ·
-  `node scripts/check-version-sync.mjs`. CI (`ci.yml`) is the aggregate required check.
+  `make check` (neutrality + self-test + purity + actionlint) · `make test` (bun 45 + go) ·
+  `make verify` (verify.sh, 47 checks — **now also runs in CI + the release gate**, PR #33) ·
+  `make package` (drift guard) · `node scripts/check-version-sync.mjs`. CI (`ci.yml`) is the
+  aggregate required check. Note: shellcheck + actionlint are NOT yet CI-enforced (→ #34).
   Bumping any version = edit root `VERSION` + the three manifests (sync-guarded).
 - **Generated, never hand-edit**: `plugin/claude-plugin/mcp/server.js` and
   `plugin/claude-plugin/schema/profile.schema.yaml` — regen with `cd plugin && bun run package`;
@@ -255,6 +284,9 @@ or profile scalars in skill prose).
 - **Store location** (since PR #24): no `--dir` → `$XDG_DATA_HOME/pocket-librarian/
   <DESK_NAME>/`; unresolvable DESK_NAME + no `--dir` → exit 1 (serve/migrate included).
   verify.sh exports a scratch XDG_DATA_HOME — keep it hermetic when adding checks.
+- **Store self-initializes** (ADR 0003, since PR #32): tool commands run `RunAppMigrations()`
+  at the `requireConfig` choke point, so a fresh store needs no manual `migrate up`. When adding
+  a new store-touching command routed through `requireConfig`, it inherits this automatically.
 - **PocketBase bare `TextField` silently caps at 5000 chars** (`Max==0` → default 5000, per
   `core.TextField`). Any field holding full file bodies / transcripts / editable prompts MUST
   set an explicit large `Max` or it truncates at 5 KB — the content fields are widened in
