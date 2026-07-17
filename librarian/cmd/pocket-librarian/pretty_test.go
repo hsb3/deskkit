@@ -52,6 +52,31 @@ func TestPrettyQuery_Findings(t *testing.T) {
 	}
 }
 
+// TestPrettyQuery_ListAdoption pins the one list kind whose array key ("rows") differs from the
+// "files" the others use — a wrong key would silently render a zero-row table, not fall back.
+func TestPrettyQuery_ListAdoption(t *testing.T) {
+	raw := json.RawMessage(`{"kind":"adoption","count":1,"rows":[
+		{"date":"2026-07-17","event":"init","detail":"first run"}]}`)
+	out, ok := prettyQuery("adoption", raw)
+	if !ok {
+		t.Fatalf("adoption should render")
+	}
+	for _, want := range []string{"adoption: 1", "2026-07-17", "init", "first run"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("adoption output missing %q:\n%s", want, out)
+		}
+	}
+}
+
+func TestPrettyQuery_ListLiveFiles(t *testing.T) {
+	raw := json.RawMessage(`{"kind":"live_files","count":1,"files":[
+		{"path":"tasks/t.md","dir_kind":"tasks","entity_type":"task","status":"","graduated_to":"","git_last_commit":"abc|2026-07-15"}]}`)
+	out, ok := prettyQuery("live_files", raw)
+	if !ok || !strings.Contains(out, "tasks/t.md") || !strings.Contains(out, "git_last_commit") {
+		t.Errorf("live_files output unexpected (ok=%v):\n%s", ok, out)
+	}
+}
+
 func TestPrettyQuery_EmptyListStillRenders(t *testing.T) {
 	raw := json.RawMessage(`{"kind":"orphans","count":0,"files":[]}`)
 	out, ok := prettyQuery("orphans", raw)

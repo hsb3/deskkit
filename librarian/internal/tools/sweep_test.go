@@ -68,6 +68,8 @@ func TestDirKindForInfra(t *testing.T) {
 		".github/workflows/ci.yml":   "infra",
 		".claude/memory/note.md":     "memory", // memory precedence still wins
 		"scratch/notes.md":           "other",  // non-dotted, non-entity -> still other
+		".gitignore":                 "root",   // bare dotted FILE at root -> root (no "/"), not infra
+		".env":                       "root",   // infra bucket catches dotted DIRS, not root dotfiles
 	}
 	for rel, want := range cases {
 		if got := dirKindFor(rel, dirMap, ""); got != want {
