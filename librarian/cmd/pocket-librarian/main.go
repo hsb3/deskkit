@@ -277,6 +277,14 @@ func requireConfig(app core.App, cfg *config.Config, cfgErr error) (*config.Conf
 	if cfgErr != nil {
 		return nil, cfgErr
 	}
+	// Self-initialize the store (ADR 0003): one-shot tool commands do NOT trigger a migration
+	// run on their own (only serve and `migrate up` do), so a command against a never-initialized
+	// store would otherwise find no collections and leak sql.ErrNoRows. Apply pending app
+	// migrations idempotently here — before the desk-guard, so it consults now-existing (empty)
+	// collections and a first run passes by construction. Cheap (a _migrations check) once current.
+	if err := app.RunAppMigrations(); err != nil {
+		return nil, fmt.Errorf("initialize store schema: %w", err)
+	}
 	// Desk open-guard (ADR 0002 §3): refuse if this store already belongs to another desk.
 	// Checked before any seeding/write so a mismatched desk never mutates the wrong store; the
 	// choke point every tool + agent/chat/mcp-serve/gui RunE reaches first.
