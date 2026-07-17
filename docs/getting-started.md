@@ -72,6 +72,16 @@ A `make`-built or release binary reports its release version via `--version`; a 
 prints `dev` was built with a bare `go build` (no version stamp) — pin such a build from its
 source commit instead.
 
+Prefer a prebuilt binary? Once a `v*` release is published, `install.sh` at the repo root
+downloads the release binary for your OS/arch, verifies its sha256 against the published
+checksums, and installs it to `~/.local/bin` (no root):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/hsb3/desk-standard/main/install.sh | bash
+# pin a version / preview without writing anything:
+#   ./install.sh --version v0.4.0 --dry-run
+```
+
 ## 4. First sweep and patrol
 
 The librarian needs two env vars (it refuses to run without them) — the desk to steward and
