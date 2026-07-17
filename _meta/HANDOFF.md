@@ -26,23 +26,39 @@ v1 (Claude Code only) is built, distributable, and CI-green on `main` — a live
 marketplace: `claude plugin marketplace add hsb3/desk-standard` →
 `claude plugin install desk-standard@desk-standard` (proven end-to-end).
 
-**All four dev-tooling-desk field-eval findings are now shipped**: **#18 merged** (PR #22,
-squash `f0adc61`, 2026-07-17; CI-green on main, review "Ready to merge") closed the
-field-interaction UX batch; **#16 + #17** landed earlier the same day (PR #21, §2b). Top
-priority is now **#20** (a design ruling that needs your input — see §3) and, in parallel, the
-distribution arc **#7 → #12** (pure build work, no ruling needed).
+**All rulings are in; everything open is now pure build work.** The field-eval findings
+(#16/#17/#18) shipped earlier (PRs #21/#22, §2b), and **#20 closed 2026-07-17** — the
+multi-desk design session was held and recorded as **ADR 0002** (commit `27a37a1`, §2).
 
-Open backlog, ranked:
-- **#20** — design session: multi-desk topology (7 desks → 7 stores vs 1; canonical store
-  location; resolve the latent-but-forbidden `desk` field). A ruling, not code — gates any
-  serious multi-desk story. **Needs Henry.**
+Open backlog, ranked (no ruling gates any of it):
 - **#7** — curl-able install.sh (absorbs librarian release binaries, configure, post-install
   verify; builds on the marketplace flow + `bun run package`).
+- **#23** — implement ADR 0002: XDG canonical store home (`$XDG_DATA_HOME/pocket-librarian/
+  <DESK_NAME>/` when `--dir` absent) + `desk` open-guard (refuse a store whose rows carry a
+  different desk name). Acceptance criteria in the issue.
 - **#12** — dual-format common-core fan-out (Claude + OpenCode instances; consumes
   `bun run package` as the seed).
 - **#19** — PB-served webapp chat surface (deferred interactive follow-on; ADR 0001).
 
-## 2. Last session delivered (2026-07-17)
+## 2. Last session delivered (2026-07-17, later)
+
+**#20** — multi-desk design session held with Henry; four rulings, all recorded in
+`docs/decisions/0002-multi-desk-topology-store-per-desk.md` (commit `27a37a1`, CI-green;
+issue closed with the ruling comment, implementation split to **#23**):
+
+1. **Store-per-desk** — portfolio view is read-only fan-out, never a shared write store.
+2. **Canonical store home = XDG data home** (`$XDG_DATA_HOME/pocket-librarian/<DESK_NAME>/`,
+   fallback `~/.local/share/…`) when `--dir` is absent; `--dir` stays the override. Stores
+   live outside the iCloud-synced desk tree.
+3. **`desk` field kept + promoted to open-guard** (refuse a store whose rows carry a different
+   desk name). No composite `(desk, path)` key. Fact correction found during the session: the
+   field was never latent — sweep/patrol/apply_fix already populate it with `DESK_NAME`.
+4. **MCP stays one desk per process.**
+
+Operational notes (version skew self-heals via per-store automigrate; patrol needs no
+cross-desk coordination; backup/restore is per-store) are in the ADR, no code needed.
+
+## 2a. Earlier same day (2026-07-17)
 
 **#18** — field-interaction UX batch — fixed, proven, and **merged** as **PR #22** (squash
 `f0adc61`). Four independent findings, one commit each; CI-green, three claude-review passes to
@@ -89,11 +105,12 @@ Review cycle noted one accepted trade-off (migration 0012 down-path `return nil`
 
 ## 3. Where to start building
 
-With all field-eval findings shipped, the open work splits two ways. **Pure build (no ruling
-needed):** the distribution arc **#7** (curl-able install.sh) **→ #12** (dual-format
-common-core fan-out) — safe to start immediately. **Needs a ruling first: #20** is a design
-session (store-per-desk vs shared, canonical store location, `desk`-field resolution — decide,
-then code) — bring this to Henry before building. **#19** (webapp) is the deferred interactive
+Everything open is pure build — no ruling gates anything. Two independent arcs, safe to run
+in parallel: the distribution arc **#7** (curl-able install.sh) **→ #12** (dual-format
+common-core fan-out), and **#23** (ADR 0002 implementation: XDG store-home default +
+`desk` open-guard; acceptance criteria in the issue, rationale in the ADR — remember
+spec §10 + `librarian/README.md` operator docs need the new default-location language).
+**#19** (webapp) is the deferred interactive
 follow-on; ADR 0001 records the preferred shape (custom Go route, PB-served, no runtime
 frontend toolchain). Note the skill
 files under `plugin/claude-plugin/skills/` are neutrality-lint-scanned (no bare issue refs,
