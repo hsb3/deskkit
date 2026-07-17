@@ -48,7 +48,8 @@ type ProposedFix struct {
 	Rule       string `json:"rule"`
 	Action     string `json:"action"`   // edit | move
 	NewPath    string `json:"new_path"` // for moves
-	Outcome    string `json:"outcome"`  // recorded | ignored | missing | stale | noop (destination exists)
+	Outcome    string `json:"outcome"`  // recorded | ignored | missing | stale | noop (destination exists) | error
+	Error      string `json:"error,omitempty"`
 }
 
 type ProposeFixResult struct {

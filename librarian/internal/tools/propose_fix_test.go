@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/pocketbase/pocketbase/core"
@@ -190,7 +191,44 @@ func TestProposeFix_RecordsOriginalBeforeAnyWrite(t *testing.T) {
 	}
 }
 
-func TestProposeFix_ForcedStoreFailureAbortsAndPreventsTheWrite(t *testing.T) {
+// A desk file well over PocketBase's implicit 5,000-char TextField default must still have
+// its full original recorded byte-exact (the record-original-first boundary can't be capped;
+// migration 0011 widens original_content). The phase-1 fixtures were all under the cap, so
+// this regression pins a >5 KB body.
+func TestProposeFix_RecordsLargeOriginalOverDefaultCap(t *testing.T) {
+	app, cfg := newTestEnv(t)
+	// ~8 KB with no frontmatter → R1 fires; well past the 5000-char default.
+	body := strings.Repeat("This is a long analysis paragraph that pads the file well past 5 KB.\n", 120)
+	content := "# Big analysis, no frontmatter\n\n" + body
+	if len(content) <= 5000 {
+		t.Fatalf("fixture must exceed the 5000-char default cap, got %d", len(content))
+	}
+	abs := mustWriteFile(t, cfg.DeskRoot, "analyses/big.md", content)
+	checksum := desklib.Checksum([]byte(content))
+	fileRec := mustCreateFileRecord(t, app, "analyses/big.md", "analyses", "analysis", checksum)
+	mustCreateFinding(t, app, fileRec, "R1", checksum, "run-1")
+
+	res, err := ProposeFix(context.Background(), app, cfg, &ProposeFixInput{RunID: "run-1"})
+	if err != nil {
+		t.Fatalf("ProposeFix: %v", err)
+	}
+	if len(res.Proposed) != 1 || res.Proposed[0].Outcome != "recorded" {
+		t.Fatalf("expected one recorded outcome for the oversized file, got %+v", res.Proposed)
+	}
+	rev := reloadRecord(t, app, "revisions", res.Proposed[0].RevisionID)
+	if got := rev.GetString("original_content"); got != content {
+		t.Fatalf("original_content truncated: recorded %d chars, want %d", len(got), len(content))
+	}
+	if rev.GetString("original_checksum") != checksum {
+		t.Fatalf("original_checksum mismatch on the large file")
+	}
+	// The on-disk file is untouched (propose_fix never writes the fs).
+	if onDisk, rerr := os.ReadFile(abs); rerr != nil || string(onDisk) != content {
+		t.Fatalf("propose_fix must not touch the fs (err=%v)", rerr)
+	}
+}
+
+func TestProposeFix_ForcedStoreFailureIsToleratedAndPreventsTheWrite(t *testing.T) {
 	app, cfg := newTestEnv(t)
 	content := "no frontmatter here\n"
 	abs := mustWriteFile(t, cfg.DeskRoot, "tasks/example.md", content)
@@ -200,8 +238,18 @@ func TestProposeFix_ForcedStoreFailureAbortsAndPreventsTheWrite(t *testing.T) {
 
 	broken := &failingSaveApp{TestApp: app, failFor: "revisions"}
 
-	if _, err := ProposeFix(context.Background(), broken, cfg, &ProposeFixInput{RunID: "run-1"}); err == nil {
-		t.Fatalf("expected an error when the revisions store is unreachable")
+	// A failed original-record is now tolerated per-file: the run returns no top-level error,
+	// the finding gets an "error" outcome (with no revision id), and the safety boundary
+	// still holds — no revision row and no filesystem write.
+	res, err := ProposeFix(context.Background(), broken, cfg, &ProposeFixInput{RunID: "run-1"})
+	if err != nil {
+		t.Fatalf("ProposeFix must tolerate a per-file store failure, got top-level error: %v", err)
+	}
+	if len(res.Proposed) != 1 {
+		t.Fatalf("expected 1 proposed outcome, got %d: %+v", len(res.Proposed), res.Proposed)
+	}
+	if got := res.Proposed[0]; got.Outcome != "error" || got.RevisionID != "" || got.Error == "" {
+		t.Fatalf("expected an error outcome with no revision id and a populated Error, got %+v", got)
 	}
 
 	// No revision row was created for the finding...

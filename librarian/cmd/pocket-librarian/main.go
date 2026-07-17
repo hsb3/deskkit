@@ -116,7 +116,7 @@ func main() {
 	}
 }
 
-func requireConfig(cfg *config.Config, cfgErr error) (*config.Config, error) {
+func requireConfig(app core.App, cfg *config.Config, cfgErr error) (*config.Config, error) {
 	if cfgErr != nil {
 		return nil, cfgErr
 	}
@@ -125,6 +125,14 @@ func requireConfig(cfg *config.Config, cfgErr error) (*config.Config, error) {
 	// ignore file. A present-but-unreadable file still fails closed in desklib.
 	if err := desklib.EnsureIgnoreFile(cfg.IgnoreConfig, cfg.DeskRoot); err != nil {
 		return nil, err
+	}
+	// Seed the editable system prompt on first run here too, not only under serve (spec
+	// §4.10): a desk driven purely via one-shot CLI + MCP would otherwise never materialize
+	// the prompts row, leaving "edit the system prompt in the DB" a silent no-op. Unlike the
+	// ignore boundary this is not a safety gate — the agent falls back to the embedded
+	// default — so a seed failure logs but never blocks the command (mirrors the serve hook).
+	if err := prompt.Seed(app); err != nil {
+		app.Logger().Error("seed system prompt", "err", err)
 	}
 	return cfg, nil
 }
@@ -139,7 +147,7 @@ func registerToolCommands(app *pocketbase.PocketBase, cfg *config.Config, cfgErr
 		Use:   "sweep",
 		Short: "Reindex the desk tree into the files collection",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := requireConfig(cfg, cfgErr)
+			c, err := requireConfig(app, cfg, cfgErr)
 			if err != nil {
 				return err
 			}
@@ -153,7 +161,7 @@ func registerToolCommands(app *pocketbase.PocketBase, cfg *config.Config, cfgErr
 		Use:   "patrol",
 		Short: "Dry-run: file rule findings (R1–R6) + one log row; NO fs writes",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := requireConfig(cfg, cfgErr)
+			c, err := requireConfig(app, cfg, cfgErr)
 			if err != nil {
 				return err
 			}
@@ -170,7 +178,7 @@ func registerToolCommands(app *pocketbase.PocketBase, cfg *config.Config, cfgErr
 		Use:   "propose-fix",
 		Short: "Plan mechanical fixes and record originals to revisions; NO fs writes",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := requireConfig(cfg, cfgErr)
+			c, err := requireConfig(app, cfg, cfgErr)
 			if err != nil {
 				return err
 			}
@@ -188,7 +196,7 @@ func registerToolCommands(app *pocketbase.PocketBase, cfg *config.Config, cfgErr
 		Use:   "apply-fix",
 		Short: "Commit recorded revisions byte-exact (supervised; writes desk files)",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := requireConfig(cfg, cfgErr)
+			c, err := requireConfig(app, cfg, cfgErr)
 			if err != nil {
 				return err
 			}
@@ -205,7 +213,7 @@ func registerToolCommands(app *pocketbase.PocketBase, cfg *config.Config, cfgErr
 		Use:   "restore",
 		Short: "Reverse a change to the exact recorded original",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := requireConfig(cfg, cfgErr)
+			c, err := requireConfig(app, cfg, cfgErr)
 			if err != nil {
 				return err
 			}
@@ -223,7 +231,7 @@ func registerToolCommands(app *pocketbase.PocketBase, cfg *config.Config, cfgErr
 		Short: "Read-only queries: live_files recent orphans uncollapsed findings summary adoption",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := requireConfig(cfg, cfgErr)
+			c, err := requireConfig(app, cfg, cfgErr)
 			if err != nil {
 				return err
 			}
@@ -248,7 +256,7 @@ func registerToolCommands(app *pocketbase.PocketBase, cfg *config.Config, cfgErr
 		Short: "Run the agent loop once on an instruction (manual trigger)",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := requireConfig(cfg, cfgErr)
+			c, err := requireConfig(app, cfg, cfgErr)
 			if err != nil {
 				return err
 			}
@@ -273,7 +281,7 @@ func registerToolCommands(app *pocketbase.PocketBase, cfg *config.Config, cfgErr
 		Use:   "chat",
 		Short: "Interactive multi-turn librarian session (REPL over the agent loop)",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := requireConfig(cfg, cfgErr)
+			c, err := requireConfig(app, cfg, cfgErr)
 			if err != nil {
 				return err
 			}
@@ -293,7 +301,7 @@ func registerToolCommands(app *pocketbase.PocketBase, cfg *config.Config, cfgErr
 		Use:   "mcp-serve",
 		Short: "Expose the six-tool core as an MCP stdio server (model-facing; gated per §5.4)",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := requireConfig(cfg, cfgErr)
+			c, err := requireConfig(app, cfg, cfgErr)
 			if err != nil {
 				return err
 			}
@@ -307,7 +315,7 @@ func registerToolCommands(app *pocketbase.PocketBase, cfg *config.Config, cfgErr
 		Use:   "gui",
 		Short: "Serve the DB and open the admin GUI in a browser",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := requireConfig(cfg, cfgErr)
+			c, err := requireConfig(app, cfg, cfgErr)
 			url := "http://127.0.0.1:8090/_/"
 			if err == nil {
 				url = strings.TrimRight(c.PBURL, "/") + "/_/"
