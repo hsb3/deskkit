@@ -111,6 +111,18 @@ func Patrol(ctx context.Context, app core.App, cfg *config.Config, in *PatrolInp
 				}
 			}
 		}
+		// R4 is JUDGMENT (spec §5.2): its detection is mechanical (an invalid/empty decision
+		// status), but choosing WHICH of {proposed, accepted, rejected, superseded} an empty
+		// status should become is a semantic call the librarian cannot make. So propose_fix
+		// never auto-fixes R4 (it is absent from FIXABLE_RULES) and patrol files it as judgment,
+		// not mechanical — a supervisor picks the value.
+		for _, row := range filtered {
+			if detail, fix, hit := checkR4(row); hit {
+				if err := fileFinding(row, "R4", "judgment", detail, fix); err != nil {
+					return err
+				}
+			}
+		}
 		for _, row := range filtered {
 			if detail, fix, hit := checkR5(root, row); hit {
 				if err := fileFinding(row, "R5", "judgment", detail, fix); err != nil {
@@ -174,8 +186,10 @@ func Patrol(ctx context.Context, app core.App, cfg *config.Config, in *PatrolInp
 }
 
 // mechanicalRules is the fixed MECHANICAL check order (spec §5.2 point 3): sorted
-// MECHANICAL (R1,R2,R3,R4), then JUDGMENT (R5) is run separately below, then R6 last.
-var mechanicalRules = []string{"R1", "R2", "R3", "R4"}
+// MECHANICAL (R1,R2,R3), then the JUDGMENT rules (R4, R5) run separately below, then R6 last.
+// R4 detects mechanically but remediates by judgment, so it is filed as judgment (see the R4
+// block in Patrol) and is not in this list.
+var mechanicalRules = []string{"R1", "R2", "R3"}
 
 func runMechanicalCheck(root, rule string, row fileRow, dirMap map[string]string) (string, string, bool) {
 	switch rule {
@@ -185,8 +199,6 @@ func runMechanicalCheck(root, rule string, row fileRow, dirMap map[string]string
 		return checkR2(row)
 	case "R3":
 		return checkR3(row, dirMap)
-	case "R4":
-		return checkR4(row)
 	default:
 		return "", "", false
 	}
@@ -314,7 +326,8 @@ func checkR3(row fileRow, dirMap map[string]string) (string, string, bool) {
 
 var decisionStatuses = map[string]bool{"proposed": true, "accepted": true, "rejected": true, "superseded": true}
 
-// r4Check is the pure core of R4 (flag-only, no fixer).
+// r4Check is the pure core of R4 (judgment, flag-only, no fixer — the fix requires choosing a
+// status value, which is a supervisor's semantic call; filed as judgment in Patrol).
 func r4Check(dirKind, relPath, status string) (string, string, bool) {
 	if dirKind != "decisions" || !strings.HasSuffix(relPath, ".md") {
 		return "", "", false

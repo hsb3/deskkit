@@ -271,7 +271,9 @@ func TestR6CheckNoGitHistoryDegradesToNoFinding(t *testing.T) {
 }
 
 func TestMechanicalRulesFixedOrder(t *testing.T) {
-	want := []string{"R1", "R2", "R3", "R4"}
+	// R4 is deliberately absent: it detects mechanically but remediates by judgment, so it is
+	// filed as a judgment finding (see the R4 block in Patrol), not through this list.
+	want := []string{"R1", "R2", "R3"}
 	if !reflect.DeepEqual(mechanicalRules, want) {
 		t.Fatalf("got %#v, want %#v", mechanicalRules, want)
 	}
@@ -290,6 +292,39 @@ func TestPatrolSummaryNoneWhenEmpty(t *testing.T) {
 	result := &PatrolResult{FilesSwept: 5, FindingsNew: 0, ByRule: map[string]int{}}
 	if got := patrolSummary(result); got != "files=5 findings_new=0 (none)" {
 		t.Fatalf("got %q", got)
+	}
+}
+
+// TestPatrol_FilesR4AsJudgment: an invalid decision status is detected mechanically but its
+// remediation (which status to choose) is a judgment call, so patrol files R4 with severity
+// "judgment", not "mechanical".
+func TestPatrol_FilesR4AsJudgment(t *testing.T) {
+	app, cfg := newTestEnv(t)
+
+	// A decision doc with complete universal frontmatter (so R1 stays quiet) under its correct
+	// dir (so R3 stays quiet) but an invalid — here empty — decision status: only R4 fires.
+	content := "---\ntype: decision\ncreated: 2026-01-01\nupdated: 2026-01-01\ntags: []\nsynopsis: \"x\"\n---\nbody\n"
+	rel := "_structure/decisions/no-status.md"
+	mustWriteFile(t, cfg.DeskRoot, rel, content)
+	rec := mustCreateFileRecord(t, app, rel, "decisions", "decision", desklib.Checksum([]byte(content)))
+	rec.Set("status", "") // invalid decision status -> R4
+	if err := app.Save(rec); err != nil {
+		t.Fatalf("save file record: %v", err)
+	}
+
+	if _, err := Patrol(context.Background(), app, cfg, &PatrolInput{}); err != nil {
+		t.Fatalf("Patrol: %v", err)
+	}
+
+	findings, err := app.FindRecordsByFilter("patrol_findings", "rule = 'R4'", "", 0, 0)
+	if err != nil {
+		t.Fatalf("load R4 findings: %v", err)
+	}
+	if len(findings) != 1 {
+		t.Fatalf("expected exactly one R4 finding, got %d", len(findings))
+	}
+	if sev := findings[0].GetString("severity"); sev != "judgment" {
+		t.Fatalf("R4 severity = %q, want judgment (detection is mechanical, remediation is judgment)", sev)
 	}
 }
 
