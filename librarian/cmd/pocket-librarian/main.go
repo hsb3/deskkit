@@ -226,6 +226,7 @@ func registerToolCommands(app *pocketbase.PocketBase, cfg *config.Config, cfgErr
 
 	// query <kind>
 	var queryDays int
+	var queryPretty bool
 	queryCmd := &cobra.Command{
 		Use:   "query <kind>",
 		Short: "Read-only queries: live_files recent orphans uncollapsed findings summary adoption",
@@ -239,11 +240,21 @@ func registerToolCommands(app *pocketbase.PocketBase, cfg *config.Config, cfgErr
 			if qerr != nil {
 				return qerr
 			}
+			// --pretty renders an aligned table for the human-supervised workflow; raw JSON
+			// (the agent/scripting contract) stays the default and is the fallback for any kind
+			// the renderer does not format.
+			if queryPretty {
+				if out, ok := prettyQuery(args[0], raw); ok {
+					fmt.Println(out)
+					return nil
+				}
+			}
 			fmt.Println(string(raw))
 			return nil
 		},
 	}
 	queryCmd.Flags().IntVar(&queryDays, "days", 7, "window for 'recent'")
+	queryCmd.Flags().BoolVar(&queryPretty, "pretty", false, "render an aligned table instead of raw JSON (human-supervised workflow)")
 	app.RootCmd.AddCommand(queryCmd)
 
 	// agent <instruction> — Phase-1 MANUAL trigger for the eino ReAct loop (spec §6;

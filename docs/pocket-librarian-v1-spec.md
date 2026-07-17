@@ -459,7 +459,7 @@ including field order and stable collection ids; the four new collections (`mess
 | 1 | `path` | text | Required. Relative to `DESK_ROOT`. Unique index `idx_files_path`. |
 | 2 | `desk` | text | Stamped with `DESK_NAME`. |
 | 3 | `entity_type` | text | Frontmatter `type`, or `""`. |
-| 4 | `dir_kind` | select (maxSelect 1) | Values: `decisions`, `tasks`, `analyses`, `journal`, `meta`, `memory`, `root`, `other`. |
+| 4 | `dir_kind` | select (maxSelect 1) | Values: `decisions`, `tasks`, `analyses`, `journal`, `meta`, `memory`, `root`, `other`, `infra` (`infra` added in migration 0012 — dotted infra dirs; §5.1/§5.6). |
 | 5 | `status` | text | Frontmatter `status`, or `""`. |
 | 6 | `synopsis` | text | Frontmatter `synopsis`. |
 | 7 | `origin` | text | Git first-add `"<hash>|<yyyy-mm-dd>"`. |
@@ -661,7 +661,8 @@ func init() {
         files.Fields.Add(&core.TextField{Name: "desk"})
         files.Fields.Add(&core.TextField{Name: "entity_type"})
         files.Fields.Add(&core.SelectField{Name: "dir_kind", MaxSelect: 1,
-            Values: []string{"decisions", "tasks", "analyses", "journal", "meta", "memory", "root", "other"}})
+            // "infra" added in migration 0012 (fresh stores carry it here; 0012 alters existing).
+            Values: []string{"decisions", "tasks", "analyses", "journal", "meta", "memory", "root", "other", "infra"}})
         files.Fields.Add(&core.TextField{Name: "status"})
         files.Fields.Add(&core.TextField{Name: "synopsis"})
         files.Fields.Add(&core.TextField{Name: "origin"})
@@ -868,7 +869,11 @@ entity-dir PATHS as **prefixes**, not bare first path segments. The entity-dir m
    **and** `"/memory/"` is in `rel`) → `"memory"`. Reproduce the PoC's operator precedence
    exactly — the source expression is `top == "memory" or top == ".claude" and "/memory/" in
    rel`, i.e. `memory OR (.claude AND /memory/)`.
-5. Else `"other"`.
+5. Else if the first path segment starts with `"."` (a dotted infra dir — `.claude`, `.agents`,
+   `.github`, …) → `"infra"`. Non-entity infrastructure is not misfiled desk content; this
+   bucket lets the `orphans` view exclude it (§5.6, added 2026-07-17 per issue #18). The memory
+   rule (step 4) still claims `.claude/memory/**` first.
+6. Else `"other"`.
 
 This prefix form is what makes the nested default `_structure/decisions` work: a
 **bare-top-segment** match (matching only `top == "decisions"`, the PoC's original flat-layout
@@ -940,7 +945,7 @@ type PatrolResult struct {
 1. `run_id = "patrol-" + UTCNow().Format("20060102T150405Z")`.
 2. Load non-deleted `files`. Build `open_keys` = set of `(path, rule, checksum)` from currently
    `flagged` findings.
-3. Run checks in order: sorted MECHANICAL (`R1, R2, R3, R4`) then sorted JUDGMENT (`R5`), then
+3. Run checks in order: sorted MECHANICAL (`R1, R2, R3`) then sorted JUDGMENT (`R4, R5`), then
    `R6` separately.
 4. `file_finding(rec, rule, severity, detail, proposed_fix)`: `key = (rec.path, rule,
    rec.checksum)`; if `key ∈ open_keys` skip (dedupe); else create a `patrol_findings` row
@@ -967,12 +972,13 @@ single-file patrol inspects just that file and only evaluates R6 if that file *i
 | R1 | mechanical | `is_entity_doc` (dir_kind ∈ {decisions,tasks,analyses,journal} and path ends `.md`, **excluding a basename `README.md`** — a directory index inside an entity dir is not an entity record) AND a key in `UNIVERSAL_FM_KEYS = [type, created, updated, tags, synopsis]` is missing from parsed frontmatter. |
 | R2 | mechanical | `dir_kind == journal` AND basename fails `JOURNAL_NAME_RE = ^\d{4}-\d{2}-\d{2}-.+\.md$`. |
 | R3 | mechanical | `expected_dir = TYPE_DIR_MAP[entity_type]` — the configured entity-dir PATH for that type; if `expected_dir` is set AND `rel` is NOT under it (same prefix test as `dir_kind_for`, §5.1: `rel == expected_dir` or `rel` starts with `expected_dir + "/"`) → finding (keyed off frontmatter `type`). `TYPE_DIR_MAP = {decision:DECISIONS_DIR, task:TASKS_DIR, analysis:ANALYSES_DIR, journal:JOURNAL_DIR}` (paths, not `dir_kind` labels — a correctly-placed `_structure/decisions/…` decision doc is under `DECISIONS_DIR` and never flags). |
-| R4 | mechanical (FLAG-ONLY) | `dir_kind == decisions` and `.md` (**excluding a basename `README.md`** — the decisions-dir index is not a decision record); `status ∉ DECISION_STATUSES = {proposed, accepted, rejected, superseded}`. No fixer. |
+| R4 | judgment (FLAG-ONLY) | `dir_kind == decisions` and `.md` (**excluding a basename `README.md`** — the decisions-dir index is not a decision record); `status ∉ DECISION_STATUSES = {proposed, accepted, rejected, superseded}`. Detection is mechanical but the fix — choosing WHICH valid status an invalid/empty one becomes — is a semantic call, so R4 is **judgment**, not mechanical, and has no fixer (reclassified 2026-07-17 from the dev-tooling-desk field evaluation, issue #18). |
 | R5 | judgment | entity docs **excluding** decisions (append-only); `lines > 40` AND `ISSUE_REF_RE` matches. Flag only. `ISSUE_REF_RE = (?:\bwb#\d+|(?<![\w&])#\d+)`. |
 | R6 | judgment (handled separately) | Operates on the handoff record only (`HANDOFF_PATH`, default `_meta/HANDOFF.md` — configurable for identity-neutrality). `doc_date` = `fm.updated` (string) else regex `Last updated:\s*(\d{4}-\d{2}-\d{2})`; `newest` = `git -C root log -1 --format=%cs`; if `newest` empty → no finding; if `doc_date` empty OR `doc_date < newest` → finding. |
 
-`FIXABLE_RULES = {R1, R2, R3}` (R4 is mechanical but flag-only). Severity split: MECHANICAL =
-{R1,R2,R3,R4}, JUDGMENT = {R5}, R6 separate.
+`FIXABLE_RULES = {R1, R2, R3}` (R4 detects mechanically but is flag-only judgment — its fix is a
+supervisor's status choice). Severity split: MECHANICAL = {R1,R2,R3}, JUDGMENT = {R4,R5}, R6
+separate.
 
 **Finding text (canonical `detail` / `proposed_fix` strings — PoC verbatim; `<…>` are
 substitutions).**
@@ -1172,7 +1178,7 @@ func writeExact(abs string, content []byte) error {
 5. **Byte-identical writes.** `write_exact` writes exact bytes with no newline translation, so
    `restore` (§5.5) is `cmp`-clean.
 6. **Mechanical only.** The fix selection is filtered to `severity == mechanical && rule ∈
-   {R1,R2,R3}`; judgment findings (R5, R6) and R4 stay flagged for a human.
+   {R1,R2,R3}`; judgment findings (R4, R5, R6) stay flagged for a human.
 
 **DB reads/writes.** Reads `revisions`, `patrol_findings`, `files`, ignore config; writes the
 filesystem; patches `revisions` and `patrol_findings`; creates one `adoption_log`. The per-revision
@@ -1297,7 +1303,7 @@ type QueryInput struct {
 |---|---|
 | `live_files` | Non-deleted `files` rows. |
 | `recent` | Files touched within `--days` (default 7), by `git_last_commit` date. |
-| `orphans` | `.md` files with empty `entity_type` not under the meta/secrets prefix set (the same `_meta/` / `SECRETS_DIR` prefixes used elsewhere; configurable, not hardcoded). |
+| `orphans` | `.md` files with empty `entity_type` that could be misfiled desk content — i.e. `dir_kind ∉ {meta, memory, infra}` (non-entity infrastructure is excluded, not just the meta/secrets prefix set: the memory store and dotted infra dirs like `.claude`/`.agents` are legitimately outside the taxonomy). The `_meta/` / `SECRETS_DIR` prefix check remains as a belt-and-suspenders guard (configurable, not hardcoded). Excluding `infra`/`memory` added 2026-07-17 per issue #18. |
 | `uncollapsed` | Open R5 findings (graduated-but-not-collapsed). |
 | `findings` | Open findings grouped by rule. |
 | `summary` | The aggregate the `/api/desk/summary` route returns: `{files_total, files_by_dir_kind, open_findings_total, open_findings_by_rule, open_findings_by_severity}`. |

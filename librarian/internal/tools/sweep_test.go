@@ -47,8 +47,29 @@ func TestDirKindForMemoryPrecedence(t *testing.T) {
 	cases := map[string]string{
 		"memory/foo.md":              "memory",
 		".claude/memory/bar.md":      "memory",
-		".claude/other/bar.md":       "other", // .claude without /memory/ in the path
+		".claude/other/bar.md":       "infra", // .claude without /memory/ -> dotted infra dir
 		"somewhere/memory/README.md": "other", // "memory" only matches as the TOP segment
+	}
+	for rel, want := range cases {
+		if got := dirKindFor(rel, dirMap, ""); got != want {
+			t.Errorf("dirKindFor(%q) = %q, want %q", rel, got, want)
+		}
+	}
+}
+
+// TestDirKindForInfra pins the "infra" bucket (issue #18): non-entity content under a dotted
+// top-level dir is infrastructure, not misfiled desk content. The memory special-case still
+// wins for .claude/memory/**, and a non-dotted "other" dir is unaffected.
+func TestDirKindForInfra(t *testing.T) {
+	dirMap := map[string]string{}
+	cases := map[string]string{
+		".claude/agents/reviewer.md": "infra",
+		".agents/skills/x.md":        "infra",
+		".github/workflows/ci.yml":   "infra",
+		".claude/memory/note.md":     "memory", // memory precedence still wins
+		"scratch/notes.md":           "other",  // non-dotted, non-entity -> still other
+		".gitignore":                 "root",   // bare dotted FILE at root -> root (no "/"), not infra
+		".env":                       "root",   // infra bucket catches dotted DIRS, not root dotfiles
 	}
 	for rel, want := range cases {
 		if got := dirKindFor(rel, dirMap, ""); got != want {

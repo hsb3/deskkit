@@ -168,9 +168,19 @@ func sortFileBriefsByCommitDateDesc(files []fileBrief) {
 }
 
 // isOrphan is the pure core of the `orphans` query (spec §5.6): a .md file with empty
-// entity_type, not under the meta/secrets prefix set.
+// entity_type that could be misfiled desk content — i.e. NOT non-entity infrastructure. Files
+// whose dir_kind is meta, memory, or infra (dotted infra dirs like .claude/.agents) are
+// legitimately outside the entity taxonomy and never count as orphans (spec §5.6); the
+// isMetaPath check also guards meta/secrets belt-and-suspenders.
 func isOrphan(row fileRow, secretsDir string) bool {
-	return strings.HasSuffix(row.Path, ".md") && row.EntityType == "" && !isMetaPath(row.Path, secretsDir)
+	if !strings.HasSuffix(row.Path, ".md") || row.EntityType != "" {
+		return false
+	}
+	switch row.DirKind {
+	case "meta", "memory", "infra":
+		return false
+	}
+	return !isMetaPath(row.Path, secretsDir)
 }
 
 func sortOrphanBriefs(files []orphanBrief) {
