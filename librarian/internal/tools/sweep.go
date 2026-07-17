@@ -309,6 +309,12 @@ func dirKindFor(rel string, dirMap map[string]string, secretsDir string) string 
 	if top == "memory" || (top == ".claude" && strings.Contains(rel, "/memory/")) {
 		return "memory"
 	}
+	// Non-entity infrastructure living under a dotted top-level dir (.claude, .agents, .github,
+	// ...) is not misfiled desk content — bucket it as "infra" so the orphans view can exclude it
+	// (spec §5.1/§5.6). The memory check above already claimed .claude/memory/**.
+	if strings.HasPrefix(top, ".") {
+		return "infra"
+	}
 	return "other"
 }
 

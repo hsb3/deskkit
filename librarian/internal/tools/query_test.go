@@ -58,6 +58,13 @@ func TestIsOrphan(t *testing.T) {
 		{fileRow{Path: "_meta/HANDOFF.md", EntityType: ""}, "_meta/secrets", false},     // under _meta/
 		{fileRow{Path: "_meta/secrets/key.md", EntityType: ""}, "_meta/secrets", false}, // under SECRETS_DIR
 		{fileRow{Path: "custom-secrets/k.md", EntityType: ""}, "custom-secrets", false}, // configurable SECRETS_DIR
+		// Non-entity infrastructure is not an orphan, keyed off dir_kind (spec §5.6): dotted
+		// infra dirs and the memory store are outside the desk taxonomy, not misfiled content.
+		{fileRow{Path: ".claude/agents/reviewer.md", EntityType: "", DirKind: "infra"}, "_meta/secrets", false},
+		{fileRow{Path: ".agents/skills/x.md", EntityType: "", DirKind: "infra"}, "_meta/secrets", false},
+		{fileRow{Path: ".claude/memory/note.md", EntityType: "", DirKind: "memory"}, "_meta/secrets", false},
+		// A genuinely misfiled .md in a non-infra dir is still an orphan.
+		{fileRow{Path: "scratch/loose.md", EntityType: "", DirKind: "other"}, "_meta/secrets", true},
 	}
 	for _, c := range cases {
 		if got := isOrphan(c.row, c.secretsDir); got != c.want {

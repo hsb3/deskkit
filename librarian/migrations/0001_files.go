@@ -15,7 +15,8 @@ func init() {
 		files.Fields.Add(&core.TextField{Name: "desk"})
 		files.Fields.Add(&core.TextField{Name: "entity_type"})
 		files.Fields.Add(&core.SelectField{Name: "dir_kind", MaxSelect: 1,
-			Values: []string{"decisions", "tasks", "analyses", "journal", "meta", "memory", "root", "other"}})
+			// "infra" added in 0012 — this fresh-store decl carries it; 0012 alters existing stores.
+			Values: []string{"decisions", "tasks", "analyses", "journal", "meta", "memory", "root", "other", "infra"}})
 		files.Fields.Add(&core.TextField{Name: "status"})
 		files.Fields.Add(&core.TextField{Name: "synopsis"})
 		files.Fields.Add(&core.TextField{Name: "origin"})

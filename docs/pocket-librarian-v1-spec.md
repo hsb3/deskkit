@@ -459,7 +459,7 @@ including field order and stable collection ids; the four new collections (`mess
 | 1 | `path` | text | Required. Relative to `DESK_ROOT`. Unique index `idx_files_path`. |
 | 2 | `desk` | text | Stamped with `DESK_NAME`. |
 | 3 | `entity_type` | text | Frontmatter `type`, or `""`. |
-| 4 | `dir_kind` | select (maxSelect 1) | Values: `decisions`, `tasks`, `analyses`, `journal`, `meta`, `memory`, `root`, `other`. |
+| 4 | `dir_kind` | select (maxSelect 1) | Values: `decisions`, `tasks`, `analyses`, `journal`, `meta`, `memory`, `root`, `other`, `infra` (`infra` added in migration 0012 — dotted infra dirs; §5.1/§5.6). |
 | 5 | `status` | text | Frontmatter `status`, or `""`. |
 | 6 | `synopsis` | text | Frontmatter `synopsis`. |
 | 7 | `origin` | text | Git first-add `"<hash>|<yyyy-mm-dd>"`. |
@@ -661,7 +661,8 @@ func init() {
         files.Fields.Add(&core.TextField{Name: "desk"})
         files.Fields.Add(&core.TextField{Name: "entity_type"})
         files.Fields.Add(&core.SelectField{Name: "dir_kind", MaxSelect: 1,
-            Values: []string{"decisions", "tasks", "analyses", "journal", "meta", "memory", "root", "other"}})
+            // "infra" added in migration 0012 (fresh stores carry it here; 0012 alters existing).
+            Values: []string{"decisions", "tasks", "analyses", "journal", "meta", "memory", "root", "other", "infra"}})
         files.Fields.Add(&core.TextField{Name: "status"})
         files.Fields.Add(&core.TextField{Name: "synopsis"})
         files.Fields.Add(&core.TextField{Name: "origin"})
@@ -868,7 +869,11 @@ entity-dir PATHS as **prefixes**, not bare first path segments. The entity-dir m
    **and** `"/memory/"` is in `rel`) → `"memory"`. Reproduce the PoC's operator precedence
    exactly — the source expression is `top == "memory" or top == ".claude" and "/memory/" in
    rel`, i.e. `memory OR (.claude AND /memory/)`.
-5. Else `"other"`.
+5. Else if the first path segment starts with `"."` (a dotted infra dir — `.claude`, `.agents`,
+   `.github`, …) → `"infra"`. Non-entity infrastructure is not misfiled desk content; this
+   bucket lets the `orphans` view exclude it (§5.6, added 2026-07-17 per issue #18). The memory
+   rule (step 4) still claims `.claude/memory/**` first.
+6. Else `"other"`.
 
 This prefix form is what makes the nested default `_structure/decisions` work: a
 **bare-top-segment** match (matching only `top == "decisions"`, the PoC's original flat-layout
@@ -1298,7 +1303,7 @@ type QueryInput struct {
 |---|---|
 | `live_files` | Non-deleted `files` rows. |
 | `recent` | Files touched within `--days` (default 7), by `git_last_commit` date. |
-| `orphans` | `.md` files with empty `entity_type` not under the meta/secrets prefix set (the same `_meta/` / `SECRETS_DIR` prefixes used elsewhere; configurable, not hardcoded). |
+| `orphans` | `.md` files with empty `entity_type` that could be misfiled desk content — i.e. `dir_kind ∉ {meta, memory, infra}` (non-entity infrastructure is excluded, not just the meta/secrets prefix set: the memory store and dotted infra dirs like `.claude`/`.agents` are legitimately outside the taxonomy). The `_meta/` / `SECRETS_DIR` prefix check remains as a belt-and-suspenders guard (configurable, not hardcoded). Excluding `infra`/`memory` added 2026-07-17 per issue #18. |
 | `uncollapsed` | Open R5 findings (graduated-but-not-collapsed). |
 | `findings` | Open findings grouped by rule. |
 | `summary` | The aggregate the `/api/desk/summary` route returns: `{files_total, files_by_dir_kind, open_findings_total, open_findings_by_rule, open_findings_by_severity}`. |
