@@ -1,7 +1,7 @@
 _Session-to-session bridge for desk-standard. Read this before working; update it at the end
 of any substantial session. Secret-free — live URLs/credentials belong in `_meta/operations/`
 (untracked) if that dir is ever created._
-Status: active (2026-07-16)
+Status: active (2026-07-17)
 
 # HANDOFF
 
@@ -22,66 +22,70 @@ decision records (e.g. 0013–0016) referenced from the build brief — annotate
 
 ## 1. Current standing + top priority
 
-v1 (Claude Code only) is built, distributable, and CI-green on `main`. The repo is a live
-plugin marketplace: `claude plugin marketplace add hsb3/desk-standard` →
+v1 (Claude Code only) is built, distributable, and CI-green on `main` — a live plugin
+marketplace: `claude plugin marketplace add hsb3/desk-standard` →
 `claude plugin install desk-standard@desk-standard` (proven end-to-end).
 
-The interactive-surfaces arc (**#13/#14/#15**) shipped 2026-07-16 evening (§2). Open
-backlog, ranked: **#7** (curl-able install.sh; absorbs remaining distribution work:
-librarian release binaries, configure + post-install verify) → **#12** (dual-format
-common-core fan-out — consumes `bun run package` as the seed of the production step) →
-**#19** (PB-served webapp session — the deferred follow-on recorded in ADR 0001).
+**Awaiting your merge: PR #21** (branch `fix/librarian-record-original-cap-and-prompt-seed`,
+CI-green — `ci` + `claude-review` pass) closes **#16 + #17**, the two correctness fixes from
+the 2026-07-16 dev-tooling-desk field evaluation (§2). Outward-facing, so left for you to merge.
 
-## 2. Last substantial session delivered (2026-07-16, evening)
+Open backlog, ranked (field-eval findings interleaved with the distribution arc):
+- **#16 / #17** — in PR #21, awaiting merge.
+- **#18** — field-interaction UX batch (orphan noise from infra dirs, R4 severity ambiguity,
+  mcp-serve EOF exit, JSON-only output); non-blocking cleanups.
+- **#20** — design session: multi-desk topology (7 desks → 7 stores vs 1; canonical store
+  location; resolve the latent-but-forbidden `desk` field). A ruling, not code — gates any
+  serious multi-desk story.
+- **#7** — curl-able install.sh (absorbs librarian release binaries, configure, post-install
+  verify; builds on the marketplace flow + `bun run package`).
+- **#12** — dual-format common-core fan-out (Claude + OpenCode instances; consumes
+  `bun run package` as the seed).
+- **#19** — PB-served webapp chat surface (deferred interactive follow-on; ADR 0001).
 
-Closed **#13, #14, #15** via two parallel worktree crews (foreman pattern: opus lead-driven
-team for the coupled #13 chain, single opus builder for #14/#15; every diff independently
-adversarially reviewed before landing — crew B 5/5 claims confirmed, crew A 7/7; all gates
-re-run by the session). Commits `d4c52aa` (crew B) → `e851e5b` (crew A) → merge `f148e04`;
-CI green on both pushes. Filed **#19** (deferred webapp follow-on).
+## 2. Last session delivered (2026-07-17)
 
-- `d4c52aa` **#14 items 1–2 + #15** — `secrets_ref.llm_api_key` indirection implemented
-  (plus `LLM_API_KEY_ENV` env override; per-provider vars remain the fallback, byte-identical
-  when unset); idempotent superuser auto-create under `serve` (new `internal/bootstrap`;
-  note: NOT on bare `migrate up` — no app-lifecycle hook there, recorded on #14); patrol now
-  resolves open findings that stop firing (`state=resolved` + `resolved_run`, same
-  transaction; scoped patrols resolve in-scope only; deleted-file findings resolve by
-  design, test-pinned; migration `0010` down-func remaps resolved→flagged before stripping
-  the enum — proven e2e against a real store).
-- `e851e5b` **#13** — `pocket-librarian chat`: multi-turn desk-stewardship REPL over the
-  eino loop (`internal/agent/session.go`, stubbed-provider tests, history cap 40, no new
-  write path — tools only via the gated registry, `restore` never exposed, `apply_fix`
-  gated at execution time too); trigger wake layer `internal/trigger` under `serve` (hourly
-  cron patrol, files-create hook → scoped patrol, claimer finally consuming
-  `ClaimerPollInterval`; transactional claim, panic-safe dispatch — a panicking task marks
-  `failed`, serve survives); ADR **`docs/decisions/0001-interactive-surface-tui-first.md`**
-  (§7.4 options evaluated; TUI now, PB-served webapp deferred → #19); spec §7.4 carries the
-  supersession pointer; `verify.sh` 40 → 42 checks.
-- Reviewer findings fixed pre-land: claimer panic recovery + chat history cap (crew A);
-  0010 rollback data-remap + deleted-file resolution test (crew B). Known benign behavior:
-  a bulk sweep enqueues one scoped patrol per new file (burst, not recursion — patrol never
-  writes `files`).
+**#16 + #17** fixed and proven, shipped as **PR #21** (commit `918bfaa`, CI-green). Both were
+findings from the 2026-07-16 dev-tooling-desk field evaluation.
 
-## 2b. Earlier same day (2026-07-16)
+- **#16** — record-original-first was silently capped at PocketBase's 5000-char TextField
+  default: any desk file >5 KB could not have its byte-exact original recorded (the §5.4
+  safety boundary failing on exactly the costly files), and one oversized file hard-aborted
+  the whole propose-fix run. Fix: new migration `0011_widen_content_fields.go` widens the
+  three content-bearing text fields (`revisions.original_content`, `messages.content`,
+  `prompts.content`; `Max=50_000_000`) — applies to EXISTING stores on next migrate, via the
+  0010 alter pattern. `propose_fix` now tolerates per-file failures (an `"error"` outcome
+  mirroring `ApplyOutcome`) instead of aborting; boundary unweakened (an errored finding
+  records no revision row → no fs write can follow). Regression test with a >5 KB fixture;
+  forced-store-failure test rewritten to the tolerant contract. Live-proven: `propose-fix` on
+  a 9512-char file returns `recorded` with the full original stored.
+- **#17** — `prompt.Seed` was `OnServe`-only, so CLI/MCP-only desks never materialized the
+  editable system-prompt row (§4.10). Moved the seed into `requireConfig` (the shared
+  one-shot entry path), non-fatal; the `.librarian-ignore` half was already there. Live-proven:
+  one-shot `sweep` seeds the `prompts` row.
 
-Closed **#8** (brownfield-adoption skill, `eec43eb`, plugin 0.2.0 → 0.3.0: hardened K24
-runbook, 9 phases, librarian baseline as final gate; field-test patrol evidence on the
-issue) and **#9/#10/#11** + operator docs (`f90bb29`/`455769c`/`0e44935`/`5044405`):
-directory-index README patrol exemption (greenfield template patrols at zero findings),
-in-repo marketplace + self-contained plugin bundle (`bun run package`, drift-guarded),
-issue/PR templates + live claude workflows, `librarian/README.md` operator sections
-(LLM/keys, admin console via `make gui`, `mcp-serve` wiring). The discovery flow from those
-sittings filed #13/#14/#15 — all now closed (§2).
+The same field evaluation filed **#16/#17/#18/#20**; #18 and #20 remain open (§1 backlog).
+
+## 2b. Earlier eras (full detail in merged PRs / closed issues / git)
+
+- **2026-07-16 eve** — #13/#14/#15 via parallel worktree crews: `chat` REPL + trigger wake
+  layer (ADR `docs/decisions/0001-interactive-surface-tui-first.md`, TUI-first; webapp
+  deferred → #19), `secrets_ref.llm_api_key` indirection, superuser auto-create under serve,
+  patrol stale-finding resolution (migration `0010`). Commits `d4c52aa`→`e851e5b`→merge
+  `f148e04`; `verify.sh` 40→42 checks.
+- **2026-07-16 day** — #8 (brownfield-adoption skill, plugin 0.3.0) + #9/#10/#11: README
+  patrol exemption, in-repo marketplace + `bun run package` bundle (drift-guarded), issue/PR
+  templates + live claude workflows, `librarian/README.md` operator docs.
 
 ## 3. Where to start building
 
-Start with #7 (curl-able install.sh): absorb the remaining distribution work — librarian
-release binaries, configure step, post-install verify — building on the proven marketplace
-flow and `bun run package`. Then #12 (dual-format fan-out). #19 (webapp session) is the
-deferred interactive follow-on; ADR 0001 records the preferred shape (custom Go route,
-PB-served, no runtime frontend toolchain). Note the skill files under
-`plugin/claude-plugin/skills/` are neutrality-lint-scanned (no bare issue refs, GitHub
-URLs, or profile scalars in skill prose).
+Once PR #21 merges (closes #16/#17), the top code items are **#18** (UX cleanup batch —
+safe, non-blocking) and the distribution arc **#7 → #12**. **#20** is a design session
+(ruling first — store-per-desk vs shared, canonical store location, `desk`-field resolution —
+then code). **#19** (webapp) is the deferred interactive follow-on; ADR 0001 records the
+preferred shape (custom Go route, PB-served, no runtime frontend toolchain). Note the skill
+files under `plugin/claude-plugin/skills/` are neutrality-lint-scanned (no bare issue refs,
+GitHub URLs, or profile scalars in skill prose).
 
 ## 4. Conventions & gotchas
 
@@ -108,6 +112,14 @@ URLs, or profile scalars in skill prose).
   gates `apply_fix` (MCP and enqueued tasks — checked at execution time); `restore` is
   CLI-only. `serve` extras: `PB_SUPERUSER_EMAIL`/`PB_SUPERUSER_PASSWORD` (idempotent
   first-run superuser), `CLAIMER_POLL_INTERVAL` (wake-layer claimer).
+- **PocketBase bare `TextField` silently caps at 5000 chars** (`Max==0` → default 5000, per
+  `core.TextField`). Any field holding full file bodies / transcripts / editable prompts MUST
+  set an explicit large `Max` or it truncates at 5 KB — the content fields are widened in
+  migration `0011`. Set `Max` explicitly when adding a new content-bearing text field.
+- **Altering a shipped collection: add a forward migration, don't edit the applied one**
+  (precedent: `0010`, `0011`). Editing `000N`'s field decl only reaches fresh stores; a new
+  migration that mutates the field via `FindCollectionByNameOrId` + `Save(c)` fixes existing
+  stores on next migrate. Source decls carry a `// … widened in 0011` pointer comment.
 - Go 1.25 floor (PocketBase's go.mod); Bun 1.3.14 pinned in CI.
 - **Worktree provisioning**: untracked-and-load-bearing = `plugin/node_modules` (run
   `bun install --frozen-lockfile`) and `.claude/agent-memory/` (machine-local). Everything

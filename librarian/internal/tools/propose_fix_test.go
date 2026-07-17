@@ -132,14 +132,19 @@ func breakIgnoreFile(t *testing.T, cfg *config.Config) {
 // failingSaveApp wraps a *tests.TestApp and forces app.Save to fail for one named
 // collection — used to simulate a "store unreachable" failure at the exact
 // record-original-first insert (spec §5.3 boundary 1) without needing a real outage.
+// When failPath is set, only the record whose "path" field matches fails, so a batch test
+// can break exactly one file's original-record and prove the rest still record.
 type failingSaveApp struct {
 	*tests.TestApp
-	failFor string
+	failFor  string
+	failPath string
 }
 
 func (f *failingSaveApp) Save(model core.Model) error {
 	if rec, ok := model.(*core.Record); ok && rec.Collection() != nil && rec.Collection().Name == f.failFor {
-		return errors.New("forced store failure (test)")
+		if f.failPath == "" || rec.GetString("path") == f.failPath {
+			return errors.New("forced store failure (test)")
+		}
 	}
 	return f.TestApp.Save(model)
 }
@@ -277,6 +282,55 @@ func TestProposeFix_ForcedStoreFailureIsToleratedAndPreventsTheWrite(t *testing.
 	}
 	if string(onDisk) != content {
 		t.Fatalf("file was mutated despite the aborted propose_fix operation: %q", string(onDisk))
+	}
+}
+
+// The core new contract is "one bad file never aborts the batch." A single-finding run can't
+// prove it — this two-finding run breaks the store for ONLY the first file and asserts the
+// second still records, with exactly one revision row surviving.
+func TestProposeFix_BatchContinuesPastOneFailedFile(t *testing.T) {
+	app, cfg := newTestEnv(t)
+	content := "no frontmatter here\n"
+	checksum := desklib.Checksum([]byte(content))
+
+	// Candidates sort by (rule, path); both R1, so "tasks/a.md" is [0] and "tasks/b.md" is [1].
+	mustWriteFile(t, cfg.DeskRoot, "tasks/a.md", content)
+	fileA := mustCreateFileRecord(t, app, "tasks/a.md", "tasks", "task", checksum)
+	mustCreateFinding(t, app, fileA, "R1", checksum, "run-1")
+
+	mustWriteFile(t, cfg.DeskRoot, "tasks/b.md", content)
+	fileB := mustCreateFileRecord(t, app, "tasks/b.md", "tasks", "task", checksum)
+	mustCreateFinding(t, app, fileB, "R1", checksum, "run-1")
+
+	// Break the original-record insert for ONLY the first file.
+	broken := &failingSaveApp{TestApp: app, failFor: "revisions", failPath: "tasks/a.md"}
+
+	res, err := ProposeFix(context.Background(), broken, cfg, &ProposeFixInput{RunID: "run-1"})
+	if err != nil {
+		t.Fatalf("ProposeFix must tolerate a per-file failure, got top-level error: %v", err)
+	}
+	if len(res.Proposed) != 2 {
+		t.Fatalf("expected 2 proposed outcomes, got %d: %+v", len(res.Proposed), res.Proposed)
+	}
+
+	first, second := res.Proposed[0], res.Proposed[1]
+	if first.Path != "tasks/a.md" || first.Outcome != "error" || first.RevisionID != "" || first.Error == "" {
+		t.Fatalf("first finding should be an error with no revision id, got %+v", first)
+	}
+	if second.Path != "tasks/b.md" || second.Outcome != "recorded" || second.RevisionID == "" {
+		t.Fatalf("second finding should still be recorded despite the first failing, got %+v", second)
+	}
+
+	// Exactly one revision row exists — the surviving one, for the second file only.
+	revs, ferr := app.FindRecordsByFilter("revisions", "", "", 0, 0)
+	if ferr != nil {
+		t.Fatalf("list revisions: %v", ferr)
+	}
+	if len(revs) != 1 {
+		t.Fatalf("expected exactly one revision row (the second file), got %d", len(revs))
+	}
+	if revs[0].GetString("path") != "tasks/b.md" {
+		t.Fatalf("the surviving revision should be for tasks/b.md, got %q", revs[0].GetString("path"))
 	}
 }
 

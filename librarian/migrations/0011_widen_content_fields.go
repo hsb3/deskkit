@@ -33,8 +33,9 @@ func init() {
 	m.Register(func(app core.App) error {
 		return setContentMax(app, widenedContentMax)
 	}, func(app core.App) error {
-		// Down: restore the implicit default (Max==0 → 5000). Reverting the schema cap never
-		// re-validates existing rows, so oversized recorded originals survive a rollback intact.
+		// Down: restore the implicit default (Max==0 → 5000). Schema rollback is NON-destructive:
+		// existing rows whose content already exceeds 5000 chars are NOT truncated — only future
+		// saves against these fields become capped again, until a fresh migrate re-applies 0011.
 		return setContentMax(app, 0)
 	})
 }
