@@ -30,13 +30,20 @@ marketplace: `claude plugin marketplace add hsb3/desk-standard` →
 (#16/#17/#18) shipped earlier (PRs #21/#22, §2b), and **#20 closed 2026-07-17** — the
 multi-desk design session was held and recorded as **ADR 0002** (commit `27a37a1`, §2).
 
-**TOP PRIORITY — the release is PREPARED and waiting on one human command.** `make
-release-prep` is green at **v0.4.0** (clean main, all gates rerun). To publish, run:
-`git tag v0.4.0 && git push --tags` — the release workflow then asserts tag==VERSION, reruns
-CI-equivalent gates (now including `verify.sh`, see §2), cross-compiles the four binaries, and
-publishes a GitHub release + `checksums.txt`. This is the first *real* release (only a
-`v0.0.1-alpha` pre-release exists). After it publishes, do the deferred live e2e of `install.sh`
-(`curl | bash` against the real assets) — the one thing no PR could prove pre-release.
+**TOP PRIORITY — v0.4.0 is RELEASED; the curl|bash install path is gated on repo visibility.**
+`git tag v0.4.0 && git push --tags` was run 2026-07-17; the release workflow succeeded and
+published a non-draft/non-prerelease **v0.4.0** with all four binaries + `checksums.txt` +
+plugin bundle. Verified authoritatively: the darwin/arm64 binary downloads (73 MB), runs, and
+reports `version 0.4.0`, and its sha256 matches the published `checksums.txt`.
+**BUT the repo is PRIVATE**, so the documented public install flow (`install.sh`) cannot be
+exercised unauthenticated — `raw.githubusercontent.com/.../install.sh`, `/releases/latest`, and
+every `/releases/download/…` URL return **404 by design** for a private repo. install.sh's URL
+construction + checksum logic are proven correct (its URLs are byte-identical to the API's
+`browser_download_url`, and the authed content verifies); the ONLY missing link is the
+unauthenticated HTTP fetch. **Action to unblock #7's "without hiccups" acceptance: make the repo
+public** (a deliberate launch decision — not taken autonomously). No code change needed; the
+same URLs resolve the moment the repo is public. If it must stay private, install.sh would need
+token/`gh` auth instead (design change).
 
 Open backlog, ranked (no ruling gates the buildable ones):
 - **#12** — dual-format common-core fan-out (Claude + OpenCode instances; consumes
@@ -308,6 +315,15 @@ or profile scalars in skill prose).
 
 ## 5. Incident log
 
+- 2026-07-17: first real release (v0.4.0) cut successfully, but the live `install.sh` e2e
+  surfaced that **the repo is private** — every unauthenticated URL the public install flow needs
+  (`raw…/install.sh`, `/releases/latest`, `/releases/download/…`) returns 404. Initially looked
+  like CDN propagation lag (persisted >6 min); root-caused by checking `gh repo view` visibility.
+  Authed `gh release download` proved the assets are valid (binary runs, sha256 matches
+  checksums.txt), so install.sh is correct — the blocker is purely repo visibility. Resolution:
+  make the repo public when launching (§1), or add token auth to install.sh if it stays private.
+  Lesson: a persistent (not transient) 404 on release assets that the authed API can see = check
+  repo visibility before blaming propagation.
 - 2026-07-16: first #11 commit accidentally swept 27 pre-staged pocketbase files into the
   fix commit (parallel agent had staged them); caught pre-push, reset --soft and recommitted
   per-stream. See the pre-staged-files gotcha above.
