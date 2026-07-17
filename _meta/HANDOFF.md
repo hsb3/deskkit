@@ -129,9 +129,13 @@ GitHub URLs, or profile scalars in skill prose).
   set an explicit large `Max` or it truncates at 5 KB — the content fields are widened in
   migration `0011`. Set `Max` explicitly when adding a new content-bearing text field.
 - **Altering a shipped collection: add a forward migration, don't edit the applied one**
-  (precedent: `0010`, `0011`). Editing `000N`'s field decl only reaches fresh stores; a new
-  migration that mutates the field via `FindCollectionByNameOrId` + `Save(c)` fixes existing
-  stores on next migrate. Source decls carry a `// … widened in 0011` pointer comment.
+  (precedent: `0010`, `0011`, `0012`). Editing `000N`'s field decl only reaches fresh stores; a
+  new migration that mutates the field via `FindCollectionByNameOrId` + `Save(c)` fixes existing
+  stores on next migrate. Source decls carry a pointer comment (`// … widened in 0011`,
+  `// "infra" added in 0012`). Two variants proven: **TextField Max** (`0011`) and **SelectField
+  Values** enum-extension (`0012` adds `infra` to `dir_kind`). An enum-extension's DOWN migration
+  must remap rows off the new value FIRST (`0012`: `infra`→`other`) before dropping it from the
+  enum, or a rollback leaves a row outside its reverted enum (same data-first pattern as `0010`).
 - Go 1.25 floor (PocketBase's go.mod); Bun 1.3.14 pinned in CI.
 - **Worktree provisioning**: untracked-and-load-bearing = `plugin/node_modules` (run
   `bun install --frozen-lockfile`) and `.claude/agent-memory/` (machine-local). Everything
@@ -144,3 +148,10 @@ GitHub URLs, or profile scalars in skill prose).
 - 2026-07-16: first #11 commit accidentally swept 27 pre-staged pocketbase files into the
   fix commit (parallel agent had staged them); caught pre-push, reset --soft and recommitted
   per-stream. See the pre-staged-files gotcha above.
+- 2026-07-17: a gate command piped to `tail` (`check-neutrality.mjs 2>&1 | tail -1 && git add`)
+  masked neutrality's exit 1 — a pipeline's status is the LAST command's (`tail`=0), so the
+  `&&` proceeded and a #18 commit landed locally with 4 bare-`#18` lint violations in
+  `librarian/`. Caught on the next standalone run, `--amend`ed before push (nothing bad reached
+  the remote). Lesson: when a command GATES a commit, run it bare and check its own exit code —
+  never pipe it. (Neutrality scope reminder: `docs/` is exempt, so the spec's `#18` refs are
+  fine; `librarian/` Go comments/tests are not.)
