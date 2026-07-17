@@ -3,8 +3,13 @@
 # Single-writer rule (spec §2.7): the one-shot subcommands (sweep, patrol, propose-fix,
 # findings/summary/adoption/orphans/uncollapsed, and the supervised `apply-fix` CLI) open
 # the same on-disk SQLite store directly via native DAO. They must NOT run while `serve` is
-# up against the same pb_data — run `make stop` first. `verify` is self-contained (it
-# manages its own throwaway pb_data + scratch desk) and is safe to run at any time.
+# up against the same store — run `make stop` first. `verify` is self-contained (it manages
+# its own throwaway XDG store home + scratch desk) and is safe to run at any time.
+#
+# Store location (ADR 0002 §2): with no --dir, every command below resolves its store to
+# $XDG_DATA_HOME/pocket-librarian/<DESK_NAME>/ (fallback ~/.local/share/...). These targets
+# pass no --dir, so they use that canonical per-desk home and require DESK_NAME to be
+# resolvable (env / walk-up .env / the desk's _knowledge/profile.*).
 #
 # `apply-fix` is deliberately NOT a Makefile target (spec §9.5): committing a fix to the
 # REAL desk is supervised-only, run by hand as
@@ -76,9 +81,12 @@ uncollapsed: build ## Show open R5 judgment findings — graduated-but-not-colla
 verify: ## Run the Phase-1 verify gate against a throwaway scratch desk (never the real desk)
 	@bash verify.sh
 
-clean: stop ## Stop serve + remove the built binary and local pb_data
-	@rm -rf $(BIN) pb_data $(PIDFILE) $(LOGFILE)
-	@echo "cleaned: binary, pb_data, pidfile, serve log"
+clean: stop ## Stop serve + remove build artifacts (binary, pidfile, serve log)
+	@rm -rf $(BIN) $(PIDFILE) $(LOGFILE)
+	@rm -rf pb_data  # legacy cwd-relative store from pre-ADR-0002 checkouts, if any lingers
+	@echo "cleaned: binary, pidfile, serve log (+ any legacy ./pb_data)"
+	@echo "note: the canonical per-desk store lives at \$$XDG_DATA_HOME/pocket-librarian/<DESK_NAME>/"
+	@echo "      (fallback ~/.local/share/...); it is persistent and NOT removed by clean — rm it by hand."
 
 test: ## go test ./...
 	@go test ./...

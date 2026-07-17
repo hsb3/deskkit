@@ -11,7 +11,7 @@
 #   - The spec's dead-store-refusal trigger `LIBRARIAN_FAULT_INJECT=revision-store-down`
 #     (§9.2/§9.4 check 10) is NOT implemented in the current Go tree (verified: no match
 #     anywhere in librarian/). This script substitutes a filesystem-permission fault
-#     (chmod the pb_data tree read-only) to force the same revisions-insert failure and
+#     (chmod the store tree read-only) to force the same revisions-insert failure and
 #     proves the same invariant (rc != 0, no fs write) without inventing the env flag.
 #   - `serve` is never started here: none of the checks in this gate's brief require a live
 #     HTTP server, and starting/stopping one only adds process-management risk. `make serve`
@@ -64,17 +64,30 @@ snapshot() {
 }
 
 WORK=$(mktemp -d "${TMPDIR:-/tmp}/pocket-librarian-verify.XXXXXX")
+
+# Hermetic store home (ADR 0002 §2): point XDG_DATA_HOME at a throwaway scratch for the WHOLE
+# run. Every store-touching command now resolves its store to
+# $XDG_DATA_HOME/pocket-librarian/<DESK_NAME> when no --dir is passed, so exporting a scratch
+# XDG_DATA_HOME guarantees NO check — including the new resolution/guard checks below — can ever
+# touch the operator's real ~/.local/share store. Exported so every child process inherits it.
+XDG_DATA_HOME=$(mktemp -d "${TMPDIR:-/tmp}/pocket-librarian-xdg.XXXXXX")
+export XDG_DATA_HOME
+# The main run drives the "verify-desk" desk; with no --dir its store resolves to this dir.
+STORE="$XDG_DATA_HOME/pocket-librarian/verify-desk"
+
 cleanup() {
   chmod -R u+w "$WORK" 2>/dev/null || true
   rm -rf "$WORK"
-  chmod -R u+w pb_data 2>/dev/null || true
-  rm -rf pb_data
+  chmod -R u+w "$XDG_DATA_HOME" 2>/dev/null || true
+  rm -rf "$XDG_DATA_HOME"
 }
 trap cleanup EXIT
 
+# run_lib inherits the exported scratch XDG_DATA_HOME above; it passes NO --dir on purpose, so
+# the run exercises the ADR 0002 §2 XDG default-resolution path end to end.
 run_lib() { DESK_ROOT="$WORK" DESK_NAME="verify-desk" ./"$BIN" "$@"; }
 
-# Single-writer guard (spec §2.7): refuse to blow away pb_data out from under a live `serve`.
+# Single-writer guard (spec §2.7): refuse to blow away the store out from under a live `serve`.
 if [ -f .pocket-librarian.pid ] && kill -0 "$(cat .pocket-librarian.pid)" 2>/dev/null; then
   echo "FATAL: a serve process is running (pid $(cat .pocket-librarian.pid)) — run 'make stop' first." >&2
   exit 1
@@ -83,8 +96,8 @@ fi
 echo "scratch desk: $WORK"
 echo
 
-# --- 0. build + clean pb_data -------------------------------------------------------------
-rm -rf pb_data
+# --- 0. build + clean the scratch store ---------------------------------------------------
+rm -rf "$STORE"
 go build -o "$BIN" ./cmd/pocket-librarian
 check "build ./$BIN" $?
 
@@ -193,10 +206,10 @@ N_UNCOLLAPSED_BEFORE=$(run_lib query uncollapsed | jq -r '.count')
 # --- 6. dead-store refusal (spec §9.2/§9.4 check 10 — see the header note: the documented
 # LIBRARIAN_FAULT_INJECT env flag is not implemented, so a filesystem-permission fault stands
 # in for it) --------------------------------------------------------------------------------
-chmod -R -w pb_data
+chmod -R -w "$STORE"
 run_lib propose-fix --run "$RUN_ID" > /dev/null 2>&1
 RC=$?
-chmod -R u+w pb_data
+chmod -R u+w "$STORE"
 [ "$RC" -ne 0 ] \
   && [ "$(sha "$WORK/$R3_SRC")" = "$SHA_R3_ORIG" ] \
   && [ ! -f "$WORK/$R3_DST" ]
@@ -277,10 +290,10 @@ diff <(echo "$SNAP_SEEDED") <(echo "$SNAP_RESTORED") > /dev/null
 check "whole scratch-desk tree matches its as-seeded state after both restores" $?
 
 # --- 10. rebuild-from-scratch reproduces the file count + checksum set (§9.4 check 7) ----
-chmod -R u+w pb_data 2>/dev/null || true
-rm -rf pb_data
+chmod -R u+w "$STORE" 2>/dev/null || true
+rm -rf "$STORE"
 run_lib migrate up > /dev/null 2>&1
-check "rebuild: migrate up on a fresh pb_data" $?
+check "rebuild: migrate up on a fresh store" $?
 SWEEP3=$(run_lib sweep)
 N_REBUILT=$(echo "$SWEEP3" | jq -r '.total')
 [ "$N_REBUILT" -eq "$N_FILES" ]
@@ -303,6 +316,46 @@ check "chat --help exits 0 (interactive session subcommand is registered)" $?
 
 ./"$BIN" --help 2>&1 | grep -q '^  chat '
 check "root --help lists the chat command" $?
+
+# --- 13. store-location resolution + desk open-guard (ADR 0002 §2/§3) ---------------------
+# Self-contained: its own throwaway XDG home + desk roots, isolated from the main run's store.
+XDG2=$(mktemp -d "${TMPDIR:-/tmp}/pocket-librarian-xdg2.XXXXXX")
+DESK2=$(mktemp -d "${TMPDIR:-/tmp}/pocket-librarian-desk2.XXXXXX")
+DIR3=$(mktemp -d "${TMPDIR:-/tmp}/pocket-librarian-dir3.XXXXXX")
+cleanup13() {
+  chmod -R u+w "$XDG2" "$DESK2" "$DIR3" 2>/dev/null || true
+  rm -rf "$XDG2" "$DESK2" "$DIR3"
+}
+
+# (i) no --dir + XDG_DATA_HOME set -> store created at $XDG/pocket-librarian/<DESK_NAME>.
+XDG_DATA_HOME="$XDG2" DESK_ROOT="$DESK2" DESK_NAME="desk-one" ./"$BIN" migrate up > /dev/null 2>&1
+RC=$?
+[ "$RC" -eq 0 ] && [ -d "$XDG2/pocket-librarian/desk-one" ]
+check "no --dir: store resolves to \$XDG_DATA_HOME/pocket-librarian/<DESK_NAME>" $?
+
+# populate a desk row so the open-guard has a stored desk to compare against.
+XDG_DATA_HOME="$XDG2" DESK_ROOT="$DESK2" DESK_NAME="desk-one" ./"$BIN" sweep > /dev/null 2>&1
+check "no --dir: sweep populates the XDG-resolved store" $?
+
+# (ii) reopen the SAME physical store dir with a different DESK_NAME -> refused, error names
+# both desks. DESK_NAME is itself the store's dir name, so the mismatch the guard defends
+# against (ADR 0002 §3) is a copy-pasted --dir / env pointing a second desk at the first's
+# store; --dir at desk-one's store while configuring "desk-two" reproduces exactly that.
+STORE_ONE="$XDG2/pocket-librarian/desk-one"
+GUARD_OUT=$(DESK_ROOT="$DESK2" DESK_NAME="desk-two" ./"$BIN" query summary --dir "$STORE_ONE" 2>&1)
+RC=$?
+[ "$RC" -ne 0 ] \
+  && echo "$GUARD_OUT" | grep -q 'desk-one' \
+  && echo "$GUARD_OUT" | grep -q 'desk-two'
+check "desk open-guard: mismatched DESK_NAME on the same store refused (rc=$RC), error names both desks" $?
+
+# (iii) explicit --dir wins: store lands at the chosen dir, NOT under XDG.
+XDG_DATA_HOME="$XDG2" DESK_ROOT="$DESK2" DESK_NAME="desk-three" ./"$BIN" migrate up --dir "$DIR3" > /dev/null 2>&1
+RC=$?
+[ "$RC" -eq 0 ] && [ -f "$DIR3/data.db" ] && [ ! -d "$XDG2/pocket-librarian/desk-three" ]
+check "--dir overrides the XDG default (store lands at the explicit dir, not XDG)" $?
+
+cleanup13
 
 # --- done ----------------------------------------------------------------------------------
 echo
