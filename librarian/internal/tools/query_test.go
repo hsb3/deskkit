@@ -1,6 +1,9 @@
 package tools
 
 import (
+	"database/sql"
+	"errors"
+	"fmt"
 	"reflect"
 	"testing"
 	"time"
@@ -187,5 +190,27 @@ func TestSortFindingBriefs(t *testing.T) {
 	want := []findingBrief{{Path: "a.md", Detail: "a"}, {Path: "a.md", Detail: "z"}, {Path: "b.md", Detail: "z"}}
 	if !reflect.DeepEqual(findings, want) {
 		t.Fatalf("got %#v, want %#v", findings, want)
+	}
+}
+
+// A query against a store whose collections were never created (no prior migrate/serve)
+// resolves each collection lookup to the bare database/sql sentinel sql.ErrNoRows —
+// indistinguishable, at that call site, from a genuinely empty result. Query must turn
+// that into an actionable message instead of leaking the driver-level string.
+func TestTranslateUninitializedStoreError(t *testing.T) {
+	if err := translateUninitializedStoreError(sql.ErrNoRows); !errors.Is(err, errStoreNotInitialized) {
+		t.Fatalf("translateUninitializedStoreError(sql.ErrNoRows) = %v, want errStoreNotInitialized", err)
+	}
+	// Still recognized when wrapped (e.g. fmt.Errorf("...: %w", sql.ErrNoRows)), since
+	// pocketbase's own lookups may wrap it on the way up.
+	wrapped := fmt.Errorf("query %q: %w", "files", sql.ErrNoRows)
+	if err := translateUninitializedStoreError(wrapped); !errors.Is(err, errStoreNotInitialized) {
+		t.Fatalf("translateUninitializedStoreError(wrapped sql.ErrNoRows) = %v, want errStoreNotInitialized", err)
+	}
+	// Any other error (a real driver failure, an invalid filter) must pass through
+	// unchanged — this translation is scoped to the uninitialized-store condition only.
+	other := errors.New("disk I/O error")
+	if err := translateUninitializedStoreError(other); !errors.Is(err, other) {
+		t.Fatalf("translateUninitializedStoreError(other) = %v, want unchanged %v", err, other)
 	}
 }

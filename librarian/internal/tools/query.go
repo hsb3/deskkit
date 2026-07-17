@@ -2,7 +2,9 @@ package tools
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"sort"
 	"strings"
@@ -14,34 +16,61 @@ import (
 	"github.com/example/pocket-librarian/internal/config"
 )
 
+// errStoreNotInitialized is the actionable error Query surfaces in place of pocketbase's bare
+// sql.ErrNoRows when the store's collections have never been created. The app migrations that
+// create the files/findings/adoption collections run only under `serve` and `migrate up` — a
+// plain tool command against a store that has never had either applied finds no collection at
+// all, so every query kind hits the same underlying condition. A migrated-but-unswept store,
+// by contrast, degrades cleanly to empty results; the remedy is `migrate up`, not `sweep`.
+var errStoreNotInitialized = errors.New("store is not initialized — run `librarian migrate up` first")
+
 // Query — §5.6: read-only queries over files/findings/adoption. Kind selects one of
 // live_files | recent | orphans | uncollapsed | findings | summary | adoption; the returned
 // JSON document echoes kind + count (except `summary`, which mirrors the /api/desk/summary
 // aggregate shape verbatim, per the concrete examples in §5.6) plus a kind-specific body.
 // Never writes.
 func Query(ctx context.Context, app core.App, cfg *config.Config, in *QueryInput) (json.RawMessage, error) {
+	var (
+		raw json.RawMessage
+		err error
+	)
 	switch in.Kind {
 	case "live_files":
-		return queryLiveFiles(app)
+		raw, err = queryLiveFiles(app)
 	case "recent":
 		days := in.Days
 		if days <= 0 {
 			days = 7
 		}
-		return queryRecent(app, days)
+		raw, err = queryRecent(app, days)
 	case "orphans":
-		return queryOrphans(app, cfg)
+		raw, err = queryOrphans(app, cfg)
 	case "uncollapsed":
-		return queryUncollapsed(app)
+		raw, err = queryUncollapsed(app)
 	case "findings":
-		return queryFindings(app)
+		raw, err = queryFindings(app)
 	case "summary":
-		return querySummary(app)
+		raw, err = querySummary(app)
 	case "adoption":
-		return queryAdoption(app)
+		raw, err = queryAdoption(app)
 	default:
 		return nil, fmt.Errorf("query: unknown kind %q (one of: live_files recent orphans uncollapsed findings summary adoption)", in.Kind)
 	}
+	if err != nil {
+		return nil, translateUninitializedStoreError(err)
+	}
+	return raw, nil
+}
+
+// translateUninitializedStoreError rewrites the collection-not-found error pocketbase's record/
+// collection lookups return — the bare database/sql sentinel sql.ErrNoRows, indistinguishable
+// at this call site from a genuinely empty (but existing) result set — into errStoreNotInitialized.
+// Any other error (an invalid filter expression, a real driver failure) passes through as-is.
+func translateUninitializedStoreError(err error) error {
+	if errors.Is(err, sql.ErrNoRows) {
+		return errStoreNotInitialized
+	}
+	return err
 }
 
 // --- output shapes (spec §5.6 "Return JSON shape per kind (concrete)") ---
