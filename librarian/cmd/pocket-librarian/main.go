@@ -241,7 +241,9 @@ func isStoreTouchingInvocation(args []string) bool {
 // BEFORE cobra even reaches the "unknown flag" parse error for `serve` — proceeded unguarded).
 //
 // --dir/--encryptionEnv/--queryTimeout are pocketbase.go's actual registered root persistent
-// flags in THIS build (verified against the vendored source; migratecmd registers none).
+// flags in THIS build (verified against the vendored source: eagerParseFlags in
+// github.com/pocketbase/pocketbase/pocketbase.go registers them on RootCmd — re-audit that
+// function on every dependency bump; migratecmd registers none).
 // --hooksDir/--hooksWatch/--hooksPool are NOT currently registered (the jsvm plugin that adds
 // them is not imported here) but are added defensively: they are real PocketBase-ecosystem
 // root flags a future dependency bump could wire in, and — as the bug above shows — an

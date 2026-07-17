@@ -188,6 +188,10 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           version="$(cat VERSION)"
+          if [ -z "$(ls -A dist)" ]; then
+            echo "dist/ is empty — refusing to create an artifact-less release" >&2
+            exit 1
+          fi
           gh release create "v${version}" dist/* \
             --title "v${version}" \
             --generate-notes

@@ -30,7 +30,10 @@ const SOURCES = [
   {
     label: ".claude-plugin/marketplace.json (plugins[0].version)",
     file: ".claude-plugin/marketplace.json",
-    pick: (j) => j.plugins?.[0]?.version,
+    pick: (j) =>
+      Array.isArray(j.plugins) && j.plugins.length === 0
+        ? "<plugins array is empty>"
+        : j.plugins?.[0]?.version,
   },
 ];
 
