@@ -30,23 +30,60 @@ marketplace: `claude plugin marketplace add hsb3/desk-standard` →
 (#16/#17/#18) shipped earlier (PRs #21/#22, §2b), and **#20 closed 2026-07-17** — the
 multi-desk design session was held and recorded as **ADR 0002** (commit `27a37a1`, §2).
 
-Open backlog, ranked (no ruling gates any of it):
-- **#7** — curl-able install.sh. Its substrate now EXISTS: the tag-driven release workflow
-  (PR #26) publishes cross-compiled librarian binaries + the plugin bundle + sha256 checksums
-  on any `v*` tag — install.sh consumes those artifacts. First release: bump VERSION, run
-  `make release-prep`, follow its printed tag instructions.
+Open backlog, ranked (no ruling gates the buildable ones):
 - **#12** — dual-format common-core fan-out (Claude + OpenCode instances; consumes
-  `bun run package` as the seed).
-- **#25** — query on a never-swept store errors opaquely (`sql: no rows in result set`);
-  small UX fix, found during clean-install verification.
-- **#27** — SHA-pin GitHub Actions across both workflows (supply-chain hardening; close
-  before the release substrate is used seriously).
+  `bun run package` as the seed). Architectural — likely needs an OpenCode-target ruling
+  before fan-out; scope as its own phased effort, not a flat wave.
+- **#31** — tool commands (sweep/patrol/…) leak the same opaque `sql: no rows` on an
+  *uninitialized* (never-`migrate up`'d) store — follow-up surfaced during the #25 fix.
+  Needs a ruling: per-command error translation (in-pattern, cheap) vs. self-initializing
+  stores that auto-run app migrations on first tool command (nicer UX, ADR-worthy behavior
+  change — today only `serve`/`migrate up` create collections).
 - **#19** — PB-served webapp chat surface (deferred interactive follow-on; ADR 0001).
 
-Shipped 2026-07-17: **#23** (PR #24, `b723d31`) — ADR 0002 implementation; **NOTE.md punch
-list** (PR #26, squash `84d3b6e`) — repo plumbing + user docs, see §2.
+**Distribution substrate is ready but not yet exercised live.** `install.sh` exists (PR #29)
+and its artifact-name contract is verified against `release.yml`, but its live `curl | bash`
+path can only be proven once a real `v*` release is published — **no release has been cut
+yet**. Next concrete step to make install.sh live: bump `VERSION`, run `make release-prep`,
+follow its printed tag instructions. SHA-pinning (#27) already landed, so the release
+workflow is hardened before its first serious use.
+
+Shipped 2026-07-17: **#7 / #25 / #27** (PRs #29 / #30 / #28) — distribution + hardening wave,
+see §2. Earlier same day: **#23** (PR #24, `b723d31`), **NOTE.md punch list** (PR #26,
+`84d3b6e`).
 
 ## 2. Last session delivered (2026-07-17, latest)
+
+**Distribution + hardening wave — #7, #25, #27** — built foreman-style as a flat fan-out: three
+parallel worktree builders (disjoint file scopes), foreman adversarial verification + one
+foreman-level correction, all three merged CI-green (`aca8b6e`/`fb039e7`→squash on main).
+Local aggregate gates re-run on the integrated tree (version-sync, neutrality, shellcheck,
+actionlint, full `go test`) — all green.
+
+- **#27 — SHA-pin GitHub Actions** (PR #28). All 22 `uses:` refs across *four* workflows
+  (`ci`, `release`, `claude`, `claude-review` — two more than expected) pinned to 40-char
+  commit SHAs with `# vX` comments; annotated-tag refs (e.g. `claude-code-action@v1.0.158`)
+  dereferenced to the underlying commit. Foreman independently re-resolved a SHA sample via
+  `git ls-remote`. Landed FIRST so the release path is hardened before its first tag.
+- **#7 — curl-able install.sh** (PR #29). Root `install.sh`: OS/arch detect → download the
+  matching release binary + `checksums.txt` → sha256 verify (refuse on mismatch) → install to
+  `~/.local/bin` (no root) → guide the marketplace plugin install; `--version`, `--prefix`,
+  `--with-plugin`, `--dry-run`, `INSTALL_OS/ARCH` test hooks. Artifact names cross-checked
+  line-by-line against `release.yml` (bare-version binary name, `sha256sum ./*` checksum
+  format, `v<version>` tag). shellcheck clean; dry-run + error paths (exit 1) foreman-executed.
+  `docs/getting-started.md` gained a *conditional* ("once a `v*` release is published")
+  prebuilt-binary pointer. **Live e2e deferred to post-first-release** (nothing to download yet).
+- **#25 — uninitialized-store message** (PR #30). `query` on a store whose collections were
+  never created leaked PocketBase's bare `sql: no rows in result set`. Root cause: app
+  migrations run only under `serve`/`migrate up`, never on a plain tool-command bootstrap.
+  Fix translates `sql.ErrNoRows` (wrapped or bare) at the single `Query()` dispatch point
+  (covers all 7 kinds + CLI/MCP/agent callers) into `store is not initialized — run
+  \`librarian migrate up\` first`. **Foreman correction:** the builder first advised `sweep`;
+  changed to `migrate up` after confirming against the documented first-run flow AND that
+  `sweep` hits the same wall on a virgin store (sweep does not create collections). The
+  broader leak from `sweep`/`patrol`/etc. is filed as **#31**.
+
+## 2-prev0. NOTE.md punch list (2026-07-17)
 
 **Henry's NOTE.md punch list** (user docs / tests visibility / VERSION / precommit / release
 flow / Makefile / docs-vs-_meta) — built foreman-style (3 parallel builders + adversarial
@@ -172,13 +209,16 @@ Review cycle noted one accepted trade-off (migration 0012 down-path `return nil`
 
 ## 3. Where to start building
 
-Everything open is pure build — no ruling gates anything. Next up is the distribution arc
-**#7** (curl-able install.sh) **→ #12** (dual-format common-core fan-out).
-**#19** (webapp) is the deferred interactive
-follow-on; ADR 0001 records the preferred shape (custom Go route, PB-served, no runtime
-frontend toolchain). Note the skill
-files under `plugin/claude-plugin/skills/` are neutrality-lint-scanned (no bare issue refs,
-GitHub URLs, or profile scalars in skill prose).
+The distribution *script* (#7) is done; the natural next step is to **cut the first release**
+(bump `VERSION` → `make release-prep` → follow its tag instructions) so `install.sh`'s live
+`curl | bash` path is finally exercised — the one thing this wave could not prove because no
+release exists yet. After that, two tracks, each needing a ruling before build: **#12**
+(dual-format fan-out — decide the OpenCode-target shape) and **#31** (uninitialized-store
+error — per-command translation vs. self-initializing auto-migrate). **#19** (webapp) is the
+deferred interactive follow-on; ADR 0001 records the preferred shape (custom Go route,
+PB-served, no runtime frontend toolchain). Note the skill files under
+`plugin/claude-plugin/skills/` are neutrality-lint-scanned (no bare issue refs, GitHub URLs,
+or profile scalars in skill prose).
 
 ## 4. Conventions & gotchas
 
