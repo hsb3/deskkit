@@ -26,14 +26,14 @@ v1 (Claude Code only) is built, distributable, and CI-green on `main` — a live
 marketplace: `claude plugin marketplace add hsb3/desk-standard` →
 `claude plugin install desk-standard@desk-standard` (proven end-to-end).
 
-**Awaiting your merge: PR #21** (branch `fix/librarian-record-original-cap-and-prompt-seed`,
-CI-green — `ci` + `claude-review` pass) closes **#16 + #17**, the two correctness fixes from
-the 2026-07-16 dev-tooling-desk field evaluation (§2). Outward-facing, so left for you to merge.
+**PR #21 merged** (squash `e004f59`, 2026-07-17; four claude-review passes to a clean bill,
+CI-green on main) — closed **#16 + #17**, the two correctness fixes from the 2026-07-16
+dev-tooling-desk field evaluation (§2). Top priority is now **#18**.
 
 Open backlog, ranked (field-eval findings interleaved with the distribution arc):
-- **#16 / #17** — in PR #21, awaiting merge.
 - **#18** — field-interaction UX batch (orphan noise from infra dirs, R4 severity ambiguity,
-  mcp-serve EOF exit, JSON-only output); non-blocking cleanups.
+  mcp-serve EOF exit, JSON-only output); non-blocking cleanups. Two of the four are product
+  rulings (orphan taxonomy; R4 mechanical-vs-judgment), two are clear fixes (EOF exit, pretty).
 - **#20** — design session: multi-desk topology (7 desks → 7 stores vs 1; canonical store
   location; resolve the latent-but-forbidden `desk` field). A ruling, not code — gates any
   serious multi-desk story.
@@ -45,8 +45,12 @@ Open backlog, ranked (field-eval findings interleaved with the distribution arc)
 
 ## 2. Last session delivered (2026-07-17)
 
-**#16 + #17** fixed and proven, shipped as **PR #21** (commit `918bfaa`, CI-green). Both were
-findings from the 2026-07-16 dev-tooling-desk field evaluation.
+**#16 + #17** fixed, proven, and **merged** as **PR #21** (squash `e004f59`). Both were
+findings from the 2026-07-16 dev-tooling-desk field evaluation. The review cycle ran four
+claude-review passes (six findings total — 2 code tidy-ups, 2 test-gap fills, 2 doc/comment
+accuracy) all resolved before merge; commits `2db9bf4` (hoist collection lookup + path in
+errors + batch/seed tests), `4250219` (path-based test lookup + migration-comment asymmetry),
+`59ae0d9` (ProposeFix docstring corrected to the per-file-tolerance contract).
 
 - **#16** — record-original-first was silently capped at PocketBase's 5000-char TextField
   default: any desk file >5 KB could not have its byte-exact original recorded (the §5.4
