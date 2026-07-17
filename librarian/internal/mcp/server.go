@@ -127,8 +127,11 @@ func Serve(ctx context.Context, app core.App, cfg *config.Config) error {
 // real failure: a plain io.EOF, a cancelled/expired context, or the SDK's jsonrpc2
 // "server is closing: EOF" — which wraps its (internal, unimportable) ErrServerClosing
 // sentinel via %w and appends io.EOF via %v, so errors.Is(err, io.EOF) does NOT match it and
-// the message must be matched directly. Scoped to the "server is closing" sentinel so a
-// genuine mid-session transport failure still surfaces.
+// the message must be matched directly. The match is deliberately on the "server is closing"
+// sentinel ALONE, not "…: EOF": a client that drops the read end mid-write terminates the
+// session via a write error (broken pipe), yielding "server is closing: <writeErr>" — also a
+// normal stdio disconnect that must exit clean. A genuine mid-session failure does not carry
+// the "server is closing" sentinel, so it still surfaces.
 func isShutdownEOF(err error) bool {
 	if errors.Is(err, io.EOF) || errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
 		return true
