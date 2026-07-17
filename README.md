@@ -107,13 +107,18 @@ plugin/
 librarian/          pocket-librarian: Go binary, embedded PocketBase, MCP server + CLI
 schema/             schema v1 — shared by plugin/ and librarian/
 _knowledge/         your personalization root (profile + freeform background)
-docs/               build brief, product specs, data-surface design
+docs/               product specs, ADRs, and the getting-started / plugin / librarian guides
 ```
 
-## Source of truth
+## Documentation
 
-- `docs/build-brief.md` — the build brief this repo was built from (repo shape, acceptance
-  criteria, parallelism).
+Start with the user guides, then go deep:
+
+- **[docs/getting-started.md](docs/getting-started.md)** — install, fill your profile, build the librarian, first sweep + patrol.
+- **[docs/plugin-guide.md](docs/plugin-guide.md)** — the four skills as user journeys: when to reach for each, what you get.
+- **[docs/librarian-guide.md](docs/librarian-guide.md)** — the daily loop: sweep → patrol → fix → byte-exact restore.
+- `plugin/README.md`, `schema/README.md`, `librarian/README.md` — per-product operator detail.
 - `docs/pocket-librarian-v1-spec.md` — the librarian's product and technical spec.
-- `docs/m-05-data-surfaces.md` — the profile / `_knowledge/` design and the neutrality lint.
-- `plugin/README.md`, `schema/README.md`, `librarian/README.md` — per-product detail.
+- `docs/decisions/` — architecture decision records (interactive surface, multi-desk topology).
+- `_meta/build-brief.md` — the build brief this repo was built from (repo shape, acceptance criteria, parallelism).
+- `_meta/m-05-data-surfaces.md` — the profile / `_knowledge/` design and the neutrality lint.
