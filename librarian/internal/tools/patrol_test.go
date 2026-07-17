@@ -1,11 +1,20 @@
 package tools
 
 import (
+	"context"
 	"reflect"
 	"sort"
 	"strconv"
 	"testing"
+
+	"github.com/example/pocket-librarian/internal/desklib"
 )
+
+// fullFM is a complete universal-frontmatter doc: R1 finds no missing keys, so R1 does not fire.
+const fullFM = "---\ntype: task\ncreated: 2026-07-15\nupdated: 2026-07-15\ntags: []\nsynopsis: \"x\"\n---\nbody line\n"
+
+// missingFM is missing four universal keys: R1 fires.
+const missingFM = "---\ntype: task\n---\none body line\n"
 
 func TestIsEntityDoc(t *testing.T) {
 	cases := []struct {
@@ -281,6 +290,136 @@ func TestPatrolSummaryNoneWhenEmpty(t *testing.T) {
 	result := &PatrolResult{FilesSwept: 5, FindingsNew: 0, ByRule: map[string]int{}}
 	if got := patrolSummary(result); got != "files=5 findings_new=0 (none)" {
 		t.Fatalf("got %q", got)
+	}
+}
+
+// --- resolution (full/scoped patrol closes stale findings) ---
+
+// TestPatrol_ResolvesStaleFindingOnFullPatrol: a flagged finding whose rule no longer fires is
+// transitioned to resolved with the resolving run id after a FULL-desk patrol.
+func TestPatrol_ResolvesStaleFindingOnFullPatrol(t *testing.T) {
+	app, cfg := newTestEnv(t)
+
+	// The file now has complete frontmatter, so R1 no longer fires...
+	mustWriteFile(t, cfg.DeskRoot, "tasks/example.md", fullFM)
+	checksum := desklib.Checksum([]byte(fullFM))
+	fileRec := mustCreateFileRecord(t, app, "tasks/example.md", "tasks", "task", checksum)
+	// ...but a stale R1 finding from a prior run is still open.
+	finding := mustCreateFinding(t, app, fileRec, "R1", "old-checksum", "prior-run")
+
+	res, err := Patrol(context.Background(), app, cfg, &PatrolInput{})
+	if err != nil {
+		t.Fatalf("Patrol: %v", err)
+	}
+
+	got := reloadRecord(t, app, "patrol_findings", finding.Id)
+	if got.GetString("state") != "resolved" {
+		t.Fatalf("stale finding state = %q, want resolved", got.GetString("state"))
+	}
+	if got.GetString("resolved_run") != res.RunID {
+		t.Fatalf("resolved_run = %q, want the resolving run id %q", got.GetString("resolved_run"), res.RunID)
+	}
+}
+
+// TestPatrol_ScopedPatrolLeavesOutOfScopeStaleFinding: a scoped (--path) patrol resolves only
+// findings within its scope; a stale finding outside the scope is left flagged.
+func TestPatrol_ScopedPatrolLeavesOutOfScopeStaleFinding(t *testing.T) {
+	app, cfg := newTestEnv(t)
+
+	// In scope: a stale finding under tasks/ (R1 no longer fires -> should resolve).
+	mustWriteFile(t, cfg.DeskRoot, "tasks/in-scope.md", fullFM)
+	inRec := mustCreateFileRecord(t, app, "tasks/in-scope.md", "tasks", "task", desklib.Checksum([]byte(fullFM)))
+	inFinding := mustCreateFinding(t, app, inRec, "R1", "old-checksum", "prior-run")
+
+	// Out of scope: an equally-stale finding under analyses/ (must stay flagged).
+	mustWriteFile(t, cfg.DeskRoot, "analyses/out-of-scope.md", fullFM)
+	outRec := mustCreateFileRecord(t, app, "analyses/out-of-scope.md", "analyses", "task", desklib.Checksum([]byte(fullFM)))
+	outFinding := mustCreateFinding(t, app, outRec, "R1", "old-checksum", "prior-run")
+
+	if _, err := Patrol(context.Background(), app, cfg, &PatrolInput{Path: "tasks"}); err != nil {
+		t.Fatalf("Patrol: %v", err)
+	}
+
+	if got := reloadRecord(t, app, "patrol_findings", inFinding.Id); got.GetString("state") != "resolved" {
+		t.Fatalf("in-scope stale finding state = %q, want resolved", got.GetString("state"))
+	}
+	got := reloadRecord(t, app, "patrol_findings", outFinding.Id)
+	if got.GetString("state") != "flagged" {
+		t.Fatalf("out-of-scope stale finding state = %q, want flagged (untouched by a scoped patrol)", got.GetString("state"))
+	}
+	if got.GetString("resolved_run") != "" {
+		t.Fatalf("out-of-scope finding resolved_run = %q, want empty", got.GetString("resolved_run"))
+	}
+}
+
+// TestPatrol_StillFiringFindingStaysFlaggedAndDedupes: a finding whose rule still fires (same
+// checksum) stays flagged and is not re-created (deduped), never resolved.
+func TestPatrol_StillFiringFindingStaysFlaggedAndDedupes(t *testing.T) {
+	app, cfg := newTestEnv(t)
+
+	mustWriteFile(t, cfg.DeskRoot, "tasks/broken.md", missingFM)
+	checksum := desklib.Checksum([]byte(missingFM))
+	fileRec := mustCreateFileRecord(t, app, "tasks/broken.md", "tasks", "task", checksum)
+	// Finding stored with the file's CURRENT checksum so it dedupes against the re-fire.
+	finding := mustCreateFinding(t, app, fileRec, "R1", checksum, "prior-run")
+
+	res, err := Patrol(context.Background(), app, cfg, &PatrolInput{})
+	if err != nil {
+		t.Fatalf("Patrol: %v", err)
+	}
+
+	got := reloadRecord(t, app, "patrol_findings", finding.Id)
+	if got.GetString("state") != "flagged" {
+		t.Fatalf("still-firing finding state = %q, want flagged", got.GetString("state"))
+	}
+	if got.GetString("resolved_run") != "" {
+		t.Fatalf("still-firing finding must not record a resolved_run, got %q", got.GetString("resolved_run"))
+	}
+	// Deduped: no new R1 row was created for this path/checksum.
+	if res.ByRule["R1"] != 0 {
+		t.Fatalf("expected R1 deduped (0 new), got %d new R1 findings", res.ByRule["R1"])
+	}
+	all, err := app.FindRecordsByFilter("patrol_findings", "rule = 'R1'", "", 0, 0)
+	if err != nil {
+		t.Fatalf("list R1 findings: %v", err)
+	}
+	if len(all) != 1 {
+		t.Fatalf("expected exactly 1 R1 finding after dedupe, got %d", len(all))
+	}
+}
+
+// TestPatrol_ResolvesFindingOnDeletedFile pins an INTENDED consequence of the resolution
+// mechanism, not an accident: Patrol only reads files where deleted = false, so a soft-deleted
+// file's row drops out of filesByID entirely. Its open finding then resolves to an empty path
+// (filesByID lookup misses), and an empty path can never appear in `fired` (fired is populated
+// only from swept, non-deleted rows in `filtered`). So on the next FULL-desk patrol, a flagged
+// finding whose file has since been soft-deleted resolves exactly like any other finding whose
+// rule stopped re-firing — which is correct: a deleted file can never re-trip any rule, so
+// "resolved" accurately reflects nothing left to fix. This test locks in that behavior so a
+// future refactor of the fired/filesByID plumbing does not silently change it.
+func TestPatrol_ResolvesFindingOnDeletedFile(t *testing.T) {
+	app, cfg := newTestEnv(t)
+
+	fileRec := mustCreateFileRecord(t, app, "tasks/deleted.md", "tasks", "task", "checksum-x")
+	finding := mustCreateFinding(t, app, fileRec, "R1", "checksum-x", "prior-run")
+
+	// Soft-delete the file record, exactly as sweep does when the on-disk file disappears.
+	fileRec.Set("deleted", true)
+	if err := app.Save(fileRec); err != nil {
+		t.Fatalf("soft-delete file record: %v", err)
+	}
+
+	res, err := Patrol(context.Background(), app, cfg, &PatrolInput{})
+	if err != nil {
+		t.Fatalf("Patrol: %v", err)
+	}
+
+	got := reloadRecord(t, app, "patrol_findings", finding.Id)
+	if got.GetString("state") != "resolved" {
+		t.Fatalf("deleted-file finding state = %q, want resolved", got.GetString("state"))
+	}
+	if got.GetString("resolved_run") != res.RunID {
+		t.Fatalf("resolved_run = %q, want the resolving run id %q", got.GetString("resolved_run"), res.RunID)
 	}
 }
 

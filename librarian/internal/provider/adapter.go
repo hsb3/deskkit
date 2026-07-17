@@ -7,6 +7,11 @@
 // stored in Config (spec §6.3, §3.4). A required key that is unset fails LOUD with a clear
 // error (not a panic, not a deferred failure on first API call) so `agent` without a key
 // exits cleanly with an actionable message (Phase-1 acceptance).
+//
+// Key indirection: a profile may set secrets_ref.llm_api_key to the NAME of the env var that
+// holds the API key (surfaced as cfg.LLMAPIKeyEnv). When set, that named var is read instead
+// of the per-provider default (ANTHROPIC_API_KEY / OPENAI_API_KEY / GEMINI_API_KEY); when
+// unset the default var is used. Either way the secret VALUE lives only in the environment.
 package provider
 
 import (
@@ -30,11 +35,9 @@ import (
 func NewChatModel(ctx context.Context, cfg *config.Config) (model.ToolCallingChatModel, error) {
 	switch cfg.LLMProvider {
 	case "anthropic":
-		key := os.Getenv("ANTHROPIC_API_KEY")
+		key, envName := resolveAPIKey(cfg, "ANTHROPIC_API_KEY")
 		if key == "" {
-			return nil, fmt.Errorf(
-				"LLM_PROVIDER=anthropic requires ANTHROPIC_API_KEY, which is not set; " +
-					"export it or add it to a discovered .env")
+			return nil, missingKeyErr("anthropic", envName)
 		}
 		return claude.NewChatModel(ctx, &claude.Config{
 			APIKey:    key,
@@ -42,11 +45,9 @@ func NewChatModel(ctx context.Context, cfg *config.Config) (model.ToolCallingCha
 			MaxTokens: cfg.LLMMaxTokens,
 		})
 	case "openai":
-		key := os.Getenv("OPENAI_API_KEY")
+		key, envName := resolveAPIKey(cfg, "OPENAI_API_KEY")
 		if key == "" {
-			return nil, fmt.Errorf(
-				"LLM_PROVIDER=openai requires OPENAI_API_KEY, which is not set; " +
-					"export it or add it to a discovered .env")
+			return nil, missingKeyErr("openai", envName)
 		}
 		maxTokens := cfg.LLMMaxTokens
 		return openai.NewChatModel(ctx, &openai.ChatModelConfig{
@@ -55,11 +56,9 @@ func NewChatModel(ctx context.Context, cfg *config.Config) (model.ToolCallingCha
 			MaxTokens: &maxTokens,   // *int on the OpenAI config
 		})
 	case "gemini":
-		key := os.Getenv("GEMINI_API_KEY")
+		key, envName := resolveAPIKey(cfg, "GEMINI_API_KEY")
 		if key == "" {
-			return nil, fmt.Errorf(
-				"LLM_PROVIDER=gemini requires GEMINI_API_KEY, which is not set; " +
-					"export it or add it to a discovered .env")
+			return nil, missingKeyErr("gemini", envName)
 		}
 		client, err := genai.NewClient(ctx, &genai.ClientConfig{APIKey: key})
 		if err != nil {
@@ -74,4 +73,24 @@ func NewChatModel(ctx context.Context, cfg *config.Config) (model.ToolCallingCha
 	default:
 		return nil, fmt.Errorf("unknown LLM_PROVIDER %q (want anthropic|openai|gemini)", cfg.LLMProvider)
 	}
+}
+
+// resolveAPIKey returns the API key value and the NAME of the env var it was read from.
+// When the profile sets secrets_ref.llm_api_key (cfg.LLMAPIKeyEnv), that named var is used;
+// otherwise the per-provider default var name is used. The env var VALUE is read here and
+// never stored in Config (spec §6.3).
+func resolveAPIKey(cfg *config.Config, defaultEnv string) (key, envName string) {
+	envName = defaultEnv
+	if cfg.LLMAPIKeyEnv != "" {
+		envName = cfg.LLMAPIKeyEnv
+	}
+	return os.Getenv(envName), envName
+}
+
+// missingKeyErr builds the fail-loud message naming the exact env var that must be set —
+// the resolved indirection target when configured, else the per-provider default.
+func missingKeyErr(provider, envName string) error {
+	return fmt.Errorf(
+		"LLM_PROVIDER=%s requires %s, which is not set; export it or add it to a discovered .env",
+		provider, envName)
 }

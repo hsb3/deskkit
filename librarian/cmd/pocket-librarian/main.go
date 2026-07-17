@@ -20,6 +20,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/example/pocket-librarian/internal/agent"
+	"github.com/example/pocket-librarian/internal/bootstrap"
 	"github.com/example/pocket-librarian/internal/config"
 	"github.com/example/pocket-librarian/internal/desklib"
 	"github.com/example/pocket-librarian/internal/mcp"
@@ -55,6 +56,15 @@ func main() {
 		}
 		if err := prompt.Seed(e.App); err != nil {
 			app.Logger().Error("seed system prompt", "err", err)
+		}
+		// First-run superuser auto-create (spec §10.3): only when both PB_SUPERUSER_* env
+		// vars are set; idempotent and non-fatal — a failure logs but never blocks serve.
+		if cfgErr == nil {
+			if created, err := bootstrap.EnsureSuperuser(e.App, cfg); err != nil {
+				app.Logger().Error("ensure superuser", "err", err)
+			} else if created {
+				app.Logger().Info("created superuser from PB_SUPERUSER_* env", "email", cfg.PBSuperuserEmail)
+			}
 		}
 		return e.Next()
 	})

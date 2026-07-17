@@ -24,6 +24,52 @@ func TestNewChatModel_UnknownProvider(t *testing.T) {
 	}
 }
 
+func TestResolveAPIKey_Fallback(t *testing.T) {
+	// No profile indirection (LLMAPIKeyEnv empty) -> read the per-provider default var.
+	t.Setenv("ANTHROPIC_API_KEY", "sk-default-value")
+	cfg := &config.Config{LLMProvider: "anthropic"}
+	key, envName := resolveAPIKey(cfg, "ANTHROPIC_API_KEY")
+	if envName != "ANTHROPIC_API_KEY" {
+		t.Fatalf("envName = %q, want ANTHROPIC_API_KEY", envName)
+	}
+	if key != "sk-default-value" {
+		t.Fatalf("key = %q, want the default-var value", key)
+	}
+}
+
+func TestResolveAPIKey_Indirection(t *testing.T) {
+	// secrets_ref.llm_api_key names a custom env var; that var wins over the default one,
+	// and the default var is NOT consulted even when it is also set.
+	t.Setenv("ANTHROPIC_API_KEY", "sk-should-not-be-used")
+	t.Setenv("DESK_LLM_KEY", "sk-indirect-value")
+	cfg := &config.Config{LLMProvider: "anthropic", LLMAPIKeyEnv: "DESK_LLM_KEY"}
+	key, envName := resolveAPIKey(cfg, "ANTHROPIC_API_KEY")
+	if envName != "DESK_LLM_KEY" {
+		t.Fatalf("envName = %q, want DESK_LLM_KEY", envName)
+	}
+	if key != "sk-indirect-value" {
+		t.Fatalf("key = %q, want the indirection-target value (default var must be ignored)", key)
+	}
+}
+
+func TestNewChatModel_MissingKeyNamesIndirectionTarget(t *testing.T) {
+	// When indirection is configured but the named var is unset, the loud error must name the
+	// resolved target var, not the per-provider default.
+	t.Setenv("ANTHROPIC_API_KEY", "sk-present-but-not-the-target")
+	t.Setenv("DESK_LLM_KEY", "") // empty == unset for our os.Getenv check
+	cfg := &config.Config{LLMProvider: "anthropic", LLMModel: "x", LLMMaxTokens: 4096, LLMAPIKeyEnv: "DESK_LLM_KEY"}
+	m, err := NewChatModel(context.Background(), cfg)
+	if err == nil {
+		t.Fatalf("expected a loud missing-key error, got model %v", m)
+	}
+	if !strings.Contains(err.Error(), "DESK_LLM_KEY") {
+		t.Fatalf("error should name the indirection target DESK_LLM_KEY, got %q", err.Error())
+	}
+	if strings.Contains(err.Error(), "ANTHROPIC_API_KEY") {
+		t.Fatalf("error must not name the default var when indirection is configured, got %q", err.Error())
+	}
+}
+
 func TestNewChatModel_MissingKeyFailsLoud(t *testing.T) {
 	cases := []struct {
 		provider string

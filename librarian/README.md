@@ -44,10 +44,12 @@ Provider and model resolve with precedence **env var → profile → default**:
 | Provider | `LLM_PROVIDER` | `models.provider` | `anthropic` |
 | Model | `LLM_MODEL` | `models.model` | `claude-opus-4-8` |
 
-Each provider reads its own key from a fixed env var — `anthropic` → `ANTHROPIC_API_KEY`,
-`openai` → `OPENAI_API_KEY`, `gemini` → `GEMINI_API_KEY`. A missing key fails loud with an
-actionable message; nothing silently falls back. (The profile's `secrets_ref.llm_api_key`
-field is not yet read by the binary — the per-provider env vars above are the mechanism.)
+Each provider reads its key from a fixed env var by default — `anthropic` → `ANTHROPIC_API_KEY`,
+`openai` → `OPENAI_API_KEY`, `gemini` → `GEMINI_API_KEY`. A profile's `secrets_ref.llm_api_key`
+(or the `LLM_API_KEY_ENV` env var) can redirect this: set it to the NAME of the env var that
+actually holds the key, and that var is read instead of the provider default. A missing key
+fails loud with an actionable message naming the exact var it looked for; nothing silently
+falls back.
 
 ```bash
 export LLM_PROVIDER=anthropic     # or set models.provider in your profile
@@ -68,9 +70,10 @@ patrol `findings`, and `revisions` (recorded originals) directly:
 make gui             # builds, starts serve, opens http://127.0.0.1:8090/_/
 ```
 
-or by hand: `./pocket-librarian serve` then open `http://127.0.0.1:8090/_/`. On a fresh
-database the console's first-run screen creates the superuser account, or create one
-non-interactively:
+or by hand: `./pocket-librarian serve` then open `http://127.0.0.1:8090/_/`. If
+`PB_SUPERUSER_EMAIL` and `PB_SUPERUSER_PASSWORD` are both set, `serve` auto-creates that
+superuser account on first run (idempotent — safe to leave set across restarts). Otherwise,
+use the console's first-run screen, or create one non-interactively:
 
 ```bash
 ./pocket-librarian superuser create you@example.com <password>

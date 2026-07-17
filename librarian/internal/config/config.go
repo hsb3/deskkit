@@ -38,6 +38,7 @@ type Config struct {
 	ClaimerPollInterval time.Duration // CLAIMER_POLL_INTERVAL (§2.4; Phase 2)
 	LLMProvider         string        // LLM_PROVIDER
 	LLMModel            string        // LLM_MODEL
+	LLMAPIKeyEnv        string        // secrets_ref.llm_api_key — NAME of the env var holding the LLM API key (profile indirection; empty falls back to the per-provider default var)
 	LLMMaxTokens        int           // LLM_MAX_TOKENS
 	AgentMaxStep        int           // AGENT_MAX_STEP
 }
@@ -100,6 +101,9 @@ func Load() (*Config, error) {
 		HandoffPath:         pick("HANDOFF_PATH", ps("desk.paths.handoff"), "_meta/HANDOFF.md"),
 		LLMProvider:         pick("LLM_PROVIDER", ps("models.provider"), "anthropic"),
 		LLMModel:            pick("LLM_MODEL", ps("models.model"), "claude-opus-4-8"),
+		// secrets_ref.llm_api_key names (never contains) the env var holding the API key.
+		// Env still wins so an operator can override the indirection without a profile edit.
+		LLMAPIKeyEnv: pick("LLM_API_KEY_ENV", ps("secrets_ref.llm_api_key"), ""),
 	}
 	c.AutonomousWrites = envBool("LIBRARIAN_AUTONOMOUS_WRITES", false)
 	c.LLMMaxTokens = envInt("LLM_MAX_TOKENS", 4096)

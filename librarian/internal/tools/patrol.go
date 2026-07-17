@@ -58,13 +58,21 @@ func Patrol(ctx context.Context, app core.App, cfg *config.Config, in *PatrolInp
 			filesByID[row.ID] = row
 		}
 		openKeys := make(map[findingKey]bool, len(openFindingRecs))
+		openFindings := make([]openFinding, 0, len(openFindingRecs))
 		for _, f := range openFindingRecs {
 			p := ""
 			if row, ok := filesByID[f.GetString("file")]; ok {
 				p = row.Path
 			}
-			openKeys[findingDedupeKey(p, f.GetString("rule"), f.GetString("checksum"))] = true
+			rule := f.GetString("rule")
+			openKeys[findingDedupeKey(p, rule, f.GetString("checksum"))] = true
+			openFindings = append(openFindings, openFinding{rec: f, path: p, rule: rule})
 		}
+
+		// fired records every (path, rule) whose rule detection hit this run — recorded BEFORE
+		// the dedupe check so a still-firing finding that dedupes still counts as fired (and so
+		// is never resolved). Any open finding whose (path, rule) is absent here did not re-fire.
+		fired := make(map[ruleKey]bool)
 
 		findingsCollection, err := txApp.FindCollectionByNameOrId("patrol_findings")
 		if err != nil {
@@ -72,6 +80,7 @@ func Patrol(ctx context.Context, app core.App, cfg *config.Config, in *PatrolInp
 		}
 
 		fileFinding := func(row fileRow, rule, severity, detail, proposedFix string) error {
+			fired[ruleKey{row.Path, rule}] = true
 			if isDuplicateFinding(openKeys, row.Path, rule, row.Checksum) {
 				return nil
 			}
@@ -122,6 +131,27 @@ func Patrol(ctx context.Context, app core.App, cfg *config.Config, in *PatrolInp
 			}
 		}
 
+		// Resolution (deterministic; same transaction as the patrol write). Any open finding
+		// whose (path, rule) did NOT re-fire this run transitions to state=resolved with the
+		// resolving run id recorded. A FULL-desk patrol (no path restriction) considers every
+		// open finding; a SCOPED patrol (--path) resolves only findings within its scope, so a
+		// stale finding outside the scope is left flagged.
+		findingsResolved := 0
+		for _, of := range openFindings {
+			if in.Path != "" && !pathOrSubtree(of.path, in.Path) {
+				continue // out of scope for a scoped patrol
+			}
+			if fired[ruleKey{of.path, of.rule}] {
+				continue // still firing this run — stays flagged
+			}
+			of.rec.Set("state", "resolved")
+			of.rec.Set("resolved_run", runID)
+			if err := txApp.Save(of.rec); err != nil {
+				return err
+			}
+			findingsResolved++
+		}
+
 		logCollection, err := txApp.FindCollectionByNameOrId("patrol_log")
 		if err != nil {
 			return err
@@ -134,7 +164,7 @@ func Patrol(ctx context.Context, app core.App, cfg *config.Config, in *PatrolInp
 		logRec.Set("finished", time.Now().UTC())
 		logRec.Set("files_swept", result.FilesSwept)
 		logRec.Set("findings_new", result.FindingsNew)
-		logRec.Set("summary", patrolSummary(result))
+		logRec.Set("summary", fmt.Sprintf("%s resolved=%d", patrolSummary(result), findingsResolved))
 		return txApp.Save(logRec)
 	})
 	if txErr != nil {
@@ -179,6 +209,18 @@ func patrolSummary(result *PatrolResult) string {
 // --- dedupe key (spec §5.2 point 4: key = (path, rule, checksum)) ---
 
 type findingKey struct{ path, rule, checksum string }
+
+// ruleKey identifies a (path, rule) pair independent of checksum — the granularity at which a
+// finding "re-fires". A finding is resolved when its ruleKey did not fire in the current run.
+type ruleKey struct{ path, rule string }
+
+// openFinding is an in-scope flagged finding carried through the run for the resolution pass:
+// the record to patch plus its resolved (path, rule).
+type openFinding struct {
+	rec  *core.Record
+	path string
+	rule string
+}
 
 func findingDedupeKey(path, rule, checksum string) findingKey {
 	return findingKey{path, rule, checksum}
