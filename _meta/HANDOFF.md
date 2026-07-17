@@ -26,70 +26,69 @@ v1 (Claude Code only) is built, distributable, and CI-green on `main`. The repo 
 plugin marketplace: `claude plugin marketplace add hsb3/desk-standard` →
 `claude plugin install desk-standard@desk-standard` (proven end-to-end).
 
-Open backlog, ranked (rationale posted as comments on each issue, 2026-07-16):
-**#13** (interactive librarian surfaces — next: TUI/local webapp + the unbuilt trigger
-layer; fold **#14** config-drift fixes in; **#15** — patrol never resolves findings that
-stop firing — is small librarian work that fits the same sitting) → **#7** (curl-able
-install.sh; absorbs remaining distribution work: librarian release binaries, configure +
-post-install verify) → **#12** (dual-format common-core fan-out — last; consumes
-`bun run package` as the seed of the production step).
+The interactive-surfaces arc (**#13/#14/#15**) shipped 2026-07-16 evening (§2). Open
+backlog, ranked: **#7** (curl-able install.sh; absorbs remaining distribution work:
+librarian release binaries, configure + post-install verify) → **#12** (dual-format
+common-core fan-out — consumes `bun run package` as the seed of the production step) →
+**#19** (PB-served webapp session — the deferred follow-on recorded in ADR 0001).
 
-## 2. Last substantial session delivered (2026-07-16, later sitting)
+## 2. Last substantial session delivered (2026-07-16, evening)
 
-Closed **#8** (brownfield-adoption skill); one commit on `main` (`eec43eb`), CI green:
+Closed **#13, #14, #15** via two parallel worktree crews (foreman pattern: opus lead-driven
+team for the coupled #13 chain, single opus builder for #14/#15; every diff independently
+adversarially reviewed before landing — crew B 5/5 claims confirmed, crew A 7/7; all gates
+re-run by the session). Commits `d4c52aa` (crew B) → `e851e5b` (crew A) → merge `f148e04`;
+CI green on both pushes. Filed **#19** (deferred webapp follow-on).
 
-- Pre-design condition first: re-ran the field-test patrol on the adopted dev-tooling desk
-  with a post-#11 build, into a **fresh store** (`patrol-20260716T225845Z`, 188 files):
-  8 findings — the 2 upstream `_structure/decisions/README.md` findings are gone (resolved
-  by rule, #11 confirmed in the field); 7 known debt + 1 new genuine R5. Evidence on #8.
-- Discovery → filed **#15**: patrol dedupes against open findings but has no transition for
-  one that stops firing (rule change / hand-fix / deletion) — stale rows sit `flagged`
-  forever; re-baseline after a librarian upgrade needs a fresh store (workaround in issue).
-- `eec43eb` **#8** — `plugin/claude-plugin/skills/brownfield-adoption/` (SKILL.md, ~150
-  lines + `assets/adoption-plan.md` disposition-table template): the hardened K24 runbook —
-  9 phases mapped to K24's status track, librarian baseline as the FINAL gate. All 16 field
-  notes (issue #8 first comment) carried; an adversarial reviewer re-derived N1–N16
-  traceability and verified the librarian-phase claims against the spec + `patrol.go`.
-  desk-setup's scope note now points at the sibling skill; README + marketplace description
-  enumerate four skills; plugin **0.2.0 → 0.3.0**. Issue body updated per N6 (extension of
-  K24, not a new skill from scratch).
+- `d4c52aa` **#14 items 1–2 + #15** — `secrets_ref.llm_api_key` indirection implemented
+  (plus `LLM_API_KEY_ENV` env override; per-provider vars remain the fallback, byte-identical
+  when unset); idempotent superuser auto-create under `serve` (new `internal/bootstrap`;
+  note: NOT on bare `migrate up` — no app-lifecycle hook there, recorded on #14); patrol now
+  resolves open findings that stop firing (`state=resolved` + `resolved_run`, same
+  transaction; scoped patrols resolve in-scope only; deleted-file findings resolve by
+  design, test-pinned; migration `0010` down-func remaps resolved→flagged before stripping
+  the enum — proven e2e against a real store).
+- `e851e5b` **#13** — `pocket-librarian chat`: multi-turn desk-stewardship REPL over the
+  eino loop (`internal/agent/session.go`, stubbed-provider tests, history cap 40, no new
+  write path — tools only via the gated registry, `restore` never exposed, `apply_fix`
+  gated at execution time too); trigger wake layer `internal/trigger` under `serve` (hourly
+  cron patrol, files-create hook → scoped patrol, claimer finally consuming
+  `ClaimerPollInterval`; transactional claim, panic-safe dispatch — a panicking task marks
+  `failed`, serve survives); ADR **`docs/decisions/0001-interactive-surface-tui-first.md`**
+  (§7.4 options evaluated; TUI now, PB-served webapp deferred → #19); spec §7.4 carries the
+  supersession pointer; `verify.sh` 40 → 42 checks.
+- Reviewer findings fixed pre-land: claimer panic recovery + chat history cap (crew A);
+  0010 rollback data-remap + deleted-file resolution test (crew B). Known benign behavior:
+  a bulk sweep enqueues one scoped patrol per new file (burst, not recursion — patrol never
+  writes `files`).
 
-## 2b. Prior session same day (2026-07-16)
+## 2b. Earlier same day (2026-07-16)
 
-Closed #9, #10, #11 and addressed the librarian-docs gap; four commits on `main`, CI green:
-
-- `f90bb29` **#11** — patrol rules: a basename `README.md` inside an entity-mapped dir is a
-  directory index, not an entity record (exempt from R1/R4/R5 via `isEntityDoc`/`r4Check`).
-  Greenfield template now patrols at **zero findings** (proven e2e). Key discovery: there was
-  no pre-existing exemption mechanism — `_meta/README.md` escapes only via `dir_kind=meta`;
-  the conventions-standard skill's documented allowlist was unenforced prose, now reconciled.
-- `455769c` **#9** — in-repo marketplace (`.claude-plugin/marketplace.json`) + self-contained
-  plugin bundle: `bun run package` emits `plugin/claude-plugin/mcp/server.js` (core + npm deps
-  inlined) + in-plugin schema copy the existing walk-up finds from the cache. Generated
-  artifacts committed + CI drift-guarded. Plugin 0.1.0 → 0.2.0.
-- `0e44935` **#10** — issue/PR templates + `claude.yml`/`claude-review.yml` (action
-  v1.0.158, OAuth-preferred/API-key fallback; `CLAUDE_CODE_OAUTH_TOKEN` secret set by Henry,
-  workflows live) + PocketBase dev skill tracked at `.claude/skills/pocketbase/`.
-- `5044405` — `librarian/README.md` operator sections (LLM/provider selection, API keys,
-  admin console via `make gui` → `127.0.0.1:8090/_/`, `mcp-serve` wiring snippet), written as
-  actual current behavior. Filed **#13** (interactive agent surfaces — Henry's ruling: the
-  librarian is an on-demand built-in agent, not CLI-only) and **#14** (declared-but-unread
-  config: `secrets_ref.llm_api_key`, superuser auto-create, `ClaimerPollInterval`).
+Closed **#8** (brownfield-adoption skill, `eec43eb`, plugin 0.2.0 → 0.3.0: hardened K24
+runbook, 9 phases, librarian baseline as final gate; field-test patrol evidence on the
+issue) and **#9/#10/#11** + operator docs (`f90bb29`/`455769c`/`0e44935`/`5044405`):
+directory-index README patrol exemption (greenfield template patrols at zero findings),
+in-repo marketplace + self-contained plugin bundle (`bun run package`, drift-guarded),
+issue/PR templates + live claude workflows, `librarian/README.md` operator sections
+(LLM/keys, admin console via `make gui`, `mcp-serve` wiring). The discovery flow from those
+sittings filed #13/#14/#15 — all now closed (§2).
 
 ## 3. Where to start building
 
-Start with #13 (design entry points: spec §7.4 — three uncommitted surface options — and
-§1.3, stewardship not general chat; Henry's ruling refines, doesn't discard, that boundary),
-folding in #14's config-drift fixes and #15's patrol finding-resolution transition as
-same-sitting librarian work. Note the skill files under `plugin/claude-plugin/skills/` are
-neutrality-lint-scanned (no bare issue refs, GitHub URLs, or profile scalars in skill prose).
+Start with #7 (curl-able install.sh): absorb the remaining distribution work — librarian
+release binaries, configure step, post-install verify — building on the proven marketplace
+flow and `bun run package`. Then #12 (dual-format fan-out). #19 (webapp session) is the
+deferred interactive follow-on; ADR 0001 records the preferred shape (custom Go route,
+PB-served, no runtime frontend toolchain). Note the skill files under
+`plugin/claude-plugin/skills/` are neutrality-lint-scanned (no bare issue refs, GitHub
+URLs, or profile scalars in skill prose).
 
 ## 4. Conventions & gotchas
 
 - **Gates** (run all before claiming done): `node scripts/check-neutrality.mjs` ·
   `cd plugin && bun run check:purity && bun test && bun run build` ·
   `cd librarian && go build ./... && go vet ./... && go test ./...` · `bash librarian/verify.sh`
-  (40 checks) · `actionlint`. CI (`ci.yml`) is the aggregate required check.
+  (42 checks) · `actionlint`. CI (`ci.yml`) is the aggregate required check.
 - **Generated, never hand-edit**: `plugin/claude-plugin/mcp/server.js` and
   `plugin/claude-plugin/schema/profile.schema.yaml` — regen with `cd plugin && bun run package`;
   CI drift-guards them. Bundle output is byte-identical across macOS/linux (proven).
@@ -103,9 +102,12 @@ neutrality-lint-scanned (no bare issue refs, GitHub URLs, or profile scalars in 
 - **Beware pre-staged files**: parallel agents may `git add` their scope; `git commit` with a
   pathspec still sweeps the whole index. Check `git status` before every commit.
 - Librarian env: `DESK_ROOT`/`DESK_NAME` required by all tool commands; LLM only needed by
-  `agent`/MCP-driven calls (`LLM_PROVIDER` env → `profile.models` → anthropic;
-  `ANTHROPIC_API_KEY`/`OPENAI_API_KEY`/`GEMINI_API_KEY` hardcoded per provider);
-  `LIBRARIAN_AUTONOMOUS_WRITES=true` gates `apply_fix` over MCP; `restore` is CLI-only.
+  `agent`/`chat`/MCP-driven calls (`LLM_PROVIDER` env → `profile.models` → anthropic; key
+  from the env var named by `LLM_API_KEY_ENV` / `secrets_ref.llm_api_key`, else per-provider
+  `ANTHROPIC_API_KEY`/`OPENAI_API_KEY`/`GEMINI_API_KEY`); `LIBRARIAN_AUTONOMOUS_WRITES=true`
+  gates `apply_fix` (MCP and enqueued tasks — checked at execution time); `restore` is
+  CLI-only. `serve` extras: `PB_SUPERUSER_EMAIL`/`PB_SUPERUSER_PASSWORD` (idempotent
+  first-run superuser), `CLAIMER_POLL_INTERVAL` (wake-layer claimer).
 - Go 1.25 floor (PocketBase's go.mod); Bun 1.3.14 pinned in CI.
 - **Worktree provisioning**: untracked-and-load-bearing = `plugin/node_modules` (run
   `bun install --frozen-lockfile`) and `.claude/agent-memory/` (machine-local). Everything
