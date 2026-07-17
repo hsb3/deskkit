@@ -313,11 +313,20 @@ func TestProposeFix_BatchContinuesPastOneFailedFile(t *testing.T) {
 		t.Fatalf("expected 2 proposed outcomes, got %d: %+v", len(res.Proposed), res.Proposed)
 	}
 
-	first, second := res.Proposed[0], res.Proposed[1]
-	if first.Path != "tasks/a.md" || first.Outcome != "error" || first.RevisionID != "" || first.Error == "" {
+	// Select by path rather than index so the assertions don't depend on candidate sort order.
+	var first, second ProposedFix
+	for _, p := range res.Proposed {
+		switch p.Path {
+		case "tasks/a.md":
+			first = p
+		case "tasks/b.md":
+			second = p
+		}
+	}
+	if first.Outcome != "error" || first.RevisionID != "" || first.Error == "" {
 		t.Fatalf("first finding should be an error with no revision id, got %+v", first)
 	}
-	if second.Path != "tasks/b.md" || second.Outcome != "recorded" || second.RevisionID == "" {
+	if second.Outcome != "recorded" || second.RevisionID == "" {
 		t.Fatalf("second finding should still be recorded despite the first failing, got %+v", second)
 	}
 

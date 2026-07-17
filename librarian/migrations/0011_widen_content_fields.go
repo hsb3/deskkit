@@ -44,6 +44,10 @@ func setContentMax(app core.App, max int) error {
 	for _, f := range contentTextFields {
 		c, err := app.FindCollectionByNameOrId(f.coll)
 		if err != nil {
+			// Hard-error: the collection must exist (created by 0004/0007/0009 before this
+			// migration runs). An unexpected miss signals a broken migration sequence, not a
+			// planned schema change — unlike the field-type guard below, which soft-continues
+			// so a future migration may freely rename or drop one of these fields.
 			return err
 		}
 		tf, ok := c.Fields.GetByName(f.field).(*core.TextField)
