@@ -6,6 +6,8 @@
 package main
 
 import (
+	"bufio"
+	"context"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -26,6 +28,7 @@ import (
 	"github.com/example/pocket-librarian/internal/mcp"
 	"github.com/example/pocket-librarian/internal/prompt"
 	"github.com/example/pocket-librarian/internal/tools"
+	"github.com/example/pocket-librarian/internal/trigger"
 
 	// Blank-import registers all Go migrations (spec §4.11).
 	_ "github.com/example/pocket-librarian/migrations"
@@ -65,6 +68,23 @@ func main() {
 			} else if created {
 				app.Logger().Info("created superuser from PB_SUPERUSER_* env", "email", cfg.PBSuperuserEmail)
 			}
+		}
+
+		// Wake layer (spec §2.4) — registered ONLY under serve, so one-shot tool commands
+		// (which also create records) never enqueue tasks. Event hooks + cron enqueue tasks
+		// rows; a single background claimer polls the queue at CLAIMER_POLL_INTERVAL and runs
+		// each task (deterministic kinds call the tool directly; agentic kinds run the loop
+		// via the injected action below). Config is required for the tools, so gate on cfgErr.
+		if cfgErr == nil {
+			if err := trigger.RegisterHooks(e.App, cfg); err != nil {
+				app.Logger().Error("register record hooks", "err", err)
+			}
+			if err := trigger.RegisterCron(e.App, cfg); err != nil {
+				app.Logger().Error("register cron", "err", err)
+			}
+			trigger.StartClaimer(context.Background(), e.App, cfg, agentAction)
+		} else {
+			app.Logger().Warn("config not resolved; wake layer (hooks/cron/claimer) not started", "err", cfgErr)
 		}
 		return e.Next()
 	})
@@ -244,6 +264,23 @@ func registerToolCommands(app *pocketbase.PocketBase, cfg *config.Config, cfgErr
 	}
 	app.RootCmd.AddCommand(agentCmd)
 
+	// chat — interactive multi-turn stewardship session (REPL) over the eino loop (ADR 0001:
+	// terminal surface first). Like `agent`, a one-shot process that opens the DB directly, so
+	// it requires a prior `migrate up` (or serve). Scope stays desk stewardship: the session
+	// inherits the gated tool set (restore never exposed; apply_fix only when
+	// LIBRARIAN_AUTONOMOUS_WRITES is set) and the data-backed system prompt — not a general chat.
+	app.RootCmd.AddCommand(&cobra.Command{
+		Use:   "chat",
+		Short: "Interactive multi-turn librarian session (REPL over the agent loop)",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			c, err := requireConfig(cfg, cfgErr)
+			if err != nil {
+				return err
+			}
+			return runChat(cmd.Context(), app, c)
+		},
+	})
+
 	// mcp-serve — expose the tool core as an MCP stdio server (spec §7.2 outbound dual-surface;
 	// build-brief §5 / punch-list 4). The model-facing tool set is tools.AgentTools(cfg): the
 	// SAME §5.4 registration-time write gate as the eino loop (apply_fix only when
@@ -285,6 +322,53 @@ func registerToolCommands(app *pocketbase.PocketBase, cfg *config.Config, cfgErr
 			return child.Run()
 		},
 	})
+}
+
+// agentAction adapts agent.Run to trigger.AgentAction (the claimer's agentic dispatch): a
+// query/custom task runs the eino loop and the final text is discarded (the transcript is
+// persisted to the messages/agent_runs collections either way). Keeping this in the command
+// layer is what lets internal/trigger stay free of an internal/agent import.
+func agentAction(ctx context.Context, app core.App, cfg *config.Config, trig, input string) error {
+	_, err := agent.Run(ctx, app, cfg, trig, input)
+	return err
+}
+
+// runChat drives a line-oriented REPL over one agent.Session. Each input line is one
+// conversational turn; the session's growing history keeps the exchange multi-turn (the model
+// sees prior turns). Exit with "exit", "quit", or EOF (Ctrl-D). The write boundary and the
+// stewardship scope are the Session's, inherited from the gated tool set — nothing here opens a
+// new capability.
+func runChat(ctx context.Context, app core.App, cfg *config.Config) error {
+	sess, err := agent.NewSession(ctx, app, cfg)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = sess.Close(ctx) }()
+
+	fmt.Printf("pocket-librarian session for desk %q — type a request; 'exit', 'quit', or Ctrl-D to end.\n", cfg.DeskName)
+	sc := bufio.NewScanner(os.Stdin)
+	sc.Buffer(make([]byte, 0, 64*1024), 1024*1024) // allow long pasted requests
+	for {
+		fmt.Print("\nlibrarian> ")
+		if !sc.Scan() {
+			break // EOF (Ctrl-D) or read error (checked below)
+		}
+		line := strings.TrimSpace(sc.Text())
+		if line == "" {
+			continue
+		}
+		if line == "exit" || line == "quit" {
+			break
+		}
+		reply, terr := sess.Turn(ctx, line)
+		if terr != nil {
+			fmt.Fprintf(os.Stderr, "error: %v\n", terr)
+			continue
+		}
+		fmt.Println(reply)
+	}
+	fmt.Println("session ended.")
+	return sc.Err()
 }
 
 // printJSON marshals a tool's typed result (or returns its error) to stdout.

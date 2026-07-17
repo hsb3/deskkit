@@ -31,6 +31,10 @@ import (
 	"github.com/example/pocket-librarian/internal/tools"
 )
 
+// chatModelFactory builds the provider chat model; overridable in tests to inject a stub
+// so the loop can be exercised without a live API key.
+var chatModelFactory = provider.NewChatModel
+
 // systemPrompt resolves the ACTIVE prompt from the prompts collection (spec §4.10/§6.1),
 // falling back to the embedded default seed, then prepends a short desk-facts preamble
 // interpolated from config. Loaded at RUN START so GUI/REST edits apply to the next run.
@@ -179,7 +183,7 @@ func Run(ctx context.Context, app core.App, cfg *config.Config, trigger, input s
 	}
 	rc := &runCtx{app: app, cfg: cfg, runID: run.Id}
 
-	chatModel, err := provider.NewChatModel(ctx, cfg)
+	chatModel, err := chatModelFactory(ctx, cfg)
 	if err != nil {
 		return "", failRun(app, run, rc, err)
 	}
