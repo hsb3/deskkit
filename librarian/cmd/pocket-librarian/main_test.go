@@ -41,6 +41,15 @@ func TestFirstSubcommand(t *testing.T) {
 		{"multiple value flags before the subcommand", []string{"--dir", "/x", "--queryTimeout", "5", "query"}, "query"},
 		{"no subcommand (bare invocation)", []string{}, ""},
 		{"only flags, no subcommand", []string{"--dev"}, ""},
+		// Regression coverage for the --hooksDir bypass: an unregistered-in-this-build but
+		// recognized value flag must still have its value skipped, not mistaken for the
+		// subcommand — this is exactly how "--hooksDir /some/path serve" previously resolved to
+		// "/some/path" (not store-touching) and let PocketBase Bootstrap create a stray data dir.
+		{"hooksDir value form before the subcommand", []string{"--hooksDir", "/some/path", "serve"}, "serve"},
+		{"hooksDir equals form before the subcommand", []string{"--hooksDir=/some/path", "serve"}, "serve"},
+		{"hooksWatch value form before the subcommand", []string{"--hooksWatch", "true", "serve"}, "serve"},
+		{"hooksPool value form before the subcommand", []string{"--hooksPool", "25", "serve"}, "serve"},
+		{"multiple jsvm-style value flags before the subcommand", []string{"--hooksDir", "/x", "--hooksPool", "25", "sweep"}, "sweep"},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -69,6 +78,12 @@ func TestIsStoreTouchingInvocation(t *testing.T) {
 		{"bare invocation is not store-touching", []string{}, false},
 		{"flags before the subcommand still resolve", []string{"--dir", "/x", "sweep"}, true},
 		{"completion-style unknown subcommand not store-touching", []string{"completion", "bash"}, false},
+		// The --hooksDir bypass, end to end: before globalValueFlags recognized these, this case
+		// resolved firstSubcommand to "/some/path" and returned false here, silently skipping the
+		// unresolved-location guard for a real `serve` invocation.
+		{"hooksDir before serve does not bypass the guard", []string{"--hooksDir", "/some/path", "serve"}, true},
+		{"hooksWatch before serve does not bypass the guard", []string{"--hooksWatch", "true", "serve"}, true},
+		{"hooksPool before serve does not bypass the guard", []string{"--hooksPool", "25", "serve"}, true},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {

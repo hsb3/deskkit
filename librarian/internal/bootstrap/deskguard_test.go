@@ -87,3 +87,18 @@ func TestCheckDeskGuard_MismatchDetectedViaPatrolLogWhenFilesEmpty(t *testing.T)
 		t.Fatalf("error must name both desks, got: %s", err.Error())
 	}
 }
+
+func TestCheckDeskGuard_MismatchDetectedViaAdoptionLogWhenFilesAndPatrolLogEmpty(t *testing.T) {
+	app := newGuardApp(t)
+	// files and patrol_log are both empty; the mismatch lives only in adoption_log — the guard
+	// must fall through to the last collection in deskCarryingCollections, not just the first two.
+	insertRow(t, app, "adoption_log", deskAlpha, "")
+
+	err := CheckDeskGuard(app, deskBeta)
+	if err == nil {
+		t.Fatalf("mismatch recorded in adoption_log (files and patrol_log empty) must be refused")
+	}
+	if !strings.Contains(err.Error(), deskAlpha) || !strings.Contains(err.Error(), deskBeta) {
+		t.Fatalf("error must name both desks, got: %s", err.Error())
+	}
+}

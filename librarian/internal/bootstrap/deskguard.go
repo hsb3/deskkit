@@ -32,6 +32,12 @@ func CheckDeskGuard(app core.App, deskName string) error {
 		// First collection with any row decides (ADR 0002 §3). A row's desk is written from
 		// cfg.DeskName by sweep/patrol/apply_fix, so a differing value means this store already
 		// belongs to another desk.
+		//
+		// An empty stored desk ("") intentionally PASSES rather than refuses: it means the row
+		// predates the `desk` field's introduction (a pre-ADR-0002 store) or was written by some
+		// other unowned path, not that it names a mismatched desk. Only a genuinely differing
+		// NON-EMPTY value is evidence of the two-desks-one-store collision this guard exists to
+		// catch.
 		if stored := rec.GetString("desk"); stored != "" && stored != deskName {
 			return fmt.Errorf("store at %s belongs to desk %q but DESK_NAME is %q",
 				app.DataDir(), stored, deskName)

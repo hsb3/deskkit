@@ -75,11 +75,22 @@ export XDG_DATA_HOME
 # The main run drives the "verify-desk" desk; with no --dir its store resolves to this dir.
 STORE="$XDG_DATA_HOME/pocket-librarian/verify-desk"
 
+# Section 13's own scratch dirs are declared (empty) here, before the EXIT trap is installed,
+# so ONE trap covers the whole script — including a SIGINT mid-section-13, after these are
+# mktemp'd in section 13 but before that section finishes. Each is guarded with an empty-string
+# check in cleanup() since they are unset for most of the run.
+XDG2=""
+DESK2=""
+DIR3=""
+
 cleanup() {
   chmod -R u+w "$WORK" 2>/dev/null || true
   rm -rf "$WORK"
   chmod -R u+w "$XDG_DATA_HOME" 2>/dev/null || true
   rm -rf "$XDG_DATA_HOME"
+  [ -n "$XDG2" ] && { chmod -R u+w "$XDG2" 2>/dev/null || true; rm -rf "$XDG2"; }
+  [ -n "$DESK2" ] && { chmod -R u+w "$DESK2" 2>/dev/null || true; rm -rf "$DESK2"; }
+  [ -n "$DIR3" ] && { chmod -R u+w "$DIR3" 2>/dev/null || true; rm -rf "$DIR3"; }
 }
 trap cleanup EXIT
 
@@ -319,13 +330,11 @@ check "root --help lists the chat command" $?
 
 # --- 13. store-location resolution + desk open-guard (ADR 0002 §2/§3) ---------------------
 # Self-contained: its own throwaway XDG home + desk roots, isolated from the main run's store.
+# XDG2/DESK2/DIR3 are declared (empty) up top, next to the main WORK/XDG_DATA_HOME scratch
+# dirs, so the single EXIT trap removes them too — no separate cleanup13 trap/call needed.
 XDG2=$(mktemp -d "${TMPDIR:-/tmp}/pocket-librarian-xdg2.XXXXXX")
 DESK2=$(mktemp -d "${TMPDIR:-/tmp}/pocket-librarian-desk2.XXXXXX")
 DIR3=$(mktemp -d "${TMPDIR:-/tmp}/pocket-librarian-dir3.XXXXXX")
-cleanup13() {
-  chmod -R u+w "$XDG2" "$DESK2" "$DIR3" 2>/dev/null || true
-  rm -rf "$XDG2" "$DESK2" "$DIR3"
-}
 
 # (i) no --dir + XDG_DATA_HOME set -> store created at $XDG/pocket-librarian/<DESK_NAME>.
 XDG_DATA_HOME="$XDG2" DESK_ROOT="$DESK2" DESK_NAME="desk-one" ./"$BIN" migrate up > /dev/null 2>&1
@@ -354,8 +363,6 @@ XDG_DATA_HOME="$XDG2" DESK_ROOT="$DESK2" DESK_NAME="desk-three" ./"$BIN" migrate
 RC=$?
 [ "$RC" -eq 0 ] && [ -f "$DIR3/data.db" ] && [ ! -d "$XDG2/pocket-librarian/desk-three" ]
 check "--dir overrides the XDG default (store lands at the explicit dir, not XDG)" $?
-
-cleanup13
 
 # --- done ----------------------------------------------------------------------------------
 echo

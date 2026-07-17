@@ -223,15 +223,35 @@ func isStoreTouchingInvocation(args []string) bool {
 	return storeTouchingCommands[firstSubcommand(args)]
 }
 
+// globalValueFlags are every value-taking flag this manual pre-parse must recognize so its
+// value token is never mistaken for the subcommand name (the specific bug this list closes:
+// `--hooksDir /some/path serve` previously resolved firstSubcommand to "/some/path", which is
+// not in storeTouchingCommands, so isStoreTouchingInvocation silently returned false and
+// PocketBase's Bootstrap — which runs and MkdirAll-creates the (wrong, exe-relative) data dir
+// BEFORE cobra even reaches the "unknown flag" parse error for `serve` — proceeded unguarded).
+//
+// --dir/--encryptionEnv/--queryTimeout are pocketbase.go's actual registered root persistent
+// flags in THIS build (verified against the vendored source; migratecmd registers none).
+// --hooksDir/--hooksWatch/--hooksPool are NOT currently registered (the jsvm plugin that adds
+// them is not imported here) but are added defensively: they are real PocketBase-ecosystem
+// root flags a future dependency bump could wire in, and — as the bug above shows — an
+// UNREGISTERED flag is exactly as dangerous to this pre-parse as a registered one, since this
+// scan runs before app construction and cannot consult cobra's own flag definitions. This
+// remains an enumerated whitelist, not a structural fix: a genuinely novel unrecognized
+// value-flag not on this list could still shadow the subcommand token the same way.
+var globalValueFlags = map[string]bool{
+	"--dir": true, "--encryptionEnv": true, "--queryTimeout": true,
+	"--hooksDir": true, "--hooksWatch": true, "--hooksPool": true,
+}
+
 // firstSubcommand returns the first non-flag token in args (the invoked subcommand name),
 // skipping any leading global flags and the values of the value-taking ones so a form like
 // `--dir /x serve` still resolves to "serve". Returns "" for the bare (no-subcommand) usage.
 func firstSubcommand(args []string) string {
-	valueFlags := map[string]bool{"--dir": true, "--encryptionEnv": true, "--queryTimeout": true}
 	for i := 0; i < len(args); i++ {
 		a := args[i]
 		if strings.HasPrefix(a, "-") {
-			if !strings.Contains(a, "=") && valueFlags[a] {
+			if !strings.Contains(a, "=") && globalValueFlags[a] {
 				i++ // its value is the next token, not the subcommand name
 			}
 			continue
@@ -472,7 +492,23 @@ func registerToolCommands(app *pocketbase.PocketBase, cfg *config.Config, cfgErr
 			if xerr != nil {
 				return xerr
 			}
-			child := exec.Command(bin, append([]string{"serve"}, args...)...)
+			// Forward the resolved --dir to the child so it opens the EXACT SAME store gui just
+			// desk-guarded and is about to display in the browser (chosen over the alternative of
+			// having gui refuse an explicit --dir outright: forwarding is strictly more useful and
+			// gui otherwise behaves like every other subcommand w.r.t. --dir). --dir is a process
+			// flag, not an env var, so unlike DESK_ROOT/DESK_NAME/XDG_DATA_HOME (which DO inherit
+			// via exec.Command's default nil Env) it does NOT propagate to the child on its own.
+			// cmd.Flags().GetString("dir") reads cobra's own resolved value — the operator's
+			// explicit --dir when passed, or otherwise the XDG default this process's main()
+			// computed and handed to pocketbase.NewWithConfig as DefaultDataDir — so forwarding
+			// unconditionally (not only when --dir was passed explicitly) keeps parent and child
+			// aimed at the same store in both cases; there is no scenario where they should diverge.
+			dir, derr := cmd.Flags().GetString("dir")
+			if derr != nil {
+				return derr
+			}
+			childArgs := append([]string{"serve", "--dir", dir}, args...)
+			child := exec.Command(bin, childArgs...)
 			child.Stdout, child.Stderr, child.Stdin = os.Stdout, os.Stderr, os.Stdin
 			return child.Run()
 		},
