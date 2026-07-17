@@ -112,6 +112,15 @@ rm -rf "$STORE"
 go build -o "$BIN" ./cmd/pocket-librarian
 check "build ./$BIN" $?
 
+# --- 0b. self-initialization (ADR 0003) ---------------------------------------------------
+# A tool command against a store that was never `migrate up`'d must succeed by auto-applying
+# the app migrations at the requireConfig choke point, NOT leak the bare sql.ErrNoRows. Uses a
+# DISTINCT desk name so its store is a fresh, never-migrated location under the scratch XDG home
+# (cleaned by the EXIT trap); DESK_ROOT reuses $WORK (still empty here). Regression guard for the
+# uninitialized-store leak.
+DESK_ROOT="$WORK" DESK_NAME="verify-selfinit-desk" ./"$BIN" query summary > /dev/null 2>&1
+check "self-init: query on a never-migrated store succeeds (ADR 0003)" $?
+
 # --- 1. migrate: applies + is idempotent (spec §9.4 check 2) -----------------------------
 run_lib migrate up > /dev/null 2>&1
 check "migrate up" $?
