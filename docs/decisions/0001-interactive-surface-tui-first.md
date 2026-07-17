@@ -1,7 +1,18 @@
 _ADR for the pocket-librarian on-demand interactive surface: how a human reaches a live stewardship session._
-Status: Accepted — 2026-07-16
+Status: Accepted (corrected 2026-07-17) — 2026-07-16
 
 # 0001 — Interactive surface: terminal session first, PocketBase-served webapp deferred
+
+> **Correction (2026-07-17):** two clarifications to this record, neither of which changes the
+> decision.
+> 1. **"TUI" here means a line-oriented REPL, not a full-screen/graphical terminal UI.** What
+>    shipped is `chat` — a `bufio.Scanner` + prompt read-eval loop (`cmd/pocket-librarian/main.go`,
+>    `runChat`), with no bubbletea/tview/tcell dependency. The word "TUI" at the Decision heading
+>    and in the rationale below (and the `-tui-` filename slug) is loose usage; read it as
+>    "terminal session / REPL," the accurate term this ADR already uses in the Decision body.
+> 2. **The "≤2 commands (`migrate up`, then `chat`)" figure below is superseded by ADR 0003.**
+>    Tool commands now self-initialize the store, so `chat` needs no prior `migrate up` — the path
+>    is one command.
 
 ## Context
 

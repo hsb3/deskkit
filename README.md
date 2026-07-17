@@ -83,10 +83,12 @@ improvement-log pass.
 cd librarian
 export DESK_ROOT=/path/to/your/desk
 export DESK_NAME=my-desk
-make build && ./pocket-librarian migrate up
+make build
 make sweep    # index the desk tree
 make patrol   # flag rule violations — dry-run, never writes
 ```
+
+The store self-initializes on first run — `./pocket-librarian migrate up` is optional.
 
 `apply-fix` is deliberately not a Makefile target — it's supervised-only, run by hand, and
 every fix it applies can be reversed with `./pocket-librarian restore --by-path <path>`.
@@ -119,6 +121,6 @@ Start with the user guides, then go deep:
 - **[docs/librarian-guide.md](docs/librarian-guide.md)** — the daily loop: sweep → patrol → fix → byte-exact restore.
 - `plugin/README.md`, `schema/README.md`, `librarian/README.md` — per-product operator detail.
 - `docs/pocket-librarian-v1-spec.md` — the librarian's product and technical spec.
-- `docs/decisions/` — architecture decision records (interactive surface, multi-desk topology).
+- `docs/decisions/` — architecture decision records (interactive surface, multi-desk topology, store self-initialization).
 - `_meta/build-brief.md` — the build brief this repo was built from (repo shape, acceptance criteria, parallelism).
 - `_meta/m-05-data-surfaces.md` — the profile / `_knowledge/` design and the neutrality lint.

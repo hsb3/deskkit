@@ -23,11 +23,13 @@ export DESK_NAME=my-desk
 
 ```bash
 make build          # go build -> ./pocket-librarian
-./pocket-librarian migrate up   # apply migrations (idempotent)
 make sweep           # index the desk tree
 make patrol          # flag rule violations (dry-run; never writes)
 make findings        # or: summary / adoption / orphans / uncollapsed
 ```
+
+The store self-initializes on first run (ADR 0003) — no separate setup step needed.
+`./pocket-librarian migrate up` remains available as an explicit, optional step (idempotent).
 
 `make help` lists every target.
 
@@ -89,16 +91,16 @@ manual trigger; step-bounded by `AGENT_MAX_STEP`, default 12).
 ## Interactive session (`chat`)
 
 `chat` opens a multi-turn REPL over the same agent loop, in the same single binary,
-against the desk's store (see "Where the store lives" above). It requires a prior
-`migrate up` (or a prior `serve`) — it opens the DB directly, like `agent` and `mcp-serve`:
+against the desk's store (see "Where the store lives" above). It needs no prior
+`migrate up` — like `agent` and `mcp-serve`, it self-initializes the store on first run
+(ADR 0003):
 
 ```bash
-./pocket-librarian migrate up   # once, to create/upgrade the DB
 ./pocket-librarian chat         # start the multi-turn session
 ```
 
-That's the whole path from a built binary plus an API key to a live session — two
-commands. (Design origin: `../docs/decisions/0001-interactive-surface-tui-first.md`.)
+That's the whole path from a built binary plus an API key to a live session — one
+command. (Design origin: `../docs/decisions/0001-interactive-surface-tui-first.md`.)
 
 Needs an LLM provider and API key exactly like `agent` — see "Choosing the LLM and
 setting the API key" above.

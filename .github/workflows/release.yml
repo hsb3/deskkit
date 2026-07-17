@@ -96,6 +96,9 @@ jobs:
         working-directory: librarian
         run: go test ./...
 
+      - name: Librarian — verify gate (integration; self-init, write-boundary, restore, open-guard)
+        run: make verify
+
   # ---- cross-compile the librarian binary for every target ----
   binaries:
     needs: gate

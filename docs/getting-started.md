@@ -79,7 +79,7 @@ checksums, and installs it to `~/.local/bin` (no root):
 ```bash
 curl -fsSL https://raw.githubusercontent.com/hsb3/desk-standard/main/install.sh | bash
 # pin a version / preview without writing anything:
-#   ./install.sh --version v0.4.0 --dry-run
+#   ./install.sh --version vX.Y.Z --dry-run
 ```
 
 ## 4. First sweep and patrol
@@ -94,12 +94,11 @@ export DESK_ROOT=/path/to/your/desk
 export DESK_NAME=my-desk
 ```
 
-Create the store, index the tree, then flag violations. `sweep` and `patrol` are LLM-free
-and **never write desk files** — `patrol` is a pure dry run:
+Index the tree, then flag violations — no setup step needed, `sweep` creates the store on
+first run. `sweep` and `patrol` are LLM-free and **never write desk files** — `patrol` is a
+pure dry run:
 
 ```console
-$ ./pocket-librarian migrate up   # create/upgrade the store (idempotent)
-
 $ ./pocket-librarian sweep
 {
   "total": 4,
