@@ -296,6 +296,14 @@ RC=$?
 [ "$RC" -ne 0 ]
 check "restore --by-path nonexistent exits non-zero (rc=$RC)" $?
 
+# --- 12. interactive surface is registered (key-free: --help never opens a Session, so this
+# needs no LLM provider, no API key, and no running serve) --------------------------------
+./"$BIN" chat --help > /dev/null 2>&1
+check "chat --help exits 0 (interactive session subcommand is registered)" $?
+
+./"$BIN" --help 2>&1 | grep -q '^  chat '
+check "root --help lists the chat command" $?
+
 # --- done ----------------------------------------------------------------------------------
 echo
 echo "verify: $PASS passed, $FAIL failed ($N total)"

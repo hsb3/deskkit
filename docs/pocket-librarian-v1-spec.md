@@ -1784,6 +1784,14 @@ None are built in this spec.
 These are recorded so the architecture leaves room for them; **none is designed or built here**, and
 none touches the Phase 1/2 build acceptance (§8). They are also listed in §11.1 out-of-scope.
 
+> **Direction update (2026-07-16):** the "reuse the built-in GUI for chat" research spike below is
+> superseded for the **interactive surface** by ADR
+> [`docs/decisions/0001-interactive-surface-tui-first.md`](decisions/0001-interactive-surface-tui-first.md).
+> A terminal session (`chat` subcommand, multi-turn REPL over the eino loop) ships as the on-demand
+> human surface; the three web options below are re-scoped as a **deferred** follow-on, with option
+> **(b)** (custom Go route serving an embedded page) recorded as the preferred choice if/when a
+> browser surface is built. The bullet is left in place for provenance.
+
 - **Research spike — reuse the built-in GUI for chat (investigate only).** Whether a chat surface for
   the agent can be served without a separate frontend, via one of three options: **(a)** extending the
   PocketBase admin GUI, **(b)** a small custom Go route/page mounted in `OnServe` (like the summary

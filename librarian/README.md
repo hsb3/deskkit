@@ -56,8 +56,36 @@ export ANTHROPIC_API_KEY=sk-...
 ```
 
 `agent` runs the librarian's reasoning loop once over the tool set and exits (one-shot,
-manual trigger; step-bounded by `AGENT_MAX_STEP`, default 12). There is no interactive
-chat/watch mode yet — richer interaction surfaces are tracked in the repo issues.
+manual trigger; step-bounded by `AGENT_MAX_STEP`, default 12).
+
+## Interactive session (`chat`)
+
+`chat` opens a multi-turn REPL over the same agent loop, in the same single binary,
+against the local `pb_data`. It requires a prior `migrate up` (or a prior `serve`) — it
+opens the DB directly, like `agent` and `mcp-serve`:
+
+```bash
+./pocket-librarian migrate up   # once, to create/upgrade the DB
+./pocket-librarian chat         # start the multi-turn session
+```
+
+That's the whole path from a built binary plus an API key to a live session — two
+commands. (Design origin: `../docs/decisions/0001-interactive-surface-tui-first.md`.)
+
+Needs an LLM provider and API key exactly like `agent` — see "Choosing the LLM and
+setting the API key" above.
+
+The prompt is `librarian> `; each input line is one turn, and the session replays the
+recent conversation so the model sees prior turns. History is bounded to a sliding window
+of the most recent turns (a fixed cap, oldest turns dropped, no summarization), so a long
+session stays cheap rather than growing unbounded. Exit with `exit`, `quit`, or Ctrl-D.
+
+The session inherits the same gated tool set and boundaries as everything else in this
+README: `restore` is never exposed, `apply-fix` only runs when
+`LIBRARIAN_AUTONOMOUS_WRITES=true`, and the system prompt is the same data-backed one
+`agent` uses. It is desk stewardship, not a general chat assistant — there is no webapp
+or browser chat surface built yet; a PocketBase-served browser UI is a recorded, deferred
+follow-on (see the ADR above).
 
 ## The admin console
 
@@ -95,6 +123,30 @@ desk files; the `apply-fix` boundary below still holds.
     }
   }
 }
+```
+
+## Triggers — the wake layer under `serve`
+
+`serve` (only `serve` — one-shot CLI commands never enqueue tasks) runs three triggers
+that keep the desk patrolled without a human driving each step:
+
+| Trigger | What it does |
+|---|---|
+| Cron | Hourly job `desk-patrol` (`0 * * * *`) enqueues a `sweep` task, then a `patrol` task. |
+| On-record-create hook | A newly indexed row in `files` enqueues a scoped `patrol` task for that file. |
+| Claimer | One background goroutine polls the `tasks` queue every `CLAIMER_POLL_INTERVAL` (default `5s`), claims the highest-priority queued task transactionally, and runs it. |
+
+The claimer runs each claimed task by kind: `sweep`, `patrol`, `propose_fix`,
+`apply_fix`, and `restore` call the matching tool function directly (no LLM); `query`
+and `custom` tasks drive the agent loop. A claimed `apply_fix` still honors the write
+gate — with `LIBRARIAN_AUTONOMOUS_WRITES` off it is left `deferred` rather than applied,
+for a supervised CLI run later.
+
+These triggers start automatically the moment `serve` is running — no extra command.
+Set the poll interval with:
+
+```bash
+export CLAIMER_POLL_INTERVAL=10s   # default: 5s
 ```
 
 ## The write path — supervised only
