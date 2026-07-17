@@ -35,6 +35,12 @@ import (
 	_ "github.com/example/pocket-librarian/migrations"
 )
 
+// version is stamped at build time via ldflags (-X main.version=<VERSION>), wired from the
+// repo-root VERSION file by the librarian Makefile and the release workflow. A bare `go build`
+// leaves the default "dev", so `pocket-librarian --version` prints the real version only for
+// make/release builds.
+var version = "dev"
+
 func main() {
 	// Config is resolved BEFORE the app is constructed: the store location is derived from
 	// DESK_NAME and seeds PocketBase's --dir default (ADR 0002 §2). config.Load has no
@@ -94,6 +100,10 @@ func main() {
 		DefaultDev:     osutils.IsProbablyGoRun(),
 		DefaultDataDir: defaultDataDir,
 	})
+
+	// Override PocketBase's own RootCmd.Version (defaults to its embedded "(untracked)") with the
+	// ldflags-stamped repo version, so `pocket-librarian --version` reports THIS binary's release.
+	app.RootCmd.Version = version
 
 	// Automigrate on startup; also `pocket-librarian migrate up`. See §11.3 open item 1:
 	// confirm the automigrate generated-migration behavior in the run environment. migrate is

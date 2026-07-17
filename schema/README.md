@@ -6,11 +6,11 @@ Status: active
 
 **What schema v1 is.** One shared, product-neutral schema both the desk-standard plugin
 and the pocket-librarian binary read as their single rule/structure source
-(`docs/build-brief.md` §3.3(a); `_structure/decisions/0013` item 8). It is the seed of
+(`_meta/build-brief.md` §3.3(a); `_structure/decisions/0013` item 8). It is the seed of
 a single estate-wide schema (`0013` item 4).
 
 **What's in it now.** `profile.schema.yaml` — the M-05 personalization profile block
-(`docs/m-05-data-surfaces.md`, "Field set (schema v1 profile block)"): identity, repos,
+(`_meta/m-05-data-surfaces.md`, "Field set (schema v1 profile block)"): identity, repos,
 board, desk paths, machines, models, secrets_ref, preferences, and the open-ended
 `custom` escape hatch. It validates a `_knowledge/profile.{yaml,json,md}` file. Only
 `schema_version` is required at the top level; nested objects require their own core

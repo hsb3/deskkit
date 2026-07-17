@@ -47,6 +47,11 @@ jobs:
       - name: Neutrality lint — self-test (seeded-violation detection, AC5 down)
         run: node scripts/check-neutrality.mjs --self-test
 
+      # Version-sync: the root VERSION file is the single source of truth; fail if any of the
+      # three shipped manifests (plugin.json, plugin/package.json, marketplace.json) drift.
+      - name: Version-sync — VERSION vs shipped manifests
+        run: node scripts/check-version-sync.mjs
+
       # ---- plugin lane ----
       - name: Install plugin deps
         working-directory: plugin

@@ -12,7 +12,7 @@ person/org/repo/issue): **`plugin/`** (harness-pure TS core + stdio MCP server, 
 Claude Code plugin with four skills) and **`librarian/`** (pocket-librarian: single Go
 binary, embedded PocketBase, eino agent loop, record-original-first write boundary), with
 **`schema/`** as the contract both read. Personalization is only via `_knowledge/profile.yaml`.
-Root `README.md` is the front door; `docs/build-brief.md` is the build brief this repo was
+Root `README.md` is the front door; `_meta/build-brief.md` is the build brief this repo was
 built from; `docs/pocket-librarian-v1-spec.md` is the librarian's spec (build spec, not
 operator docs — operator docs are `librarian/README.md`).
 
@@ -156,7 +156,7 @@ GitHub URLs, or profile scalars in skill prose).
 - **Neutrality lint scope** = `plugin/` + `librarian/` recursively. Bare issue refs (`#11`)
   in Go comments/tests inside `librarian/` FAIL the lint — write issue-free comments.
   `.claude-plugin/marketplace.json` (owner identity) is deliberately outside the surface
-  (recorded in `docs/m-05-data-surfaces.md`).
+  (recorded in `_meta/m-05-data-surfaces.md`).
 - **Commits auto-close**: `Resolves #N` in a commit message closes the issue on push to
   main — post the proof comment first, or use `gh issue comment` after (close-with-comment
   fails on an already-closed issue).
