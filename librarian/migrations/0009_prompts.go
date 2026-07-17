@@ -16,7 +16,7 @@ func init() {
 		c.Id = "pbc_1968329054"
 		c.Fields.Add(&core.TextField{Name: "key", Required: true})
 		c.Fields.Add(&core.TextField{Name: "name"})
-		c.Fields.Add(&core.TextField{Name: "content"})
+		c.Fields.Add(&core.TextField{Name: "content"}) // Max widened off the 5000 default in 0011
 		c.Fields.Add(&core.NumberField{Name: "version", OnlyInt: true, Min: types.Pointer(0.0)})
 		c.Fields.Add(&core.BoolField{Name: "active"})
 		c.Fields.Add(&core.AutodateField{Name: "created", OnCreate: true})

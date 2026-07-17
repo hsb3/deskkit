@@ -21,7 +21,9 @@ import (
 // ProposeFix — §5.3: load the ignore list FIRST (fail closed via desklib.Ignored), then for
 // each flagged mechanical R1/R2/R3 finding run the guards in EXACT order
 // (ignore → missing → read → staleness → plan → RECORD-ORIGINAL-FIRST) and create a
-// revisions row. No filesystem write. A failed original-record aborts the operation.
+// revisions row. No filesystem write. A failed original-record is tolerated per-file (an
+// "error" outcome that records NO revision row) and the batch continues — the safety
+// boundary holds because no filesystem write may ever follow a finding without a revision.
 func ProposeFix(ctx context.Context, app core.App, cfg *config.Config, in *ProposeFixInput) (*ProposeFixResult, error) {
 	result := &ProposeFixResult{RunID: in.RunID, Proposed: []ProposedFix{}}
 
@@ -85,12 +87,18 @@ func ProposeFix(ctx context.Context, app core.App, cfg *config.Config, in *Propo
 		return result, nil
 	}
 
+	// Resolve the revisions collection ONCE, ahead of the loop, rather than per-file inside
+	// proposeOne (it is a pure schema lookup, invariant across candidates). A failure here is
+	// carried into proposeOne so its step-6 record-original guard reports a per-file "error"
+	// — earlier guards (ignore/missing/stale/noop) still resolve normally.
+	revCol, revColErr := app.FindCollectionByNameOrId("revisions")
+
 	for _, c := range candidates {
-		out, perr := proposeOne(app, cfg, c.finding, c.file, c.path, ignoreList, in.RunID)
-		if perr != nil {
-			return nil, perr
-		}
-		result.Proposed = append(result.Proposed, out)
+		// Per-file tolerance: a failure recording one file's original (e.g. a store error)
+		// yields an "error" outcome for that finding and the run continues to the rest —
+		// one bad file never aborts the batch. The safety boundary is unweakened: an errored
+		// finding records NO revision row, so no filesystem write can ever follow it.
+		result.Proposed = append(result.Proposed, proposeOne(app, cfg, c.finding, c.file, c.path, ignoreList, in.RunID, revCol, revColErr))
 	}
 	return result, nil
 }
@@ -118,34 +126,37 @@ func effectiveRuleSet(requested []string) map[string]bool {
 }
 
 // proposeOne runs the per-finding guard chain (§5.3, EXACT order): ignore check FIRST,
-// then missing, read+checksum, staleness, plan, record-original-first.
-func proposeOne(app core.App, cfg *config.Config, finding, fileRec *core.Record, path string, ignoreList []string, runID string) (ProposedFix, error) {
+// then missing, read+checksum, staleness, plan, record-original-first. It never returns an
+// error: a failure at any step is folded into an "error" outcome so the caller can continue
+// the batch. An "error" (or any non-"recorded") outcome creates NO revision row, preserving
+// the boundary that no filesystem write may ever follow a failed original-record.
+func proposeOne(app core.App, cfg *config.Config, finding, fileRec *core.Record, path string, ignoreList []string, runID string, revCol *core.Collection, revColErr error) ProposedFix {
 	rule := finding.GetString("rule")
 	out := ProposedFix{FindingID: finding.Id, Path: path, Rule: rule}
 
 	// 1. Ignore check FIRST. No read, no write.
 	if desklib.IsIgnored(path, ignoreList) {
 		out.Outcome = "ignored"
-		return out, nil
+		return out
 	}
 
 	// 2. File must exist as a regular file on disk.
 	if fileRec == nil {
 		out.Outcome = "missing"
-		return out, nil
+		return out
 	}
 	abs := filepath.Join(cfg.DeskRoot, path)
 	fi, statErr := os.Stat(abs)
 	if statErr != nil || !fi.Mode().IsRegular() {
 		out.Outcome = "missing"
-		return out, nil
+		return out
 	}
 
 	// 3. Read the original: raw bytes + checksum.
 	raw, rerr := os.ReadFile(abs)
 	if rerr != nil {
 		out.Outcome = "missing"
-		return out, nil
+		return out
 	}
 	checksum := desklib.Checksum(raw)
 
@@ -153,26 +164,30 @@ func proposeOne(app core.App, cfg *config.Config, finding, fileRec *core.Record,
 	findingChecksum := finding.GetString("checksum")
 	if findingChecksum != "" && checksum != findingChecksum {
 		out.Outcome = "stale"
-		return out, nil
+		return out
 	}
 
 	// 5. Compute the plan (pure function of rule + file record + original bytes).
 	plan, perr := computePlan(cfg, rule, fileRec, raw)
 	if perr != nil {
-		return out, fmt.Errorf("propose_fix: compute plan for %s: %w", path, perr)
+		out.Outcome = "error"
+		out.Error = fmt.Sprintf("compute plan for %s: %v", path, perr)
+		return out
 	}
 	if plan == nil {
 		out.Outcome = "noop"
-		return out, nil
+		return out
 	}
 	out.Action = plan.Action
 	out.NewPath = plan.NewPath
 
-	// 6. RECORD ORIGINAL FIRST (Boundary 1, decision 0014). If this create fails, return
-	// an error and abort — no filesystem write may ever follow a failed original-record.
-	revCol, cerr := app.FindCollectionByNameOrId("revisions")
-	if cerr != nil {
-		return out, fmt.Errorf("propose_fix: revisions collection: %w", cerr)
+	// 6. RECORD ORIGINAL FIRST (Boundary 1, decision 0014). If this create fails, report a
+	// per-file error and record NOTHING — no filesystem write may ever follow a failed
+	// original-record, and the caller carries on with the remaining findings.
+	if revColErr != nil {
+		out.Outcome = "error"
+		out.Error = fmt.Sprintf("revisions collection for %s: %v", path, revColErr)
+		return out
 	}
 	rev := core.NewRecord(revCol)
 	rev.Set("path", path)
@@ -185,11 +200,13 @@ func proposeOne(app core.App, cfg *config.Config, finding, fileRec *core.Record,
 	rev.Set("restored", false)
 	rev.Set("run_id", runID)
 	if err := app.Save(rev); err != nil {
-		return out, fmt.Errorf("propose_fix: record original for %s: %w", path, err)
+		out.Outcome = "error"
+		out.Error = fmt.Sprintf("record original for %s: %v", path, err)
+		return out
 	}
 	out.RevisionID = rev.Id
 	out.Outcome = "recorded"
-	return out, nil
+	return out
 }
 
 // --- planners (ported verbatim, §5.3) ---

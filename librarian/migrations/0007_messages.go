@@ -19,7 +19,7 @@ func init() {
 		c.Fields.Add(&core.RelationField{Name: "run", CollectionId: runs.Id, MaxSelect: 1, MinSelect: 1, CascadeDelete: true})
 		c.Fields.Add(&core.NumberField{Name: "seq", OnlyInt: true, Min: types.Pointer(0.0)})
 		c.Fields.Add(&core.SelectField{Name: "role", MaxSelect: 1, Values: []string{"system", "user", "assistant", "tool"}})
-		c.Fields.Add(&core.TextField{Name: "content"})
+		c.Fields.Add(&core.TextField{Name: "content"}) // Max widened off the 5000 default in 0011
 		c.Fields.Add(&core.JSONField{Name: "tool_calls"})
 		c.Fields.Add(&core.TextField{Name: "tool_call_id"})
 		c.Fields.Add(&core.TextField{Name: "tool_name"})

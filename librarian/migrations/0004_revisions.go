@@ -17,7 +17,7 @@ func init() {
 		c.Id = "pbc_3986342941"
 		c.Fields.Add(&core.TextField{Name: "path", Required: true})
 		c.Fields.Add(&core.SelectField{Name: "action", MaxSelect: 1, Values: []string{"edit", "move", "delete"}})
-		c.Fields.Add(&core.TextField{Name: "original_content"})
+		c.Fields.Add(&core.TextField{Name: "original_content"}) // Max widened off the 5000 default in 0011
 		c.Fields.Add(&core.TextField{Name: "original_checksum"})
 		c.Fields.Add(&core.TextField{Name: "new_path"})
 		c.Fields.Add(&core.RelationField{Name: "finding", CollectionId: findings.Id, MaxSelect: 1, MinSelect: 0, CascadeDelete: false})

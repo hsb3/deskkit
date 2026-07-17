@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/pocketbase/pocketbase/core"
@@ -131,14 +132,19 @@ func breakIgnoreFile(t *testing.T, cfg *config.Config) {
 // failingSaveApp wraps a *tests.TestApp and forces app.Save to fail for one named
 // collection — used to simulate a "store unreachable" failure at the exact
 // record-original-first insert (spec §5.3 boundary 1) without needing a real outage.
+// When failPath is set, only the record whose "path" field matches fails, so a batch test
+// can break exactly one file's original-record and prove the rest still record.
 type failingSaveApp struct {
 	*tests.TestApp
-	failFor string
+	failFor  string
+	failPath string
 }
 
 func (f *failingSaveApp) Save(model core.Model) error {
 	if rec, ok := model.(*core.Record); ok && rec.Collection() != nil && rec.Collection().Name == f.failFor {
-		return errors.New("forced store failure (test)")
+		if f.failPath == "" || rec.GetString("path") == f.failPath {
+			return errors.New("forced store failure (test)")
+		}
 	}
 	return f.TestApp.Save(model)
 }
@@ -190,7 +196,44 @@ func TestProposeFix_RecordsOriginalBeforeAnyWrite(t *testing.T) {
 	}
 }
 
-func TestProposeFix_ForcedStoreFailureAbortsAndPreventsTheWrite(t *testing.T) {
+// A desk file well over PocketBase's implicit 5,000-char TextField default must still have
+// its full original recorded byte-exact (the record-original-first boundary can't be capped;
+// migration 0011 widens original_content). The phase-1 fixtures were all under the cap, so
+// this regression pins a >5 KB body.
+func TestProposeFix_RecordsLargeOriginalOverDefaultCap(t *testing.T) {
+	app, cfg := newTestEnv(t)
+	// ~8 KB with no frontmatter → R1 fires; well past the 5000-char default.
+	body := strings.Repeat("This is a long analysis paragraph that pads the file well past 5 KB.\n", 120)
+	content := "# Big analysis, no frontmatter\n\n" + body
+	if len(content) <= 5000 {
+		t.Fatalf("fixture must exceed the 5000-char default cap, got %d", len(content))
+	}
+	abs := mustWriteFile(t, cfg.DeskRoot, "analyses/big.md", content)
+	checksum := desklib.Checksum([]byte(content))
+	fileRec := mustCreateFileRecord(t, app, "analyses/big.md", "analyses", "analysis", checksum)
+	mustCreateFinding(t, app, fileRec, "R1", checksum, "run-1")
+
+	res, err := ProposeFix(context.Background(), app, cfg, &ProposeFixInput{RunID: "run-1"})
+	if err != nil {
+		t.Fatalf("ProposeFix: %v", err)
+	}
+	if len(res.Proposed) != 1 || res.Proposed[0].Outcome != "recorded" {
+		t.Fatalf("expected one recorded outcome for the oversized file, got %+v", res.Proposed)
+	}
+	rev := reloadRecord(t, app, "revisions", res.Proposed[0].RevisionID)
+	if got := rev.GetString("original_content"); got != content {
+		t.Fatalf("original_content truncated: recorded %d chars, want %d", len(got), len(content))
+	}
+	if rev.GetString("original_checksum") != checksum {
+		t.Fatalf("original_checksum mismatch on the large file")
+	}
+	// The on-disk file is untouched (propose_fix never writes the fs).
+	if onDisk, rerr := os.ReadFile(abs); rerr != nil || string(onDisk) != content {
+		t.Fatalf("propose_fix must not touch the fs (err=%v)", rerr)
+	}
+}
+
+func TestProposeFix_ForcedStoreFailureIsToleratedAndPreventsTheWrite(t *testing.T) {
 	app, cfg := newTestEnv(t)
 	content := "no frontmatter here\n"
 	abs := mustWriteFile(t, cfg.DeskRoot, "tasks/example.md", content)
@@ -200,8 +243,18 @@ func TestProposeFix_ForcedStoreFailureAbortsAndPreventsTheWrite(t *testing.T) {
 
 	broken := &failingSaveApp{TestApp: app, failFor: "revisions"}
 
-	if _, err := ProposeFix(context.Background(), broken, cfg, &ProposeFixInput{RunID: "run-1"}); err == nil {
-		t.Fatalf("expected an error when the revisions store is unreachable")
+	// A failed original-record is now tolerated per-file: the run returns no top-level error,
+	// the finding gets an "error" outcome (with no revision id), and the safety boundary
+	// still holds — no revision row and no filesystem write.
+	res, err := ProposeFix(context.Background(), broken, cfg, &ProposeFixInput{RunID: "run-1"})
+	if err != nil {
+		t.Fatalf("ProposeFix must tolerate a per-file store failure, got top-level error: %v", err)
+	}
+	if len(res.Proposed) != 1 {
+		t.Fatalf("expected 1 proposed outcome, got %d: %+v", len(res.Proposed), res.Proposed)
+	}
+	if got := res.Proposed[0]; got.Outcome != "error" || got.RevisionID != "" || got.Error == "" {
+		t.Fatalf("expected an error outcome with no revision id and a populated Error, got %+v", got)
 	}
 
 	// No revision row was created for the finding...
@@ -229,6 +282,64 @@ func TestProposeFix_ForcedStoreFailureAbortsAndPreventsTheWrite(t *testing.T) {
 	}
 	if string(onDisk) != content {
 		t.Fatalf("file was mutated despite the aborted propose_fix operation: %q", string(onDisk))
+	}
+}
+
+// The core new contract is "one bad file never aborts the batch." A single-finding run can't
+// prove it — this two-finding run breaks the store for ONLY the first file and asserts the
+// second still records, with exactly one revision row surviving.
+func TestProposeFix_BatchContinuesPastOneFailedFile(t *testing.T) {
+	app, cfg := newTestEnv(t)
+	content := "no frontmatter here\n"
+	checksum := desklib.Checksum([]byte(content))
+
+	// Candidates sort by (rule, path); both R1, so "tasks/a.md" is [0] and "tasks/b.md" is [1].
+	mustWriteFile(t, cfg.DeskRoot, "tasks/a.md", content)
+	fileA := mustCreateFileRecord(t, app, "tasks/a.md", "tasks", "task", checksum)
+	mustCreateFinding(t, app, fileA, "R1", checksum, "run-1")
+
+	mustWriteFile(t, cfg.DeskRoot, "tasks/b.md", content)
+	fileB := mustCreateFileRecord(t, app, "tasks/b.md", "tasks", "task", checksum)
+	mustCreateFinding(t, app, fileB, "R1", checksum, "run-1")
+
+	// Break the original-record insert for ONLY the first file.
+	broken := &failingSaveApp{TestApp: app, failFor: "revisions", failPath: "tasks/a.md"}
+
+	res, err := ProposeFix(context.Background(), broken, cfg, &ProposeFixInput{RunID: "run-1"})
+	if err != nil {
+		t.Fatalf("ProposeFix must tolerate a per-file failure, got top-level error: %v", err)
+	}
+	if len(res.Proposed) != 2 {
+		t.Fatalf("expected 2 proposed outcomes, got %d: %+v", len(res.Proposed), res.Proposed)
+	}
+
+	// Select by path rather than index so the assertions don't depend on candidate sort order.
+	var first, second ProposedFix
+	for _, p := range res.Proposed {
+		switch p.Path {
+		case "tasks/a.md":
+			first = p
+		case "tasks/b.md":
+			second = p
+		}
+	}
+	if first.Outcome != "error" || first.RevisionID != "" || first.Error == "" {
+		t.Fatalf("first finding should be an error with no revision id, got %+v", first)
+	}
+	if second.Outcome != "recorded" || second.RevisionID == "" {
+		t.Fatalf("second finding should still be recorded despite the first failing, got %+v", second)
+	}
+
+	// Exactly one revision row exists — the surviving one, for the second file only.
+	revs, ferr := app.FindRecordsByFilter("revisions", "", "", 0, 0)
+	if ferr != nil {
+		t.Fatalf("list revisions: %v", ferr)
+	}
+	if len(revs) != 1 {
+		t.Fatalf("expected exactly one revision row (the second file), got %d", len(revs))
+	}
+	if revs[0].GetString("path") != "tasks/b.md" {
+		t.Fatalf("the surviving revision should be for tasks/b.md, got %q", revs[0].GetString("path"))
 	}
 }
 
