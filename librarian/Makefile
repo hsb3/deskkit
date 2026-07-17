@@ -23,6 +23,13 @@ BIN     := pocket-librarian
 PIDFILE := .pocket-librarian.pid
 LOGFILE := serve.log
 
+# Version stamp: the single source of truth is the repo-root VERSION file. The build target
+# passes it to the binary via `-ldflags -X main.version=<VERSION>` so `pocket-librarian
+# --version` reports the release (a bare `go build ./...` leaves the default "dev"). The
+# release workflow stamps the same way for cross-compiled artifacts.
+VERSION  := $(shell cat ../VERSION 2>/dev/null || echo dev)
+LDFLAGS  := -X main.version=$(VERSION)
+
 .PHONY: help build gui serve stop sweep patrol propose-fix findings summary \
         adoption orphans uncollapsed verify clean test vet fmt
 
@@ -30,8 +37,8 @@ help: ## List targets
 	@grep -hE '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) \
 	  | awk -F':.*?## ' '{printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}'
 
-build: ## Build the pocket-librarian binary (./pocket-librarian)
-	@go build -o $(BIN) ./cmd/pocket-librarian
+build: ## Build the pocket-librarian binary (./pocket-librarian), version-stamped from ../VERSION
+	@go build -ldflags "$(LDFLAGS)" -o $(BIN) ./cmd/pocket-librarian
 
 gui: build ## Serve the DB and open the admin GUI in a browser
 	@./$(BIN) gui

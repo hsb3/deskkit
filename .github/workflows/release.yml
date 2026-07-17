@@ -1,0 +1,197 @@
+name: release
+
+# Cuts a tagged release. Trigger: pushing a tag `v<major>.<minor>.<patch>`. The tag MUST match
+# the root VERSION file (asserted in `gate`) — use `make release-prep` to run the gates and get
+# the exact `git tag … && git push --tags` line. The workflow re-runs the CI gates, cross-
+# compiles the librarian for darwin/linux × amd64/arm64 (pure-Go, CGO disabled — PocketBase
+# uses the modernc sqlite driver, so no cgo toolchain is needed), rebuilds the plugin bundle,
+# and publishes a GitHub release with the binaries, the bundle, and a sha256 checksums file.
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  # ---- gate: assert the tag matches VERSION, then re-run the CI gates inline ----
+  gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Assert tag matches VERSION
+        run: |
+          version="$(cat VERSION)"
+          expected="v${version}"
+          if [ "${GITHUB_REF_NAME}" != "${expected}" ]; then
+            echo "release: tag '${GITHUB_REF_NAME}' does not match VERSION ('${expected}')." >&2
+            echo "Bump VERSION + the three manifests (see check-version-sync) and re-tag." >&2
+            exit 1
+          fi
+          echo "tag ${GITHUB_REF_NAME} matches VERSION ${version}."
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: librarian/go.mod
+          cache-dependency-path: librarian/go.sum
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: '1.3.14'
+
+      - name: Neutrality lint — scan the shipped tree
+        run: node scripts/check-neutrality.mjs
+
+      - name: Neutrality lint — self-test
+        run: node scripts/check-neutrality.mjs --self-test
+
+      - name: Version-sync — VERSION vs shipped manifests
+        run: node scripts/check-version-sync.mjs
+
+      - name: Install plugin deps
+        working-directory: plugin
+        run: bun install --frozen-lockfile
+
+      - name: Plugin — core purity
+        working-directory: plugin
+        run: bun run check:purity
+
+      - name: Plugin — packaged artifacts drift guard
+        working-directory: plugin
+        run: |
+          bun run package
+          git diff --exit-code -- claude-plugin/
+
+      - name: Plugin — tests
+        working-directory: plugin
+        run: bun run test
+
+      - name: Plugin — TypeScript build
+        working-directory: plugin
+        run: bun run build
+
+      - name: Librarian — build
+        working-directory: librarian
+        run: go build ./...
+
+      - name: Librarian — vet
+        working-directory: librarian
+        run: go vet ./...
+
+      - name: Librarian — tests
+        working-directory: librarian
+        run: go test ./...
+
+  # ---- cross-compile the librarian binary for every target ----
+  binaries:
+    needs: gate
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: true
+      matrix:
+        goos: [darwin, linux]
+        goarch: [amd64, arm64]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: librarian/go.mod
+          cache-dependency-path: librarian/go.sum
+
+      - name: Cross-compile (CGO disabled, pure-Go)
+        working-directory: librarian
+        env:
+          CGO_ENABLED: '0'
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+        run: |
+          version="$(cat ../VERSION)"
+          out="pocket-librarian_${version}_${{ matrix.goos }}_${{ matrix.goarch }}"
+          go build -ldflags "-X main.version=${version}" -o "${out}" ./cmd/pocket-librarian
+          echo "built ${out}"
+
+      - name: Upload binary artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: pocket-librarian_${{ matrix.goos }}_${{ matrix.goarch }}
+          path: librarian/pocket-librarian_*_${{ matrix.goos }}_${{ matrix.goarch }}
+          if-no-files-found: error
+
+  # ---- build the marketplace plugin bundle ----
+  bundle:
+    needs: gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: '1.3.14'
+
+      - name: Build plugin bundle
+        run: |
+          version="$(cat VERSION)"
+          cd plugin
+          bun install --frozen-lockfile
+          bun run package
+          tar -czf "../desk-standard-plugin_${version}.tar.gz" -C claude-plugin .
+          echo "built desk-standard-plugin_${version}.tar.gz"
+
+      - name: Upload bundle artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: desk-standard-plugin-bundle
+          path: desk-standard-plugin_*.tar.gz
+          if-no-files-found: error
+
+  # ---- publish the GitHub release ----
+  publish:
+    needs: [binaries, bundle]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Generate sha256 checksums
+        run: |
+          cd dist
+          sha256sum ./* > ../checksums.txt
+          mv ../checksums.txt .
+          cat checksums.txt
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version="$(cat VERSION)"
+          if [ -z "$(ls -A dist)" ]; then
+            echo "dist/ is empty — refusing to create an artifact-less release" >&2
+            exit 1
+          fi
+          gh release create "v${version}" dist/* \
+            --title "v${version}" \
+            --generate-notes

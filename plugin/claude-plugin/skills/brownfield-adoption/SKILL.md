@@ -36,10 +36,9 @@ Settle these before Phase 1; they bind every phase.
   docs-driven mode**: follow the same phases by hand against the `conventions-standard` docs,
   rendering placeholders manually instead of via the tool.
 - **pocket-librarian installed**, for the final baseline. The recommended path is **downloading
-  the published release artifact and verifying its checksum** before first use. **Alpha gotcha:**
-  the binary's `--version` reports the **embedded framework's** version, *not* the release
-  version — the release version lives in the **artifact filenames and release notes**, so pin
-  the release from there, not from `--version`.
+  the published release artifact and verifying its checksum** before first use. Release-built binaries
+  report their release version via `--version`; a binary that prints `dev` was built from
+  source without the version stamp — pin such a build from its source commit, not `--version`.
 
 ## Phase runbook
 

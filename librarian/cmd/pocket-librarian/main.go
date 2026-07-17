@@ -35,6 +35,12 @@ import (
 	_ "github.com/example/pocket-librarian/migrations"
 )
 
+// version is stamped at build time via ldflags (-X main.version=<VERSION>), wired from the
+// repo-root VERSION file by the librarian Makefile and the release workflow. A bare `go build`
+// leaves the default "dev", so `pocket-librarian --version` prints the real version only for
+// make/release builds.
+var version = "dev"
+
 func main() {
 	// Config is resolved BEFORE the app is constructed: the store location is derived from
 	// DESK_NAME and seeds PocketBase's --dir default (ADR 0002 §2). config.Load has no
@@ -94,6 +100,10 @@ func main() {
 		DefaultDev:     osutils.IsProbablyGoRun(),
 		DefaultDataDir: defaultDataDir,
 	})
+
+	// Override PocketBase's own RootCmd.Version (defaults to its embedded "(untracked)") with the
+	// ldflags-stamped repo version, so `pocket-librarian --version` reports THIS binary's release.
+	app.RootCmd.Version = version
 
 	// Automigrate on startup; also `pocket-librarian migrate up`. See §11.3 open item 1:
 	// confirm the automigrate generated-migration behavior in the run environment. migrate is
@@ -231,7 +241,9 @@ func isStoreTouchingInvocation(args []string) bool {
 // BEFORE cobra even reaches the "unknown flag" parse error for `serve` — proceeded unguarded).
 //
 // --dir/--encryptionEnv/--queryTimeout are pocketbase.go's actual registered root persistent
-// flags in THIS build (verified against the vendored source; migratecmd registers none).
+// flags in THIS build (verified against the vendored source: eagerParseFlags in
+// github.com/pocketbase/pocketbase/pocketbase.go registers them on RootCmd — re-audit that
+// function on every dependency bump; migratecmd registers none).
 // --hooksDir/--hooksWatch/--hooksPool are NOT currently registered (the jsvm plugin that adds
 // them is not imported here) but are added defensively: they are real PocketBase-ecosystem
 // root flags a future dependency bump could wire in, and — as the bug above shows — an
