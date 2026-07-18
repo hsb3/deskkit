@@ -48,23 +48,21 @@ interrupted turn's partial text (judged correct — it's real answer text). The 
 CHANGELOG now holds `make install` + the docs split + the whole chat-TUI pass; `make
 version-status` advises a bump — cut the next release when Henry's ready.
 
-**AWAITING HENRY: PR #48** — the chat-TUI UX pass (#44 light-terminal theming fix + #45
-researched UX pass + #43 `init`/first-run onramp + the Crush-style app chrome). CI green, all
-9 review threads fixed+replied, VHS-proven light AND dark, dev build demoed live in his tmux
-pane. **The chat GIFs predate the app-chrome commits — re-record after his verdict on the
-look** (bars/tints are one-line palette tweaks in `themeSurfaces`). Merging auto-closes
-#43/#44/#45. Deferred UX items are recorded in `docs/development/chat-tui-ux-survey.md`.
+**MERGED 2026-07-18: PR #48** (chat-TUI pass — #44 theming + #45 UX + #43 init/onramp +
+Crush-style app chrome, look approved live) **and PR #54** (`record_feedback`, #50). Chat
+GIFs re-recorded with the final chrome post-merge. Deferred UX items are recorded in
+`docs/development/chat-tui-ux-survey.md`.
 
-**AWAITING HENRY: PR #54** — `record_feedback` (issue #50): store-native feedback/friction
-log (migration 0013, tool on agent/chat/MCP + `record-feedback` CLI, `query feedback`).
-Independent of #48, branched off main; both touch `main.go`/CHANGELOG — second merge may need
-a trivial rebase. Both review comments fixed+replied; CI green.
+**AWAITING HENRY — the TUI roadmap rulings.** His direction (2026-07-18): "not just one
+window — threads, resume, context %; lift and shift from Crush." The decision memo with the
+five checkboxes + recommendations is at
+`_meta/briefings/2026-07-18-tui-roadmap-rulings/README.md`: #53 Charm-v2-stack migration is
+the gate ruling (ADR-worthy; Crush itself is FSL — lift designs, original code on MIT Charm
+libs), then #51 sessions surface and #52 context/token display. Recommended sequence: rule
+#53 → migration PR + ADR → #51/#52 on v2 (#52's session-layer plumbing can start anytime).
 
-**TUI roadmap (Henry's direction 2026-07-18: "not just one window — threads, resume, context
-%; lift and shift from Crush")**: #51 session-management surface, #52 context-window/token
-display, **#53 Charm-v2-stack migration = the enabler ruling (ADR-worthy, needs his accept;
-Crush itself is FSL-licensed — lift designs, write original code on MIT Charm libs)**.
-Sequence: land #48 → rule #53 → build #51/#52 on v2.
+**Release note:** `[Unreleased]` now holds the whole TUI pass + `record_feedback` + `make
+install` — a solid 0.6.0. Cut per `docs/development/releasing.md` when Henry wants it.
 
 **Open backlog, ranked** (no ruling gates the buildable ones):
 - **#12** — dual-format Claude+OpenCode fan-out (consumes `bun run package` as the seed).
