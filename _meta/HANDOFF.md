@@ -49,10 +49,22 @@ CHANGELOG now holds `make install` + the docs split + the whole chat-TUI pass; `
 version-status` advises a bump — cut the next release when Henry's ready.
 
 **AWAITING HENRY: PR #48** — the chat-TUI UX pass (#44 light-terminal theming fix + #45
-researched UX pass + #43 `init`/first-run onramp, one PR per his directive). CI green,
-adversarially reviewed, VHS-proven on light AND dark terminals. Review/merge is his call;
-merging auto-closes #43/#44/#45. Deferred UX items (slash-command menu, $EDITOR hatch,
-token/cost display…) are recorded in `docs/development/chat-tui-ux-survey.md`, not lost.
+researched UX pass + #43 `init`/first-run onramp + the Crush-style app chrome). CI green, all
+9 review threads fixed+replied, VHS-proven light AND dark, dev build demoed live in his tmux
+pane. **The chat GIFs predate the app-chrome commits — re-record after his verdict on the
+look** (bars/tints are one-line palette tweaks in `themeSurfaces`). Merging auto-closes
+#43/#44/#45. Deferred UX items are recorded in `docs/development/chat-tui-ux-survey.md`.
+
+**AWAITING HENRY: PR #54** — `record_feedback` (issue #50): store-native feedback/friction
+log (migration 0013, tool on agent/chat/MCP + `record-feedback` CLI, `query feedback`).
+Independent of #48, branched off main; both touch `main.go`/CHANGELOG — second merge may need
+a trivial rebase. Both review comments fixed+replied; CI green.
+
+**TUI roadmap (Henry's direction 2026-07-18: "not just one window — threads, resume, context
+%; lift and shift from Crush")**: #51 session-management surface, #52 context-window/token
+display, **#53 Charm-v2-stack migration = the enabler ruling (ADR-worthy, needs his accept;
+Crush itself is FSL-licensed — lift designs, write original code on MIT Charm libs)**.
+Sequence: land #48 → rule #53 → build #51/#52 on v2.
 
 **Open backlog, ranked** (no ruling gates the buildable ones):
 - **#12** — dual-format Claude+OpenCode fan-out (consumes `bun run package` as the seed).
@@ -71,14 +83,19 @@ token/cost display…) are recorded in `docs/development/chat-tui-ux-survey.md`,
 
 ## 2. Recent deliveries (newest first — full detail in the cited PRs / ADRs / git)
 
+- **2026-07-18 — record_feedback** (PR #54, open; issue #50): `feedback` collection
+  (migration 0013), tool on all surfaces + CLI subcommand, `query feedback` kind,
+  system-prompt nudge. Built in a worktree off main, independent of the TUI branch.
 - **2026-07-18 — chat-TUI UX pass** (PR #48, open): #44 per-theme palettes resolved once
   pre-program (`--theme`/`LIBRARIAN_THEME`/auto-probe) + #45 survey
   (`docs/development/chat-tui-ux-survey.md`) and apply (gutters, per-turn `model · latency`
   footer, bubbles/help + ctrl+g, ctrl+y copy-raw-markdown, edge-row prompt history with draft
   stash, scroll-anchored streaming, NO_COLOR reduced motion) + #43 `pocket-librarian init` +
-  interactive first-run onramp (`--no-input` keeps fail-closed). New `chat-light.tape`/GIF is
-  the light-background proof. Review hardening: lipgloss background cache pinned to the
-  resolved theme in `tui.Run` (see §4).
+  interactive first-run onramp (`--no-input` keeps fail-closed) + Crush-style app chrome
+  (full-width header/status bars, rounded input box that dims while streaming, user turns as
+  `▌`-bordered tinted blocks, 120-col measure — `themeSurfaces` in styles.go). New
+  `chat-light.tape`/GIF (light proof) + `init-onramp.tape`/GIF (offline onramp proof).
+  Review hardening: lipgloss background cache pinned to the resolved theme in `tui.Run` (§4).
 - **2026-07-18 — profile-first docs onramp** (PR #46). Fixed a getting-started
   self-inconsistency: §4 told non-devs to `export DESK_ROOT`/`DESK_NAME` even though step 2
   already fills `_knowledge/profile.yaml`, which the librarian auto-discovers by walk-up
