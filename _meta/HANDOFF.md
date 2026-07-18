@@ -1,7 +1,7 @@
 _Session-to-session bridge for desk-standard. Read this before working; update it at the end
 of any substantial session. Secret-free — live URLs/credentials belong in `_meta/operations/`
 (untracked) if that dir is ever created._
-Status: active (2026-07-17)
+Status: active (2026-07-18)
 
 # HANDOFF
 
@@ -30,7 +30,21 @@ marketplace: `claude plugin marketplace add hsb3/desk-standard` →
 (#16/#17/#18) shipped earlier (PRs #21/#22, §2b), and **#20 closed 2026-07-17** — the
 multi-desk design session was held and recorded as **ADR 0002** (commit `27a37a1`, §2).
 
-**TOP PRIORITY — v0.4.0 is RELEASED; the curl|bash install path is gated on repo visibility.**
+**TUI BUILD COMPLETE (2026-07-18) — all 5 phases MERGED (PRs #37, #38, #39, #40).** Henry
+ruled the draft client/server TUI spec (his executive desk,
+`_meta/plans/desk-tooling/pocket-librarian-tui-spec.md` under dev-tooling-desk) into an
+**in-process** Bubble Tea TUI (see §2). `chat` now runs a full-screen TUI on a terminal
+(REPL when piped / `--plain`), with streaming, tool steps, markdown, cancel, and
+conversation resume (ctrl+o) — recorded as **ADR 0004**. Live-verified end to end (§2).
+Remaining follow-ons, all small: VERSION bump 0.4.0 → 0.5.0 at next release (sync-guarded
+flow); two accepted review nits from PR #40 to fold into a future touch — the locked-store
+hint's substring match could false-positive on a path containing "locked" (harmless: hint is
+phrased as a question), and `docs/media/chat.tape`'s 30s answer sleep is tight for slow API
+days (only matters on manual re-record; committed GIF verified good). Watch item from PR #38
+(intermittent ctrl+t exit) never reproduced post-query-fix, including the live phase-4/5
+passes.
+
+**PRIOR PRIORITY — v0.4.0 is RELEASED; the curl|bash install path is gated on repo visibility.**
 `git tag v0.4.0 && git push --tags` was run 2026-07-17; the release workflow succeeded and
 published a non-draft/non-prerelease **v0.4.0** with all four binaries + `checksums.txt` +
 plugin bundle. Verified authoritatively: the darwin/arm64 binary downloads (73 MB), runs, and
@@ -77,7 +91,74 @@ Shipped 2026-07-17: **#31** (PR #32, ADR 0003) + **docs/CI release-prep sweep** 
 §2. Earlier same day: **#7 / #25 / #27** (PRs #29 / #30 / #28), **#23** (PR #24), **NOTE.md
 punch list** (PR #26).
 
-## 2. Last session delivered (2026-07-17, latest)
+## 2. Last sessions delivered (2026-07-18): chat TUI, all 5 phases
+
+**Phases 4–5 (same day, follow-on session): resume + docs — BUILD COMPLETE.**
+PR #39 (squash `2c66b2e`): conversation resume. `agent/resume.go` — `ListConversations`
+(manual runs; excludes the live session's own run and never-turned runs — a live-pass
+defect: the picker's default selection was the current session itself, "resuming" an empty
+history; caught by VHS, fixed + regression-tested) and `ResumeSession` (history rehydrated
+with orphaned user rows collapsed — keep a user row iff the next retained row is an
+assistant; `rc.seq` resumes past the persisted max; run row reopened, `Close` re-finalizes).
+`tui/picker.go` — ctrl+o overlay, ctrl+n new conversation, both no-ops while streaming;
+session swaps are open-before-close (claude-review round: a failed fresh/resume no longer
+strands the user on a finalized run; corrupt `tool_calls` JSON fails closed in rehydration;
+failed list/resume shows an inline error — each regression-tested). Live proof: quit
+mid-conversation with a real trailing orphaned user row (fast esc-cancel), relaunch, ctrl+o,
+resume — model recalled the pre-restart codeword; seq continued densely; anthropic accepted
+the collapsed history. PR #40 (squash `7f46b40`): ADR 0004 (supersedes ONLY ADR 0001's
+correction-note clarification 1; 0001's decision + status unchanged), README/guide chat
+rewrite, key-gated `docs/media/chat.tape` + live-recorded `chat.gif` (default `make media`
+stays hermetic), main.go stale `migrate up` comment fixed + locked-store hint
+(`annotateLockErr`, both surfacing points). Docs fact-checked adversarially: 33 confirmed /
+0 refuted. Crew: one Opus lead (phase 4), four parallel builders + one reviewer (phase 5);
+every gate re-run by the foreman.
+
+**Phases 1–3 (earlier same day):**
+
+Foreman-run build off the approved plan (`~/.claude/plans/floating-bouncing-journal.md`).
+Rulings taken with Henry: **in-process TUI** (Bubble Tea drives `agent.Session` directly —
+the draft spec's HTTP+SSE client/server shape was rejected as conflicting with ADR 0001;
+the streaming Event type is JSON-tagged so the deferred webapp SSE route reuses it);
+**`chat` auto-detects TTY** (full-screen TUI on a terminal, the old line REPL byte-identical
+when piped/non-TTY/`--plain`); **reuse `agent_runs`+`messages`** as conversation+transcript
+(no new collections; picker title = `input_summary`, backfilled on first turn).
+
+- **PR #37 (squash `fa81cd3`) — streaming engine.** `Session.StreamTurn` emits
+  token/tool_start/tool_end/final/error events; tokens sourced from the model-callback
+  stream copy because the agent output stream is BURSTY under the anthropic
+  StreamToolCallChecker (verified in eino v0.9.12 source). `Turn()` is now a thin drain over
+  StreamTurn (one persistence path for REPL+TUI). **Fixed a confirmed latent bug**: the
+  persistence hwm was per-session, so every multi-turn session duplicated the prior
+  assistant row (no-tool turns) or dropped the new user row (tool turns); now re-baselined
+  per turn, guarded by an exactly-once transcript regression test. Cancel semantics: partial
+  → plain assistant row (no marker in DB; TUI badges "(interrupted)"), no partial → history
+  rollback. Two claude-review rounds, all findings fixed + gap tests added.
+- **PR #38 (squash `bebb24e`) — TUI (phases 2+3).** `librarian/internal/tui/` (model/pump/
+  markdown/steps/styles/picker-seams), charmbracelet v1 deps (bubbletea 1.3.10, bubbles
+  1.0.0, glamour 1.0.0; binary 70.5→77.9 MiB), TTY routing in main.go. Plain-text while
+  streaming, glamour on finalize (per-token glamour is O(n²) — plan-sanctioned deviation).
+  **Live pass (foreman, VHS-driven real pty + real key) caught 3 defects unit tests missed**:
+  glamour `WithAutoStyle` fired OSC 11/DSR queries after bubbletea owned stdin and the
+  responses leaked INTO THE TEXTAREA (and to the model) — fixed with static style
+  (`GLAMOUR_STYLE` override) + regression guards; faint answer text (same root cause);
+  intermittent ctrl+t app-exit (2 of ~7 runs, unreproducible since the fix under stderr
+  capture + liveness probes — **watch item on PR #38**). Live pass also exposed a REAL
+  streaming regression: **zero-arg tool calls (sweep/patrol) stream no argument deltas →
+  `ArgumentsInJSON == ""` → unmarshal error killed the turn**; fixed via
+  `argNormalizingTool` adapter at the buildTools registration point ("" → "{}"),
+  live-re-proven (`sweep()` runs from chat).
+
+Load-bearing findings for the remaining phases: eino does NOT propagate ctx-cancel into a
+stuck provider stream (esc shows "cancelling…" until the provider ends its stream); a failed
+tool call surfaces ONLY via the OnError callback → `tool_end` event with `Err` set (`Result`
+empty); canceled turns leave orphaned user rows in `messages` → phase-4 resume must collapse
+consecutive user rows before replaying history to anthropic. Live-verification method:
+VHS tapes (RELATIVE Output/Screenshot paths only — absolute paths break its parser) +
+`secret get ANTHROPIC_API_KEY` + scratch DESK_ROOT/XDG_DATA_HOME; tapes in the session
+scratchpad under `vhs/`.
+
+## 2-prev2. Earlier session (2026-07-17)
 
 **#31 self-init ruling + docs/CI release-prep sweep, then release PREPARED.** Two threads:
 
@@ -261,6 +342,16 @@ Review cycle noted one accepted trade-off (migration 0012 down-path `return nil`
 
 ## 3. Where to start building
 
+**The TUI build is done** (all 5 phases merged — see §1). Next candidates, in rough order:
+release v0.5.0 when ready (VERSION bump via the sync-guarded flow, tag, verify assets like
+v0.4.0 in §1-prior); the repo-visibility decision gating the curl|bash install path (§1
+PRIOR PRIORITY, unchanged); the deferred webapp surface (ADR 0001 option b) now has its
+substrate ready — `StreamTurn`'s JSON-taggable events (ADR 0004) marshal straight onto an
+SSE route. For any new streaming/TUI work, gates per §4 and live proof via the §2 VHS
+method.
+
+## 3-prev. Prior guidance (pre-TUI, still valid)
+
 The distribution *script* (#7) is done; the natural next step is to **cut the first release**
 (bump `VERSION` → `make release-prep` → follow its tag instructions) so `install.sh`'s live
 `curl | bash` path is finally exercised — the one thing this wave could not prove because no
@@ -324,6 +415,13 @@ or profile scalars in skill prose).
   must remap rows off the new value FIRST (`0012`: `infra`→`other`) before dropping it from the
   enum, or a rollback leaves a row outside its reverted enum (same data-first pattern as `0010`).
 - Go 1.25 floor (PocketBase's go.mod); Bun 1.3.14 pinned in CI.
+- **eino streaming gotchas** (bind any new streaming caller to these — details in §2):
+  agent output stream is bursty under the anthropic tool-call checker (use model-callback
+  stream copies for live tokens); ctx-cancel doesn't abort a stuck provider stream; failed
+  tools fire OnError only; zero-arg tool calls need the `argNormalizingTool` adapter (in
+  place at buildTools — keep new tools behind it). **No terminal queries after bubbletea
+  starts** (no glamour WithAutoStyle / lazy lipgloss adaptive colors) — responses leak into
+  the textarea; regression-guarded in `internal/tui/defects_test.go`.
 - **Worktree provisioning**: untracked-and-load-bearing = `plugin/node_modules` (run
   `bun install --frozen-lockfile`) and `.claude/agent-memory/` (machine-local). Everything
   else a worktree agent needs is committed.
