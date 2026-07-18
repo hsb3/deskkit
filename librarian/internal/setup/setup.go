@@ -149,7 +149,8 @@ func InitProfile(dir string, opts InitOptions, confirmNested func(deskName, ance
 	}
 
 	if opts.WithEnv {
-		if err := os.WriteFile(envPath, []byte(envStub), 0o644); err != nil {
+		// 0o600: this stub holds a real LLM API key once filled in, so it is owner-only from birth.
+		if err := os.WriteFile(envPath, []byte(envStub), 0o600); err != nil {
 			return nil, err
 		}
 		res.EnvPath = envPath
@@ -234,10 +235,16 @@ func ancestorDeskName(profilePath string) string {
 	return filepath.Base(filepath.Dir(filepath.Dir(profilePath)))
 }
 
-// yamlQuote returns s as a YAML double-quoted scalar (escaping backslash and double-quote), so
-// a basename with spaces or special characters round-trips through the YAML parser unchanged.
+// yamlQuote returns s as a YAML double-quoted scalar (escaping backslash, double-quote, and the
+// control chars newline/carriage-return), so a basename with spaces, special characters, or even
+// an embedded newline round-trips through the YAML parser unchanged. Backslash is escaped first so
+// the escapes emitted below are not themselves re-escaped; the raw \n / \r are turned into their
+// YAML escape sequences (a literal newline in a double-quoted scalar folds to a space — silently
+// wrong — so it must never reach the emitted YAML).
 func yamlQuote(s string) string {
 	s = strings.ReplaceAll(s, `\`, `\\`)
 	s = strings.ReplaceAll(s, `"`, `\"`)
+	s = strings.ReplaceAll(s, "\n", `\n`)
+	s = strings.ReplaceAll(s, "\r", `\r`)
 	return `"` + s + `"`
 }

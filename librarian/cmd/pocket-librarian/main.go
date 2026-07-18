@@ -667,7 +667,9 @@ func registerToolCommands(app *pocketbase.PocketBase, cfg *config.Config, cfgErr
 			// set it, so an unset flag defers to the env override rather than shadowing it.
 			themeFlag := ""
 			if cmd.Flags().Changed("theme") {
-				themeFlag, _ = cmd.Flags().GetString("theme")
+				// GetString only errors on an unregistered/wrong-type flag; "theme" is registered as a
+				// string below, so the error is structurally impossible here — discard it explicitly.
+				themeFlag, _ = cmd.Flags().GetString("theme") //nolint:errcheck // "theme" is a registered string flag
 			}
 			return tui.Run(cmd.Context(), app, c, tui.ResolveTheme(themeFlag))
 		},

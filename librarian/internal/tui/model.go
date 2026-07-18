@@ -537,7 +537,13 @@ func (m model) newConversation() (tea.Model, tea.Cmd) {
 	fresh, err := m.provider.fresh(m.baseCtx)
 	if err != nil {
 		// Degraded: the fresh session failed to build. The old session was not touched, so the
-		// surface stays fully usable on it.
+		// surface stays fully usable on it — but say why (same visible-error path as openPicker),
+		// since a silent ctrl+n that does nothing reads as a dead keybinding, not a failed build.
+		m.entries = append(m.entries, entry{
+			role: roleAssistant, isError: true, finalized: true,
+			errText: "could not start a new conversation: " + err.Error(),
+		})
+		m.refreshViewport()
 		return m, nil
 	}
 	_ = m.provider.closeSession(m.baseCtx, m.sess)
@@ -831,7 +837,10 @@ func (m model) renderEntry(e entry) string {
 // the bare glyph — which still separates the turn — rather than losing the border entirely.
 func applyGutter(content string, style lipgloss.Style, glyph string) string {
 	prefix := style.Render(glyph) + " "
-	lines := strings.Split(content, "\n")
+	// TrimRight the trailing renderer newlines first, so they don't split into empty lines that
+	// would each render as an orphan line carrying only the gutter glyph. Embedded newlines
+	// (blank lines WITHIN the content) are preserved — only a trailing run is dropped.
+	lines := strings.Split(strings.TrimRight(content, "\n"), "\n")
 	for i, ln := range lines {
 		lines[i] = prefix + ln
 	}

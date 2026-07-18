@@ -2,6 +2,7 @@ package setup
 
 import (
 	"bytes"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -131,6 +132,12 @@ func TestInitProfileWithEnv(t *testing.T) {
 	if res.EnvPath == "" {
 		t.Fatal("EnvPath empty; want a written .env")
 	}
+	// The .env stub holds a real secret once filled in, so it must be owner-only (0o600).
+	if fi, err := os.Stat(res.EnvPath); err != nil {
+		t.Fatalf("stat .env: %v", err)
+	} else if perm := fi.Mode().Perm(); perm != 0o600 {
+		t.Errorf(".env mode = %04o, want 0600", perm)
+	}
 	b, err := os.ReadFile(res.EnvPath)
 	if err != nil {
 		t.Fatalf("read .env: %v", err)
@@ -215,6 +222,81 @@ func TestInitProfileAncestorDeskDetection(t *testing.T) {
 	}
 	if _, err := InitProfile(other, InitOptions{Force: true}, nil); err != nil {
 		t.Fatalf("nested desk with --force: %v", err)
+	}
+}
+
+// TestYamlQuoteControlChars proves a desk name carrying a literal newline (or CR) survives the
+// YAML round-trip exactly: without escaping, a raw newline in a double-quoted scalar folds to a
+// space, silently corrupting the desk name. We emit the profile the same way InitProfile does
+// (fmt.Sprintf(profileTemplate, yamlQuote(name))) and parse it back through config.LoadProfile.
+func TestYamlQuoteControlChars(t *testing.T) {
+	cases := []struct {
+		name string
+		desk string
+	}{
+		{"embedded newline", "line1\nline2"},
+		{"embedded carriage return", "a\rb"},
+		{"crlf", "a\r\nb"},
+		{"quote and backslash and newline", `a"b\c` + "\nd"},
+		{"plain with spaces", "my desk"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := t.TempDir()
+			kdir := filepath.Join(dir, "_knowledge")
+			if err := os.MkdirAll(kdir, 0o755); err != nil {
+				t.Fatal(err)
+			}
+			pp := filepath.Join(kdir, "profile.yaml")
+			content := fmt.Sprintf(profileTemplate, yamlQuote(tc.desk))
+			if err := os.WriteFile(pp, []byte(content), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			m, err := config.LoadProfile(pp)
+			if err != nil {
+				t.Fatalf("LoadProfile on emitted YAML: %v\nemitted:\n%s", err, content)
+			}
+			desk, ok := m["desk"].(map[string]any)
+			if !ok {
+				t.Fatalf("profile has no desk map: %v", m)
+			}
+			if got, _ := desk["name"].(string); got != tc.desk {
+				t.Errorf("round-tripped desk name = %q, want %q\nemitted:\n%s", got, tc.desk, content)
+			}
+		})
+	}
+}
+
+func TestConfirmNested(t *testing.T) {
+	cases := []struct {
+		name   string
+		input  string
+		isTTY  bool
+		want   bool
+		prompt bool // whether the prompt should have been emitted
+	}{
+		{"accept-y", "y\n", true, true, true},
+		{"accept-yes", "yes\n", true, true, true},
+		{"accept-upper", "Y\n", true, true, true},
+		{"decline-empty-default-no", "\n", true, false, true},
+		{"decline-n", "n\n", true, false, true},
+		{"decline-other", "maybe\n", true, false, true},
+		{"non-tty-declines-no-prompt", "y\n", false, false, false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			var w bytes.Buffer
+			got, err := ConfirmNested(strings.NewReader(tc.input), &w, tc.isTTY, "parent-desk", "/some/parent/_knowledge/profile.yaml")
+			if err != nil {
+				t.Fatalf("ConfirmNested: %v", err)
+			}
+			if got != tc.want {
+				t.Errorf("decision = %v, want %v", got, tc.want)
+			}
+			if emitted := w.Len() > 0; emitted != tc.prompt {
+				t.Errorf("prompt emitted = %v (%q), want %v", emitted, w.String(), tc.prompt)
+			}
+		})
 	}
 }
 
