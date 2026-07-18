@@ -469,10 +469,14 @@ func registerToolCommands(app *pocketbase.PocketBase, cfg *config.Config, cfgErr
 		},
 	}
 	recordFeedbackCmd.Flags().StringVar(&fbKind, "kind", "", "entry type: problem or feedback")
-	recordFeedbackCmd.Flags().StringVar(&fbSummary, "summary", "", "one-line summary (required)")
+	recordFeedbackCmd.Flags().StringVar(&fbSummary, "summary", "", "one-line summary")
 	recordFeedbackCmd.Flags().StringVar(&fbDetail, "detail", "", "optional longer detail")
 	recordFeedbackCmd.Flags().StringVar(&fbContext, "context", "", "optional note on what the agent was doing")
 	recordFeedbackCmd.Flags().StringVar(&fbSource, "source", "agent", "who originated the entry: agent or user")
+	// Declared required at the cobra layer so --help marks them and a missing flag fails fast
+	// with cobra's standard error (the tool re-validates values either way).
+	_ = recordFeedbackCmd.MarkFlagRequired("kind")
+	_ = recordFeedbackCmd.MarkFlagRequired("summary")
 	app.RootCmd.AddCommand(recordFeedbackCmd)
 
 	// agent <instruction> — Phase-1 MANUAL trigger for the eino ReAct loop (spec §6;

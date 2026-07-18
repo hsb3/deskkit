@@ -157,12 +157,14 @@ type adoptionResult struct {
 }
 
 // feedbackBrief is one open feedback-log entry as the `feedback` query returns it: identity +
-// summary + status + created, with the full detail body included (spec: read-back carries detail).
+// summary + source + status + created, with the full detail body included (spec: read-back
+// carries detail; source lets a harvest pass split agent-observed problems from user asks).
 type feedbackBrief struct {
 	ID      string `json:"id"`
 	Kind    string `json:"kind"`
 	Summary string `json:"summary"`
 	Detail  string `json:"detail"`
+	Source  string `json:"source"`
 	Status  string `json:"status"`
 	Created string `json:"created"`
 }
@@ -425,6 +427,7 @@ func queryFeedback(app core.App) (json.RawMessage, error) {
 			Kind:    r.GetString("kind"),
 			Summary: r.GetString("summary"),
 			Detail:  r.GetString("detail"),
+			Source:  r.GetString("source"),
 			Status:  r.GetString("status"),
 			Created: r.GetString("created"),
 		}
