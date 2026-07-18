@@ -90,8 +90,8 @@ manual trigger; step-bounded by `AGENT_MAX_STEP`, default 12).
 
 ## Interactive session (`chat`)
 
-`chat` opens a multi-turn REPL over the same agent loop, in the same single binary,
-against the desk's store (see "Where the store lives" above). It needs no prior
+`chat` opens a multi-turn conversation over the same agent loop, in the same single
+binary, against the desk's store (see "Where the store lives" above). It needs no prior
 `migrate up` — like `agent` and `mcp-serve`, it self-initializes the store on first run
 (ADR 0003):
 
@@ -100,14 +100,41 @@ against the desk's store (see "Where the store lives" above). It needs no prior
 ```
 
 That's the whole path from a built binary plus an API key to a live session — one
-command. (Design origin: `../docs/decisions/0001-interactive-surface-tui-first.md`.)
+command. (Design origin: `../docs/decisions/0001-interactive-surface-tui-first.md`,
+`../docs/decisions/0004-chat-full-screen-tui.md`.)
 
 Needs an LLM provider and API key exactly like `agent` — see "Choosing the LLM and
 setting the API key" above.
 
-The prompt is `librarian> `; each input line is one turn, and the session replays the
-recent conversation so the model sees prior turns. History is bounded to a sliding window
-of the most recent turns (a fixed cap, oldest turns dropped, no summarization), so a long
+On a terminal — stdin and stdout both TTYs — `chat` opens a full-screen TUI: the answer
+streams token by token, a finished answer renders as markdown, and each tool call
+collapses to one faint line (`ctrl+t` expands it). The keys:
+
+| Key | Does |
+|---|---|
+| `enter` | send |
+| `alt+enter` | insert a newline (multi-line input) |
+| `esc` | cancel an in-flight turn (badges it `(interrupted)`), or close the resume picker |
+| `ctrl+o` | resume a prior conversation |
+| `ctrl+n` | start a new conversation |
+| `ctrl+t` | toggle tool-step detail |
+| `pgup` / `pgdn` | scroll the transcript |
+| `ctrl+c` | quit |
+
+`ctrl+o` lists recent prior chat conversations — only ones that reached at least one
+turn — and resuming one restores the transcript and continues the model with full
+context. Conversations are not a separate store: they live in the same store as
+everything else.
+
+Markdown is rendered in a fixed dark style by default; `GLAMOUR_STYLE` overrides it to
+another named style. `auto` is rejected — an auto style queries the terminal for its
+background at render time, which would collide with the TUI's own input handling.
+
+When either stdin or stdout is not a terminal (piped input or output), or when
+`--plain` is passed, `chat` falls back to the original line REPL instead: the prompt is
+`librarian> `, each input line is one turn, and the session replays the recent
+conversation so the model sees prior turns. History is bounded to a sliding window of
+the most recent turns (a fixed cap, oldest turns dropped, no summarization), so a long
 session stays cheap rather than growing unbounded. Exit with `exit`, `quit`, or Ctrl-D.
 
 The session inherits the same gated tool set and boundaries as everything else in this
@@ -115,7 +142,7 @@ README: `restore` is never exposed, `apply-fix` only runs when
 `LIBRARIAN_AUTONOMOUS_WRITES=true`, and the system prompt is the same data-backed one
 `agent` uses. It is desk stewardship, not a general chat assistant — there is no webapp
 or browser chat surface built yet; a PocketBase-served browser UI is a recorded, deferred
-follow-on (see the ADR above).
+follow-on (see the ADRs above).
 
 ## The admin console
 
