@@ -12,9 +12,9 @@ person/org/repo/issue): **`plugin/`** (harness-pure TS core + stdio MCP server, 
 Claude Code plugin with four skills) and **`librarian/`** (pocket-librarian: single Go
 binary, embedded PocketBase, eino agent loop, record-original-first write boundary), with
 **`schema/`** as the contract both read. Personalization is only via `_knowledge/profile.yaml`.
-Root `README.md` is the front door; `_meta/build-brief.md` is the build brief this repo was
-built from; `docs/pocket-librarian-v1-spec.md` is the librarian's spec (build spec, not
-operator docs — operator docs are `librarian/README.md`).
+Root `README.md` is the front door; `docs/README.md` indexes the docs (Using ┃ Development);
+`_meta/build-brief.md` is the build brief this repo was built from; `docs/pocket-librarian-v1-spec.md`
+is the librarian's spec (build spec, not operator docs — operator docs are `librarian/README.md`).
 
 Siblings: `hsb3/dotfiles-agents` (the pattern source for workflows/templates); Henry's
 executive desk at `~/Documents/EXECUTIVE_DESK/Projects/dev-tooling-desk` holds off-repo
@@ -22,405 +22,88 @@ decision records (e.g. 0013–0016) referenced from the build brief — annotate
 
 ## 1. Current standing + top priority
 
-v1 (Claude Code only) is built, distributable, and CI-green on `main` — a live plugin
-marketplace: `claude plugin marketplace add hsb3/desk-standard` →
-`claude plugin install desk-standard@desk-standard` (proven end-to-end).
+**v0.5.0 is released and CI-green on `main`.** Both products ship at 0.5.0 off the single root
+`VERSION`: the plugin (live marketplace — `claude plugin marketplace add hsb3/desk-standard` →
+`claude plugin install desk-standard@desk-standard`, proven) and the `pocket-librarian` binary
+(release assets verified — downloads, runs, sha256 matches `checksums.txt`). All product rulings
+are in; open work is pure build. Cutting the next release just follows
+`docs/development/releasing.md` (§3, §4).
 
-**All rulings are in; everything open is now pure build work.** The field-eval findings
-(#16/#17/#18) shipped earlier (PRs #21/#22, §2b), and **#20 closed 2026-07-17** — the
-multi-desk design session was held and recorded as **ADR 0002** (commit `27a37a1`, §2).
+**Active blocker — the public `curl|bash` install path is gated on repo visibility.** The repo is
+PRIVATE, so every unauthenticated URL `install.sh` needs (`raw…/install.sh`, `/releases/latest`,
+`/releases/download/…`) 404s by design. install.sh's URL + checksum logic are proven correct
+(authed assets verify); the only missing link is the unauthenticated fetch. Fix = make the repo
+public (a deliberate launch decision, not autonomous) or add token/`gh` auth to install.sh.
 
-**TUI BUILD COMPLETE (2026-07-18) — all 5 phases MERGED (PRs #37, #38, #39, #40).** Henry
-ruled the draft client/server TUI spec (his executive desk,
-`_meta/plans/desk-tooling/pocket-librarian-tui-spec.md` under dev-tooling-desk) into an
-**in-process** Bubble Tea TUI (see §2). `chat` now runs a full-screen TUI on a terminal
-(REPL when piped / `--plain`), with streaming, tool steps, markdown, cancel, and
-conversation resume (ctrl+o) — recorded as **ADR 0004**. Live-verified end to end (§2).
+**ON HOLD (Henry, 2026-07-17): going public AND OpenCode (#12) are parked** until Henry is
+satisfied with the current build in practice — the focus is dogfooding/stabilizing shipped
+Claude-Code, not opening or extending. Don't action either without his go-ahead. Buildable
+follow-ups (#34, #35) can proceed.
 
-**v0.5.0 RELEASED (2026-07-18) — the TUI shipped under a tag, and the missing-bump gap is now
-guarded.** The chat TUI had merged under a stale VERSION 0.4.0; PR #41 bumped to 0.5.0, added a
-`CHANGELOG.md` (Keep a Changelog), and installed a two-tier missing-bump guard (**ADR 0005**):
-`check-changelog.mjs` (hard release gate — a tagged VERSION must have a non-empty CHANGELOG
-section; wired into `make release-prep` + `release.yml`) and `check-version-status.mjs`
-(non-blocking advisory — `make version-status` + a CI step — that warns when `plugin/`/`librarian/`
-changed since the last tag without a bump). `docs/development/releasing.md` is the runbook. `git tag v0.5.0`
-was pushed; the release workflow succeeded and published a non-draft/non-prerelease **v0.5.0**
-(4 binaries + `checksums.txt` + plugin bundle). Verified authoritatively: the darwin/arm64 binary
-downloads, runs, reports `version 0.5.0`, and its sha256 matches the published `checksums.txt`.
-The repo-visibility blocker on the *public* curl|bash path (below) is unchanged.
+**Small open follow-ons:** two accepted PR #40 review nits — the locked-store hint's substring
+match could false-positive on a path containing "locked" (harmless; the hint is phrased as a
+question), and `docs/development/tapes/chat.tape`'s 30s answer sleep is tight on slow API days
+(only matters on manual re-record; committed GIF verified good). The `make install` + docs-split
+work sits in `CHANGELOG.md [Unreleased]` (no tag cut yet — dev-facing).
 
-Remaining follow-ons from the TUI build, all small: two accepted review nits from PR #40 to fold
-into a future touch — the locked-store
-hint's substring match could false-positive on a path containing "locked" (harmless: hint is
-phrased as a question), and `docs/development/tapes/chat.tape`'s 30s answer sleep is tight for slow API
-days (only matters on manual re-record; committed GIF verified good). Watch item from PR #38
-(intermittent ctrl+t exit) never reproduced post-query-fix, including the live phase-4/5
-passes.
+**Open backlog, ranked** (no ruling gates the buildable ones):
+- **#12** — dual-format Claude+OpenCode fan-out (consumes `bun run package` as the seed).
+  Architectural; needs an OpenCode-target ruling before fan-out. **ON HOLD (above).**
+- **#34** — CI hardening: enforce shellcheck (incl. `install.sh`) + actionlint + a SHA-pin drift
+  guard in CI (all exist locally/pre-commit, not yet in the pipeline).
+- **#35** — coverage: unit-test `requireConfig` self-init for non-`query` commands + a behavioral
+  test for the TS MCP server.
+- **#19** — PB-served webapp chat surface (deferred; ADR 0001 option b — substrate ready, see §3).
+- **#36** — Template SOP library (v-next **major**): grow the 2 fixer templates to a full ~20-type
+  SOP library from the headcase shared set (`_headcase/shared/sops/`). Needs a design ruling first
+  (vendor-vs-sync, type↔dir_kind, planner template-selection, neutrality of vendored examples).
+  Corrects the "librarian knows ~20 SOPs" premise — that catalog never existed; the 2-template
+  boundary was intentional. A status-against-roadmap briefing deck lives at
+  `_meta/briefings/2026-07-17-status-against-roadmap/`.
 
-**PRIOR PRIORITY — v0.4.0 is RELEASED; the curl|bash install path is gated on repo visibility.**
-`git tag v0.4.0 && git push --tags` was run 2026-07-17; the release workflow succeeded and
-published a non-draft/non-prerelease **v0.4.0** with all four binaries + `checksums.txt` +
-plugin bundle. Verified authoritatively: the darwin/arm64 binary downloads (73 MB), runs, and
-reports `version 0.4.0`, and its sha256 matches the published `checksums.txt`.
-**BUT the repo is PRIVATE**, so the documented public install flow (`install.sh`) cannot be
-exercised unauthenticated — `raw.githubusercontent.com/.../install.sh`, `/releases/latest`, and
-every `/releases/download/…` URL return **404 by design** for a private repo. install.sh's URL
-construction + checksum logic are proven correct (its URLs are byte-identical to the API's
-`browser_download_url`, and the authed content verifies); the ONLY missing link is the
-unauthenticated HTTP fetch. **Action to unblock #7's "without hiccups" acceptance: make the repo
-public** (a deliberate launch decision — not taken autonomously). No code change needed; the
-same URLs resolve the moment the repo is public. If it must stay private, install.sh would need
-token/`gh` auth instead (design change).
+## 2. Recent deliveries (newest first — full detail in the cited PRs / ADRs / git)
 
-**ON HOLD (Henry, 2026-07-17): going public AND OpenCode are both parked until Henry is
-satisfied with how the current build works in practice.** So #7's public-launch step (make the
-repo public) and #12 (the OpenCode second format) are deliberately deferred — the near-term
-focus is dogfooding/stabilizing the shipped Claude-Code v0.4.0, not opening or extending it. Do
-not action either without Henry's go-ahead. Buildable-but-safe follow-ups (#34 CI hardening,
-#35 coverage) can still proceed.
+- **2026-07-18 — make install + docs dev/use split** (PR #42). `make install` (root →
+  `librarian/Makefile`) builds the version-stamped binary into `~/.local/bin` (override `PREFIX=`);
+  prompted by a stale on-PATH binary — `/plugin` updates the plugin, NOT the standalone binary
+  (separate artifacts). Docs split Using vs Development: new `docs/README.md` index + `docs/development/`
+  (overview, `releasing.md`, VHS `tapes/`); spec + ADRs kept at `docs/` top level for citation
+  stability (§4 "Docs layout").
+- **2026-07-18 — v0.5.0 release + versioning/changelog guard** (PR #41, **ADR 0005**). Bumped
+  0.4.0→0.5.0, added `CHANGELOG.md`, and a two-tier missing-bump guard: `check-changelog.mjs`
+  (hard release gate) + `check-version-status.mjs` (non-blocking drift advisory) — §4
+  "Versioning/release". Tagged + released; assets verified.
+- **2026-07-18 — chat full-screen TUI, all 5 phases** (PRs #37–#40, **ADR 0004**). Bubble Tea TUI
+  with streaming, tool steps, markdown, cancel, resume (ctrl+o); REPL fallback when piped/`--plain`.
+  Streaming substrate (`Session.StreamTurn`, JSON-taggable `Event`) is reusable for the deferred
+  webapp SSE route. eino/bubbletea streaming gotchas → §4.
+- **2026-07-17 — #31 store self-init** (PR #32, **ADR 0003**) + **docs/CI release-prep sweep**
+  (PR #33): tool commands auto-run migrations at `requireConfig`; `verify.sh` wired into CI + the
+  release gate (§4 "Store self-initializes").
+- **2026-07-17 — distribution + hardening** #7/#25/#27 (PRs #29/#30/#28): curl-able `install.sh`,
+  SHA-pinned Actions, actionable uninitialized-store message. **First release v0.4.0 cut** (§5).
+- **2026-07-17 — NOTE.md punch list** (PR #26): root `Makefile`, unified `VERSION`, `lefthook.yml`,
+  `release.yml`, three user guides + VHS media.
+- **2026-07-17 — #23 XDG store home + desk open-guard** (PR #24, **ADR 0002**, from the #20 design
+  session): store defaults to `$XDG_DATA_HOME/pocket-librarian/<DESK_NAME>/`; a mismatched-desk
+  store refuses. PocketBase bootstrap/serve-RunE gotchas → §4.
+- **2026-07-17 — #18 field-UX batch** (PR #22): `infra` dir_kind, R4→judgment, mcp-serve clean EOF,
+  `query --pretty`. **#16/#17** (PR #21): content-field widen (migration 0011) + prompt seed moved
+  into `requireConfig`.
+- **2026-07-16 — #13/#14/#15** (**ADR 0001**): chat REPL + trigger wake layer, `secrets_ref`
+  indirection, serve superuser auto-create, patrol stale-finding resolution (migration 0010).
+  **#8–#11**: brownfield-adoption skill, in-repo marketplace + `bun run package` bundle, operator docs.
 
-Open backlog, ranked (no ruling gates the buildable ones):
-- **#12** — dual-format common-core fan-out (Claude + OpenCode instances; consumes
-  `bun run package` as the seed). Architectural — likely needs an OpenCode-target ruling
-  before fan-out; scope as its own phased effort, not a flat wave. **ON HOLD (see above).**
-- **#34** — CI hardening: enforce shellcheck (incl. `install.sh`), actionlint, and a SHA-pin
-  drift guard in CI (all exist locally/pre-commit but not in the pipeline). Follow-up from the
-  release-prep audit.
-- **#35** — test coverage: unit-test `requireConfig` self-init for non-`query` commands +
-  a behavioral test for the TS MCP server. Follow-up from the release-prep audit.
-- **#19** — PB-served webapp chat surface (deferred interactive follow-on; ADR 0001).
-- **#36** — Template SOP library (v-next **major**): grow the embedded template set from the
-  current 2 fixer templates to a full ~20-type SOP library, sourced from the headcase shared SOP
-  set (`_headcase/shared/sops/`, 22 `template.md`/`guide.md`/`example.md` triads). Needs a design
-  ruling first (vendor-vs-sync, type↔dir_kind classification, planner template-selection,
-  neutrality of vendored examples). Corrects the "librarian knows ~20 SOPs" premise — that catalog
-  never existed; the 2-template "templates-only" boundary was intentional, not 2-of-20.
+## 3. Where to start next
 
-Filed 2026-07-17 (later): **#36** (Template SOP library, v-next major — see backlog) + a
-status-against-roadmap **briefing deck** at `_meta/briefings/2026-07-17-status-against-roadmap/`
-(deck.json + HTML + PDF).
-
-Shipped 2026-07-17: **#31** (PR #32, ADR 0003) + **docs/CI release-prep sweep** (PR #33), see
-§2. Earlier same day: **#7 / #25 / #27** (PRs #29 / #30 / #28), **#23** (PR #24), **NOTE.md
-punch list** (PR #26).
-
-## 2. Last session delivered (2026-07-18, latest): make install + docs dev/use split
-
-Post-release dogfooding turned up two things, both fixed on branch `docs/dev-use-separation`
-(PR pending at handoff time):
-
-- **`make install`** (root + `librarian/Makefile`) — build the version-stamped binary and drop it
-  in `~/.local/bin` (override `PREFIX=`). Mirrors install.sh's default location; the one-command
-  update-from-source path. Root delegates to `librarian/Makefile install`. Prompted by a real
-  incident: the `pocket-librarian` on Henry's PATH was a **stale 16-Jul build** (no `chat` command,
-  `--version` printed `(untracked)`) because `/plugin` updates the plugin, NOT the standalone
-  binary — the two are separate artifacts. Fixed by installing the released v0.5.0 arm64 binary
-  (checksum-verified) and adding `make install` so it's a one-liner going forward. Added to
-  `CHANGELOG.md [Unreleased]`.
-- **Docs split into using vs development** (chosen structure: "dev home + index", not a full
-  physical move — the spec + ADRs are cited from code/skills/the neutrality-lint allowlist, so
-  their paths stay stable). New `docs/README.md` (index: Using ┃ Development) + `docs/development/`
-  (overview README, `releasing.md` moved here, and the VHS `tapes/` moved out of `docs/media/` so
-  tape *source* is separated from `.gif` *output*). `scripts/record-media.sh` now reads tapes from
-  `docs/development/tapes/`; the `Output docs/media/*.gif` lines are unchanged (vhs runs from repo
-  root). Gifs still live in `docs/media/` (guides reference `media/*.gif` — unchanged). All moved-
-  doc backlinks fixed; a link-resolution check + shellcheck + `make check` pass.
-
-## 2-rel. Earlier same day (2026-07-18): v0.5.0 release + versioning workflow
-
-**Significant chat-TUI enhancements had merged without a version bump; this session closed that
-and hardened against a repeat.** Shipped as **PR #41** (squash `5c67e06`), then tagged + released.
-
-- **Version bump 0.4.0 → 0.5.0** — root `VERSION` + the three manifests (version-sync green).
-- **`CHANGELOG.md`** (Keep a Changelog): full `[0.5.0]` chat-TUI entry, concise `[0.4.0]` retro
-  (first tagged release), empty `[Unreleased]`. Pre-`0.4.0` history stays in git.
-- **Missing-bump guard (ADR 0005)** — release-gate + advisory, chosen over per-PR enforcement
-  (which taxes refactor/test PRs and noises the changelog). `scripts/check-changelog.mjs` (hard
-  gate: tagged VERSION must have a documented CHANGELOG section — in `release-prep` + `release.yml`);
-  `scripts/check-version-status.mjs` (non-blocking advisory: product drift since last tag without
-  a bump — `make version-status` + a CI step; `ci.yml` checkout gained `fetch-depth: 0` so it can
-  see tags; **always exits 0**). Both **negative-tested**: the gate exits 1 on an undocumented
-  version; the advisory reproduced the actual drift (files under plugin/librarian since v0.4.0,
-  VERSION unmoved). claude-review caught one real bug (bare VERSION read broke the advisory's
-  exit-0 guarantee) — fixed (try/catch + `execFileSync` argv, no shell surface) in `cc48d07`.
-- **Docs**: ADR 0005, `docs/development/releasing.md` runbook, README pointers (CHANGELOG + releasing),
-  `getting-started` `--version` output → 0.5.0, ADR index row.
-- **Released**: `make release-prep` green → `git tag v0.5.0 && git push --tags` → workflow
-  published v0.5.0 (assets verified: binary runs, reports 0.5.0, sha256 matches checksums.txt).
-
-## 2-tui. Earlier same day (2026-07-18): chat TUI, all 5 phases
-
-**Phases 4–5 (same day, follow-on session): resume + docs — BUILD COMPLETE.**
-PR #39 (squash `2c66b2e`): conversation resume. `agent/resume.go` — `ListConversations`
-(manual runs; excludes the live session's own run and never-turned runs — a live-pass
-defect: the picker's default selection was the current session itself, "resuming" an empty
-history; caught by VHS, fixed + regression-tested) and `ResumeSession` (history rehydrated
-with orphaned user rows collapsed — keep a user row iff the next retained row is an
-assistant; `rc.seq` resumes past the persisted max; run row reopened, `Close` re-finalizes).
-`tui/picker.go` — ctrl+o overlay, ctrl+n new conversation, both no-ops while streaming;
-session swaps are open-before-close (claude-review round: a failed fresh/resume no longer
-strands the user on a finalized run; corrupt `tool_calls` JSON fails closed in rehydration;
-failed list/resume shows an inline error — each regression-tested). Live proof: quit
-mid-conversation with a real trailing orphaned user row (fast esc-cancel), relaunch, ctrl+o,
-resume — model recalled the pre-restart codeword; seq continued densely; anthropic accepted
-the collapsed history. PR #40 (squash `7f46b40`): ADR 0004 (supersedes ONLY ADR 0001's
-correction-note clarification 1; 0001's decision + status unchanged), README/guide chat
-rewrite, key-gated `docs/development/tapes/chat.tape` + live-recorded `chat.gif` (default `make media`
-stays hermetic), main.go stale `migrate up` comment fixed + locked-store hint
-(`annotateLockErr`, both surfacing points). Docs fact-checked adversarially: 33 confirmed /
-0 refuted. Crew: one Opus lead (phase 4), four parallel builders + one reviewer (phase 5);
-every gate re-run by the foreman.
-
-**Phases 1–3 (earlier same day):**
-
-Foreman-run build off the approved plan (`~/.claude/plans/floating-bouncing-journal.md`).
-Rulings taken with Henry: **in-process TUI** (Bubble Tea drives `agent.Session` directly —
-the draft spec's HTTP+SSE client/server shape was rejected as conflicting with ADR 0001;
-the streaming Event type is JSON-tagged so the deferred webapp SSE route reuses it);
-**`chat` auto-detects TTY** (full-screen TUI on a terminal, the old line REPL byte-identical
-when piped/non-TTY/`--plain`); **reuse `agent_runs`+`messages`** as conversation+transcript
-(no new collections; picker title = `input_summary`, backfilled on first turn).
-
-- **PR #37 (squash `fa81cd3`) — streaming engine.** `Session.StreamTurn` emits
-  token/tool_start/tool_end/final/error events; tokens sourced from the model-callback
-  stream copy because the agent output stream is BURSTY under the anthropic
-  StreamToolCallChecker (verified in eino v0.9.12 source). `Turn()` is now a thin drain over
-  StreamTurn (one persistence path for REPL+TUI). **Fixed a confirmed latent bug**: the
-  persistence hwm was per-session, so every multi-turn session duplicated the prior
-  assistant row (no-tool turns) or dropped the new user row (tool turns); now re-baselined
-  per turn, guarded by an exactly-once transcript regression test. Cancel semantics: partial
-  → plain assistant row (no marker in DB; TUI badges "(interrupted)"), no partial → history
-  rollback. Two claude-review rounds, all findings fixed + gap tests added.
-- **PR #38 (squash `bebb24e`) — TUI (phases 2+3).** `librarian/internal/tui/` (model/pump/
-  markdown/steps/styles/picker-seams), charmbracelet v1 deps (bubbletea 1.3.10, bubbles
-  1.0.0, glamour 1.0.0; binary 70.5→77.9 MiB), TTY routing in main.go. Plain-text while
-  streaming, glamour on finalize (per-token glamour is O(n²) — plan-sanctioned deviation).
-  **Live pass (foreman, VHS-driven real pty + real key) caught 3 defects unit tests missed**:
-  glamour `WithAutoStyle` fired OSC 11/DSR queries after bubbletea owned stdin and the
-  responses leaked INTO THE TEXTAREA (and to the model) — fixed with static style
-  (`GLAMOUR_STYLE` override) + regression guards; faint answer text (same root cause);
-  intermittent ctrl+t app-exit (2 of ~7 runs, unreproducible since the fix under stderr
-  capture + liveness probes — **watch item on PR #38**). Live pass also exposed a REAL
-  streaming regression: **zero-arg tool calls (sweep/patrol) stream no argument deltas →
-  `ArgumentsInJSON == ""` → unmarshal error killed the turn**; fixed via
-  `argNormalizingTool` adapter at the buildTools registration point ("" → "{}"),
-  live-re-proven (`sweep()` runs from chat).
-
-Load-bearing findings for the remaining phases: eino does NOT propagate ctx-cancel into a
-stuck provider stream (esc shows "cancelling…" until the provider ends its stream); a failed
-tool call surfaces ONLY via the OnError callback → `tool_end` event with `Err` set (`Result`
-empty); canceled turns leave orphaned user rows in `messages` → phase-4 resume must collapse
-consecutive user rows before replaying history to anthropic. Live-verification method:
-VHS tapes (RELATIVE Output/Screenshot paths only — absolute paths break its parser) +
-`secret get ANTHROPIC_API_KEY` + scratch DESK_ROOT/XDG_DATA_HOME; tapes in the session
-scratchpad under `vhs/`.
-
-## 2-prev2. Earlier session (2026-07-17)
-
-**#31 self-init ruling + docs/CI release-prep sweep, then release PREPARED.** Two threads:
-
-- **#31 — store self-initialization** (PR #32, **ADR 0003**). Ruling taken: tool commands
-  *self-initialize the store* (not merely translate the error). `requireConfig` now runs
-  `app.RunAppMigrations()` idempotently before the desk-guard, so `sweep`/`query`/`patrol`/
-  `chat`/etc. work on a fresh desk with no manual `migrate up`. Live-proven; `verify.sh` gained
-  a self-init check (46→47). `migrate up` stays as the explicit path; ADR 0002 location
-  fail-closed untouched. Rejected the translate-only option (keeps a papercut that serves no one).
-- **Docs + tests sweep** (PR #33), driven by two read-only audits (docs-accuracy, test-coverage):
-  - Docs: demoted `migrate up` from prerequisite → optional across all four user docs (stale
-    after ADR 0003); dated **correction note on ADR 0001** (its "TUI" is a line-oriented REPL —
-    `chat` = `bufio.Scanner` loop, zero TUI deps; "two commands" → one); de-pinned a stale
-    `v0.4.0` install.sh example → `vX.Y.Z`.
-  - Tests/CI: **wired `verify.sh` into `ci.yml` AND the `release.yml` gate** — the entire
-    integration safety suite (self-init, record-original-first, byte-exact restore, open-guard)
-    previously ran ONLY via a local `make verify`; the pipeline never exercised it (confirmed
-    running green in CI on Linux). Activated 8 orphaned opencode tests (glob was `core mcp`,
-    now `core mcp opencode`; `bun test` 37→45). Filed **#34** (CI hardening) + **#35** (coverage)
-    as non-blocking follow-ups.
-- **Release prepared:** `make release-prep` green at v0.4.0; awaiting `git tag v0.4.0 && git push
-  --tags` (a human go/no-go, not auto-run — publishes a public release).
-
-The `chat` interactive surface is a **line REPL, not a full-screen TUI** (ADR 0001 uses "TUI"
-loosely; corrected in place). A real graphical/web surface is deferred → **#19**.
-
-## 2-prev1. Distribution + hardening wave (2026-07-17)
-
-**Distribution + hardening wave — #7, #25, #27** — built foreman-style as a flat fan-out: three
-parallel worktree builders (disjoint file scopes), foreman adversarial verification + one
-foreman-level correction, all three merged CI-green (`aca8b6e`/`fb039e7`→squash on main).
-Local aggregate gates re-run on the integrated tree (version-sync, neutrality, shellcheck,
-actionlint, full `go test`) — all green.
-
-- **#27 — SHA-pin GitHub Actions** (PR #28). All 22 `uses:` refs across *four* workflows
-  (`ci`, `release`, `claude`, `claude-review` — two more than expected) pinned to 40-char
-  commit SHAs with `# vX` comments; annotated-tag refs (e.g. `claude-code-action@v1.0.158`)
-  dereferenced to the underlying commit. Foreman independently re-resolved a SHA sample via
-  `git ls-remote`. Landed FIRST so the release path is hardened before its first tag.
-- **#7 — curl-able install.sh** (PR #29). Root `install.sh`: OS/arch detect → download the
-  matching release binary + `checksums.txt` → sha256 verify (refuse on mismatch) → install to
-  `~/.local/bin` (no root) → guide the marketplace plugin install; `--version`, `--prefix`,
-  `--with-plugin`, `--dry-run`, `INSTALL_OS/ARCH` test hooks. Artifact names cross-checked
-  line-by-line against `release.yml` (bare-version binary name, `sha256sum ./*` checksum
-  format, `v<version>` tag). shellcheck clean; dry-run + error paths (exit 1) foreman-executed.
-  `docs/getting-started.md` gained a *conditional* ("once a `v*` release is published")
-  prebuilt-binary pointer. **Live e2e deferred to post-first-release** (nothing to download yet).
-- **#25 — uninitialized-store message** (PR #30). `query` on a store whose collections were
-  never created leaked PocketBase's bare `sql: no rows in result set`. Root cause: app
-  migrations run only under `serve`/`migrate up`, never on a plain tool-command bootstrap.
-  Fix translates `sql.ErrNoRows` (wrapped or bare) at the single `Query()` dispatch point
-  (covers all 7 kinds + CLI/MCP/agent callers) into `store is not initialized — run
-  \`librarian migrate up\` first`. **Foreman correction:** the builder first advised `sweep`;
-  changed to `migrate up` after confirming against the documented first-run flow AND that
-  `sweep` hits the same wall on a virgin store (sweep does not create collections). The
-  broader leak from `sweep`/`patrol`/etc. is filed as **#31**.
-
-## 2-prev0. NOTE.md punch list (2026-07-17)
-
-**Henry's NOTE.md punch list** (user docs / tests visibility / VERSION / precommit / release
-flow / Makefile / docs-vs-_meta) — built foreman-style (3 parallel builders + adversarial
-reviewer + CI-review hardening round), merged as **PR #26** (squash `84d3b6e`). Rulings taken
-with Henry: build-brief + m-05 → `_meta/` (spec + ADRs STAY in docs/); ONE repo version
-(0.4.0, was plugin 0.3.0 / package.json 0.1.0 drift); guides + VHS recordings. Delivered:
-
-- **Root `Makefile`** — canonical interface (`make help`): build/test/check/verify/package/
-  media/setup/clean/release-prep. Use `make check` + `make test` + `make verify` as the gate
-  suite now.
-- **`VERSION` = 0.4.0** drives plugin.json/package.json/marketplace.json (drift-guarded by
-  `scripts/check-version-sync.mjs` in CI + pre-commit) and the librarian binary via ldflags
-  (`make`-built prints 0.4.0; bare `go build` prints `dev` — RootCmd.Version override in
-  main.go, PocketBase's own Version var isn't ours to -X).
-- **lefthook.yml** — fast pre-commit mirror (neutrality+self-test, version-sync; actionlint/
-  purity path-scoped). `make setup` installs.
-- **`.github/workflows/release.yml`** — tag `v*` → tag==VERSION gate + CI-equivalent checks →
-  darwin/linux × amd64/arm64 pure-Go binaries (CGO_ENABLED=0; linux/arm64 cross-compile
-  proven) → plugin bundle → gh release + sha256 checksums. Empty-dist guard; least-privilege
-  permissions. THE SUBSTRATE FOR #7.
-- **Three user guides** (docs/getting-started, plugin-guide, librarian-guide) in
-  value-and-proof style — every transcript really run; reviewer independently reproduced the
-  librarian guide's whole chain including byte-exact restore checksums. Four VHS
-  tapes + GIFs (648K) in docs/media/, regenerable via `make media` (hermetic script).
-- Review rounds caught: a stale `--version` claim in getting-started (contradicted the new
-  stamp — fixed), a VHS tape teaching that CLI apply-fix needs LIBRARIAN_AUTONOMOUS_WRITES
-  (it doesn't — env gates MCP/agent only; tape re-recorded), + 3 hardening nits (fixed).
-  SHA-pinning actions deferred to **#27**.
-
-## 2-prev. Earlier same day (2026-07-17, later still)
-
-**#23** — ADR 0002 implementation, built foreman-style (scout → 2 builders + adversarial
-reviewer → CI-review fix round), merged as **PR #24** (squash `b723d31`; CI + claude-review
-green twice; verify.sh 42→46 checks). What shipped:
-
-- **XDG store home**: no `--dir` → `$XDG_DATA_HOME/pocket-librarian/<DESK_NAME>/` (fallback
-  `~/.local/share/…`, empty XDG = unset), pre-created `0700`. `config.Load()` now runs BEFORE
-  app construction (PocketBase parses `--dir` eagerly inside `NewWithConfig`).
-- **Fail-closed location**: unresolvable DESK_NAME + no `--dir` → exit 1 for every
-  store-touching command (incl. serve/migrate), enforced by a pre-`Start()` argv scan in
-  `main()` — cobra hooks are TOO LATE (PocketBase `Bootstrap()` creates the data dir before
-  any RunE/PreRunE fires). The old "serve/migrate run config-free" tolerance is narrowed:
-  store LOCATION must now resolve.
-- **Desk open-guard** (`internal/bootstrap/deskguard.go`): mismatched `desk` rows
-  (files → patrol_log → adoption_log) refuse with both names; empty store passes; `migrate`
-  exempt. Sites: `requireConfig` + the OnServe hook.
-- **gui** forwards the resolved `--dir` to its serve child unconditionally and aborts before
-  opening a browser on any requireConfig error.
-- verify.sh is hermetic (scratch `XDG_DATA_HOME` exported for the whole run) — never touches
-  a real store.
-
-Review cycle caught 5 real defects post-build (all fixed + live-proven): serve's open-guard
-printed the refusal but exited 0 (PocketBase runs the command goroutine and DISCARDS RunE
-errors for serve/superuser — they're registered inside `Start()`, after the cmdErr wrapper;
-fail-closed there needs a direct `os.Exit(1)`); gui didn't forward `--dir` to its child
-(would serve a different store than the browser targeted); `--hooksDir x serve` bypassed the
-location guard via the argv scan's value-flag list (whitelist extended: hooksDir/hooksWatch/
-hooksPool; residual known limitation — it's an enumerated whitelist by construction, noted
-in code); a verify.sh scratch-dir leak on SIGINT; a missing adoption_log fallthrough test.
-
-## 2a-bis. Earlier same day (2026-07-17, later)
-
-**#20** — multi-desk design session held with Henry; four rulings, all recorded in
-`docs/decisions/0002-multi-desk-topology-store-per-desk.md` (commit `27a37a1`, CI-green;
-issue closed with the ruling comment, implementation split to **#23**):
-
-1. **Store-per-desk** — portfolio view is read-only fan-out, never a shared write store.
-2. **Canonical store home = XDG data home** (`$XDG_DATA_HOME/pocket-librarian/<DESK_NAME>/`,
-   fallback `~/.local/share/…`) when `--dir` is absent; `--dir` stays the override. Stores
-   live outside the iCloud-synced desk tree.
-3. **`desk` field kept + promoted to open-guard** (refuse a store whose rows carry a different
-   desk name). No composite `(desk, path)` key. Fact correction found during the session: the
-   field was never latent — sweep/patrol/apply_fix already populate it with `DESK_NAME`.
-4. **MCP stays one desk per process.**
-
-Operational notes (version skew self-heals via per-store automigrate; patrol needs no
-cross-desk coordination; backup/restore is per-store) are in the ADR, no code needed.
-
-## 2a. Earlier same day (2026-07-17)
-
-**#18** — field-interaction UX batch — fixed, proven, and **merged** as **PR #22** (squash
-`f0adc61`). Four independent findings, one commit each; CI-green, three claude-review passes to
-"Ready to merge". Two carried product rulings decided with Henry:
-
-- **Item 1 — new `infra` dir_kind (RULING: add a dir_kind, not just filter).** `query orphans`
-  was drowned in `.claude/**` / `.agents/**` / `.github/**` noise. `sweep` now buckets dotted
-  infra dirs as `infra` (memory precedence for `.claude/memory/**` preserved); `isOrphan`
-  excludes `dir_kind ∈ {meta, memory, infra}`. Migration `0012_dir_kind_add_infra.go` adds
-  `infra` to the enum for existing stores (0001 decl carries it for fresh). Spec §5.1/§5.6 +
-  schema table updated. Live-proven: infra/memory excluded, a genuine loose `.md` still flagged.
-- **Item 2 — R4 reclassified mechanical → judgment (RULING: reclassify).** R4 detects
-  mechanically but its remediation (which status to pick) is a judgment call; it was already
-  flag-only (absent from `FIXABLE_RULES`). `mechanicalRules` → `{R1,R2,R3}`; patrol files R4 as
-  `judgment`. Spec §5.2 updated.
-- **Item 3 — `mcp-serve` clean EOF exit.** Client stdin-close gave exit 1 + `Error: server is
-  closing: EOF` + usage dump. The SDK wraps its internal `ErrServerClosing` (`%w`) + `io.EOF`
-  (`%v`), so `errors.Is(io.EOF)` misses it — `isShutdownEOF` matches the "server is closing"
-  sentinel alone (deliberately: also covers a broken-pipe writeErr disconnect). Reproduced &
-  fixed: exit 1 → exit 0.
-- **Item 4 — `query --pretty` table output.** Presentation-only; raw JSON stays the default and
-  is the fallback for any kind the renderer doesn't format.
-
-Review cycle noted one accepted trade-off (migration 0012 down-path `return nil` mirrors the
-0010/0011 precedent — swallows non-not-found errors; fine for a local tool).
-
-## 2b. Earlier eras (full detail in merged PRs / closed issues / git)
-
-- **2026-07-17 (earlier) — #16 + #17** (PR #21, squash `e004f59`; four review passes).
-  **#16**: record-original-first was silently capped at PocketBase's 5000-char TextField
-  default (>5 KB desk files couldn't be recorded; one oversized file aborted the run). Migration
-  `0011_widen_content_fields.go` widens `revisions.original_content`/`messages.content`/
-  `prompts.content` to `Max=50_000_000` (existing stores on next migrate); `propose_fix`
-  tolerates per-file failures (boundary unweakened). **#17**: `prompt.Seed` was `OnServe`-only —
-  moved into `requireConfig` so CLI/MCP-only desks materialize the editable system-prompt row.
-- **2026-07-16 eve** — #13/#14/#15 via parallel worktree crews: `chat` REPL + trigger wake
-  layer (ADR `docs/decisions/0001-interactive-surface-tui-first.md`, TUI-first; webapp
-  deferred → #19), `secrets_ref.llm_api_key` indirection, superuser auto-create under serve,
-  patrol stale-finding resolution (migration `0010`). Commits `d4c52aa`→`e851e5b`→merge
-  `f148e04`; `verify.sh` 40→42 checks.
-- **2026-07-16 day** — #8 (brownfield-adoption skill, plugin 0.3.0) + #9/#10/#11: README
-  patrol exemption, in-repo marketplace + `bun run package` bundle (drift-guarded), issue/PR
-  templates + live claude workflows, `librarian/README.md` operator docs.
-
-## 3. Where to start building
-
-**The TUI build is done AND released as v0.5.0** (see §1/§2). Next candidates, in rough order:
-future releases follow **`docs/development/releasing.md`** (bump VERSION + 3 manifests → move `[Unreleased]`
-into a dated CHANGELOG section → `make release-prep` → tag) — `check-changelog` now gates the tag
-and `make version-status` flags accumulated drift; the repo-visibility decision gating the
-curl|bash install path (§1
-PRIOR PRIORITY, unchanged); the deferred webapp surface (ADR 0001 option b) now has its
-substrate ready — `StreamTurn`'s JSON-taggable events (ADR 0004) marshal straight onto an
-SSE route. For any new streaming/TUI work, gates per §4 and live proof via the §2 VHS
-method.
-
-## 3-prev. Prior guidance (pre-TUI, still valid)
-
-The distribution *script* (#7) is done; the natural next step is to **cut the first release**
-(bump `VERSION` → `make release-prep` → follow its tag instructions) so `install.sh`'s live
-`curl | bash` path is finally exercised — the one thing this wave could not prove because no
-release exists yet. After that, two tracks, each needing a ruling before build: **#12**
-(dual-format fan-out — decide the OpenCode-target shape) and **#31** (uninitialized-store
-error — per-command translation vs. self-initializing auto-migrate). **#19** (webapp) is the
-deferred interactive follow-on; ADR 0001 records the preferred shape (custom Go route,
-PB-served, no runtime frontend toolchain). Note the skill files under
-`plugin/claude-plugin/skills/` are neutrality-lint-scanned (no bare issue refs, GitHub URLs,
-or profile scalars in skill prose).
+- **Cut the next release** when `[Unreleased]` warrants — follow `docs/development/releasing.md`
+  (bump VERSION + 3 manifests → roll `[Unreleased]` into a dated CHANGELOG section →
+  `make release-prep` → tag). `check-changelog` gates the tag; `make version-status` flags drift.
+- **Repo-visibility decision** (§1) gates the public `curl|bash` path — Henry's call, on hold.
+- **#19 webapp** (deferred; ADR 0001 option b): substrate is ready — `StreamTurn`'s JSON-taggable
+  events (ADR 0004) marshal straight onto a PB-served SSE route (no runtime frontend toolchain).
+- Any new streaming/TUI work: gates per §4; live proof via VHS (tapes in `docs/development/tapes/`,
+  method in the §4 eino/bubbletea note).
 
 ## 4. Conventions & gotchas
 
@@ -436,7 +119,8 @@ or profile scalars in skill prose).
   `check-version-status.mjs` is a **non-blocking advisory** (`make version-status` + a CI step,
   always exit 0) that warns when `plugin/`/`librarian/` drifted past the last tag without a bump.
   `ci.yml` checks out `fetch-depth: 0` for it. Both scripts + CHANGELOG live outside the neutrality
-  surface (repo root / `scripts/`).
+  surface (repo root / `scripts/`). `make install` builds + drops the binary in `~/.local/bin`
+  (override `PREFIX=`); `/plugin` updates the plugin only — the binary is a separate artifact.
 - **Docs layout (since the dev/use split)**: `docs/` is indexed by `docs/README.md` in two
   tracks — **Using** (`getting-started`/`plugin-guide`/`librarian-guide` + `media/*.gif`) and
   **Development** (`docs/development/` = overview README + `releasing.md` + `tapes/*.tape`). The
@@ -449,8 +133,8 @@ or profile scalars in skill prose).
   `plugin/claude-plugin/schema/profile.schema.yaml` — regen with `cd plugin && bun run package`;
   CI drift-guards them. Bundle output is byte-identical across macOS/linux (proven).
 - **Neutrality lint scope** = `plugin/` + `librarian/` recursively. Bare issue refs (`#11`)
-  in Go comments/tests inside `librarian/` FAIL the lint — write issue-free comments.
-  `.claude-plugin/marketplace.json` (owner identity) is deliberately outside the surface
+  in Go comments/tests inside `librarian/` FAIL the lint — write issue-free comments. `docs/` is
+  exempt. `.claude-plugin/marketplace.json` (owner identity) is deliberately outside the surface
   (recorded in `_meta/m-05-data-surfaces.md`).
 - **Commits auto-close**: `Resolves #N` in a commit message closes the issue on push to
   main — post the proof comment first, or use `gh issue comment` after (close-with-comment
@@ -489,7 +173,7 @@ or profile scalars in skill prose).
   must remap rows off the new value FIRST (`0012`: `infra`→`other`) before dropping it from the
   enum, or a rollback leaves a row outside its reverted enum (same data-first pattern as `0010`).
 - Go 1.25 floor (PocketBase's go.mod); Bun 1.3.14 pinned in CI.
-- **eino streaming gotchas** (bind any new streaming caller to these — details in §2):
+- **eino streaming gotchas** (bind any new streaming caller to these — origin: PRs #37–#38 / ADR 0004):
   agent output stream is bursty under the anthropic tool-call checker (use model-callback
   stream copies for live tokens); ctx-cancel doesn't abort a stuck provider stream; failed
   tools fire OnError only; zero-arg tool calls need the `argNormalizingTool` adapter (in
@@ -499,8 +183,8 @@ or profile scalars in skill prose).
 - **Worktree provisioning**: untracked-and-load-bearing = `plugin/node_modules` (run
   `bun install --frozen-lockfile`) and `.claude/agent-memory/` (machine-local). Everything
   else a worktree agent needs is committed.
-- `_meta/` here holds only this handoff so far — the full taxonomy (operations/ ignore
-  stanza etc.) comes via the mise-en-place scaffold when needed.
+- `_meta/` holds `build-brief.md`, `m-05-data-surfaces.md`, `briefings/`, and this handoff — the
+  full taxonomy (operations/ ignore stanza etc.) comes via the mise-en-place scaffold when needed.
 
 ## 5. Incident log
 
@@ -513,6 +197,10 @@ or profile scalars in skill prose).
   make the repo public when launching (§1), or add token auth to install.sh if it stays private.
   Lesson: a persistent (not transient) 404 on release assets that the authed API can see = check
   repo visibility before blaming propagation.
+- 2026-07-18: the `pocket-librarian` on PATH was a stale build (no `chat`, `--version` printed
+  `(untracked)`) — `/plugin` updates the plugin, NOT the standalone binary (separate artifacts).
+  Fixed by installing the checksum-verified v0.5.0 release binary + adding `make install`. Lesson:
+  after a release, update the binary separately (`make install` or `gh release download`).
 - 2026-07-16: first #11 commit accidentally swept 27 pre-staged pocketbase files into the
   fix commit (parallel agent had staged them); caught pre-push, reset --soft and recommitted
   per-stream. See the pre-staged-files gotcha above.
