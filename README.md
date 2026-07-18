@@ -73,6 +73,11 @@ $EDITOR _knowledge/profile.yaml
 claude --plugin-dir ./plugin/claude-plugin
 ```
 
+Steering a plain folder instead of the plugin scaffold? `pocket-librarian init [dir]`
+(built in "Running the librarian" below) writes the minimal zero-export profile above —
+desk name from the folder's basename — without the plugin's other placeholders; see
+`docs/getting-started.md` §2.
+
 Inside that session, the `desk-setup` skill scaffolds a new desk from your profile;
 `conventions-standard` and `harvest-loop` run the standing checks and the periodic
 improvement-log pass.

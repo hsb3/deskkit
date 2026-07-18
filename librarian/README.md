@@ -29,6 +29,14 @@ supply them; it walks up from the working directory and resolves in the order en
     root: "."
   ```
 
+  `./pocket-librarian init [dir]` writes exactly this file for you (desk name from the
+  folder's basename, `root: "."`) — the fastest way to this profile. It's idempotent
+  (`--force` to overwrite), takes `--with-env` to also scaffold a `.env` naming the LLM
+  API-key env var, and never creates the store. On an interactive terminal, any
+  store-touching command that can't resolve config offers to run it for you
+  ("Set up this folder as a desk? [Y/n]"); `--no-input` (or a non-TTY) keeps the prior
+  fail-closed error instead of prompting.
+
 - **Environment (override).** Explicit vars always win over the profile — use them for a bare
   folder with no profile, for one-off runs, or when driving the dev build from `librarian/`
   (outside the desk tree, so the profile isn't on the walk-up path):
@@ -126,8 +134,10 @@ Needs an LLM provider and API key exactly like `agent` — see "Choosing the LLM
 setting the API key" above.
 
 On a terminal — stdin and stdout both TTYs — `chat` opens a full-screen TUI: the answer
-streams token by token, a finished answer renders as markdown, and each tool call
-collapses to one faint line (`ctrl+t` expands it). The keys:
+streams token by token, a finished answer renders as markdown, each tool call collapses
+to one faint line (`ctrl+t` expands it), and each turn is prefixed with a colored left
+gutter (thick for you, faint for the librarian) and closes with a `model · latency`
+footer. `ctrl+g` toggles the full keybind help below the short one. The keys:
 
 | Key | Does |
 |---|---|
@@ -137,6 +147,9 @@ collapses to one faint line (`ctrl+t` expands it). The keys:
 | `ctrl+o` | resume a prior conversation |
 | `ctrl+n` | start a new conversation |
 | `ctrl+t` | toggle tool-step detail |
+| `ctrl+y` | copy the last answer's raw markdown (toasts a confirmation) |
+| `ctrl+g` | toggle the full keybind help |
+| `up` / `down` | at the input's edge rows, walk prompt history (stashes/restores your draft) |
 | `pgup` / `pgdn` | scroll the transcript |
 | `ctrl+c` | quit |
 
@@ -145,9 +158,16 @@ turn — and resuming one restores the transcript and continues the model with f
 context. Conversations are not a separate store: they live in the same store as
 everything else.
 
-Markdown is rendered in a fixed dark style by default; `GLAMOUR_STYLE` overrides it to
-another named style. `auto` is rejected — an auto style queries the terminal for its
-background at render time, which would collide with the TUI's own input handling.
+The color theme resolves once, before the TUI starts: `chat --theme light|dark|auto`
+(default `auto`, a single terminal-background probe at startup) or the `LIBRARIAN_THEME`
+env var override — precedence is flag > env > auto-detect. `NO_COLOR` strips color from
+the whole surface and swaps the spinner for a static "working…" indicator.
+
+Markdown follows the resolved `--theme`/`LIBRARIAN_THEME` (light theme → glamour's light
+style, otherwise dark); `GLAMOUR_STYLE` still overrides to another named style. `auto` is
+rejected there specifically — an auto glamour style queries the terminal for its
+background at render time, which would collide with the TUI's own input handling; the
+chat theme itself resolves "auto" safely, once, before the program starts (see above).
 
 When either stdin or stdout is not a terminal (piped input or output), or when
 `--plain` is passed, `chat` falls back to the original line REPL instead: the prompt is
