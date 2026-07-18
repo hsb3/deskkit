@@ -10,7 +10,7 @@ package tui
 import (
 	"os"
 
-	"github.com/muesli/termenv"
+	"charm.land/lipgloss/v2"
 )
 
 // Theme values are concrete: after resolution the model never carries "auto".
@@ -52,12 +52,15 @@ func resolveTheme(flag, env string, detect func() string) string {
 	}
 }
 
-// detectBackground reads the terminal background ONCE via termenv (a pre-program query, safe
-// before the Bubble Tea stdin reader starts). termenv falls back to a dark background when it
-// cannot determine one (dumb terminal, non-TTY, probe error), so this returns themeDark in the
-// indeterminate case — preserving the historical dark default.
+// detectBackground reads the terminal background ONCE via lipgloss's standalone pre-program query
+// (a safe window before the Bubble Tea stdin reader starts — this is the ONLY terminal I/O the
+// whole surface performs, and it never runs again after tea.NewProgram). lipgloss.HasDarkBackground
+// falls back to true (dark) when it cannot determine the background (dumb terminal, non-TTY, probe
+// error), so this returns themeDark in the indeterminate case — preserving the historical dark
+// default. The chat TUI only reaches this path when stdin+stdout are TTYs (the caller's non-TTY
+// fallback is the plain REPL), so os.Stdin/os.Stdout are always real terminals here.
 func detectBackground() string {
-	if termenv.HasDarkBackground() {
+	if lipgloss.HasDarkBackground(os.Stdin, os.Stdout) {
 		return themeDark
 	}
 	return themeLight

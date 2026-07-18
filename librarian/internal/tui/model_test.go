@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 
 	"github.com/example/pocket-librarian/internal/agent"
 	"github.com/example/pocket-librarian/internal/config"
@@ -65,7 +65,7 @@ func send(m model, msg tea.Msg) model {
 func startStreaming(t *testing.T, m model, input string) model {
 	t.Helper()
 	m.ta.SetValue(input)
-	return send(m, tea.KeyMsg{Type: tea.KeyEnter})
+	return send(m, tea.KeyPressMsg{Code: tea.KeyEnter})
 }
 
 func TestWindowSizeMsg_Sizing(t *testing.T) {
@@ -73,12 +73,12 @@ func TestWindowSizeMsg_Sizing(t *testing.T) {
 	if !m.ready {
 		t.Fatal("model not marked ready after WindowSizeMsg")
 	}
-	if m.vp.Width != 80 {
-		t.Errorf("viewport width = %d, want 80", m.vp.Width)
+	if m.vp.Width() != 80 {
+		t.Errorf("viewport width = %d, want 80", m.vp.Width())
 	}
 	// height 24 - header(1) - footer(1) - input(3) - input border(2) = 17
-	if m.vp.Height != 17 {
-		t.Errorf("viewport height = %d, want 17", m.vp.Height)
+	if m.vp.Height() != 17 {
+		t.Errorf("viewport height = %d, want 17", m.vp.Height())
 	}
 	if m.renderer == nil {
 		t.Error("markdown renderer not built on WindowSizeMsg")
@@ -195,12 +195,15 @@ func TestCtrlT_TogglesStepsInOutput(t *testing.T) {
 	m = send(m, eventMsg{ev: agent.Event{Kind: agent.EventFinal, Content: "done"}})
 	m = send(m, turnDoneMsg{})
 
-	before := m.View()
+	// tea.View (v2's Model.View return type) carries a func field (OnMouse), so the struct is not
+	// comparable with == at all — compare the rendered Content string instead, which is what this
+	// assertion actually cares about.
+	before := m.View().Content
 	if strings.Contains(m.renderTranscript(), "args:") {
 		t.Fatal("expanded step detail shown before ctrl+t")
 	}
-	m = send(m, tea.KeyMsg{Type: tea.KeyCtrlT})
-	after := m.View()
+	m = send(m, tea.KeyPressMsg{Mod: tea.ModCtrl, Code: 't'})
+	after := m.View().Content
 
 	if !m.showSteps {
 		t.Error("showSteps not toggled on")
@@ -219,7 +222,7 @@ func TestEsc_CancelsInFlightTurn(t *testing.T) {
 	if fs.ctx.Err() != nil {
 		t.Fatal("turn context already canceled before esc")
 	}
-	m = send(m, tea.KeyMsg{Type: tea.KeyEsc})
+	m = send(m, tea.KeyPressMsg{Code: tea.KeyEscape})
 	if fs.ctx.Err() != context.Canceled {
 		t.Errorf("turn context err after esc = %v, want context.Canceled", fs.ctx.Err())
 	}
@@ -237,7 +240,7 @@ func TestEnterWhileStreaming_NoOp(t *testing.T) {
 	entriesBefore := len(m.entries)
 
 	m.ta.SetValue("second")
-	m = send(m, tea.KeyMsg{Type: tea.KeyEnter})
+	m = send(m, tea.KeyPressMsg{Code: tea.KeyEnter})
 
 	if fs.calls != 1 {
 		t.Errorf("StreamTurn called %d times, want 1 (enter must be a no-op while streaming)", fs.calls)

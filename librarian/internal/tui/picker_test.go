@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 
 	"github.com/example/pocket-librarian/internal/agent"
 )
@@ -58,7 +58,7 @@ func (f *fakeProvider) closeSession(ctx context.Context, s streamer) error {
 }
 
 // openPickerKey drives ctrl+o through Update.
-func openPickerKey(m model) model { return send(m, tea.KeyMsg{Type: tea.KeyCtrlO}) }
+func openPickerKey(m model) model { return send(m, tea.KeyPressMsg{Mod: tea.ModCtrl, Code: 'o'}) }
 
 func TestCtrlO_OpensPicker(t *testing.T) {
 	m, _, fp := newTestModelWithProvider(t, &fakeProvider{
@@ -94,7 +94,7 @@ func TestEsc_ClosesPicker_NoTurnCancel(t *testing.T) {
 	if m.picker == nil {
 		t.Fatal("picker not open before esc")
 	}
-	m = send(m, tea.KeyMsg{Type: tea.KeyEsc})
+	m = send(m, tea.KeyPressMsg{Code: tea.KeyEscape})
 	if m.picker != nil {
 		t.Error("esc did not close the picker")
 	}
@@ -121,7 +121,7 @@ func TestPicker_SelectResumes(t *testing.T) {
 	if m.picker == nil {
 		t.Fatal("picker not open")
 	}
-	m = send(m, tea.KeyMsg{Type: tea.KeyEnter})
+	m = send(m, tea.KeyPressMsg{Code: tea.KeyEnter})
 
 	if provider.resumedID != "run-1" {
 		t.Errorf("resumed run id = %q, want %q", provider.resumedID, "run-1")
@@ -160,7 +160,7 @@ func TestPicker_SelectEmpty_NoResume(t *testing.T) {
 	if m.picker == nil {
 		t.Fatal("picker not open")
 	}
-	m = send(m, tea.KeyMsg{Type: tea.KeyEnter})
+	m = send(m, tea.KeyPressMsg{Code: tea.KeyEnter})
 	if provider.resumedID != "" {
 		t.Errorf("resume attempted on an empty list (id = %q)", provider.resumedID)
 	}
@@ -182,7 +182,7 @@ func TestCtrlN_NewConversation(t *testing.T) {
 	}
 	closedBefore := provider.closed
 
-	m = send(m, tea.KeyMsg{Type: tea.KeyCtrlN})
+	m = send(m, tea.KeyPressMsg{Mod: tea.ModCtrl, Code: 'n'})
 
 	if provider.closed != closedBefore+1 {
 		t.Errorf("closeSession calls = %d, want %d (old session closed on new)", provider.closed, closedBefore+1)
@@ -205,7 +205,7 @@ func TestCtrlN_FreshFails_OldSessionUntouched(t *testing.T) {
 	provider := &fakeProvider{freshErr: context.Canceled}
 	m, fs, _ := newTestModelWithProvider(t, provider)
 
-	m = send(m, tea.KeyMsg{Type: tea.KeyCtrlN})
+	m = send(m, tea.KeyPressMsg{Mod: tea.ModCtrl, Code: 'n'})
 
 	if provider.closed != 0 {
 		t.Errorf("closeSession calls = %d, want 0 (old session must not be closed when fresh fails)", provider.closed)
@@ -233,7 +233,7 @@ func TestPicker_ResumeFails_OldSessionUntouched(t *testing.T) {
 		t.Fatal("picker not open")
 	}
 
-	m = send(m, tea.KeyMsg{Type: tea.KeyEnter})
+	m = send(m, tea.KeyPressMsg{Code: tea.KeyEnter})
 
 	if provider.closed != 0 {
 		t.Errorf("closeSession calls = %d, want 0 (old session must not be closed when resume fails)", provider.closed)
@@ -255,7 +255,7 @@ func TestCtrlN_NoOpWhileStreaming(t *testing.T) {
 	m = startStreaming(t, m, "q")
 	closedBefore := provider.closed
 
-	m = send(m, tea.KeyMsg{Type: tea.KeyCtrlN})
+	m = send(m, tea.KeyPressMsg{Mod: tea.ModCtrl, Code: 'n'})
 
 	if provider.closed != closedBefore {
 		t.Error("ctrl+n closed a session while streaming (must be a no-op)")
@@ -315,7 +315,7 @@ func TestFooter_ResumeHints(t *testing.T) {
 	if !strings.Contains(foot, "ctrl+n") {
 		t.Error("footer missing ctrl+n new hint")
 	}
-	if !strings.Contains(m.View(), "ctrl+o") {
+	if !strings.Contains(m.View().Content, "ctrl+o") {
 		t.Error("View output missing ctrl+o hint")
 	}
 }

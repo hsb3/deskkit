@@ -1,11 +1,12 @@
 package tui
 
 import (
+	"image/color"
 	"strings"
 	"testing"
 
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 
 	"github.com/example/pocket-librarian/internal/agent"
 )
@@ -112,7 +113,7 @@ func TestSurfaceStyles_PerTheme(t *testing.T) {
 
 	cases := []struct {
 		name       string
-		dark, lite lipgloss.TerminalColor
+		dark, lite color.Color
 	}{
 		{"header bar", dark.headerBar.GetBackground(), light.headerBar.GetBackground()},
 		{"footer bar", dark.footerBar.GetBackground(), light.footerBar.GetBackground()},
@@ -197,17 +198,17 @@ func TestHelpToggle_CtrlG(t *testing.T) {
 	if m.hlp.ShowAll {
 		t.Fatal("help started expanded")
 	}
-	m = send(m, tea.KeyMsg{Type: tea.KeyCtrlG})
+	m = send(m, tea.KeyPressMsg{Mod: tea.ModCtrl, Code: 'g'})
 	if !m.hlp.ShowAll {
 		t.Error("ctrl+g did not expand help")
 	}
-	m = send(m, tea.KeyMsg{Type: tea.KeyCtrlG})
+	m = send(m, tea.KeyPressMsg{Mod: tea.ModCtrl, Code: 'g'})
 	if m.hlp.ShowAll {
 		t.Error("second ctrl+g did not collapse help")
 	}
 	// "?" is a literal keypress: it must reach the textarea, not toggle help.
 	m2, _ := newTestModel(t)
-	m2 = send(m2, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("?")})
+	m2 = send(m2, tea.KeyPressMsg{Text: "?", Code: '?'})
 	if m2.hlp.ShowAll {
 		t.Error("bare ? toggled help; it must be typed into the textarea")
 	}
@@ -226,7 +227,7 @@ func TestEsc_KeepsPartialStreamedText(t *testing.T) {
 	m = send(m, eventMsg{ev: agent.Event{Kind: agent.EventToken, Token: "far"}})
 
 	// esc cancels the in-flight turn.
-	m = send(m, tea.KeyMsg{Type: tea.KeyEsc})
+	m = send(m, tea.KeyPressMsg{Code: tea.KeyEscape})
 	if fs.ctx.Err() == nil {
 		t.Fatal("esc did not cancel the turn context")
 	}
@@ -256,7 +257,7 @@ func TestEsc_KeepsPartialStreamedText(t *testing.T) {
 // toast and schedules its expiry.
 func TestCopyToast_NothingToCopy(t *testing.T) {
 	m, _ := newTestModel(t)
-	next, cmd := m.Update(tea.KeyMsg{Type: tea.KeyCtrlY})
+	next, cmd := m.Update(tea.KeyPressMsg{Mod: tea.ModCtrl, Code: 'y'})
 	nm := next.(model)
 	if nm.toast != "nothing to copy" {
 		t.Errorf("toast = %q, want %q", nm.toast, "nothing to copy")
@@ -287,12 +288,12 @@ func TestHistoryRecall_UpAtFirstLine(t *testing.T) {
 
 	// Type a fresh draft, then Up to recall the sent prompt.
 	m.ta.SetValue("half typed")
-	m = send(m, tea.KeyMsg{Type: tea.KeyUp})
+	m = send(m, tea.KeyPressMsg{Code: tea.KeyUp})
 	if got := m.ta.Value(); got != "first prompt" {
 		t.Errorf("after Up, textarea = %q, want %q", got, "first prompt")
 	}
 	// Down past the newest restores the stashed draft.
-	m = send(m, tea.KeyMsg{Type: tea.KeyDown})
+	m = send(m, tea.KeyPressMsg{Code: tea.KeyDown})
 	if got := m.ta.Value(); got != "half typed" {
 		t.Errorf("after Down, textarea = %q, want restored draft %q", got, "half typed")
 	}

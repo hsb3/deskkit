@@ -12,8 +12,10 @@
 package tui
 
 import (
-	"github.com/charmbracelet/bubbles/help"
-	"github.com/charmbracelet/lipgloss"
+	"image/color"
+
+	"charm.land/bubbles/v2/help"
+	"charm.land/lipgloss/v2"
 )
 
 // userBorder is the thick left border glyph for a user block (▌, a left half-block). It is a
@@ -61,7 +63,7 @@ type styleSet struct {
 // light terminals — they need opposite ends of the contrast range by background — so they are the
 // only per-theme split; the semantic accent/red/green are shared. Kept in one place so newStyles
 // and the help palette stay in lockstep and the "no runtime query" invariant is auditable here.
-func themeColors(theme string) (body, muted, faint lipgloss.Color) {
+func themeColors(theme string) (body, muted, faint color.Color) {
 	switch theme {
 	case themeLight:
 		// On a light terminal, 15 (bright white) is invisible and 7 (light gray) near-invisible.
@@ -70,8 +72,8 @@ func themeColors(theme string) (body, muted, faint lipgloss.Color) {
 		faint = lipgloss.Color("8") // dark gray — dim step lines, still legible on white
 	default: // themeDark — the historical palette
 		body = lipgloss.Color("15") // bright white — high contrast on a dark background
-		muted = lipgloss.Color("7")  // light gray — header/footer chrome
-		faint = lipgloss.Color("8")  // bright black — steps, dim commentary
+		muted = lipgloss.Color("7") // light gray — header/footer chrome
+		faint = lipgloss.Color("8") // bright black — steps, dim commentary
 	}
 	return body, muted, faint
 }
@@ -83,7 +85,7 @@ func themeColors(theme string) (body, muted, faint lipgloss.Color) {
 // the block is a touch DARKER than the bar (a recessed panel). Assistant answers use neither —
 // they stay on the terminal's own background for maximum readability. Concrete ANSI-256 tones,
 // like every other color here, so the no-runtime-query invariant (ADR 0004) stays auditable.
-func themeSurfaces(theme string) (barBG, blockBG lipgloss.Color) {
+func themeSurfaces(theme string) (barBG, blockBG color.Color) {
 	switch theme {
 	case themeLight:
 		barBG = lipgloss.Color("254")   // near-white bar on a light terminal
@@ -96,27 +98,32 @@ func themeSurfaces(theme string) (barBG, blockBG lipgloss.Color) {
 }
 
 // newStyles builds the palette for the resolved theme (themeLight or themeDark). It must be a
-// concrete theme, never "auto": the colors are fixed lipgloss.Color values so the invariant "no
+// concrete theme, never "auto": the colors are fixed color.Color values so the invariant "no
 // terminal query at render time" is trivially auditable from this one function.
 func newStyles(theme string) styleSet {
 	// Shared semantic colors. Cyan/red/green carry meaning (accent, failure, success) and read
 	// acceptably on both light and dark backgrounds, so they are not per-theme.
-	const (
-		accent = lipgloss.Color("6")  // cyan — user / header accent
-		red    = lipgloss.Color("9")  // errors, failed tool
-		green  = lipgloss.Color("10") // succeeded tool
+	//
+	// lipgloss.Color is a FUNCTION in v2 (func Color(s string) color.Color), not the named string
+	// type it was in v1 — a function call is never a Go constant expression, so this block must be
+	// `var`, not `const` (a mechanical fallout of the type-to-func change, not a behavior change:
+	// the values are still fixed at package-init time before any color is ever rendered).
+	var (
+		accent color.Color = lipgloss.Color("6")  // cyan — user / header accent
+		red    color.Color = lipgloss.Color("9")  // errors, failed tool
+		green  color.Color = lipgloss.Color("10") // succeeded tool
 	)
 	body, muted, faint := themeColors(theme)
 	barBG, blockBG := themeSurfaces(theme)
 	return styleSet{
-		header:          lipgloss.NewStyle().Foreground(muted).Background(barBG).Bold(true),
-		headerAccent:    lipgloss.NewStyle().Foreground(accent).Background(barBG).Bold(true),
-		headerBar:       lipgloss.NewStyle().Background(barBG),
-		footerBar:       lipgloss.NewStyle().Background(barBG),
-		footerState:     lipgloss.NewStyle().Foreground(accent).Background(barBG),
-		toast:           lipgloss.NewStyle().Foreground(accent).Background(barBG).Bold(true),
-		user:            lipgloss.NewStyle().Foreground(accent).Background(blockBG).Bold(true),
-		userLabel:       lipgloss.NewStyle().Foreground(muted).Background(blockBG).Bold(true),
+		header:       lipgloss.NewStyle().Foreground(muted).Background(barBG).Bold(true),
+		headerAccent: lipgloss.NewStyle().Foreground(accent).Background(barBG).Bold(true),
+		headerBar:    lipgloss.NewStyle().Background(barBG),
+		footerBar:    lipgloss.NewStyle().Background(barBG),
+		footerState:  lipgloss.NewStyle().Foreground(accent).Background(barBG),
+		toast:        lipgloss.NewStyle().Foreground(accent).Background(barBG).Bold(true),
+		user:         lipgloss.NewStyle().Foreground(accent).Background(blockBG).Bold(true),
+		userLabel:    lipgloss.NewStyle().Foreground(muted).Background(blockBG).Bold(true),
 		userBlock: lipgloss.NewStyle().
 			Border(userBorder, false, false, false, true).
 			BorderForeground(accent).
@@ -146,7 +153,7 @@ func newStyles(theme string) styleSet {
 // footer inside the no-runtime-query invariant: keys are muted, descriptions and separators faint.
 // A non-nil bg fills every segment so the help text sits on the status-bar surface with no holes
 // between segments; pass nil for the ctrl+g overlay, which renders on the terminal background.
-func helpStyles(muted, faint lipgloss.Color, bg lipgloss.TerminalColor) help.Styles {
+func helpStyles(muted, faint color.Color, bg color.Color) help.Styles {
 	key := lipgloss.NewStyle().Foreground(muted)
 	desc := lipgloss.NewStyle().Foreground(faint)
 	sep := lipgloss.NewStyle().Foreground(faint)
