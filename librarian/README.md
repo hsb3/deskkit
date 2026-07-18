@@ -14,12 +14,31 @@ Full spec: `../docs/pocket-librarian-v1-spec.md`.
 
 ## Quick start
 
-Required environment (no personal defaults — the binary refuses to run without these):
+The binary needs `DESK_ROOT` (which desk) and `DESK_NAME` (a unique store name) — with no
+personal defaults, it refuses to run until it can resolve both. There are **two ways** to
+supply them; it walks up from the working directory and resolves in the order env > profile:
 
-```bash
-export DESK_ROOT=/path/to/your/desk
-export DESK_NAME=my-desk
-```
+- **Profile (zero-export).** A `_knowledge/profile.yaml` in the desk supplies both —
+  `desk.name` → `DESK_NAME`, and the folder that owns `_knowledge/` → `DESK_ROOT`. Run any
+  command from inside the desk with nothing exported. This is the everyday path.
+
+  ```yaml
+  # <desk>/_knowledge/profile.yaml
+  desk:
+    name: my-desk
+    root: "."
+  ```
+
+- **Environment (override).** Explicit vars always win over the profile — use them for a bare
+  folder with no profile, for one-off runs, or when driving the dev build from `librarian/`
+  (outside the desk tree, so the profile isn't on the walk-up path):
+
+  ```bash
+  export DESK_ROOT=/path/to/your/desk
+  export DESK_NAME=my-desk
+  ```
+
+The `make` targets run from `librarian/`, so they take the environment form:
 
 ```bash
 make build          # go build -> ./pocket-librarian

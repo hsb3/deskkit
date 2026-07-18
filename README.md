@@ -88,7 +88,10 @@ make sweep    # index the desk tree
 make patrol   # flag rule violations — dry-run, never writes
 ```
 
-The store self-initializes on first run — `./pocket-librarian migrate up` is optional.
+The store self-initializes on first run — `./pocket-librarian migrate up` is optional. The
+exports above are needed here only because `make` runs from `librarian/`; with the binary on
+your `PATH` and a `_knowledge/profile.yaml` in the desk (`desk.name` + `root: "."`), running
+`pocket-librarian` from inside the desk needs no env vars. See `docs/getting-started.md` §4.
 
 `apply-fix` is deliberately not a Makefile target — it's supervised-only, run by hand, and
 every fix it applies can be reversed with `./pocket-librarian restore --by-path <path>`.
