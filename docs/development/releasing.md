@@ -1,5 +1,5 @@
 _How to version and cut a release of desk-standard (the plugin + the librarian, one shared
-version). The why is [ADR 0005](decisions/0005-versioning-and-changelog.md)._
+version). The why is [ADR 0005](../decisions/0005-versioning-and-changelog.md)._
 Status: active
 
 # Releasing
@@ -56,7 +56,7 @@ GitHub release with `checksums.txt`.
 
 ## The missing-bump guard
 
-You don't have to remember to bump. Two mechanisms flag it (see [ADR 0005](decisions/0005-versioning-and-changelog.md)):
+You don't have to remember to bump. Two mechanisms flag it (see [ADR 0005](../decisions/0005-versioning-and-changelog.md)):
 
 - **`make version-status`** (and a non-blocking CI step) warns when `plugin/` or `librarian/`
   changed since the last `v*` tag but `VERSION` hasn't moved — unreleased work piling up. Advisory

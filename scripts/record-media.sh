@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# record-media.sh — regenerate docs/media/*.gif from docs/media/*.tape (VHS).
+# record-media.sh — regenerate docs/media/*.gif from docs/development/tapes/*.tape (VHS).
 #
 # The tapes are the source of truth; the GIFs are generated artifacts (never hand-edited —
 # re-run this script to regenerate them after any tape edit). This script is fully
@@ -7,8 +7,9 @@
 # tape, isolated from each other so no tape's writes can bleed into another's demo), points
 # EVERY store-touching invocation at a scratch XDG_DATA_HOME + HOME so nothing can ever touch
 # the operator's real ~/.local/share/pocket-librarian, pre-runs whatever setup each tape's demo
-# assumes already happened (migrate/sweep/patrol), then drives `vhs` over each tape, writing
-# GIFs next to their tapes. Idempotent: every run starts from a fresh scratch tree and leaves
+# assumes already happened (migrate/sweep/patrol), then drives `vhs` over each tape (sources in
+# docs/development/tapes/), writing the GIFs to docs/media/ (each tape's `Output docs/media/*.gif`
+# path resolves from the repo root). Idempotent: every run starts from a fresh scratch tree and leaves
 # no litter behind (trap-cleaned on exit, including on error/interrupt).
 set -euo pipefail
 
@@ -172,7 +173,7 @@ record_tape() { # record_tape <tape-file> <desk_root> <xdg_home> [store_one]
   local tape="$1" desk="$2" xdg="$3" store_one="${4:-}"
   log "recording $tape"
   MEDIA_DESK_ROOT="$desk" MEDIA_XDG_HOME="$xdg" MEDIA_STORE_ONE="$store_one" \
-    vhs "docs/media/$tape"
+    vhs "docs/development/tapes/$tape"
 }
 
 record_tape sweep-and-findings.tape "$DESK_SWEEP" "$XDG_SWEEP"

@@ -114,14 +114,19 @@ docs/               product specs, ADRs, and the getting-started / plugin / libr
 
 ## Documentation
 
-Start with the user guides, then go deep:
+Docs split into two tracks — see **[docs/README.md](docs/README.md)** for the full index.
+
+**Using it** — install and run:
 
 - **[docs/getting-started.md](docs/getting-started.md)** — install, fill your profile, build the librarian, first sweep + patrol.
 - **[docs/plugin-guide.md](docs/plugin-guide.md)** — the four skills as user journeys: when to reach for each, what you get.
 - **[docs/librarian-guide.md](docs/librarian-guide.md)** — the daily loop: sweep → patrol → fix → byte-exact restore.
 - `plugin/README.md`, `schema/README.md`, `librarian/README.md` — per-product operator detail.
+
+**Developing it** — build, test, release:
+
+- **[docs/development/](docs/development/)** — the contributor overview: build/test gates, media regeneration, and how to cut a release.
 - `docs/pocket-librarian-v1-spec.md` — the librarian's product and technical spec.
-- **[docs/releasing.md](docs/releasing.md)** — how to version and cut a release (both products, one version).
 - `docs/decisions/` — architecture decision records (interactive surface, multi-desk topology, store self-initialization, chat TUI, versioning policy).
 - **[CHANGELOG.md](CHANGELOG.md)** — what changed in each release.
 - `_meta/build-brief.md` — the build brief this repo was built from (repo shape, acceptance criteria, parallelism).

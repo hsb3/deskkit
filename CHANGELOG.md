@@ -6,14 +6,16 @@ repo version (the root `VERSION` file); a release tags that single version.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html). See
-[`docs/releasing.md`](docs/releasing.md) for how a version is bumped and cut, and
+[`docs/development/releasing.md`](docs/development/releasing.md) for how a version is bumped and cut, and
 [`docs/decisions/0005-versioning-and-changelog.md`](docs/decisions/0005-versioning-and-changelog.md)
 for why this policy exists.
 
 ## [Unreleased]
 
-_Nothing yet — add entries here as user-facing changes land, then roll them into the next
-version section at release time._
+### Added
+
+- **`make install`** — build the version-stamped librarian binary and install it to `~/.local/bin`
+  (override with `make install PREFIX=/usr/local`). The one-command update-from-source path.
 
 ## [0.5.0] — 2026-07-18
 
