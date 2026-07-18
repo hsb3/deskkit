@@ -62,6 +62,9 @@ jobs:
       - name: Version-sync — VERSION vs shipped manifests
         run: node scripts/check-version-sync.mjs
 
+      - name: Changelog — this version is documented
+        run: node scripts/check-changelog.mjs
+
       - name: Install plugin deps
         working-directory: plugin
         run: bun install --frozen-lockfile

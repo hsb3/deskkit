@@ -14,7 +14,7 @@ SHELL := /bin/bash
 
 VERSION := $(shell cat VERSION 2>/dev/null || echo dev)
 
-.PHONY: help setup build test check verify package media clean release-prep
+.PHONY: help setup build test check verify package media clean version-status release-prep
 
 help: ## List targets
 	@grep -hE '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) \
@@ -53,6 +53,9 @@ clean: ## Remove build artifacts from both lanes
 	@$(MAKE) -C librarian clean
 	@echo "cleaned: plugin/dist + librarian artifacts."
 
+version-status: ## Advisory (non-blocking): unreleased product changes since the last tag vs VERSION
+	@node scripts/check-version-status.mjs
+
 release-prep: ## Pre-tag gate: assert clean main, run check+test, print the tag/push commands (no auto-tag)
 	@if [ -n "$$(git status --porcelain)" ]; then \
 	  echo "release-prep: working tree is not clean — commit or stash first." >&2; exit 1; fi
@@ -60,6 +63,8 @@ release-prep: ## Pre-tag gate: assert clean main, run check+test, print the tag/
 	  if [ "$$branch" != "main" ]; then \
 	    echo "release-prep: on branch '$$branch', not main — release from main." >&2; exit 1; fi
 	@node scripts/check-version-sync.mjs
+	@node scripts/check-changelog.mjs
+	@node scripts/check-version-status.mjs
 	@$(MAKE) check
 	@$(MAKE) test
 	@echo ""

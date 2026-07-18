@@ -1,5 +1,5 @@
 {
   "name": "desk-standard",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "Profile-driven repo conventions: knowledge indexing, template rendering, and schema validation over a shared MCP tool surface. Skills and tools auto-discover in this directory; personalize via _knowledge/profile.yaml, never by editing shipped definitions."
 }
