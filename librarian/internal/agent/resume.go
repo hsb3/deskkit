@@ -177,7 +177,7 @@ func rehydrateHistory(rows []*core.Record) []*schema.Message {
 		case "user":
 			cands = append(cands, candidate{msg: schema.UserMessage(r.GetString("content")), isUser: true})
 		case "assistant":
-			if len(toolCallsOf(r)) == 0 { // final answers only; tool-calling rows are skipped
+			if !hasToolCalls(r) { // final answers only; tool-calling rows are skipped
 				cands = append(cands, candidate{msg: schema.AssistantMessage(r.GetString("content"), nil), isUser: false})
 			}
 		default:
@@ -244,9 +244,19 @@ func buildTranscript(rows []*core.Record) []TranscriptEntry {
 	return out
 }
 
-// toolCallsOf parses a message row's tool_calls JSON. persistMessage only sets the field when a
-// message actually carries tool calls, so a final-answer assistant row has no/empty value; an
-// empty, "null", or "[]" payload all yield nil (no tool calls).
+// hasToolCalls reports whether a message row carries tool calls, judged by the raw field alone.
+// persistMessage only sets tool_calls when a message actually carries them, so ANY non-empty
+// value marks a tool-calling row — including one whose JSON no longer parses (e.g. truncated by
+// a crash). History rehydration keys on this, not on toolCallsOf, so a corrupt row fails closed
+// (excluded from the model-facing history) instead of being misread as a final answer.
+func hasToolCalls(r *core.Record) bool {
+	raw := strings.TrimSpace(r.GetString("tool_calls"))
+	return raw != "" && raw != "null" && raw != "[]"
+}
+
+// toolCallsOf parses a message row's tool_calls JSON, for display purposes (the invoked tool's
+// name in the transcript). An empty, "null", "[]", or unparseable payload yields nil — display
+// gracefully degrades to no tool name, while hasToolCalls still classifies the row correctly.
 func toolCallsOf(r *core.Record) []schema.ToolCall {
 	raw := strings.TrimSpace(r.GetString("tool_calls"))
 	if raw == "" || raw == "null" || raw == "[]" {

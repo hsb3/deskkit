@@ -367,27 +367,35 @@ func (m model) openPicker() (tea.Model, tea.Cmd) {
 	}
 	convos, err := m.provider.list(pickerLimit, m.sess.RunID())
 	if err != nil {
-		return m, nil // degraded: keep the surface open, just do not present a picker
+		// Degraded: keep the surface open without a picker, but say why — a silent ctrl+o that
+		// does nothing reads as a dead keybinding, not a failed lookup.
+		m.entries = append(m.entries, entry{
+			role: roleAssistant, isError: true, finalized: true,
+			errText: "could not list conversations: " + err.Error(),
+		})
+		m.refreshViewport()
+		return m, nil
 	}
 	m.picker = newPicker(convos, m.vp.Width, m.vp.Height)
 	return m, nil
 }
 
 // newConversation abandons the current conversation and starts a fresh one. It is a no-op while a
-// turn is streaming. It closes the current session, opens a fresh one, and resets the transcript.
-// The close-before-open ordering is safe with no drain: ctrl+n is a no-op while streaming, so
-// there is never an in-flight turn to drain at swap time.
+// turn is streaming. Open-before-close: the fresh session is built FIRST, and the current one is
+// closed only once a replacement exists — so a failed open leaves the old session genuinely live
+// (not finalized out from under the user). No drain is needed at swap time: ctrl+n is a no-op
+// while streaming, so there is never an in-flight turn.
 func (m model) newConversation() (tea.Model, tea.Cmd) {
 	if m.streaming {
 		return m, nil
 	}
-	_ = m.provider.closeSession(m.baseCtx, m.sess)
 	fresh, err := m.provider.fresh(m.baseCtx)
 	if err != nil {
-		// Degraded: the fresh session failed to build. Keep the old session live (do not nil out
-		// sess) so the surface stays usable rather than stranded on a dead session.
+		// Degraded: the fresh session failed to build. The old session was not touched, so the
+		// surface stays fully usable on it.
 		return m, nil
 	}
+	_ = m.provider.closeSession(m.baseCtx, m.sess)
 	m.sess = fresh
 	m.entries = nil
 	m.inflightIdx = -1
@@ -415,14 +423,22 @@ func (m model) handlePickerKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if runID == "" {
 			return m, nil
 		}
-		_ = m.provider.closeSession(m.baseCtx, m.sess)
+		// Open-before-close (same reasoning as newConversation): resume FIRST, and close the
+		// current session only once the replacement exists, so a failed resume leaves the old
+		// session genuinely live rather than finalized out from under the user.
 		newSess, transcript, err := m.provider.resume(m.baseCtx, runID)
 		if err != nil {
-			// Degraded: resume failed. Keep the old session live and just dismiss the overlay.
+			// Degraded: resume failed. The old session was not touched; dismiss the overlay and
+			// say why instead of silently doing nothing.
 			m.picker = nil
+			m.entries = append(m.entries, entry{
+				role: roleAssistant, isError: true, finalized: true,
+				errText: "could not resume conversation: " + err.Error(),
+			})
 			m.refreshViewport()
 			return m, nil
 		}
+		_ = m.provider.closeSession(m.baseCtx, m.sess)
 		m.sess = newSess
 		m.entries = entriesFromTranscript(transcript)
 		m.inflightIdx = -1

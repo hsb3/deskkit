@@ -198,6 +198,52 @@ func TestCtrlN_NewConversation(t *testing.T) {
 	}
 }
 
+// TestCtrlN_FreshFails_OldSessionUntouched: open-before-close — when the fresh session cannot be
+// built, the old session must NOT have been closed (it stays genuinely live, not finalized out
+// from under the user).
+func TestCtrlN_FreshFails_OldSessionUntouched(t *testing.T) {
+	provider := &fakeProvider{freshErr: context.Canceled}
+	m, fs, _ := newTestModelWithProvider(t, provider)
+
+	m = send(m, tea.KeyMsg{Type: tea.KeyCtrlN})
+
+	if provider.closed != 0 {
+		t.Errorf("closeSession calls = %d, want 0 (old session must not be closed when fresh fails)", provider.closed)
+	}
+	if m.sess != fs {
+		t.Error("session swapped away from the old (still-live) session despite the fresh failure")
+	}
+}
+
+// TestPicker_ResumeFails_OldSessionUntouched: same open-before-close rule on the resume path,
+// plus visible feedback (an inline error entry) instead of a silent dismissal.
+func TestPicker_ResumeFails_OldSessionUntouched(t *testing.T) {
+	provider := &fakeProvider{
+		convos:    []agent.ConversationInfo{{RunID: "run-1", Title: "prior chat"}},
+		resumeErr: context.Canceled,
+	}
+	m, fs, _ := newTestModelWithProvider(t, provider)
+	m = openPickerKey(m)
+	if m.picker == nil {
+		t.Fatal("picker not open")
+	}
+
+	m = send(m, tea.KeyMsg{Type: tea.KeyEnter})
+
+	if provider.closed != 0 {
+		t.Errorf("closeSession calls = %d, want 0 (old session must not be closed when resume fails)", provider.closed)
+	}
+	if m.sess != fs {
+		t.Error("session swapped away from the old (still-live) session despite the resume failure")
+	}
+	if m.picker != nil {
+		t.Error("picker still open after a failed resume; expected it dismissed")
+	}
+	if len(m.entries) == 0 || !m.entries[len(m.entries)-1].isError {
+		t.Error("no inline error entry after a failed resume (silent failure)")
+	}
+}
+
 func TestCtrlN_NoOpWhileStreaming(t *testing.T) {
 	provider := &fakeProvider{}
 	m, _, _ := newTestModelWithProvider(t, provider)

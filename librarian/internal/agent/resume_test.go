@@ -122,6 +122,37 @@ func TestResume_RehydrationFiltering(t *testing.T) {
 	}
 }
 
+// TestRehydrateHistory_CorruptToolCallsFailClosed: an assistant row whose tool_calls payload no
+// longer parses (e.g. truncated by a crash) is still classified as tool-calling and EXCLUDED from
+// the model-facing history — it must not be misread as a final answer.
+func TestRehydrateHistory_CorruptToolCallsFailClosed(t *testing.T) {
+	app, _ := newSessionTestEnv(t)
+	coll, err := app.FindCollectionByNameOrId("messages")
+	if err != nil {
+		t.Fatalf("find messages collection: %v", err)
+	}
+	mkRow := func(role, content, rawToolCalls string) *core.Record {
+		rec := core.NewRecord(coll)
+		rec.Set("role", role)
+		rec.Set("content", content)
+		if rawToolCalls != "" {
+			rec.Set("tool_calls", types.JSONRaw(rawToolCalls))
+		}
+		return rec
+	}
+
+	rows := []*core.Record{
+		mkRow("user", "u1", ""),
+		mkRow("assistant", "step commentary", `[{"id":"call-1","type":"function","fu`), // truncated JSON
+		mkRow("assistant", "a1", ""),
+	}
+	got := contentsOf(rehydrateHistory(rows))
+	want := []string{"u1", "a1"}
+	if !equalStrings(got, want) {
+		t.Fatalf("history contents = %v, want %v (corrupt tool-calling row must be excluded)", got, want)
+	}
+}
+
 // TestResume_OrphanCollapse proves the orphan-collapse rule for interior, leading, and trailing
 // orphaned user rows (canceled/errored turns leave a user row with no assistant answer).
 func TestResume_OrphanCollapse(t *testing.T) {
