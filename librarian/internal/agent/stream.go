@@ -54,7 +54,7 @@ type Event struct {
 	Args     string    `json:"args,omitempty"`
 	Result   string    `json:"result,omitempty"`
 	Content  string    `json:"content,omitempty"`
-	Err      string    `json:"err,omitempty"`
+	Err      string    `json:"err,omitempty"` // terminal error text; on tool_end, a failed call's error
 	Canceled bool      `json:"canceled,omitempty"`
 	Partial  string    `json:"partial,omitempty"`
 }
@@ -65,7 +65,10 @@ var errSessionBusy = errors.New("session busy: a turn is already in progress")
 // StreamTurn drives one full ReAct loop over the running history and returns a buffered channel
 // (cap 64) of live events. Exactly one terminal event (final|error) is emitted, then the channel
 // is closed; the caller MUST drain to close (cancel ctx to abort — draining continues until the
-// terminal event lands). The mutex-guarded busy flag rejects overlapping turns.
+// terminal event lands), and must drain PROMPTLY: once the buffer fills, event sends block the
+// agent's own goroutines (tool callbacks and the token reader), stalling the loop until the
+// consumer catches up. Events are never dropped — a stalled consumer stalls the turn, it does
+// not corrupt the step record. The mutex-guarded busy flag rejects overlapping turns.
 //
 // Persistence and history semantics are identical to Turn() because Turn() is now a thin drain
 // over this method: one code path, so the REPL and the TUI share exactly the same transcript
@@ -279,8 +282,9 @@ func (te *turnEvents) handler() callbacks.Handler {
 			if err != nil {
 				text = err.Error()
 			}
-			// A tool error still closes the step: the error text rides in Result.
-			te.ch <- Event{Kind: EventToolEnd, Tool: toolName(info), CallID: compose.GetToolCallID(ctx), Result: text}
+			// A tool error still closes the step, but rides in Err (not Result) so a renderer
+			// can distinguish a failed call from a successful response.
+			te.ch <- Event{Kind: EventToolEnd, Tool: toolName(info), CallID: compose.GetToolCallID(ctx), Err: text}
 			return ctx
 		},
 	}

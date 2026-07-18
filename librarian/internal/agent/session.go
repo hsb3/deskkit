@@ -102,6 +102,11 @@ func (s *Session) Turn(ctx context.Context, userInput string) (string, error) {
 		}
 	}
 	if sawErr {
+		// A busy rejection never ran a turn, so termErr belongs to the in-flight turn (and may
+		// hold a stale sentinel from an earlier one) — return the busy error directly.
+		if errText == errSessionBusy.Error() {
+			return "", errSessionBusy
+		}
 		s.mu.Lock()
 		te := s.termErr
 		s.mu.Unlock()
