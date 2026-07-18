@@ -43,7 +43,7 @@ guarded.** The chat TUI had merged under a stale VERSION 0.4.0; PR #41 bumped to
 `check-changelog.mjs` (hard release gate — a tagged VERSION must have a non-empty CHANGELOG
 section; wired into `make release-prep` + `release.yml`) and `check-version-status.mjs`
 (non-blocking advisory — `make version-status` + a CI step — that warns when `plugin/`/`librarian/`
-changed since the last tag without a bump). `docs/releasing.md` is the runbook. `git tag v0.5.0`
+changed since the last tag without a bump). `docs/development/releasing.md` is the runbook. `git tag v0.5.0`
 was pushed; the release workflow succeeded and published a non-draft/non-prerelease **v0.5.0**
 (4 binaries + `checksums.txt` + plugin bundle). Verified authoritatively: the darwin/arm64 binary
 downloads, runs, reports `version 0.5.0`, and its sha256 matches the published `checksums.txt`.
@@ -52,7 +52,7 @@ The repo-visibility blocker on the *public* curl|bash path (below) is unchanged.
 Remaining follow-ons from the TUI build, all small: two accepted review nits from PR #40 to fold
 into a future touch — the locked-store
 hint's substring match could false-positive on a path containing "locked" (harmless: hint is
-phrased as a question), and `docs/media/chat.tape`'s 30s answer sleep is tight for slow API
+phrased as a question), and `docs/development/tapes/chat.tape`'s 30s answer sleep is tight for slow API
 days (only matters on manual re-record; committed GIF verified good). Watch item from PR #38
 (intermittent ctrl+t exit) never reproduced post-query-fix, including the live phase-4/5
 passes.
@@ -104,7 +104,29 @@ Shipped 2026-07-17: **#31** (PR #32, ADR 0003) + **docs/CI release-prep sweep** 
 §2. Earlier same day: **#7 / #25 / #27** (PRs #29 / #30 / #28), **#23** (PR #24), **NOTE.md
 punch list** (PR #26).
 
-## 2. Last session delivered (2026-07-18, later): v0.5.0 release + versioning workflow
+## 2. Last session delivered (2026-07-18, latest): make install + docs dev/use split
+
+Post-release dogfooding turned up two things, both fixed on branch `docs/dev-use-separation`
+(PR pending at handoff time):
+
+- **`make install`** (root + `librarian/Makefile`) — build the version-stamped binary and drop it
+  in `~/.local/bin` (override `PREFIX=`). Mirrors install.sh's default location; the one-command
+  update-from-source path. Root delegates to `librarian/Makefile install`. Prompted by a real
+  incident: the `pocket-librarian` on Henry's PATH was a **stale 16-Jul build** (no `chat` command,
+  `--version` printed `(untracked)`) because `/plugin` updates the plugin, NOT the standalone
+  binary — the two are separate artifacts. Fixed by installing the released v0.5.0 arm64 binary
+  (checksum-verified) and adding `make install` so it's a one-liner going forward. Added to
+  `CHANGELOG.md [Unreleased]`.
+- **Docs split into using vs development** (chosen structure: "dev home + index", not a full
+  physical move — the spec + ADRs are cited from code/skills/the neutrality-lint allowlist, so
+  their paths stay stable). New `docs/README.md` (index: Using ┃ Development) + `docs/development/`
+  (overview README, `releasing.md` moved here, and the VHS `tapes/` moved out of `docs/media/` so
+  tape *source* is separated from `.gif` *output*). `scripts/record-media.sh` now reads tapes from
+  `docs/development/tapes/`; the `Output docs/media/*.gif` lines are unchanged (vhs runs from repo
+  root). Gifs still live in `docs/media/` (guides reference `media/*.gif` — unchanged). All moved-
+  doc backlinks fixed; a link-resolution check + shellcheck + `make check` pass.
+
+## 2-rel. Earlier same day (2026-07-18): v0.5.0 release + versioning workflow
 
 **Significant chat-TUI enhancements had merged without a version bump; this session closed that
 and hardened against a repeat.** Shipped as **PR #41** (squash `5c67e06`), then tagged + released.
@@ -121,7 +143,7 @@ and hardened against a repeat.** Shipped as **PR #41** (squash `5c67e06`), then 
   version; the advisory reproduced the actual drift (files under plugin/librarian since v0.4.0,
   VERSION unmoved). claude-review caught one real bug (bare VERSION read broke the advisory's
   exit-0 guarantee) — fixed (try/catch + `execFileSync` argv, no shell surface) in `cc48d07`.
-- **Docs**: ADR 0005, `docs/releasing.md` runbook, README pointers (CHANGELOG + releasing),
+- **Docs**: ADR 0005, `docs/development/releasing.md` runbook, README pointers (CHANGELOG + releasing),
   `getting-started` `--version` output → 0.5.0, ADR index row.
 - **Released**: `make release-prep` green → `git tag v0.5.0 && git push --tags` → workflow
   published v0.5.0 (assets verified: binary runs, reports 0.5.0, sha256 matches checksums.txt).
@@ -143,7 +165,7 @@ mid-conversation with a real trailing orphaned user row (fast esc-cancel), relau
 resume — model recalled the pre-restart codeword; seq continued densely; anthropic accepted
 the collapsed history. PR #40 (squash `7f46b40`): ADR 0004 (supersedes ONLY ADR 0001's
 correction-note clarification 1; 0001's decision + status unchanged), README/guide chat
-rewrite, key-gated `docs/media/chat.tape` + live-recorded `chat.gif` (default `make media`
+rewrite, key-gated `docs/development/tapes/chat.tape` + live-recorded `chat.gif` (default `make media`
 stays hermetic), main.go stale `migrate up` comment fixed + locked-store hint
 (`annotateLockErr`, both surfacing points). Docs fact-checked adversarially: 33 confirmed /
 0 refuted. Crew: one Opus lead (phase 4), four parallel builders + one reviewer (phase 5);
@@ -378,7 +400,7 @@ Review cycle noted one accepted trade-off (migration 0012 down-path `return nil`
 ## 3. Where to start building
 
 **The TUI build is done AND released as v0.5.0** (see §1/§2). Next candidates, in rough order:
-future releases follow **`docs/releasing.md`** (bump VERSION + 3 manifests → move `[Unreleased]`
+future releases follow **`docs/development/releasing.md`** (bump VERSION + 3 manifests → move `[Unreleased]`
 into a dated CHANGELOG section → `make release-prep` → tag) — `check-changelog` now gates the tag
 and `make version-status` flags accumulated drift; the repo-visibility decision gating the
 curl|bash install path (§1
@@ -407,7 +429,7 @@ or profile scalars in skill prose).
   `make verify` (verify.sh, 47 checks — **now also runs in CI + the release gate**, PR #33) ·
   `make package` (drift guard) · `node scripts/check-version-sync.mjs`. CI (`ci.yml`) is the
   aggregate required check. Note: shellcheck + actionlint are NOT yet CI-enforced (→ #34).
-- **Versioning/release (ADR 0005, since PR #41 — runbook `docs/releasing.md`)**: SemVer on the
+- **Versioning/release (ADR 0005, since PR #41 — runbook `docs/development/releasing.md`)**: SemVer on the
   single root `VERSION`; a bump = edit `VERSION` + the three manifests (sync-guarded) **and** move
   `[Unreleased]` CHANGELOG entries into a dated `## [<version>]` section. `check-changelog.mjs` is
   a **hard gate** (release-prep + release.yml) — a tag with no CHANGELOG section fails.
@@ -415,6 +437,14 @@ or profile scalars in skill prose).
   always exit 0) that warns when `plugin/`/`librarian/` drifted past the last tag without a bump.
   `ci.yml` checks out `fetch-depth: 0` for it. Both scripts + CHANGELOG live outside the neutrality
   surface (repo root / `scripts/`).
+- **Docs layout (since the dev/use split)**: `docs/` is indexed by `docs/README.md` in two
+  tracks — **Using** (`getting-started`/`plugin-guide`/`librarian-guide` + `media/*.gif`) and
+  **Development** (`docs/development/` = overview README + `releasing.md` + `tapes/*.tape`). The
+  **spec** (`docs/pocket-librarian-v1-spec.md`) and **ADRs** (`docs/decisions/`) deliberately stay
+  at the `docs/` top level — they're cited from code, skills, and the neutrality-lint allowlist, so
+  their paths are kept stable (don't move them to `development/`). VHS **tape sources** live in
+  `docs/development/tapes/`; their **`.gif` output** lands in `docs/media/` (the `Output` path is
+  repo-root-relative, so tapes moved without touching it).
 - **Generated, never hand-edit**: `plugin/claude-plugin/mcp/server.js` and
   `plugin/claude-plugin/schema/profile.schema.yaml` — regen with `cd plugin && bun run package`;
   CI drift-guards them. Bundle output is byte-identical across macOS/linux (proven).

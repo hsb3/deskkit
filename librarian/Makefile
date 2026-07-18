@@ -23,6 +23,11 @@ BIN     := pocket-librarian
 PIDFILE := .pocket-librarian.pid
 LOGFILE := serve.log
 
+# Install location. Mirrors install.sh's default (~/.local/bin — no root needed); override with
+# `make install PREFIX=/usr/local` to land the binary in $(PREFIX)/bin.
+PREFIX  ?= $(HOME)/.local
+BINDIR  := $(PREFIX)/bin
+
 # Version stamp: the single source of truth is the repo-root VERSION file. The build target
 # passes it to the binary via `-ldflags -X main.version=<VERSION>` so `pocket-librarian
 # --version` reports the release (a bare `go build ./...` leaves the default "dev"). The
@@ -30,7 +35,7 @@ LOGFILE := serve.log
 VERSION  := $(shell cat ../VERSION 2>/dev/null || echo dev)
 LDFLAGS  := -X main.version=$(VERSION)
 
-.PHONY: help build gui serve stop sweep patrol propose-fix findings summary \
+.PHONY: help build install gui serve stop sweep patrol propose-fix findings summary \
         adoption orphans uncollapsed verify clean test vet fmt
 
 help: ## List targets
@@ -39,6 +44,12 @@ help: ## List targets
 
 build: ## Build the pocket-librarian binary (./pocket-librarian), version-stamped from ../VERSION
 	@go build -ldflags "$(LDFLAGS)" -o $(BIN) ./cmd/pocket-librarian
+
+install: build ## Install the version-stamped binary to $(PREFIX)/bin (default ~/.local/bin; override PREFIX=...)
+	@mkdir -p "$(BINDIR)"
+	@install -m 0755 $(BIN) "$(BINDIR)/$(BIN)"
+	@echo "installed $(BIN) $(VERSION) -> $(BINDIR)/$(BIN)"
+	@command -v $(BIN) >/dev/null 2>&1 || echo "note: $(BINDIR) is not on your PATH — add it to use '$(BIN)' as a bare command."
 
 gui: build ## Serve the DB and open the admin GUI in a browser
 	@./$(BIN) gui

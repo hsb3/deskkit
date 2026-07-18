@@ -14,7 +14,9 @@ SHELL := /bin/bash
 
 VERSION := $(shell cat VERSION 2>/dev/null || echo dev)
 
-.PHONY: help setup build test check verify package media clean version-status release-prep
+.PHONY: help setup build install test check verify package media clean version-status release-prep
+
+PREFIX ?= $(HOME)/.local
 
 help: ## List targets
 	@grep -hE '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) \
@@ -28,6 +30,9 @@ setup: ## Install plugin deps + git hooks (bun install, lefthook install)
 build: ## Build both lanes: plugin (bun/tsc) + librarian binary (go, version-stamped)
 	@cd plugin && bun run build
 	@$(MAKE) -C librarian build
+
+install: ## Build + install the librarian binary to ~/.local/bin (override PREFIX=/usr/local)
+	@$(MAKE) -C librarian install PREFIX="$(PREFIX)"
 
 test: ## Fast tests both lanes: plugin (bun test) + librarian (go test ./...)
 	@cd plugin && bun run test
