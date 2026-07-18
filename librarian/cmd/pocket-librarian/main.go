@@ -498,10 +498,20 @@ func registerToolCommands(app *pocketbase.PocketBase, cfg *config.Config, cfgErr
 			if plain || !isatty.IsTerminal(os.Stdin.Fd()) || !isatty.IsTerminal(os.Stdout.Fd()) {
 				return runChat(cmd.Context(), app, c)
 			}
-			return tui.Run(cmd.Context(), app, c)
+			// Resolve the color theme ONCE here, in the safe window before the Bubble Tea program
+			// starts — the "auto" path probes the terminal background (a query that would corrupt
+			// input if fired after the program's stdin reader is running; see ADR 0004). Precedence:
+			// --theme flag > LIBRARIAN_THEME env > auto-detect. Only consult the flag when the user
+			// set it, so an unset flag defers to the env override rather than shadowing it.
+			themeFlag := ""
+			if cmd.Flags().Changed("theme") {
+				themeFlag, _ = cmd.Flags().GetString("theme")
+			}
+			return tui.Run(cmd.Context(), app, c, tui.ResolveTheme(themeFlag))
 		},
 	}
 	chatCmd.Flags().Bool("plain", false, "force the line-oriented REPL instead of the full-screen TUI")
+	chatCmd.Flags().String("theme", "auto", "color theme for the full-screen TUI: light, dark, or auto (detect the terminal background once at startup)")
 	app.RootCmd.AddCommand(chatCmd)
 
 	// mcp-serve — expose the tool core as an MCP stdio server (spec §7.2 outbound dual-surface;

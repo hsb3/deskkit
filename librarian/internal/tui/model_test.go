@@ -49,7 +49,7 @@ func newTestModelWithProvider(t *testing.T, provider *fakeProvider) (model, *fak
 	t.Helper()
 	cfg := &config.Config{DeskName: "test-desk", LLMProvider: "openai", LLMModel: "test-model"}
 	fs := &fakeStreamer{runID: "live-run"}
-	m := newModel(context.Background(), fs, provider, cfg)
+	m := newModel(context.Background(), fs, provider, cfg, themeDark)
 	next, _ := m.Update(tea.WindowSizeMsg{Width: 80, Height: 24})
 	return next.(model), fs, provider
 }

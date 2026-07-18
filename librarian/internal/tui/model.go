@@ -183,6 +183,7 @@ type model struct {
 	llmProvider string
 	llmModel    string
 
+	theme    string // concrete resolved palette ("light"/"dark"), never "auto"
 	styles   styleSet
 	keymap   keymap
 	ta       textarea.Model
@@ -209,9 +210,10 @@ type model struct {
 }
 
 // newModel builds the chat model against an injected streamer (the real *agent.Session in
-// production, a fake in tests), the session provider (list/resume/fresh/close), and the resolved
-// config for the header.
-func newModel(baseCtx context.Context, sess streamer, provider sessionProvider, cfg *config.Config) model {
+// production, a fake in tests), the session provider (list/resume/fresh/close), the resolved
+// config for the header, and the theme resolved once at startup (a concrete "light"/"dark"; see
+// theme.go). The theme drives both the lipgloss palette and the glamour markdown style.
+func newModel(baseCtx context.Context, sess streamer, provider sessionProvider, cfg *config.Config, theme string) model {
 	ta := textarea.New()
 	ta.Placeholder = "Ask the librarian… (enter to send, alt+enter for a newline)"
 	ta.Prompt = "▏ "
@@ -231,7 +233,8 @@ func newModel(baseCtx context.Context, sess streamer, provider sessionProvider, 
 		deskName:    cfg.DeskName,
 		llmProvider: cfg.LLMProvider,
 		llmModel:    cfg.LLMModel,
-		styles:      newStyles(),
+		theme:       theme,
+		styles:      newStyles(theme),
 		keymap:      defaultKeymap(),
 		ta:          ta,
 		vp:          viewport.New(0, 0),
@@ -576,7 +579,7 @@ func (m *model) resize(w, h int) {
 	m.vp.Height = vpHeight
 	m.ta.SetWidth(w)
 	m.ta.SetHeight(inputHeight)
-	m.renderer = newRenderer(w)
+	m.renderer = newRenderer(w, m.theme)
 	if m.picker != nil {
 		m.picker.SetSize(w, vpHeight) // the overlay occupies the viewport area
 	}
