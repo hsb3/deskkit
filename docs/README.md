@@ -16,7 +16,7 @@ Read these to install and run the products. No build toolchain needed beyond the
 | [getting-started.md](getting-started.md) | Install the plugin, fill your profile, build the librarian, run your first sweep + patrol. |
 | [plugin-guide.md](plugin-guide.md) | The four skills as user journeys — when to reach for each and what it does to your desk. |
 | [librarian-guide.md](librarian-guide.md) | The daily loop: sweep → patrol → fix → byte-exact restore. |
-| `../librarian/README.md`, `../plugin/README.md`, `../schema/README.md` | Per-product operator detail. |
+| [../librarian/README.md](../librarian/README.md), [../plugin/README.md](../plugin/README.md), [../schema/README.md](../schema/README.md) | Per-product operator detail. |
 
 Demo GIFs referenced by these guides live in [`media/`](media/). (Their VHS source tapes are a
 development artifact — see below.)
