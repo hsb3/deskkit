@@ -17,7 +17,6 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/pocketbase/pocketbase/core"
 
-	"github.com/example/pocket-librarian/internal/agent"
 	"github.com/example/pocket-librarian/internal/config"
 )
 
@@ -26,22 +25,36 @@ import (
 // then drains any in-flight turn and closes the Session. It returns the program's error, or a
 // Close error when the program itself succeeded.
 func Run(ctx context.Context, app core.App, cfg *config.Config) error {
-	sess, err := agent.NewSession(ctx, app, cfg)
+	provider := &agentProvider{app: app, cfg: cfg}
+
+	// Open the initial session eagerly (via the provider), so a build/config failure surfaces
+	// before the alternate screen takes over the terminal.
+	sess, err := provider.fresh(ctx)
 	if err != nil {
 		return err
 	}
 
-	p := tea.NewProgram(newModel(ctx, sess, cfg), tea.WithAltScreen(), tea.WithContext(ctx))
+	p := tea.NewProgram(newModel(ctx, sess, provider, cfg), tea.WithAltScreen(), tea.WithContext(ctx))
 	final, runErr := p.Run()
 
-	// Drain a turn that was still streaming when the program exited (e.g. the context was
-	// canceled out from under it): cancel it, then read the channel to close. The engine never
-	// drops events, so this always terminates once the terminal event lands.
-	if fm, ok := final.(model); ok && fm.events != nil {
-		if fm.cancelTurn != nil {
-			fm.cancelTurn()
+	// The final model may hold a DIFFERENT session than the one opened above: the user may have
+	// resumed a conversation or started a new one, each of which swapped m.sess (closing the OLD
+	// session inside Update at swap time). So exactly ONE session is live at program end — the
+	// final model's — and that is the one to drain and close.
+	finalSess := sess
+	if fm, ok := final.(model); ok {
+		if fm.sess != nil {
+			finalSess = fm.sess
 		}
-		for range fm.events { //nolint:revive // intentional drain to channel close
+		// Drain a turn that was still streaming when the program exited (e.g. the context was
+		// canceled out from under it): cancel it, then read the channel to close. The engine never
+		// drops events, so this always terminates once the terminal event lands.
+		if fm.events != nil {
+			if fm.cancelTurn != nil {
+				fm.cancelTurn()
+			}
+			for range fm.events { //nolint:revive // intentional drain to channel close
+			}
 		}
 	}
 
@@ -53,7 +66,7 @@ func Run(ctx context.Context, app core.App, cfg *config.Config) error {
 		closeCtx, cancel = context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 	}
-	if cerr := sess.Close(closeCtx); cerr != nil && runErr == nil {
+	if cerr := provider.closeSession(closeCtx, finalSess); cerr != nil && runErr == nil {
 		runErr = cerr
 	}
 	return runErr
