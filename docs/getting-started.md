@@ -84,22 +84,35 @@ curl -fsSL https://raw.githubusercontent.com/hsb3/desk-standard/main/install.sh 
 
 ## 4. First sweep and patrol
 
-The librarian needs two env vars (it refuses to run without them) — the desk to steward and
-a unique store name. The store lives outside the desk tree, at
-`$XDG_DATA_HOME/pocket-librarian/<DESK_NAME>/` (see
-`decisions/0002-multi-desk-topology-store-per-desk.md`).
+The librarian needs to know two things — which desk to steward (`DESK_ROOT`) and a unique
+store name (`DESK_NAME`). **You already gave it both in step 2.** It walks up from your
+working directory, finds `_knowledge/profile.yaml`, and reads `desk.name` as `DESK_NAME`
+with the folder that owns `_knowledge/` as `DESK_ROOT`. So from your desk, with the binary on
+your `PATH` (installed by step 3's `install.sh`, or via `make install`), no exports are
+needed — just run:
 
-```bash
-export DESK_ROOT=/path/to/your/desk
-export DESK_NAME=my-desk
+```console
+$ cd /path/to/your/desk      # the folder whose _knowledge/profile.yaml you filled
+$ pocket-librarian sweep
 ```
+
+> **Env vars are the override, not the requirement.** Two cases still need them:
+> - **A bare folder with no profile** (a scratch or UAT dir) — either drop a one-line
+>   `_knowledge/profile.yaml` in it (`desk:` with `name:` and `root: "."`), or set the vars
+>   for the session: `export DESK_ROOT=/path/to/desk DESK_NAME=my-desk`.
+> - **Running the dev build from `librarian/`** (`./pocket-librarian …`) — you're outside the
+>   desk tree, so the profile isn't on the walk-up path; export the two vars.
+>
+> Env always wins over the profile. Either way the store lives outside the desk tree, at
+> `$XDG_DATA_HOME/pocket-librarian/<DESK_NAME>/` (see
+> `decisions/0002-multi-desk-topology-store-per-desk.md`).
 
 Index the tree, then flag violations — no setup step needed, `sweep` creates the store on
 first run. `sweep` and `patrol` are LLM-free and **never write desk files** — `patrol` is a
 pure dry run:
 
 ```console
-$ ./pocket-librarian sweep
+$ pocket-librarian sweep
 {
   "total": 4,
   "created": 4,
@@ -108,7 +121,7 @@ $ ./pocket-librarian sweep
   "soft_deleted": 0
 }
 
-$ ./pocket-librarian patrol
+$ pocket-librarian patrol
 {
   "run_id": "patrol-20260717T171143Z",
   "files_swept": 4,
@@ -121,7 +134,7 @@ $ ./pocket-librarian patrol
 what was flagged with a read-only query:
 
 ```console
-$ ./pocket-librarian query findings --pretty
+$ pocket-librarian query findings --pretty
 findings: 3
 
 R1 (1)
@@ -134,6 +147,10 @@ R3 (1)
 
 ## What's next
 
+- **Chat with it** — `pocket-librarian chat` opens an interactive session over the same tools
+  (a full-screen view on a terminal). Unlike `sweep`/`patrol`, `chat` needs an LLM: set
+  `ANTHROPIC_API_KEY` for the default provider, or point `models` + `secrets_ref.llm_api_key`
+  at your key in the profile. Details in `../librarian/README.md`.
 - **Repair the fixable findings** — the supervised `propose-fix → apply-fix` write path and
   the byte-exact `restore` undo are the daily loop: `librarian-guide.md`.
 - **Learn the skills** — greenfield setup, the rule set, the harvest loop, and brownfield
