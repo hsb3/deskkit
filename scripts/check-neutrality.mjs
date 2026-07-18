@@ -46,7 +46,10 @@ import { fileURLToPath } from "node:url";
 import { tmpdir } from "node:os";
 
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
-const SCAN_DIRS = ["plugin", "librarian"];
+// The shipped, identity-bearing surface: the plugin, the librarian, and the ported SOP kit
+// library (kits/ — the 0013 S4(a) template surface). All three carry the identity-neutrality
+// constraint; scripts/ + CHANGELOG.md + docs/ are authoring surfaces and stay outside.
+const SCAN_DIRS = ["plugin", "librarian", "kits"];
 const ALLOW_FILE = join("schema", "neutrality-lint.allow");
 
 const EXCLUDE_DIR_NAMES = new Set(["node_modules", "dist", ".git"]);

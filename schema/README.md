@@ -9,13 +9,20 @@ and the pocket-librarian binary read as their single rule/structure source
 (`_meta/build-brief.md` §3.3(a); `_structure/decisions/0013` item 8). It is the seed of
 a single estate-wide schema (`0013` item 4).
 
-**What's in it now.** `profile.schema.yaml` — the M-05 personalization profile block
-(`_meta/m-05-data-surfaces.md`, "Field set (schema v1 profile block)"): identity, repos,
-board, desk paths, machines, models, secrets_ref, preferences, and the open-ended
-`custom` escape hatch. It validates a `_knowledge/profile.{yaml,json,md}` file. Only
-`schema_version` is required at the top level; nested objects require their own core
-keys when present (e.g. `repos.default`, `board.number`, `machines[].role`) — see the
-schema file for the exact contract.
+**What's in it now.** Two dimensions:
+
+- `profile.schema.yaml` — the M-05 personalization profile block
+  (`_meta/m-05-data-surfaces.md`, "Field set (schema v1 profile block)"): identity, repos,
+  board, desk paths, machines, models, secrets_ref, preferences, and the open-ended
+  `custom` escape hatch. It validates a `_knowledge/profile.{yaml,json,md}` file. Only
+  `schema_version` is required at the top level; nested objects require their own core
+  keys when present (e.g. `repos.default`, `board.number`, `machines[].role`) — see the
+  schema file for the exact contract.
+- `doctypes.yaml` — the **doc-type dimension**: every doc `type` a filled SOP kit (`kits/`)
+  emits, its status family, and required/optional fields. Product-neutral successor of the
+  headcase vault's `types:` model (0013 items 4 + 8). The contract as data; the runtime
+  validation engine that consumes it is the PM-system build's job. Port + gap dispositions:
+  [`docs/decisions/0006-kit-port-schema-reconciliation.md`](../docs/decisions/0006-kit-port-schema-reconciliation.md).
 
 **How validation is consumed.** The M-05 substitution loader (build-brief D7) validates
 an agent-written profile against this schema before write — a profile that violates the

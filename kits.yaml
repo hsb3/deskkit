@@ -1,0 +1,90 @@
+# kits.yaml — the SOP kit manifest (desk decision 0013 S4(a); ported from the headcase vault
+# per desk-standard #49). The single ordered index of the ported kit library under kits/.
+#
+# Each kit is a doc-type authoring aid with a guide/template/example (G/T/E) trio, EXCEPT:
+#   - composite kits (postmortem, release-notes) ship guide+example only — they are ASSEMBLED
+#     from other kits, not authored from a blank template, so a template is omitted BY DESIGN.
+#   - the user-defined kit is nonstandard: loose project-flavored type stubs, no G/T/E trio.
+#
+# `type`   = the doc `type:` a filled kit emits (the schema/doctypes.yaml entry it conforms to).
+# `emits`  = present only when the emitted type differs from the kit name (aliased kits).
+# `files`  = the exact file set under kits/<dir>/, checked by scripts/check-kits.mjs (drift guard).
+#
+# Drift guard: `node scripts/check-kits.mjs` (wired into `make check` + CI) fails if this manifest
+# and the kits/ tree disagree in either direction — a missing/added file or an untracked/absent dir.
+
+kits:
+  - dir: analysis
+    type: analysis
+    files: [guide.md, template.md, example.md]
+  - dir: daily-note
+    type: daily-note
+    emits: journal            # aliased: a daily-note emits a lightweight `journal` doc
+    files: [guide.md, template.md, example.md]
+  - dir: decision
+    type: decision
+    files: [guide.md, template.md, example.md]
+  - dir: engineering-spec
+    type: engineering-spec
+    files: [guide.md, template.md, example.md]
+  - dir: feature-spec
+    type: feature-spec
+    files: [guide.md, template.md, example.md]
+  - dir: meeting-notes
+    type: meeting-notes
+    files: [guide.md, template.md, example.md]
+  - dir: one-pager
+    type: one-pager
+    files: [guide.md, template.md, example.md]
+  - dir: postmortem
+    type: retro               # composite: emits a `retro` with variant: incident
+    emits: retro
+    composite: true           # guide+example only; template omitted by design
+    files: [guide.md, example.md]
+  - dir: product-spec
+    type: product-spec
+    files: [guide.md, template.md, example.md]
+  - dir: project-brief
+    type: project-brief
+    files: [guide.md, template.md, example.md]
+  - dir: raid
+    type: raid
+    files: [guide.md, template.md, example.md]
+  - dir: release-notes
+    type: release-notes
+    composite: true           # guide+example only; assembled from the project record, not authored blank
+    files: [guide.md, example.md]
+  - dir: research-synthesis
+    type: research-synthesis
+    files: [guide.md, template.md, example.md]
+  - dir: retro
+    type: retro
+    files: [guide.md, template.md, example.md]
+  - dir: roadmap
+    type: roadmap
+    files: [guide.md, template.md, example.md]
+  - dir: runbook
+    type: runbook
+    files: [guide.md, template.md, example.md]
+  - dir: sow
+    type: sow
+    files: [guide.md, template.md, example.md]
+  - dir: technical-design
+    type: technical-design
+    files: [guide.md, template.md, example.md]
+  - dir: test-plan
+    type: test-plan
+    files: [guide.md, template.md, example.md]
+  - dir: user-defined
+    type: user-defined
+    nonstandard: true         # loose project-flavored type stubs; no G/T/E trio; emits meeting/note/decision/task
+    files: [decision.md, meeting.md, note.md, task.md]
+  - dir: user-journey
+    type: user-journey
+    files: [guide.md, template.md, example.md]
+  - dir: ux-spec
+    type: ux-spec
+    files: [guide.md, template.md, example.md]
+  - dir: weekly-checkin
+    type: weekly-checkin
+    files: [guide.md, template.md, example.md]

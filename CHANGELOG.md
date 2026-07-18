@@ -14,6 +14,15 @@ for why this policy exists.
 
 ### Added
 
+- **SOP kit library (`kits/`) + schema-v1 doc-type dimension.** The 23 headcase SOP kits
+  (guide/template/example per doc type) ported into the repo, neutralized to identity-neutral
+  shipped artifacts (0013 S4(a), item 9). Indexed by the root `kits.yaml` manifest with a
+  `scripts/check-kits.mjs` drift guard (in `make check` + CI). The kit frontmatter contract now
+  lives in `schema/doctypes.yaml` (schema v1's doc-type dimension, successor of the vault
+  `types:` model), with the seven previously-unschematized kit types added and the `user-defined`
+  nonstandard types deliberately excluded. `kits/` is inside the neutrality-lint scan surface.
+  Port + gap dispositions: `docs/decisions/0006-kit-port-schema-reconciliation.md`. The vault
+  copies are frozen (read-only journal).
 - **`make install`** — build the version-stamped librarian binary and install it to `~/.local/bin`
   (override with `make install PREFIX=/usr/local`). The one-command update-from-source path.
 - **`record_feedback`** — the librarian can log feedback entries into its own store: a `problem`
