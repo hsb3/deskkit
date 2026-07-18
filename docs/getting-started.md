@@ -65,7 +65,7 @@ floors it):
 $ cd librarian
 $ make build          # -> ./pocket-librarian
 $ ./pocket-librarian --version
-pocket-librarian version 0.4.0
+pocket-librarian version 0.5.0
 ```
 
 A `make`-built or release binary reports its release version via `--version`; a binary that

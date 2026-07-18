@@ -13,3 +13,4 @@ where the decision binds; never delete a record — supersede or correct in plac
 | [0002](0002-multi-desk-topology-store-per-desk.md) | Multi-desk topology: store-per-desk, XDG store home, `desk` as open-guard | Accepted (2026-07-17) |
 | [0003](0003-tool-commands-self-initialize-store.md) | Store initialization: tool commands self-initialize (auto-run app migrations) | Accepted (2026-07-17) |
 | [0004](0004-chat-full-screen-tui.md) | `chat`: full-screen Bubble Tea TUI, streaming event layer, resume | Accepted (2026-07-18) |
+| [0005](0005-versioning-and-changelog.md) | Versioning policy, CHANGELOG, and a missing-bump guard | Accepted (2026-07-18) |

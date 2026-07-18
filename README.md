@@ -121,6 +121,8 @@ Start with the user guides, then go deep:
 - **[docs/librarian-guide.md](docs/librarian-guide.md)** — the daily loop: sweep → patrol → fix → byte-exact restore.
 - `plugin/README.md`, `schema/README.md`, `librarian/README.md` — per-product operator detail.
 - `docs/pocket-librarian-v1-spec.md` — the librarian's product and technical spec.
-- `docs/decisions/` — architecture decision records (interactive surface, multi-desk topology, store self-initialization).
+- **[docs/releasing.md](docs/releasing.md)** — how to version and cut a release (both products, one version).
+- `docs/decisions/` — architecture decision records (interactive surface, multi-desk topology, store self-initialization, chat TUI, versioning policy).
+- **[CHANGELOG.md](CHANGELOG.md)** — what changed in each release.
 - `_meta/build-brief.md` — the build brief this repo was built from (repo shape, acceptance criteria, parallelism).
 - `_meta/m-05-data-surfaces.md` — the profile / `_knowledge/` design and the neutrality lint.

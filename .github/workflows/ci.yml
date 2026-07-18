@@ -23,6 +23,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          fetch-depth: 0 # full history + tags so the version-status advisory can diff since the last release
 
       - name: Set up Go
         uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
@@ -51,6 +53,12 @@ jobs:
       # three shipped manifests (plugin.json, plugin/package.json, marketplace.json) drift.
       - name: Version-sync — VERSION vs shipped manifests
         run: node scripts/check-version-sync.mjs
+
+      # Advisory only (never fails the build): nudges when user-facing changes have piled up
+      # under plugin/ or librarian/ since the last v* tag without a VERSION bump. The hard gate
+      # (a documented CHANGELOG section for the tagged version) lives in release.yml.
+      - name: Version-status advisory (non-blocking)
+        run: node scripts/check-version-status.mjs
 
       # ---- plugin lane ----
       - name: Install plugin deps

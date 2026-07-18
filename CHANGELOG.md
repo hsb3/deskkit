@@ -1,0 +1,87 @@
+# Changelog
+
+All notable changes to this repository — both the **plugin** (Claude Code plugin + MCP server)
+and the **librarian** (`pocket-librarian` Go binary) — are recorded here. The two ship under one
+repo version (the root `VERSION` file); a release tags that single version.
+
+The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project
+adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html). See
+[`docs/releasing.md`](docs/releasing.md) for how a version is bumped and cut, and
+[`docs/decisions/0005-versioning-and-changelog.md`](docs/decisions/0005-versioning-and-changelog.md)
+for why this policy exists.
+
+## [Unreleased]
+
+_Nothing yet — add entries here as user-facing changes land, then roll them into the next
+version section at release time._
+
+## [0.5.0] — 2026-07-18
+
+The `chat` interactive surface graduates from a line REPL to a full-screen terminal UI, and the
+streaming substrate underneath it becomes reusable. Recorded as
+[ADR 0004](docs/decisions/0004-chat-full-screen-tui.md).
+
+### Added
+
+- **Full-screen chat TUI.** On a terminal (stdin **and** stdout are TTYs), `librarian chat` now
+  opens a full-screen Bubble Tea UI: the answer streams token by token, a finished answer renders
+  as markdown, and each tool call collapses to one faint line.
+- **Conversation resume and switching.** `ctrl+o` opens a picker of prior conversations to
+  resume; `ctrl+n` starts a fresh one — both no-ops while a turn is streaming. Resumed history is
+  rehydrated for the model with orphaned user rows collapsed.
+- **Cancel an in-flight turn.** `esc` interrupts a streaming turn (the reply is badged
+  `(interrupted)`) or closes the resume picker; `ctrl+t` toggles tool-step detail.
+- **Streaming event layer** (`agent.Session.StreamTurn`) emitting `token` / `tool_start` /
+  `tool_end` / `final` / `error` events over a JSON-taggable `Event` type — the reusable
+  substrate the deferred webapp SSE route (ADR 0001, option b) can marshal directly.
+
+### Changed
+
+- **`chat` auto-detects the terminal.** It launches the TUI when interactive and falls back to
+  the original line REPL when either end is piped or `--plain` is passed — the non-TTY path is
+  byte-for-byte the previous REPL.
+- `Turn()` is now a thin drain over `StreamTurn`, so the REPL and the TUI share one persistence
+  path.
+
+### Fixed
+
+- **Multi-turn transcript persistence.** The persistence high-water-mark was per-session, so
+  multi-turn sessions duplicated the prior assistant row (no-tool turns) or dropped the new user
+  row (tool turns). It is now re-baselined per turn and guarded by an exactly-once transcript
+  regression test.
+- **Zero-argument tool calls** (e.g. `sweep`, `patrol`) streamed no argument deltas, leaving
+  `ArgumentsInJSON == ""` and killing the turn on unmarshal; a normalizing adapter now maps `""`
+  → `"{}"` at tool registration.
+
+## [0.4.0] — 2026-07-17
+
+First tagged release — the distribution and hardening baseline. (Pre-`0.4.0` development history,
+including the `v0.0.1-alpha` tag, lives in the git log and the merged PRs.)
+
+### Added
+
+- **Curl-able installer** (`install.sh`) and a tag-triggered **release workflow** that
+  cross-compiles the librarian for darwin/linux × amd64/arm64 (pure-Go), builds the plugin
+  bundle, and publishes a GitHub release with sha256 `checksums.txt`.
+- **Unified repo version.** One canonical `VERSION` drives the librarian binary (via ldflags) and
+  the three shipped manifests (`plugin.json`, `plugin/package.json`, `marketplace.json`),
+  drift-guarded in CI and pre-commit.
+- **Makefile task interface** (`make help`) as the canonical entry point, plus lefthook
+  pre-commit hooks mirroring CI, and three user guides + demo media.
+- **XDG store home + desk open-guard** ([ADR 0002](docs/decisions/0002-multi-desk-topology-store-per-desk.md)):
+  stores default to `$XDG_DATA_HOME/pocket-librarian/<DESK_NAME>/`; a store refuses a mismatched
+  desk name.
+- **Line-REPL `chat` + trigger wake layer** ([ADR 0001](docs/decisions/0001-interactive-surface-tui-first.md)).
+
+### Changed
+
+- **Tool commands self-initialize the store** ([ADR 0003](docs/decisions/0003-tool-commands-self-initialize-store.md)):
+  `sweep`/`query`/`patrol`/`chat`/etc. run the app migrations idempotently at first touch, so a
+  fresh desk needs no manual `migrate up`.
+
+### Fixed
+
+- `query` on an uninitialized store now returns an actionable message instead of a bare
+  `sql: no rows in result set`.
+- Record-original-first is no longer capped at PocketBase's 5000-char default; content fields are
+  widened so large desk files record and restore byte-exact.
