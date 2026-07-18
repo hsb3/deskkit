@@ -31,6 +31,7 @@ Read these to build, test, release, or change the products.
 | [development/releasing.md](development/releasing.md) | How to version and cut a release (both products, one version). |
 | [development/tapes/](development/tapes/) | VHS `.tape` sources that regenerate the demo GIFs in `media/`. |
 | [pocket-librarian-v1-spec.md](pocket-librarian-v1-spec.md) | The librarian's product + technical build spec. |
+| [pm-system-v1-spec.md](pm-system-v1-spec.md) | The PM-system (document-gated work graph) product + technical build spec — the core+modules refactor, PM module, gates, surfaces, and plugin. |
 | [decisions/](decisions/) | Architecture Decision Records (append-only; cited from code and docs). |
 | [../CHANGELOG.md](../CHANGELOG.md) | What changed in each release. |
 
