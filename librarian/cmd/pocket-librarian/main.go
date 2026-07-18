@@ -16,6 +16,7 @@ import (
 	"runtime"
 	"strings"
 
+	"github.com/mattn/go-isatty"
 	"github.com/pocketbase/pocketbase"
 	"github.com/pocketbase/pocketbase/core"
 	"github.com/pocketbase/pocketbase/plugins/migratecmd"
@@ -30,6 +31,7 @@ import (
 	"github.com/example/pocket-librarian/internal/prompt"
 	"github.com/example/pocket-librarian/internal/tools"
 	"github.com/example/pocket-librarian/internal/trigger"
+	"github.com/example/pocket-librarian/internal/tui"
 
 	// Blank-import registers all Go migrations (spec §4.11).
 	_ "github.com/example/pocket-librarian/migrations"
@@ -459,17 +461,28 @@ func registerToolCommands(app *pocketbase.PocketBase, cfg *config.Config, cfgErr
 	// it requires a prior `migrate up` (or serve). Scope stays desk stewardship: the session
 	// inherits the gated tool set (restore never exposed; apply_fix only when
 	// LIBRARIAN_AUTONOMOUS_WRITES is set) and the data-backed system prompt — not a general chat.
-	app.RootCmd.AddCommand(&cobra.Command{
+	chatCmd := &cobra.Command{
 		Use:   "chat",
-		Short: "Interactive multi-turn librarian session (REPL over the agent loop)",
+		Short: "Interactive multi-turn librarian session (full-screen TUI on a terminal; REPL when piped or --plain)",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := requireConfig(app, cfg, cfgErr)
 			if err != nil {
 				return err
 			}
-			return runChat(cmd.Context(), app, c)
+			plain, _ := cmd.Flags().GetBool("plain")
+			// Route to the line REPL when --plain is set, or when either stdio end is not a
+			// terminal (piped input/output): the full-screen TUI requires an interactive TTY on
+			// both stdin AND stdout. requireConfig has already run (and printed any self-init /
+			// open-guard notice) above, so this decision — and any REPL prompt or the alternate
+			// screen — happens only after config is known good.
+			if plain || !isatty.IsTerminal(os.Stdin.Fd()) || !isatty.IsTerminal(os.Stdout.Fd()) {
+				return runChat(cmd.Context(), app, c)
+			}
+			return tui.Run(cmd.Context(), app, c)
 		},
-	})
+	}
+	chatCmd.Flags().Bool("plain", false, "force the line-oriented REPL instead of the full-screen TUI")
+	app.RootCmd.AddCommand(chatCmd)
 
 	// mcp-serve — expose the tool core as an MCP stdio server (spec §7.2 outbound dual-surface;
 	// build-brief §5 / punch-list 4). The model-facing tool set is tools.AgentTools(cfg): the

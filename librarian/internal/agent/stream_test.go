@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/cloudwego/eino/components/model"
+	"github.com/cloudwego/eino/components/tool"
 	"github.com/cloudwego/eino/schema"
 	"github.com/pocketbase/dbx"
 	"github.com/pocketbase/pocketbase/core"
@@ -623,6 +624,111 @@ func TestStreamTurn_ToolErrorEvent(t *testing.T) {
 	if !strings.Contains(toolEnd.Err, "unknown kind") {
 		t.Fatalf("tool_end.Err = %q, want it to carry the query tool's failure", toolEnd.Err)
 	}
+}
+
+// recordingTool is a minimal tool.InvokableTool that records the argumentsInJSON it received,
+// so a test can prove the argNormalizingTool adapter rewrote empty args before delegating.
+type recordingTool struct {
+	lastArgs string
+}
+
+func (r *recordingTool) Info(_ context.Context) (*schema.ToolInfo, error) {
+	return &schema.ToolInfo{Name: "rec"}, nil
+}
+
+func (r *recordingTool) InvokableRun(_ context.Context, argumentsInJSON string, _ ...tool.Option) (string, error) {
+	r.lastArgs = argumentsInJSON
+	return "ok", nil
+}
+
+// TestArgNormalizingTool is the direct unit test of the adapter: empty/whitespace args are
+// normalized to "{}" before delegation; "{}" and real JSON pass through untouched; Info() passes
+// through. This is the single point that fixes the zero-arg-tool streaming unmarshal failure.
+func TestArgNormalizingTool(t *testing.T) {
+	cases := []struct{ name, in, want string }{
+		{"empty", "", "{}"},
+		{"spaces", "   ", "{}"},
+		{"tab_newline", "\t\n ", "{}"},
+		{"empty_object", "{}", "{}"},
+		{"real_json", `{"kind":"live_files"}`, `{"kind":"live_files"}`},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			rec := &recordingTool{}
+			adapter := argNormalizingTool{InvokableTool: rec}
+			out, err := adapter.InvokableRun(context.Background(), tc.in)
+			if err != nil {
+				t.Fatalf("InvokableRun: %v", err)
+			}
+			if out != "ok" {
+				t.Fatalf("output = %q, want %q (delegate not called)", out, "ok")
+			}
+			if rec.lastArgs != tc.want {
+				t.Fatalf("delegate received %q, want %q", rec.lastArgs, tc.want)
+			}
+		})
+	}
+
+	// Info() passes through the embedded tool unchanged.
+	info, err := (argNormalizingTool{InvokableTool: &recordingTool{}}).Info(context.Background())
+	if err != nil || info == nil || info.Name != "rec" {
+		t.Fatalf("Info passthrough = %+v, err %v; want name %q", info, err, "rec")
+	}
+}
+
+// TestStreamTurn_ZeroArgToolCall is the regression guard for the live-observed bug: the model
+// emits a tool_call for a zero-parameter tool (sweep) whose streamed ArgumentsInJSON is "".
+// Without the adapter, json.Unmarshal("") fails inside the InferTool wrapper and the whole turn
+// dies with a NodeRunError. With it, the call runs and the turn reaches EventFinal — and the
+// exactly-once transcript invariants still hold for the tool script.
+func TestStreamTurn_ZeroArgToolCall(t *testing.T) {
+	m := &scriptedModel{steps: []streamStep{
+		toolCallStep("", "sweep", "call-sweep", ""), // EMPTY arguments — the bug trigger
+		contentStep("swept clean"),
+	}}
+	installModel(t, m)
+	app, cfg := anthropicEnv(t)
+	ctx := context.Background()
+
+	sess, err := NewSession(ctx, app, cfg)
+	if err != nil {
+		t.Fatalf("NewSession: %v", err)
+	}
+	evs := drainAll(sess.StreamTurn(ctx, "sweep the desk"))
+
+	// The turn succeeded end-to-end: exactly one terminal event and it is EventFinal.
+	if countKind(evs, EventError) != 0 {
+		t.Fatalf("turn errored on a zero-arg tool call; events = %v", evs)
+	}
+	term := evs[len(evs)-1]
+	if term.Kind != EventFinal || term.Content != "swept clean" {
+		t.Fatalf("terminal = %+v, want EventFinal %q", term, "swept clean")
+	}
+
+	// tool_start/tool_end fired for sweep and the call produced a real sweep result (a
+	// SweepResult carries a "total" field), not an unmarshal-error string.
+	var start, end Event
+	for _, ev := range evs {
+		switch ev.Kind {
+		case EventToolStart:
+			start = ev
+		case EventToolEnd:
+			end = ev
+		}
+	}
+	if start.Tool != "sweep" || start.CallID != "call-sweep" {
+		t.Fatalf("tool_start = %+v, want sweep/call-sweep", start)
+	}
+	if end.Tool != "sweep" || !strings.Contains(end.Result, "total") {
+		t.Fatalf("tool_end = %+v, want a real sweep result (the call must have succeeded)", end)
+	}
+
+	// Exactly-once transcript invariants hold for the tool script.
+	recs := loadRows(t, app, sess.run.Id)
+	if got := rolesOf(recs); !equalStrings(got, []string{"system", "user", "assistant", "tool", "assistant"}) {
+		t.Fatalf("roles = %v, want [system user assistant tool assistant]", got)
+	}
+	assertDenseSeq(t, recs)
 }
 
 func equalStrings(a, b []string) bool {

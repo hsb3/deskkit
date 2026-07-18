@@ -14,6 +14,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"strings"
 
 	"github.com/cloudwego/eino/components/model"
 	"github.com/cloudwego/eino/components/tool"
@@ -152,9 +153,31 @@ func buildTools(app core.App, cfg *config.Config) ([]tool.BaseTool, error) {
 		if err != nil {
 			return nil, fmt.Errorf("register tool %q: %w", spec.Name, err)
 		}
-		out = append(out, t)
+		out = append(out, argNormalizingTool{InvokableTool: t})
 	}
 	return out, nil
+}
+
+// argNormalizingTool normalizes an empty/whitespace-only ArgumentsInJSON to "{}" before the
+// wrapped InferTool tool unmarshals it. A zero-argument tool call (e.g. sweep, patrol) streams
+// no argument deltas, so under the STREAMING path the concatenated arguments are "" and
+// json.Unmarshal("") fails inside eino's InferTool wrapper ("[LocalFunc] failed to unmarshal
+// arguments in json"), killing the whole turn. (The non-streaming Generate path received "{}"
+// from the provider's complete message, so this was a streaming-introduced regression.) The
+// wrapped InvokableTool is embedded so Info() and every other interface surface pass through
+// unchanged; only InvokableRun is intercepted — and because these tools implement solely
+// InvokableTool, ToolsNode derives its stream endpoint from InvokableRun too, so this single
+// point fixes both paths. Applied to whatever slice AgentTools returns, so the §5.4 write-gating
+// is untouched (it still governs which tools are in the slice).
+type argNormalizingTool struct {
+	tool.InvokableTool
+}
+
+func (t argNormalizingTool) InvokableRun(ctx context.Context, argumentsInJSON string, opts ...tool.Option) (string, error) {
+	if strings.TrimSpace(argumentsInJSON) == "" {
+		argumentsInJSON = "{}"
+	}
+	return t.InvokableTool.InvokableRun(ctx, argumentsInJSON, opts...)
 }
 
 // jsonResult marshals a tool's typed result to a JSON string (empty string on error).
