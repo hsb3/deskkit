@@ -2,7 +2,7 @@
 
 _Decision memo for Henry: what each issue proposes, the specific calls that are yours, and a
 recommendation for each. Everything else in these issues is build detail the crew can decide._
-Status: active (2026-07-18) — awaiting rulings
+Status: decided (2026-07-18) — Henry accepted all five recommendations verbatim
 
 Background: after the chat-TUI pass (PR #48), you directed the TUI toward a full app — thread
 management, context visibility, "lift and shift from Crush." Three issues carry that. One of
@@ -103,10 +103,9 @@ the crew adjusts to what reads well.
 4. **#51** builds after #53 so the list/dialog components come from bubbles v2 instead of
    being hand-rolled twice.
 
-**The short version — five checkboxes:**
-- [ ] #53A: migrate to Charm v2 — yes / no / not yet (rec: **yes**)
-- [ ] #53B: terminal background vs painted background (rec: **terminal**, revisit later)
-- [ ] #51A: sessions-list-first launch when threads exist (rec: **yes**)
-- [ ] #51B: truncation titles for v1, model titles later (rec: **yes**)
-- [ ] #52A: defer dollar-cost display; add the profile context-window override key
-      (rec: **defer cost, add the key**)
+**The short version — five checkboxes (all RULED 2026-07-18, per recommendation):**
+- [x] #53A: migrate to Charm v2 — **yes** (ADR 0006)
+- [x] #53B: **terminal background** (painted background revisitable later on v2)
+- [x] #51A: **sessions-list-first** launch when threads exist
+- [x] #51B: **truncation titles** for v1, model titles later
+- [x] #52A: **defer dollar-cost** display; **add** the profile context-window override key
