@@ -29,6 +29,7 @@ import (
 	"github.com/example/pocket-librarian/internal/desklib"
 	"github.com/example/pocket-librarian/internal/mcp"
 	"github.com/example/pocket-librarian/internal/prompt"
+	"github.com/example/pocket-librarian/internal/setup"
 	"github.com/example/pocket-librarian/internal/tools"
 	"github.com/example/pocket-librarian/internal/trigger"
 	"github.com/example/pocket-librarian/internal/tui"
@@ -44,6 +45,18 @@ import (
 var version = "dev"
 
 func main() {
+	// `init` scaffolds a desk profile with filesystem writes ONLY: it needs neither resolved
+	// config nor PocketBase, and — critically — must never trigger PocketBase's Bootstrap, which
+	// MkdirAll-creates a store data dir. Bootstrap runs for every KNOWN registered command
+	// (skipBootstrap only spares --help/--version/unknown), so a registered `init` reaching
+	// app.Start() would still materialize a stray pb_data. Handle it HERE, before the app exists,
+	// and exit. `init --help` / `init -h` are deliberately NOT matched (isInitInvocation returns
+	// false): they fall through to cobra, whose help path skips Bootstrap and prints the
+	// registered command's usage (init is also registered in registerToolCommands for discovery).
+	if isInitInvocation(os.Args[1:]) {
+		os.Exit(runInit(os.Args[1:]))
+	}
+
 	// Config is resolved BEFORE the app is constructed: the store location is derived from
 	// DESK_NAME and seeds PocketBase's --dir default (ADR 0002 §2). config.Load has no
 	// PocketBase dependency, so this reorder is safe. serve/migrate (schema ops) may still run
@@ -57,6 +70,10 @@ func main() {
 	// the unresolved-location guard does not apply.
 	explicitDir := hasDirFlag(os.Args[1:])
 	storeTouching := isStoreTouchingInvocation(os.Args[1:])
+	// --no-input (root persistent flag; also registered on app.RootCmd below for help/usage) is
+	// read manually here because the first-run onramp is decided in main() BEFORE cobra parses
+	// flags. Non-TTY or --no-input => today's fail-closed behavior, byte-identical error.
+	noInput := hasNoInputFlag(os.Args[1:])
 
 	// Absent --dir, the store defaults to $XDG_DATA_HOME/pocket-librarian/<DESK_NAME>/ (falling
 	// back to ~/.local/share/...), replacing PocketBase's cwd/exe-relative pb_data (ADR 0002 §2).
@@ -90,8 +107,43 @@ func main() {
 	// guard would already have written the stray dir. Gated to real store-touching subcommands
 	// so it never breaks --help, `completion`, the bare usage output, or unknown-command errors.
 	if locErr != nil && storeTouching {
-		fmt.Fprintf(os.Stderr, "pocket-librarian: %v\n", locErr)
-		os.Exit(1)
+		// First-run onramp (interactive only): when the store LOCATION is unresolvable purely
+		// because config is missing (cfgErr, not a StoreDir/mkdir failure), offer to scaffold this
+		// folder as a desk instead of only erroring. This lives HERE, not in requireConfig, because
+		// this guard os.Exit's before cobra ever dispatches the store-touching command — so a prompt
+		// hooked in requireConfig would be unreachable for exactly the commands that hit this guard.
+		// On accept we init the cwd, re-resolve config, recompute the store location, and fall
+		// through so the original command proceeds seamlessly in this same process. On decline /
+		// non-TTY / --no-input, FirstRunDecision emits nothing and the fail-closed error below is
+		// byte-identical to before.
+		if cfgErr != nil {
+			tty := isatty.IsTerminal(os.Stdin.Fd()) && isatty.IsTerminal(os.Stdout.Fd())
+			if accept, derr := setup.FirstRunDecision(os.Stdin, os.Stdout, tty, noInput); derr == nil && accept {
+				wd, _ := os.Getwd()
+				res, ierr := setup.InitProfile(wd, setup.InitOptions{}, nil)
+				if ierr != nil {
+					fmt.Fprintf(os.Stderr, "pocket-librarian: %v\n", ierr)
+					os.Exit(1)
+				}
+				res.WriteSummary(os.Stdout)
+				// Re-resolve config now that the profile exists; recompute + pre-create the store
+				// location (0700, matching the guard above) so the requested command can continue.
+				if newCfg, nerr := config.Load(); nerr == nil {
+					cfg, cfgErr = newCfg, nil
+					if dir, serr := config.StoreDir(cfg.DeskName); serr != nil {
+						locErr = fmt.Errorf("cannot resolve the store location: %w; pass --dir <path>", serr)
+					} else if mkErr := os.MkdirAll(dir, 0o700); mkErr != nil {
+						locErr = fmt.Errorf("cannot create the store directory %s: %w; pass --dir <path>", dir, mkErr)
+					} else {
+						defaultDataDir, locErr = dir, nil
+					}
+				}
+			}
+		}
+		if locErr != nil {
+			fmt.Fprintf(os.Stderr, "pocket-librarian: %v\n", locErr)
+			os.Exit(1)
+		}
 	}
 
 	// DefaultDataDir seeds the --dir flag default (override-if---dir-passed-else-XDG); empty
@@ -106,6 +158,11 @@ func main() {
 	// Override PocketBase's own RootCmd.Version (defaults to its embedded "(untracked)") with the
 	// ldflags-stamped repo version, so `pocket-librarian --version` reports THIS binary's release.
 	app.RootCmd.Version = version
+
+	// --no-input suppresses the first-run onramp prompt (fail closed on unresolved config, for
+	// scripts/CI). Registered here so it appears in --help and cobra accepts it; the onramp
+	// decision in main() reads it manually from os.Args (it fires before cobra parses flags).
+	app.RootCmd.PersistentFlags().Bool("no-input", false, "never prompt; fail closed when config is unresolved (scripts/CI)")
 
 	// Automigrate on startup; also `pocket-librarian migrate up`. See §11.3 open item 1:
 	// confirm the automigrate generated-migration behavior in the run environment. migrate is
@@ -261,10 +318,10 @@ var globalValueFlags = map[string]bool{
 	"--hooksDir": true, "--hooksWatch": true, "--hooksPool": true,
 }
 
-// firstSubcommand returns the first non-flag token in args (the invoked subcommand name),
-// skipping any leading global flags and the values of the value-taking ones so a form like
-// `--dir /x serve` still resolves to "serve". Returns "" for the bare (no-subcommand) usage.
-func firstSubcommand(args []string) string {
+// subcommandIndex returns the index in args of the invoked subcommand token, skipping any
+// leading global flags and the values of the value-taking ones so a form like `--dir /x serve`
+// resolves to the "serve" index. Returns -1 for the bare (no-subcommand) usage.
+func subcommandIndex(args []string) int {
 	for i := 0; i < len(args); i++ {
 		a := args[i]
 		if strings.HasPrefix(a, "-") {
@@ -273,9 +330,109 @@ func firstSubcommand(args []string) string {
 			}
 			continue
 		}
-		return a
+		return i
+	}
+	return -1
+}
+
+// firstSubcommand returns the first non-flag token in args (the invoked subcommand name),
+// skipping any leading global flags and the values of the value-taking ones so a form like
+// `--dir /x serve` still resolves to "serve". Returns "" for the bare (no-subcommand) usage.
+func firstSubcommand(args []string) string {
+	if i := subcommandIndex(args); i >= 0 {
+		return args[i]
 	}
 	return ""
+}
+
+// hasNoInputFlag reports whether the root --no-input flag is present (both `--no-input` and
+// `--no-input=<bool>`). Read manually because the first-run onramp is decided before cobra
+// parses flags.
+func hasNoInputFlag(args []string) bool {
+	for _, a := range args {
+		if a == "--no-input" || strings.HasPrefix(a, "--no-input=") {
+			return true
+		}
+	}
+	return false
+}
+
+// isInitInvocation reports whether os.Args invokes `init` for real execution (not `init --help`
+// / `-h`, which fall through to cobra's Bootstrap-skipping help path).
+func isInitInvocation(args []string) bool {
+	for _, a := range args {
+		switch a {
+		case "-h", "--help":
+			return false
+		}
+	}
+	return firstSubcommand(args) == "init"
+}
+
+// runInit executes `init` as a standalone cobra command BEFORE the PocketBase app exists, so it
+// never triggers Bootstrap (no stray store dir). It returns the process exit code. The trailing
+// args (init's own flags + the optional dir) are everything after the `init` token; the global
+// --no-input token is stripped since it belongs to the root, not init.
+func runInit(args []string) int {
+	idx := subcommandIndex(args)
+	var tail []string
+	if idx >= 0 {
+		tail = args[idx+1:]
+	}
+	cmd := newInitCmd()
+	cmd.SetArgs(stripNoInput(tail))
+	if err := cmd.Execute(); err != nil {
+		fmt.Fprintf(os.Stderr, "pocket-librarian: %v\n", err)
+		return 1
+	}
+	return 0
+}
+
+// stripNoInput removes the root persistent --no-input token from a subcommand's args: the
+// standalone init command below does not define it and would otherwise reject it as unknown.
+func stripNoInput(args []string) []string {
+	out := make([]string, 0, len(args))
+	for _, a := range args {
+		if a == "--no-input" || strings.HasPrefix(a, "--no-input=") {
+			continue
+		}
+		out = append(out, a)
+	}
+	return out
+}
+
+// newInitCmd builds the `init` subcommand: it scaffolds <dir>/_knowledge/profile.yaml (and, with
+// --with-env, <dir>/.env) so a folder works as a desk with zero exports. It is registered on the
+// app RootCmd for discovery/`init --help`, and executed standalone by runInit for the real run.
+// SilenceErrors/Usage keep the standalone execution's error reporting to runInit's single line.
+func newInitCmd() *cobra.Command {
+	var force, withEnv bool
+	cmd := &cobra.Command{
+		Use:           "init [dir]",
+		Short:         "Scaffold the minimal profile so a folder works as a desk (zero exports)",
+		Args:          cobra.MaximumNArgs(1),
+		SilenceErrors: true,
+		SilenceUsage:  true,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			dir := "."
+			if len(args) == 1 {
+				dir = args[0]
+			}
+			confirm := func(deskName, ancestorPath string) (bool, error) {
+				tty := isatty.IsTerminal(os.Stdin.Fd()) && isatty.IsTerminal(os.Stdout.Fd())
+				return setup.ConfirmNested(os.Stdin, os.Stdout, tty, deskName, ancestorPath)
+			}
+			res, err := setup.InitProfile(dir, setup.InitOptions{Force: force, WithEnv: withEnv}, confirm)
+			if err != nil {
+				return err
+			}
+			res.WriteSummary(os.Stdout)
+			return nil
+		},
+	}
+	cmd.Flags().BoolVar(&force, "force", false, "overwrite an existing profile/.env and allow a nested desk")
+	cmd.Flags().BoolVar(&withEnv, "with-env", false, "also write a .env stub naming the LLM API-key env var")
+	return cmd
 }
 
 func requireConfig(app core.App, cfg *config.Config, cfgErr error) (*config.Config, error) {
@@ -332,6 +489,11 @@ func annotateLockErr(err error) error {
 // routes through the same tools.* function the agent will call (spec §2.6, §3.3). Until the
 // tool-body slice lands these return ErrNotImplemented — expected for the spine.
 func registerToolCommands(app *pocketbase.PocketBase, cfg *config.Config, cfgErr error) {
+	// init — scaffold a desk profile (zero exports). Registered for discovery (`--help` listing)
+	// and `init --help`; the REAL run is intercepted in main() before app.Start() so it never
+	// triggers Bootstrap (see runInit). NOT added to storeTouchingCommands: it opens no store.
+	app.RootCmd.AddCommand(newInitCmd())
+
 	// sweep
 	app.RootCmd.AddCommand(&cobra.Command{
 		Use:   "sweep",
