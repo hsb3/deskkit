@@ -33,7 +33,6 @@ type styleSet struct {
 	header          lipgloss.Style // "· provider/model" segment, on the header bar fill
 	headerAccent    lipgloss.Style // bold desk-name segment, on the header bar fill
 	headerBar       lipgloss.Style // header bar fill (Width applied at render)
-	footer          lipgloss.Style
 	footerBar       lipgloss.Style // footer/status bar fill (Width applied at render)
 	footerState     lipgloss.Style // live state segment, on the footer bar fill
 	toast           lipgloss.Style // transient copy/status toast, on the footer bar fill
@@ -113,7 +112,6 @@ func newStyles(theme string) styleSet {
 		header:          lipgloss.NewStyle().Foreground(muted).Background(barBG).Bold(true),
 		headerAccent:    lipgloss.NewStyle().Foreground(accent).Background(barBG).Bold(true),
 		headerBar:       lipgloss.NewStyle().Background(barBG),
-		footer:          lipgloss.NewStyle().Foreground(faint),
 		footerBar:       lipgloss.NewStyle().Background(barBG),
 		footerState:     lipgloss.NewStyle().Foreground(accent).Background(barBG),
 		toast:           lipgloss.NewStyle().Foreground(accent).Background(barBG).Bold(true),

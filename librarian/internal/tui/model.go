@@ -825,7 +825,9 @@ func (m model) renderEntry(e entry) string {
 		// continuous behind the text rather than only in the trailing pad. Under NO_COLOR the
 		// fill and border color drop via the color profile, but the ▌ glyph remains as structure.
 		inner := m.styles.userLabel.Render("you") + "\n" + m.styles.user.Render(e.text)
-		return m.styles.userBlock.Width(m.contentW).Render(inner)
+		// Width sets only a MINIMUM; MaxWidth caps it so an unbreakable long token (a URL, a
+		// pasted path) wraps inside the measure instead of stretching the block past it.
+		return m.styles.userBlock.Width(m.contentW).MaxWidth(m.contentW).Render(inner)
 
 	default: // roleAssistant
 		var b strings.Builder
