@@ -15,6 +15,7 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/pocketbase/pocketbase/core"
 
 	"github.com/example/pocket-librarian/internal/config"
@@ -26,6 +27,15 @@ import (
 // Close error when the program itself succeeded. theme is the concrete palette ("light"/"dark")
 // the caller resolved in the pre-program safe window (see ResolveTheme) — never "auto".
 func Run(ctx context.Context, app core.App, cfg *config.Config, theme string) error {
+	// Pin lipgloss's cached background answer to the resolved theme, still in the pre-program
+	// safe window. This package uses no AdaptiveColor of its own, but embedded bubbles
+	// components do (the textarea's DefaultStyles), and those resolve through lipgloss's
+	// background cache: seeding it here (a) guarantees the lazy OSC background query can never
+	// fire after the program starts — today that is only prevented by a bubbletea v1 package
+	// init workaround slated for removal in v2 — and (b) makes an explicit --theme govern the
+	// embedded components too, instead of the detected background overriding the user's choice.
+	lipgloss.SetHasDarkBackground(theme == themeDark)
+
 	provider := &agentProvider{app: app, cfg: cfg}
 
 	// Open the initial session eagerly (via the provider), so a build/config failure surfaces
