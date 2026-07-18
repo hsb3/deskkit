@@ -21,6 +21,26 @@ for why this policy exists.
   the user asks it to record something. New `feedback` collection (migration 0013), the tool on
   all surfaces (agent, chat, MCP) plus a `record-feedback` CLI subcommand, and a `feedback` kind
   for `query` (open entries, newest first).
+- **Chat TUI UX pass.** Per-role left gutters (a thick accent bar for the user, a faint thin bar
+  for the librarian), a per-turn `model · latency` footer, and a fuller bubbles/help footer:
+  `ctrl+g` toggles the full keybind help, `ctrl+y` copies the last answer's raw markdown (with a
+  toast confirmation), and `up`/`down` at the textarea's edge rows walk prompt history, stashing
+  and restoring the in-progress draft. Streaming shows a "▼ new output" hint when the transcript
+  is scrolled up while new tokens arrive. `NO_COLOR` now also swaps the spinner for a static
+  "working…" indicator, alongside the existing color-free rendering.
+- **`pocket-librarian init [dir]`** — scaffolds the minimal `_knowledge/profile.yaml` a folder
+  needs to work as a desk (desk name from the folder's basename, `root: "."`); idempotent,
+  `--force` to overwrite, `--with-env` to also write a `.env` stub. It never creates the store. A
+  store-touching command that can't resolve config on an interactive terminal now offers to run
+  it ("Set up this folder as a desk? [Y/n]") and continues seamlessly on accept; the root
+  `--no-input` flag (and a non-TTY) keeps the prior fail-closed error.
+
+### Fixed
+
+- **Unreadable chat answers on light terminals.** `chat`'s full-screen TUI rendered with a single
+  fixed dark palette. Add `chat --theme light|dark|auto` (default `auto`, a one-shot terminal-
+  background probe run once before the Bubble Tea program starts — never at render time) and a
+  `LIBRARIAN_THEME` env override, with precedence flag > env > auto-detect.
 
 ## [0.5.0] — 2026-07-18
 

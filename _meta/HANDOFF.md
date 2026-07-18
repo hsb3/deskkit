@@ -42,28 +42,31 @@ follow-ups (#34, #35) can proceed.
 
 **Small open follow-ons:** two accepted PR #40 review nits — the locked-store hint's substring
 match could false-positive on a path containing "locked" (harmless; the hint is phrased as a
-question), and `docs/development/tapes/chat.tape`'s 30s answer sleep is tight on slow API days
-(only matters on manual re-record; committed GIF verified good). The `make install` + docs-split
-work sits in `CHANGELOG.md [Unreleased]` (no tag cut yet — dev-facing).
+question), and the chat tapes' 30s answer sleep is tight on slow API days (only matters on
+manual re-record; committed GIFs verified good). One accepted PR #48 nit: `ctrl+y` copies an
+interrupted turn's partial text (judged correct — it's real answer text). The `[Unreleased]`
+CHANGELOG now holds `make install` + the docs split + the whole chat-TUI pass; `make
+version-status` advises a bump — cut the next release when Henry's ready.
 
-**NEXT SESSION FOCUS (Henry's directive, 2026-07-18): the chat-TUI UX pass.** From a UAT
-dogfood of `pocket-librarian chat`. Plan is to land **#45 + #44 + #43 in ONE PR**:
-- **#44 (bug, do FIRST — priority-0 dep)** — chat answers are near-invisible on a *light*
-  terminal: streaming body is hard-coded ANSI bright-white (`Color("15")`) and finalized
-  answers use glamour's fixed `DarkStyle`; the `styles.go` "adaptive" comment is wrong. The
-  trap: you CANNOT just enable `WithAutoStyle`/`AdaptiveColor` — their runtime OSC-11 query
-  leaks into the textarea, the exact defect ADR 0004 + `internal/tui/defects_test.go` guard.
-  Fix = detect background ONCE before `tea.NewProgram(...).Run()`, or a `--theme`/`LIBRARIAN_THEME`
-  flag; keep it static-after-startup. Screenshot repro in the issue.
-- **#45 (enhancement, the focus)** — research modern AI-chat-TUI conventions (Claude Code,
-  aider, Crush, Elia…) → gap list → apply. Assumes #44's readability fix is in.
-- **#43 (enhancement)** — config bootstrap is clunky: native `pocket-librarian init` +
-  first-run prompt so users stop hand-authoring env/profile. Distinct surface from the TUI, but
-  Henry wants it in the same PR. Design Qs (overlap with plugin `desk-setup`, one source of
-  truth for the starter profile) are in the issue.
+**AWAITING HENRY: PR #48** — the chat-TUI UX pass (#44 light-terminal theming fix + #45
+researched UX pass + #43 `init`/first-run onramp + the Crush-style app chrome). CI green, all
+9 review threads fixed+replied, VHS-proven light AND dark, dev build demoed live in his tmux
+pane. **The chat GIFs predate the app-chrome commits — re-record after his verdict on the
+look** (bars/tints are one-line palette tweaks in `themeSurfaces`). Merging auto-closes
+#43/#44/#45. Deferred UX items are recorded in `docs/development/chat-tui-ux-survey.md`.
+
+**AWAITING HENRY: PR #54** — `record_feedback` (issue #50): store-native feedback/friction
+log (migration 0013, tool on agent/chat/MCP + `record-feedback` CLI, `query feedback`).
+Independent of #48, branched off main; both touch `main.go`/CHANGELOG — second merge may need
+a trivial rebase. Both review comments fixed+replied; CI green.
+
+**TUI roadmap (Henry's direction 2026-07-18: "not just one window — threads, resume, context
+%; lift and shift from Crush")**: #51 session-management surface, #52 context-window/token
+display, **#53 Charm-v2-stack migration = the enabler ruling (ADR-worthy, needs his accept;
+Crush itself is FSL-licensed — lift designs, write original code on MIT Charm libs)**.
+Sequence: land #48 → rule #53 → build #51/#52 on v2.
 
 **Open backlog, ranked** (no ruling gates the buildable ones):
-- **#45 / #44 / #43** — the chat-TUI UX pass above (next session's focus).
 - **#12** — dual-format Claude+OpenCode fan-out (consumes `bun run package` as the seed).
   Architectural; needs an OpenCode-target ruling before fan-out. **ON HOLD (above).**
 - **#34** — CI hardening: enforce shellcheck (incl. `install.sh`) + actionlint + a SHA-pin drift
@@ -80,6 +83,19 @@ dogfood of `pocket-librarian chat`. Plan is to land **#45 + #44 + #43 in ONE PR*
 
 ## 2. Recent deliveries (newest first — full detail in the cited PRs / ADRs / git)
 
+- **2026-07-18 — record_feedback** (PR #54, open; issue #50): `feedback` collection
+  (migration 0013), tool on all surfaces + CLI subcommand, `query feedback` kind,
+  system-prompt nudge. Built in a worktree off main, independent of the TUI branch.
+- **2026-07-18 — chat-TUI UX pass** (PR #48, open): #44 per-theme palettes resolved once
+  pre-program (`--theme`/`LIBRARIAN_THEME`/auto-probe) + #45 survey
+  (`docs/development/chat-tui-ux-survey.md`) and apply (gutters, per-turn `model · latency`
+  footer, bubbles/help + ctrl+g, ctrl+y copy-raw-markdown, edge-row prompt history with draft
+  stash, scroll-anchored streaming, NO_COLOR reduced motion) + #43 `pocket-librarian init` +
+  interactive first-run onramp (`--no-input` keeps fail-closed) + Crush-style app chrome
+  (full-width header/status bars, rounded input box that dims while streaming, user turns as
+  `▌`-bordered tinted blocks, 120-col measure — `themeSurfaces` in styles.go). New
+  `chat-light.tape`/GIF (light proof) + `init-onramp.tape`/GIF (offline onramp proof).
+  Review hardening: lipgloss background cache pinned to the resolved theme in `tui.Run` (§4).
 - **2026-07-18 — profile-first docs onramp** (PR #46). Fixed a getting-started
   self-inconsistency: §4 told non-devs to `export DESK_ROOT`/`DESK_NAME` even though step 2
   already fills `_knowledge/profile.yaml`, which the librarian auto-discovers by walk-up
@@ -120,10 +136,8 @@ dogfood of `pocket-librarian chat`. Plan is to land **#45 + #44 + #43 in ONE PR*
 
 ## 3. Where to start next
 
-- **Chat-TUI UX pass (#45 + #44 + #43) — the top priority.** Full brief and the #44
-  rendering trap are in §1. Order: fix #44 (readability) first, then #45 (UX to modern
-  standards), fold in #43 (config `init`); one PR per Henry's directive. Live proof via VHS
-  on BOTH a light and a dark terminal (tapes in `docs/development/tapes/`).
+- **PR #48 is in Henry's court** (chat-TUI UX pass). After merge, the branch's deferred UX
+  items live in `docs/development/chat-tui-ux-survey.md` if he wants a follow-up pass.
 - **Cut the next release** when `[Unreleased]` warrants — follow `docs/development/releasing.md`
   (bump VERSION + 3 manifests → roll `[Unreleased]` into a dated CHANGELOG section →
   `make release-prep` → tag). `check-changelog` gates the tag; `make version-status` flags drift.
@@ -181,7 +195,9 @@ dogfood of `pocket-librarian chat`. Plan is to land **#45 + #44 + #43 in ONE PR*
   prevent store creation has to run in `main()` before `app.Start()` (the argv-scan location
   guard does). And PocketBase registers `serve`/`superuser` INSIDE `Start()` then discards
   their RunE errors (goroutine) — fail-closed behavior in serve paths needs a direct
-  `os.Exit(1)` (see the OnServe desk-guard), not a returned error.
+  `os.Exit(1)` (see the OnServe desk-guard), not a returned error. Worked example since
+  PR #48: `init` executes standalone in `main()` BEFORE the app exists (and stays out of
+  `storeTouchingCommands`) precisely so Bootstrap can't create a stray store dir.
 - **Store location** (since PR #24): no `--dir` → `$XDG_DATA_HOME/pocket-librarian/
   <DESK_NAME>/`; unresolvable DESK_NAME + no `--dir` → exit 1 (serve/migrate included).
   verify.sh exports a scratch XDG_DATA_HOME — keep it hermetic when adding checks.
@@ -207,7 +223,16 @@ dogfood of `pocket-librarian chat`. Plan is to land **#45 + #44 + #43 in ONE PR*
   tools fire OnError only; zero-arg tool calls need the `argNormalizingTool` adapter (in
   place at buildTools — keep new tools behind it). **No terminal queries after bubbletea
   starts** (no glamour WithAutoStyle / lazy lipgloss adaptive colors) — responses leak into
-  the textarea; regression-guarded in `internal/tui/defects_test.go`.
+  the textarea; regression-guarded in `internal/tui/defects_test.go`. Since PR #48 the chat
+  theme resolves ONCE pre-program (`tui.ResolveTheme`) and `tui.Run` pins
+  `lipgloss.SetHasDarkBackground` to it — load-bearing for embedded bubbles components whose
+  DEFAULT styles use AdaptiveColor (the textarea): without the pin they're only safe via a
+  bubbletea v1 init workaround that v2 removes. New TUI colors go in `newStyles`'s per-theme
+  switch, never AdaptiveColor; new renderers take `(width, theme)`.
+- **VHS chat tapes** (`chat.tape` dark + `chat-light.tape` light) both need
+  `ANTHROPIC_API_KEY` — record with `ANTHROPIC_API_KEY="$(secret get ANTHROPIC_API_KEY)"
+  bash scripts/record-media.sh`. Re-recording re-encodes ALL GIFs; `git restore` the
+  non-chat ones when their tapes didn't change (byte churn, no content).
 - **Worktree provisioning**: untracked-and-load-bearing = `plugin/node_modules` (run
   `bun install --frozen-lockfile`) and `.claude/agent-memory/` (machine-local). Everything
   else a worktree agent needs is committed.

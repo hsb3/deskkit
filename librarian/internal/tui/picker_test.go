@@ -213,6 +213,11 @@ func TestCtrlN_FreshFails_OldSessionUntouched(t *testing.T) {
 	if m.sess != fs {
 		t.Error("session swapped away from the old (still-live) session despite the fresh failure")
 	}
+	// Visible feedback: a failed fresh must append an inline error entry, not silently do nothing
+	// (a dead-looking ctrl+n). Mirrors the openPicker/resume degraded paths.
+	if len(m.entries) == 0 || !m.entries[len(m.entries)-1].isError {
+		t.Error("no inline error entry after a failed fresh (silent failure reads as a dead keybinding)")
+	}
 }
 
 // TestPicker_ResumeFails_OldSessionUntouched: same open-before-close rule on the resume path,
