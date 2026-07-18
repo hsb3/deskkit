@@ -53,13 +53,31 @@ Crush-style app chrome, look approved live) **and PR #54** (`record_feedback`, #
 GIFs re-recorded with the final chrome post-merge. Deferred UX items are recorded in
 `docs/development/chat-tui-ux-survey.md`.
 
-**AWAITING HENRY — the TUI roadmap rulings.** His direction (2026-07-18): "not just one
-window — threads, resume, context %; lift and shift from Crush." The decision memo with the
-five checkboxes + recommendations is at
-`_meta/briefings/2026-07-18-tui-roadmap-rulings/README.md`: #53 Charm-v2-stack migration is
-the gate ruling (ADR-worthy; Crush itself is FSL — lift designs, original code on MIT Charm
-libs), then #51 sessions surface and #52 context/token display. Recommended sequence: rule
-#53 → migration PR + ADR → #51/#52 on v2 (#52's session-layer plumbing can start anytime).
+**RULED 2026-07-18 — all five TUI roadmap recommendations accepted verbatim** (memo, now
+marked decided: `_meta/briefings/2026-07-18-tui-roadmap-rulings/README.md`; rulings also
+commented on #51/#52/#53): #53 Charm-v2 migration GO with terminal background retained +
+no-query rule kept pre-program-only (**ADR 0006**, committed on `feat/tui-charm-v2` @
+57f1a76); #51 sessions-list-first launch + truncation titles + rename/delete v1; #52 defer
+dollar-cost, add the `models.context_window` profile override key (schema change).
+
+**IN FLIGHT — the #53 v2 migration build, branch `feat/tui-charm-v2`** (checked out in the
+main tree). A background builder is migrating `librarian/internal/tui` to the v2 modules —
+**uncommitted working-tree edits under librarian/ are ITS work; do not discard or commit
+them blind**. It ran long (resumed twice, was on the last test fixes). If this session was
+cleared and the builder's report is lost: `git status`/`go build ./... && go test ./...` in
+librarian/ shows where it stopped; finish per the migration map below, then verify (grep
+`github.com/charmbracelet` under librarian must be EMPTY), commit, PR (cite ADR 0006), VHS
+re-record for parity proof. Migration map essentials: v2 modules use the **charm.land vanity
+paths** (`charm.land/{bubbletea,lipgloss,bubbles,glamour}/v2` — bubbletea v2.0.8, lipgloss
+v2.0.5, bubbles v2.1.1, glamour v2.0.1; each repo has `UPGRADE_GUIDE_V2.md`); `View()`
+returns `tea.View` with `v.AltScreen = true` asserted in EVERY path; `tea.KeyMsg` →
+`tea.KeyPressMsg` (space is now `"space"`; verify the alt+enter string); viewport/textarea/
+help fields → Set*/getter methods; textarea styles via `SetStyles` with concrete per-theme
+values (replaces the deleted `lipgloss.SetHasDarkBackground` pin); glamour keeps our own
+GLAMOUR_STYLE handling (WithAutoStyle is gone in v2); theme probe = pre-program
+`lipgloss.HasDarkBackground(os.Stdin, os.Stdout)` (termenv dep drops).
+
+**Then:** #52's session-layer token plumbing (stack-independent) and #51 on v2.
 
 **Release note:** `[Unreleased]` now holds the whole TUI pass + `record_feedback` + `make
 install` — a solid 0.6.0. Cut per `docs/development/releasing.md` when Henry wants it.
