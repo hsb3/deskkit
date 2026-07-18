@@ -162,6 +162,18 @@ seed_r1_task "$DESK_CHAT/tasks/status-update.md"
 seed_stray_note "$DESK_CHAT/NOTES.md"
 run_lib "$DESK_CHAT" "$XDG_CHAT" example-desk migrate up > /dev/null
 
+# --- desk F: chat-light.tape -----------------------------------------------------------------
+# Same recipe as desk E, but its own desk/store so the light-theme recording's live sweep can't
+# collide with chat.tape's. Gated on ANTHROPIC_API_KEY alongside chat.tape (below): this is the
+# light-terminal readability proof for the chat TUI's per-theme palette.
+DESK_CHAT_LIGHT="$SCRATCH/desks/chat-light"
+XDG_CHAT_LIGHT="$SCRATCH/xdg/chat-light"
+mkdir -p "$DESK_CHAT_LIGHT" "$XDG_CHAT_LIGHT"
+seed_decision "$DESK_CHAT_LIGHT/_structure/decisions/0001-example-decision.md"
+seed_r1_task "$DESK_CHAT_LIGHT/tasks/status-update.md"
+seed_stray_note "$DESK_CHAT_LIGHT/NOTES.md"
+run_lib "$DESK_CHAT_LIGHT" "$XDG_CHAT_LIGHT" example-desk migrate up > /dev/null
+
 # --- record ------------------------------------------------------------------------------
 # Each tape's Hidden preamble reads its scratch desk root / XDG home from the env vars set here
 # (MEDIA_DESK_ROOT / MEDIA_XDG_HOME / MEDIA_STORE_ONE); only the DESK_ROOT/DESK_NAME exports the
@@ -181,14 +193,15 @@ record_tape patrol.tape "$DESK_PATROL" "$XDG_PATROL"
 record_tape propose-apply-restore.tape "$DESK_APPLY" "$XDG_APPLY"
 record_tape open-guard.tape "$DESK_GUARD" "$XDG_GUARD" "$STORE_ONE"
 
-# chat.tape needs a real LLM provider key (the tape's live `sweep` tool call talks to
-# Anthropic) — skip it, with a clear log line, when the operator hasn't exported one. Guarded
+# The chat tapes need a real LLM provider key (their live `sweep` tool call talks to
+# Anthropic) — skip them, with a clear log line, when the operator hasn't exported one. Guarded
 # with `${ANTHROPIC_API_KEY:-}` so this check itself is safe under `set -u` when the var is
 # unset entirely; skipping (rather than failing) keeps the default `make media` run hermetic.
 if [ -n "${ANTHROPIC_API_KEY:-}" ]; then
   record_tape chat.tape "$DESK_CHAT" "$XDG_CHAT"
+  record_tape chat-light.tape "$DESK_CHAT_LIGHT" "$XDG_CHAT_LIGHT"
 else
-  log "skipping chat.tape — ANTHROPIC_API_KEY not set in the environment (export it and re-run to record this one)"
+  log "skipping chat.tape + chat-light.tape — ANTHROPIC_API_KEY not set in the environment (export it and re-run to record these)"
 fi
 
 log "done — GIFs written under $MEDIA_DIR"
