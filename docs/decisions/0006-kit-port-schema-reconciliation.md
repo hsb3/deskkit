@@ -1,8 +1,18 @@
 _ADR for porting the 23 headcase SOP kits into this repo and reconciling their doc types with
 schema v1 — what moved, what was neutralized, and the disposition of every kit-type schema gap._
-Status: Accepted — 2026-07-18
+Status: Accepted (corrected 2026-07-18)
 
 # 0006 — SOP kit port + schema-v1 doc-type reconciliation
+
+> **Correction (2026-07-18):** Decision item 2 originally asserted "No GitHub/issue/org/path/email
+> refs were present in the kits." That was FALSE. Independent verification found **9 private-vault
+> path references** carried verbatim from the origin vault: eight `[[_headcase/agents/pm/resources/decision]]`
+> wikilinks (in `kits/analysis/{template,guide,example}.md` and `kits/postmortem/guide.md`) and one
+> `[[1_Engineering/headcase-obsidian]]` link (`kits/weekly-checkin/example.md`). All nine were
+> rewritten to neutral targets (`[[decision]]` / `[[quillpad-settings-ia]]`) and the vault name was
+> scrubbed from every shipped surface. A static blocklist gate (`scripts/check-kits.mjs`, in
+> `make check` + CI) now enforces this over `kits/` + `schema/` so the class of leak cannot recur.
+> The false sentence is struck below.
 
 ## Context
 
@@ -29,8 +39,11 @@ both lanes (plugin skills today; the PM module's document gates next). Indexed b
 **2. Neutralized per the identity-neutrality constraint (0013 item 9).** The vault examples were a
 coherent worked narrative about a real personal project. Deterministic, coherence-preserving
 neutralization: `Henry → Robin` (persona), `Toolbox → Quillpad` (sample product), `The Intern →
-the Assistant` (sample agent). Third-party tech (Firebase, Genkit) is neutral and kept. No
-GitHub/issue/org/path/email refs were present in the kits. **`kits/` is now inside the neutrality
+the Assistant` (sample agent), plus `FunctionForm → Bramble Studio`, `Robin Burden → Robin Vale`,
+and `ai_kb → capture_kit`. Third-party tech (Firebase, Genkit) is neutral and kept.
+~~No GitHub/issue/org/path/email refs were present in the kits.~~ (Struck — see the Correction
+callout above: nine private-vault path wikilinks were present and have been scrubbed.)
+**`kits/` is now inside the neutrality
 lint's scan surface** (`scripts/check-neutrality.mjs` `SCAN_DIRS`), so future kit edits are held to
 the same bar. (Note: the lint's identity denylist derives from the *profile*, which ships as
 placeholders only — so the lint alone would not have caught "Henry"; the prose neutralization was
@@ -71,6 +84,7 @@ Every kit type reconciled against schema v1's doc-type model. **None dropped sil
 | user-defined `note` | absent | **EXCLUDED** (kit-only) | Uses `category` field, freeform; nonstandard escape hatch |
 | user-defined `task` variant | `task` is lightweight | **EXCLUDED from canonicalizing its extras** | Adds `priority: p2` (lowercase — violates P0–P3 enum), `status: backlog` (outside families); `task` stays lightweight in canon |
 | user-defined `decision` variant | `decision` is canonical | **carried by the canonical `decision` type** | The stub is a project-flavored variant; canon `decision` governs |
+| project | present in vault `types:` (no kit) | **carried verbatim** | Kitless type, but carried so its `project:` status family is not left orphaned; the PM build uses a project concept |
 | all other carried types | present in vault `types:` | **carried verbatim** | Product-neutral already; no change |
 
 ## Consequences

@@ -11,7 +11,7 @@ conclusion: "Adopt capture_kit's item model with a `kind` field as the canonical
 
 # Analysis: Which content model wins the Quillpad merge?
 
-_The study behind RAID item I-001. Quillpad merges two stalled repos with incompatible content models; the merge can't proceed until one wins. This weighs the options — the call gets ratified in a follow-up [[_headcase/agents/pm/resources/decision]] note._
+_The study behind RAID item I-001. Quillpad merges two stalled repos with incompatible content models; the merge can't proceed until one wins. This weighs the options — the call gets ratified in a follow-up [[decision]] note._
 
 ## Question / Context
 
@@ -103,4 +103,4 @@ What the model has to satisfy (from the one-pager Must-Haves): capture of hetero
 - The reader feed gets a thin item→renderable mapping layer instead of querying `Post` directly — a small, contained cost.
 - The publishing half reasons about a slightly more abstract object (`Item` of `kind: thought`) rather than a literal `Post`.
 
-**Next step:** record the call in a [[_headcase/agents/pm/resources/decision]] note — this analysis becomes its `Options Considered` — and close RAID I-001 / unblock D-002 once the decision is `accepted`.
+**Next step:** record the call in a [[decision]] note — this analysis becomes its `Options Considered` — and close RAID I-001 / unblock D-002 once the decision is `accepted`.

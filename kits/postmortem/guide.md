@@ -42,7 +42,7 @@ This SOP composes these doc types — it reviews their notes as input and reuses
 - **[[raid]]** — the project's RAID log; which risks materialized and which issues/dependencies fired. Input, and a sink for new follow-up items.
 - **[[meeting-notes]]** — decisions and discussion captured in the room, with dates. Timeline input.
 - **[[weekly-checkin]]** — the week-by-week status trail. Timeline + impact input.
-- **[[_headcase/agents/pm/resources/decision]]** — the recorded choices (and their rationale) under review. Input, and a sink for any new decision the postmortem forces.
+- **[[decision]]** — the recorded choices (and their rationale) under review. Input, and a sink for any new decision the postmortem forces.
 
 **Output:** a **`retro`** note with **`variant: incident`** — `period_covered` set to the incident/project under review. The retro SOP owns that template; this SOP produces an instance of it.
 

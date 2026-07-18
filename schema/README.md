@@ -20,7 +20,7 @@ a single estate-wide schema (`0013` item 4).
   schema file for the exact contract.
 - `doctypes.yaml` — the **doc-type dimension**: every doc `type` a filled SOP kit (`kits/`)
   emits, its status family, and required/optional fields. Product-neutral successor of the
-  headcase vault's `types:` model (0013 items 4 + 8). The contract as data; the runtime
+  origin vault's `types:` model (0013 items 4 + 8). The contract as data; the runtime
   validation engine that consumes it is the PM-system build's job. Port + gap dispositions:
   [`docs/decisions/0006-kit-port-schema-reconciliation.md`](../docs/decisions/0006-kit-port-schema-reconciliation.md).
 

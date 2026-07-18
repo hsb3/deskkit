@@ -5,7 +5,7 @@ Status: active
 
 **What this is.** 23 SOP "kits" — a `guide.md` (when to use it, how to fill it), a `template.md`
 (the blank scaffold), and an `example.md` (a worked instance) per doc type. Ported from the
-headcase vault per desk decision 0013 S4(a) (the SOP-kit port work order) and indexed by
+origin vault per desk decision 0013 S4(a) (the SOP-kit port work order) and indexed by
 the root [`kits.yaml`](../kits.yaml) manifest. The frontmatter contract each kit emits lives in
 [`schema/doctypes.yaml`](../schema/doctypes.yaml) (schema v1's doc-type dimension); the port and
 its gap dispositions are recorded in [ADR 0006](../docs/decisions/0006-kit-port-schema-reconciliation.md).
@@ -29,7 +29,7 @@ this tree disagree — a missing/added file or an untracked/absent kit dir.
 
 ## Vault freeze (D4)
 
-The originating vault copies (the headcase `shared/sops/` kit set) are the **historical source**
+The originating vault copies (the origin vault's `shared/sops/` kit set) are the **historical source**
 and are now **frozen**: kit and schema authoring for these doc types happens **here**, not in the
 vault, which reverts to a read-only work journal (desk decision 0013 S4(a) precondition). To
 change a kit or its frontmatter contract, edit `kits/` + `schema/doctypes.yaml` in this repo and

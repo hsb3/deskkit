@@ -10,7 +10,7 @@ week_of: 2026-05-18
 # Weekly check-in — week of 2026-05-18
 
 ## Shipped
-- Settings IA round 2 (tabs reordered, Connect last) — [[1_Engineering/headcase-obsidian]]
+- Settings IA round 2 (tabs reordered, Connect last) — [[quillpad-settings-ia]]
 
 ## In progress
 - Agent composition spec — 4 days. (on track)

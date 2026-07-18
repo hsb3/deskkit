@@ -10,7 +10,7 @@ conclusion:
 
 # Analysis: {The question, framed as a choice}
 
-_An options-evaluation: investigate a question, lay out the live options with their trade-offs, compare them on shared criteria, and land on a recommendation. This is the **analytical front-half that precedes a decision** — analysis weighs the options; the [[_headcase/agents/pm/resources/decision]] (ADR) records the one chosen and locks the rationale. Keep this doc about the weighing; move the verdict into a `decision` note once the call is made._
+_An options-evaluation: investigate a question, lay out the live options with their trade-offs, compare them on shared criteria, and land on a recommendation. This is the **analytical front-half that precedes a decision** — analysis weighs the options; the [[decision]] (ADR) records the one chosen and locks the rationale. Keep this doc about the weighing; move the verdict into a `decision` note once the call is made._
 
 ## Question / Context
 
@@ -94,4 +94,4 @@ One clear paragraph: which option, and the reasoning that the matrix above suppo
 - {What we give up by choosing this}
 - {Why that's acceptable}
 
-**Next step:** record the call in a [[_headcase/agents/pm/resources/decision]] note (this analysis becomes its `Options Considered` backing) and link the two.
+**Next step:** record the call in a [[decision]] note (this analysis becomes its `Options Considered` backing) and link the two.

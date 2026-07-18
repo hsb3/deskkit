@@ -1,5 +1,5 @@
-# kits.yaml — the SOP kit manifest (desk decision 0013 S4(a); ported from the headcase vault
-# per desk-standard #49). The single ordered index of the ported kit library under kits/.
+# kits.yaml — the SOP kit manifest (desk decision 0013 S4(a); ported from the origin vault).
+# The single ordered index of the ported kit library under kits/.
 #
 # Each kit is a doc-type authoring aid with a guide/template/example (G/T/E) trio, EXCEPT:
 #   - composite kits (postmortem, release-notes) ship guide+example only — they are ASSEMBLED

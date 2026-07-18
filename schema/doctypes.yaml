@@ -2,7 +2,7 @@
 #
 # WHAT THIS IS. The frontmatter data model for the SOP kits (kits/, #49): every doc `type` a
 # filled kit emits, its status family, and its required/optional type-specific fields. It is the
-# product-neutral successor of the headcase vault's schema.yaml `types:` block (desk decision
+# product-neutral successor of the origin vault's schema.yaml `types:` block (desk decision
 # 0013 items 4 + 8 — the seed of one estate-wide schema). The vault copy is frozen; this file is
 # now the source of truth for the kit contract (see docs/decisions/0006-kit-port-schema-reconciliation.md).
 #
@@ -60,6 +60,7 @@ types:
   user-journey:       { status: reference, required: [author, persona, related_product_specs] }
   weekly-checkin:     { status: cadence,   required: [week_of] }
   retro:              { status: cadence,   required: [period_covered] }
+  project:            { status: project, required: [owner], optional: [code_repo_local, code_repo_remote] }  # carried; no kit (uses the `project` status family) — see ADR 0006
   journal:    { lightweight: true }   # emitted by the daily-note kit
   task:       { lightweight: true }
   idea:       { lightweight: true }

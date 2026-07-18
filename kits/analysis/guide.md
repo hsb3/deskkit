@@ -15,7 +15,7 @@ You have a real question with more than one defensible answer, and you want to d
 **Analysis precedes a decision.** The two are a pair:
 
 - An **analysis** lays out options A/B/C and weighs them. Its `status` lives in the reference family (it's a study, not a verdict). It can sit in `in-review` while people argue the matrix.
-- A **[[_headcase/agents/pm/resources/decision]]** (ADR) records the *one* option chosen and locks the rationale so nobody re-litigates it in six months. Its `status` is `proposed → accepted`.
+- A **[[decision]]** (ADR) records the *one* option chosen and locks the rationale so nobody re-litigates it in six months. Its `status` is `proposed → accepted`.
 
 Write the analysis first; when the call is made, open a `decision` note, set its `Options Considered` from this doc, and link the two. The analysis is the backing; the decision is the binding.
 
@@ -25,7 +25,7 @@ Write the analysis first; when the call is made, open a `decision` note, set its
 - You want the reasoning legible to others (or future-you) *before* committing.
 
 **Not an analysis:**
-- A choice with one real answer — that's just a [[_headcase/agents/pm/resources/decision]], skip the options pass.
+- A choice with one real answer — that's just a [[decision]], skip the options pass.
 - A daily implementation pick resolved at standup.
 - A pure preference with no project-wide ripple.
 
@@ -56,7 +56,7 @@ Note the split: this doc reaching `approved` means "the *analysis* is sound." Th
 - **No effort/risk** — pros-and-cons with no sizing. Without effort and risk, every option looks equally good and the matrix decides nothing.
 - **A matrix that doesn't discriminate** — rows where all options score the same. They pad the table and hide the real drivers.
 - **The non-recommendation** — laying out options and refusing to lean. The point of the front-half is to *tee up* the decision; an analysis with no preferred option hands the work back.
-- **Analysis that swallows the decision** — recording the final verdict and consequences here instead of in a [[_headcase/agents/pm/resources/decision]] note. Weigh here; bind there. Keep the two distinct so the ADR record stays clean.
+- **Analysis that swallows the decision** — recording the final verdict and consequences here instead of in a [[decision]] note. Weigh here; bind there. Keep the two distinct so the ADR record stays clean.
 
 ## Example
 
