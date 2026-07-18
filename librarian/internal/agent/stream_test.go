@@ -510,6 +510,121 @@ func TestStreamTurn_MidLoopError(t *testing.T) {
 	}
 }
 
+// TestStreamTurn_BusyRejection: a second call against a Session whose first turn is still in
+// flight is rejected with errSessionBusy (the sentinel path Turn falls back to when its own
+// termErr is stale) — the busy branch in StreamTurn rejects without touching s.busy/s.termErr,
+// so the in-flight turn is unaffected and completes normally once released.
+func TestStreamTurn_BusyRejection(t *testing.T) {
+	release, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	started := make(chan struct{})
+	m := &scriptedModel{steps: []streamStep{
+		blockingStep(release, started, "par", "tial"),
+	}}
+	installModel(t, m)
+	app, cfg := newSessionTestEnv(t)
+	ctx := context.Background()
+
+	sess, err := NewSession(ctx, app, cfg)
+	if err != nil {
+		t.Fatalf("NewSession: %v", err)
+	}
+
+	ch1 := sess.StreamTurn(ctx, "first")
+	<-started // the first turn is genuinely in flight (busy is set) before the second is tried
+
+	_, turnErr := sess.Turn(ctx, "second")
+	if !errors.Is(turnErr, errSessionBusy) {
+		t.Fatalf("second call error = %v, want errSessionBusy", turnErr)
+	}
+
+	// Release the first turn: it must still complete normally (final event, channel closes).
+	cancel()
+	evs := drainAll(ch1)
+	term := evs[len(evs)-1]
+	if term.Kind != EventError || !term.Canceled {
+		t.Fatalf("first turn terminal event = %+v, want EventError canceled", term)
+	}
+}
+
+// TestSessionClose_FinalizesRun: after one successful turn, Close finalizes the agent_runs row
+// to a terminal, fully-populated state.
+func TestSessionClose_FinalizesRun(t *testing.T) {
+	m := &scriptedModel{steps: []streamStep{contentStep("done")}}
+	installModel(t, m)
+	app, cfg := newSessionTestEnv(t)
+	ctx := context.Background()
+
+	sess, err := NewSession(ctx, app, cfg)
+	if err != nil {
+		t.Fatalf("NewSession: %v", err)
+	}
+	if _, err := sess.Turn(ctx, "hi"); err != nil {
+		t.Fatalf("Turn: %v", err)
+	}
+	if err := sess.Close(ctx); err != nil {
+		t.Fatalf("Close: %v", err)
+	}
+
+	rec, err := app.FindRecordById("agent_runs", sess.run.Id)
+	if err != nil {
+		t.Fatalf("reload run: %v", err)
+	}
+	if got := rec.GetString("status"); got != "succeeded" {
+		t.Fatalf("status = %q, want %q", got, "succeeded")
+	}
+	if rec.GetDateTime("finished").IsZero() {
+		t.Fatalf("finished not set")
+	}
+	if got := rec.GetInt("step_count"); got <= 0 {
+		t.Fatalf("step_count = %d, want > 0", got)
+	}
+	if rec.GetString("output_summary") == "" {
+		t.Fatalf("output_summary is empty, want non-empty")
+	}
+}
+
+// TestStreamTurn_ToolErrorEvent: a tool call the real query tool rejects (an unknown query
+// kind) surfaces through eino's ToolCallbackHandler.OnError (confirmed empirically against
+// eino v0.9.12's compose.runWithCallbacks: an InvokableTool error fires the onError callback,
+// never OnEnd), so the emitted tool_end event carries the error text in Err and leaves Result
+// empty — the distinguishability contract stream.go documents.
+func TestStreamTurn_ToolErrorEvent(t *testing.T) {
+	m := &scriptedModel{steps: []streamStep{
+		toolCallStep("", "query", "call-1", `{"kind":"not_a_real_kind"}`),
+		contentStep("handled the error"),
+	}}
+	installModel(t, m)
+	app, cfg := anthropicEnv(t)
+	ctx := context.Background()
+
+	sess, err := NewSession(ctx, app, cfg)
+	if err != nil {
+		t.Fatalf("NewSession: %v", err)
+	}
+	evs := drainAll(sess.StreamTurn(ctx, "run a bad query"))
+
+	var toolEnd *Event
+	for i := range evs {
+		if evs[i].Kind == EventToolEnd {
+			toolEnd = &evs[i]
+			break
+		}
+	}
+	if toolEnd == nil {
+		t.Fatalf("no tool_end event; sequence = %v", evs)
+	}
+	if toolEnd.Err == "" {
+		t.Fatalf("tool_end.Err is empty, want the tool failure text: %+v", toolEnd)
+	}
+	if toolEnd.Result != "" {
+		t.Fatalf("tool_end.Result = %q, want empty on a failed call", toolEnd.Result)
+	}
+	if !strings.Contains(toolEnd.Err, "unknown kind") {
+		t.Fatalf("tool_end.Err = %q, want it to carry the query tool's failure", toolEnd.Err)
+	}
+}
+
 func equalStrings(a, b []string) bool {
 	if len(a) != len(b) {
 		return false

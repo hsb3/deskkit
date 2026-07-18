@@ -35,7 +35,7 @@ type EventKind string
 const (
 	EventToken     EventKind = "token"      // content delta (+ Step ordinal)
 	EventToolStart EventKind = "tool_start" // Tool, CallID, Args
-	EventToolEnd   EventKind = "tool_end"   // Tool, CallID, Result (or error text)
+	EventToolEnd   EventKind = "tool_end"   // Tool, CallID, Result on success; Err on failure
 	EventFinal     EventKind = "final"      // Content: full assistant answer
 	EventError     EventKind = "error"      // Err, Canceled, Partial
 )
