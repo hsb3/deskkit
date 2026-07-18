@@ -15,8 +15,12 @@ package tui
 import (
 	"context"
 	"fmt"
+	"os"
 	"strings"
+	"time"
 
+	"github.com/atotto/clipboard"
+	"github.com/charmbracelet/bubbles/help"
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/bubbles/textarea"
@@ -122,6 +126,7 @@ type entry struct {
 	isError     bool
 	errText     string
 	finalized   bool
+	duration    time.Duration // wall time of the assistant turn, shown as a per-turn footer once finalized
 }
 
 // matchStep returns the index of the step a tool_end belongs to: the last not-yet-done step
@@ -141,9 +146,13 @@ func (e *entry) matchStep(callID string) int {
 	return -1
 }
 
-// keymap is the surface's binding table — the single place keys are declared. openPicker (ctrl+o)
-// opens the conversation-resume overlay and newConversation (ctrl+n) starts a fresh conversation;
-// both are no-ops while a turn is streaming (like send), so no in-flight turn is ever disturbed.
+// keymap is the surface's binding table — the single place keys are declared, each carrying its own
+// help text so the bubbles/help footer stays self-maintaining. openPicker (ctrl+o) opens the
+// conversation-resume overlay and newConversation (ctrl+n) starts a fresh conversation; both are
+// no-ops while a turn is streaming (like send), so no in-flight turn is ever disturbed. historyPrev
+// (up) / historyNext (down) walk prior prompts only at the textarea's edge rows; copyLast (ctrl+y)
+// copies the last answer's raw markdown; help (ctrl+g) toggles the expanded help. Bare "?" is
+// deliberately NOT bound — the textarea is always focused and must type it.
 type keymap struct {
 	send            key.Binding
 	newline         key.Binding
@@ -151,6 +160,10 @@ type keymap struct {
 	toggleSteps     key.Binding
 	scrollUp        key.Binding
 	scrollDown      key.Binding
+	historyPrev     key.Binding
+	historyNext     key.Binding
+	copyLast        key.Binding
+	help            key.Binding
 	quit            key.Binding
 	openPicker      key.Binding
 	newConversation key.Binding
@@ -158,15 +171,36 @@ type keymap struct {
 
 func defaultKeymap() keymap {
 	return keymap{
-		send:            key.NewBinding(key.WithKeys("enter")),
-		newline:         key.NewBinding(key.WithKeys("alt+enter")),
-		cancel:          key.NewBinding(key.WithKeys("esc")),
-		toggleSteps:     key.NewBinding(key.WithKeys("ctrl+t")),
-		scrollUp:        key.NewBinding(key.WithKeys("pgup")),
-		scrollDown:      key.NewBinding(key.WithKeys("pgdown")),
-		quit:            key.NewBinding(key.WithKeys("ctrl+c")),
-		openPicker:      key.NewBinding(key.WithKeys("ctrl+o")),
-		newConversation: key.NewBinding(key.WithKeys("ctrl+n")),
+		send:            key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "send")),
+		newline:         key.NewBinding(key.WithKeys("alt+enter"), key.WithHelp("alt+enter", "newline")),
+		cancel:          key.NewBinding(key.WithKeys("esc"), key.WithHelp("esc", "cancel")),
+		toggleSteps:     key.NewBinding(key.WithKeys("ctrl+t"), key.WithHelp("ctrl+t", "steps")),
+		scrollUp:        key.NewBinding(key.WithKeys("pgup"), key.WithHelp("pgup", "scroll up")),
+		scrollDown:      key.NewBinding(key.WithKeys("pgdown"), key.WithHelp("pgdn", "scroll down")),
+		historyPrev:     key.NewBinding(key.WithKeys("up"), key.WithHelp("↑", "prev prompt")),
+		historyNext:     key.NewBinding(key.WithKeys("down"), key.WithHelp("↓", "next prompt")),
+		copyLast:        key.NewBinding(key.WithKeys("ctrl+y"), key.WithHelp("ctrl+y", "copy answer")),
+		help:            key.NewBinding(key.WithKeys("ctrl+g"), key.WithHelp("ctrl+g", "help")),
+		quit:            key.NewBinding(key.WithKeys("ctrl+c"), key.WithHelp("ctrl+c", "quit")),
+		openPicker:      key.NewBinding(key.WithKeys("ctrl+o"), key.WithHelp("ctrl+o", "resume")),
+		newConversation: key.NewBinding(key.WithKeys("ctrl+n"), key.WithHelp("ctrl+n", "new")),
+	}
+}
+
+// ShortHelp is the one-line help footer's binding order (bubbles/help KeyMap). It surfaces the
+// everyday keys; the rest live under the ctrl+g full-help expansion.
+func (k keymap) ShortHelp() []key.Binding {
+	return []key.Binding{k.send, k.openPicker, k.newConversation, k.copyLast, k.toggleSteps, k.help, k.quit}
+}
+
+// FullHelp is the grouped expansion shown when ctrl+g toggles ShowAll (bubbles/help KeyMap),
+// columns roughly by function: composing, conversation, transcript, meta.
+func (k keymap) FullHelp() [][]key.Binding {
+	return [][]key.Binding{
+		{k.send, k.newline, k.cancel},
+		{k.openPicker, k.newConversation, k.copyLast},
+		{k.toggleSteps, k.scrollUp, k.scrollDown, k.historyPrev, k.historyNext},
+		{k.help, k.quit},
 	}
 }
 
@@ -186,10 +220,14 @@ type model struct {
 	theme    string // concrete resolved palette ("light"/"dark"), never "auto"
 	styles   styleSet
 	keymap   keymap
+	hlp      help.Model
 	ta       textarea.Model
 	vp       viewport.Model
 	sp       spinner.Model
 	renderer *glamour.TermRenderer
+
+	history history // prior-prompt recall (up/down at the textarea edges)
+	reduced bool    // reduced motion (NO_COLOR set): static "working…" instead of the spinner
 
 	entries     []entry
 	inflightIdx int // index of the assistant entry being streamed (valid while streaming)
@@ -198,6 +236,10 @@ type model struct {
 	cancelling bool
 	quitting   bool
 	showSteps  bool
+
+	turnStart time.Time // monotonic start of the in-flight turn, for its per-turn footer
+	toast     string    // transient footer toast (copy confirmation / error); "" when none
+	toastSeq  int       // stamps the live toast so a stale expiry never clears a newer one
 
 	cancelTurn context.CancelFunc
 	events     <-chan agent.Event
@@ -226,6 +268,10 @@ func newModel(baseCtx context.Context, sess streamer, provider sessionProvider, 
 
 	sp := spinner.New(spinner.WithSpinner(spinner.Dot))
 
+	styles := newStyles(theme)
+	hlp := help.New()
+	hlp.Styles = styles.help // concrete per-theme styles, never help.New()'s AdaptiveColor defaults
+
 	return model{
 		baseCtx:     baseCtx,
 		sess:        sess,
@@ -234,12 +280,24 @@ func newModel(baseCtx context.Context, sess streamer, provider sessionProvider, 
 		llmProvider: cfg.LLMProvider,
 		llmModel:    cfg.LLMModel,
 		theme:       theme,
-		styles:      newStyles(theme),
+		styles:      styles,
 		keymap:      defaultKeymap(),
+		hlp:         hlp,
 		ta:          ta,
 		vp:          viewport.New(0, 0),
 		sp:          sp,
+		history:     newHistory(nil),
+		reduced:     reducedMotion(os.Getenv("NO_COLOR")),
+		inflightIdx: -1,
 	}
+}
+
+// reducedMotion reports whether the reduced-motion path is active: any non-empty NO_COLOR value.
+// Read once at model construction (never per-frame) so the whole session is consistent. lipgloss
+// and termenv already strip color under NO_COLOR; this flag governs only the animated spinner,
+// which is swapped for a static "working…" state.
+func reducedMotion(noColor string) bool {
+	return noColor != ""
 }
 
 // Init starts the textarea cursor blink; nothing streams until the first turn.
@@ -273,6 +331,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.events = nil
 		if m.inflightIdx >= 0 && m.inflightIdx < len(m.entries) {
 			m.entries[m.inflightIdx].finalized = true
+			m.entries[m.inflightIdx].duration = time.Since(m.turnStart)
 		}
 		m.refreshViewport()
 		if m.quitting {
@@ -280,8 +339,18 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 
+	case toastExpireMsg:
+		// Only clear if this expiry belongs to the currently-shown toast; a newer toast bumped the
+		// sequence and scheduled its own expiry.
+		if msg.seq == m.toastSeq {
+			m.toast = ""
+		}
+		return m, nil
+
 	case spinner.TickMsg:
-		if !m.streaming {
+		// Under reduced motion the spinner never animates (a static "working…" shows instead), so
+		// drop stray ticks rather than re-scheduling them.
+		if !m.streaming || m.reduced {
 			return m, nil
 		}
 		var cmd tea.Cmd
@@ -338,6 +407,13 @@ func (m model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case key.Matches(msg, m.keymap.newConversation):
 		return m.newConversation()
 
+	case key.Matches(msg, m.keymap.copyLast):
+		return m.copyLastAnswer()
+
+	case key.Matches(msg, m.keymap.help):
+		m.hlp.ShowAll = !m.hlp.ShowAll
+		return m, nil
+
 	case key.Matches(msg, m.keymap.send):
 		if m.streaming {
 			return m, nil // no-op while a turn is in flight (never start an overlapping turn)
@@ -347,6 +423,35 @@ func (m model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		return m.startTurn(input)
+
+	case key.Matches(msg, m.keymap.historyPrev):
+		// Up recalls an older prompt only from the textarea's first row; elsewhere it is normal
+		// cursor movement. A recall that does not move (no history / already oldest) is swallowed
+		// (up at the first row would be a no-op in the textarea anyway).
+		if m.ta.Line() == 0 {
+			if v, moved := m.history.prev(m.ta.Value()); moved {
+				m.ta.SetValue(v)
+				m.ta.CursorEnd()
+			}
+			return m, nil
+		}
+		var cmd tea.Cmd
+		m.ta, cmd = m.ta.Update(msg)
+		return m, cmd
+
+	case key.Matches(msg, m.keymap.historyNext):
+		// Down walks toward newer prompts (and restores the stashed draft past the newest) only from
+		// the textarea's last row; elsewhere it is normal cursor movement.
+		if m.ta.Line() == m.ta.LineCount()-1 {
+			if v, moved := m.history.next(m.ta.Value()); moved {
+				m.ta.SetValue(v)
+				m.ta.CursorEnd()
+			}
+			return m, nil
+		}
+		var cmd tea.Cmd
+		m.ta, cmd = m.ta.Update(msg)
+		return m, cmd
 
 	case key.Matches(msg, m.keymap.scrollUp), key.Matches(msg, m.keymap.scrollDown):
 		var cmd tea.Cmd
@@ -358,6 +463,43 @@ func (m model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.ta, cmd = m.ta.Update(msg)
 		return m, cmd
 	}
+}
+
+// copyLastAnswer copies the last finalized assistant answer's RAW markdown to the system clipboard
+// (not the glamour-rendered output: terminal-wrapped rendering is mangled, the source is the point)
+// and shows a transient footer toast confirming the copy, its failure, or that there is nothing to
+// copy. The toast self-expires via a tea.Tick stamped with the toast sequence.
+func (m model) copyLastAnswer() (tea.Model, tea.Cmd) {
+	md, ok := lastAssistantMarkdown(m.entries)
+	if !ok {
+		return m.showToast("nothing to copy")
+	}
+	if err := clipboard.WriteAll(md); err != nil {
+		return m.showToast("copy failed: " + err.Error())
+	}
+	return m.showToast("copied")
+}
+
+// showToast sets the transient footer toast and returns the command that clears it after a short
+// window. Each toast bumps toastSeq so a stale expiry for a superseded toast is ignored.
+func (m model) showToast(text string) (tea.Model, tea.Cmd) {
+	m.toastSeq++
+	m.toast = text
+	seq := m.toastSeq
+	return m, tea.Tick(3*time.Second, func(time.Time) tea.Msg { return toastExpireMsg{seq: seq} })
+}
+
+// lastAssistantMarkdown returns the raw markdown of the most recent finalized assistant turn that
+// carries answer text, and whether one exists. Steps-only or empty assistant turns are skipped
+// (there is no answer body to copy); a still-streaming turn is skipped (not yet finalized).
+func lastAssistantMarkdown(entries []entry) (string, bool) {
+	for i := len(entries) - 1; i >= 0; i-- {
+		e := entries[i]
+		if e.role == roleAssistant && e.finalized && e.text != "" {
+			return e.text, true
+		}
+	}
+	return "", false
 }
 
 // openPicker opens the conversation-resume overlay. It is a no-op while a turn is streaming (so no
@@ -402,6 +544,7 @@ func (m model) newConversation() (tea.Model, tea.Cmd) {
 	m.sess = fresh
 	m.entries = nil
 	m.inflightIdx = -1
+	m.history = newHistory(nil) // fresh conversation: no prior prompts to recall
 	m.picker = nil
 	m.refreshViewport()
 	return m, nil
@@ -445,6 +588,7 @@ func (m model) handlePickerKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.sess = newSess
 		m.entries = entriesFromTranscript(transcript)
 		m.inflightIdx = -1
+		m.history = newHistory(userPromptsNewestFirst(m.entries)) // resume seeds prompt recall
 		m.picker = nil
 		m.refreshViewport()
 		return m, nil
@@ -493,6 +637,18 @@ func entriesFromTranscript(ts []agent.TranscriptEntry) []entry {
 	return out
 }
 
+// userPromptsNewestFirst extracts the user prompts from a transcript in newest-first order, seeding
+// the prompt-recall history when a conversation is resumed so up/down walks the loaded messages.
+func userPromptsNewestFirst(entries []entry) []string {
+	var out []string
+	for i := len(entries) - 1; i >= 0; i-- {
+		if entries[i].role == roleUser && entries[i].text != "" {
+			out = append(out, entries[i].text)
+		}
+	}
+	return out
+}
+
 // startTurn opens one streaming turn: derive a cancelable turn context, hand the input to the
 // engine, append the user entry and an empty in-flight assistant entry, and kick off the pump
 // plus the spinner. Returns the model and its initial commands.
@@ -503,13 +659,19 @@ func (m model) startTurn(input string) (tea.Model, tea.Cmd) {
 	m.entries = append(m.entries, entry{role: roleUser, text: input, finalized: true})
 	m.entries = append(m.entries, entry{role: roleAssistant})
 	m.inflightIdx = len(m.entries) - 1
+	m.history.add(input) // recallable next turn; also resets any in-progress recall
 
 	m.events = ch
 	m.cancelTurn = cancel
 	m.streaming = true
 	m.cancelling = false
+	m.turnStart = time.Now()
 	m.ta.Reset()
 	m.refreshViewport()
+	// Under reduced motion the spinner is replaced by static text, so its tick is never started.
+	if m.reduced {
+		return m, waitForEvent(ch)
+	}
 	return m, tea.Batch(waitForEvent(ch), m.sp.Tick)
 }
 
@@ -579,6 +741,7 @@ func (m *model) resize(w, h int) {
 	m.vp.Height = vpHeight
 	m.ta.SetWidth(w)
 	m.ta.SetHeight(inputHeight)
+	m.hlp.Width = w // the help footer truncates its short view to the terminal width
 	m.renderer = newRenderer(w, m.theme)
 	if m.picker != nil {
 		m.picker.SetSize(w, vpHeight) // the overlay occupies the viewport area
@@ -587,14 +750,16 @@ func (m *model) resize(w, h int) {
 }
 
 // refreshViewport re-renders the transcript into the viewport, preserving the user's scroll
-// position unless they were already at the bottom (in which case new output auto-scrolls).
+// position unless they were already at the bottom (in which case new output auto-scrolls). The
+// follow decision is captured BEFORE the content update — from the pre-update scroll position — so
+// a reader who scrolled up is never yanked back down by newly streamed content.
 func (m *model) refreshViewport() {
 	if !m.ready {
 		return
 	}
-	atBottom := m.vp.AtBottom()
+	follow := shouldAutoFollow(m.vp.ScrollPercent())
 	m.vp.SetContent(m.renderTranscript())
-	if atBottom {
+	if follow {
 		m.vp.GotoBottom()
 	}
 }
@@ -609,11 +774,15 @@ func (m model) renderTranscript() string {
 }
 
 // renderEntry renders one transcript item: the role label, then steps (assistant only), the
-// body bubble (glamour once finalized, plain while streaming), and any interrupted/error badge.
+// body bubble (glamour once finalized, plain while streaming), any interrupted/error badge, and —
+// for a finished assistant turn — a faint per-turn footer. The whole block is prefixed with a
+// colored left gutter (thick accent ▌ for the user, faint thin │ for the librarian) so turns are
+// visually separated even under NO_COLOR, where lipgloss strips the color but the glyph remains.
 func (m model) renderEntry(e entry) string {
 	switch e.role {
 	case roleUser:
-		return m.styles.roleLabel.Render("you") + "\n" + m.styles.user.Render(e.text)
+		content := m.styles.roleLabel.Render("you") + "\n" + m.styles.user.Render(e.text)
+		return applyGutter(content, m.styles.userGutter, "▌")
 
 	default: // roleAssistant
 		var b strings.Builder
@@ -648,8 +817,36 @@ func (m model) renderEntry(e entry) string {
 			}
 			b.WriteString(m.styles.errText.Render("error: " + e.errText))
 		}
-		return b.String()
+		// Per-turn footer: only on a finished turn with a recorded wall time. A still-streaming turn
+		// (duration zero) and a resumed history entry (no timing) show none.
+		if e.finalized && e.duration > 0 {
+			b.WriteString("\n" + m.styles.turnFooter.Render(m.llmModel+" · "+fmtDuration(e.duration)))
+		}
+		return applyGutter(b.String(), m.styles.assistantGutter, "│")
 	}
+}
+
+// applyGutter prefixes every line of an entry's rendered content with a colored left-gutter glyph,
+// separating turns visually. The glyph flows through a lipgloss style, so NO_COLOR degrades it to
+// the bare glyph — which still separates the turn — rather than losing the border entirely.
+func applyGutter(content string, style lipgloss.Style, glyph string) string {
+	prefix := style.Render(glyph) + " "
+	lines := strings.Split(content, "\n")
+	for i, ln := range lines {
+		lines[i] = prefix + ln
+	}
+	return strings.Join(lines, "\n")
+}
+
+// fmtDuration renders a turn's wall time compactly: sub-minute as seconds with one decimal
+// (e.g. "4.2s"), a minute or more as "1m03s".
+func fmtDuration(d time.Duration) string {
+	if d < time.Minute {
+		return fmt.Sprintf("%.1fs", d.Seconds())
+	}
+	m := int(d / time.Minute)
+	s := int((d % time.Minute) / time.Second)
+	return fmt.Sprintf("%dm%02ds", m, s)
 }
 
 // View composes the surface: header, transcript viewport, input textarea, footer. Before the
@@ -679,21 +876,39 @@ func (m model) renderHeader() string {
 	return clip(left+right, m.width)
 }
 
-// renderFooter renders the keybind hints and the live state (streaming spinner / cancelling…
-// / ready), clipped to the terminal width.
+// renderFooter renders the self-documenting keybind help (bubbles/help: one-line ShortHelp, or the
+// grouped FullHelp when ctrl+g toggled ShowAll) plus the live state segment. The state shows a
+// transient toast when one is set (copy confirmation / error); otherwise the streaming/cancelling/
+// ready indicator, with a "▼ new output" hint appended while the reader has scrolled up mid-stream.
+// Under reduced motion the animated spinner is replaced by static "working…" text. Clipped to width.
 func (m model) renderFooter() string {
-	hints := "enter send · ctrl+o resume · ctrl+n new · ctrl+t steps · pgup/pgdn scroll · esc cancel · ctrl+c quit"
 	var state string
 	switch {
+	case m.toast != "":
+		state = m.styles.toast.Render(m.toast)
 	case m.cancelling:
-		state = "cancelling…"
+		state = m.styles.footerState.Render("cancelling…")
 	case m.streaming:
-		state = m.sp.View() + " streaming"
+		work := "working…"
+		if !m.reduced {
+			work = m.sp.View() + " streaming"
+		}
+		if !m.vp.AtBottom() {
+			work += "  ▼ new output"
+		}
+		state = m.styles.footerState.Render(work)
 	default:
-		state = "ready"
+		state = m.styles.footerState.Render("ready")
 	}
-	line := m.styles.footer.Render(hints) + "  " + m.styles.footerState.Render(state)
-	return clip(line, m.width)
+
+	// Reserve room for the always-visible state segment; the help hints fill whatever remains and
+	// truncate themselves to fit (bubbles/help), so the live state is never clipped off the end.
+	hlp := m.hlp
+	if w := m.width - lipgloss.Width(state) - 2; w > 0 {
+		hlp.Width = w
+	}
+	hints := hlp.View(m.keymap)
+	return clip(hints+"  "+state, m.width)
 }
 
 // clip hard-limits a rendered line to width display cells, so header/footer never wrap.
