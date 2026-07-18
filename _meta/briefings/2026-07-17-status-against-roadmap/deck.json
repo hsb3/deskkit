@@ -1,0 +1,304 @@
+[
+  {
+    "kicker": "Status readout",
+    "notes": "Render with theme: boardroom. Audience: Henry. Framing — this deck measures the project against the build brief (docs are the plan of record), not against a schedule.",
+    "blocks": [
+      {
+        "type": "heading",
+        "level": 1,
+        "text": "desk-standard — status against the roadmap"
+      },
+      {
+        "type": "subtitle",
+        "text": "Progress vs. the build brief · v0.4.0 released · 2026-07-17"
+      }
+    ]
+  },
+  {
+    "layout": "top",
+    "fit": "shrink",
+    "kicker": "Bottom line up front",
+    "footer": "Plan of record: _meta/build-brief.md §6 (deliverables D1–D9 + 8 acceptance criteria) · epic #1 closed 2026-07-16",
+    "notes": "The one-slide story. Everything after this is the evidence.",
+    "blocks": [
+      {
+        "type": "heading",
+        "level": 1,
+        "text": "On plan and shipped — a second format and a launch call remain"
+      },
+      {
+        "type": "subtitle",
+        "text": "The brief is essentially delivered; the project has already moved into distribute-and-extend."
+      },
+      {
+        "type": "bullets",
+        "items": [
+          "**Built to spec** — the defining epic (#1) is closed; all nine deliverables exist, seven of eight criteria proven.",
+          "**Then hardened and released** — a field-eval + distribution wave the brief never scoped shipped a live **v0.4.0**.",
+          "**One plan-level gap** — the second harness format (OpenCode, {chip.warn:#12}) is not yet productionized.",
+          "**One decision blocks launch** — the public install 404s only because the repo is {warn:private}; going public fixes it, no code change."
+        ]
+      }
+    ]
+  },
+  {
+    "layout": "top",
+    "fit": "shrink",
+    "kicker": "The plan of record",
+    "footer": "Source: _meta/build-brief.md §3, §6.1 · docs/pocket-librarian-v1-spec.md",
+    "notes": "Recap what we committed to, so the scorecards that follow have a yardstick. No timelines were ever in the brief — it is deliverables + mechanically-verifiable acceptance criteria.",
+    "blocks": [
+      {
+        "type": "heading",
+        "level": 1,
+        "text": "The brief committed us to two products over one shared schema"
+      },
+      {
+        "type": "bullets",
+        "items": [
+          "**Product A — the plugin**: a harness-pure `core/` + `mcp/` boundary, wrapped as **two formats** (Claude Code + OpenCode) from one implementation.",
+          "**Product B — the pocket-librarian**: a single Go binary (embedded PocketBase, eino loop), six desk tools as both CLI and MCP server, record-original-first.",
+          "**The contract — schema v1** both read, personalized only through `_knowledge/profile.yaml`.",
+          "**The hard rule — identity-neutrality as a required CI check**: no name/org/repo/issue token ships except as a `{{profile.…}}` placeholder.",
+          "Scored on **9 deliverables + 8 mechanically-verifiable criteria** — no dates, by design."
+        ]
+      }
+    ]
+  },
+  {
+    "layout": "top",
+    "fit": "shrink",
+    "kicker": "Scorecard — deliverables",
+    "footer": "Against build-brief §6.1 · all nine directories/artifacts exist on main, CI-green",
+    "notes": "D1–D9 are the concrete artifacts. Every one exists. The single caveat is D4: the OpenCode adapter is built and unit-tested, but the fully-productionized dual-format instance is the open #12.",
+    "blocks": [
+      {
+        "type": "heading",
+        "level": 1,
+        "text": "All nine deliverables are built — one still needs to ship as a second format"
+      },
+      {
+        "type": "table",
+        "head": ["#", "Deliverable", "Status"],
+        "rows": [
+          ["D1", "schema/ — schema v1 + profile block", "{chip.ok:Done}"],
+          ["D2", "plugin/core/ — harness-pure domain library", "{chip.ok:Done}"],
+          ["D3", "plugin/mcp/ — shared MCP tool boundary", "{chip.ok:Done}"],
+          ["D4", "plugin/opencode/ — OpenCode adapter", "{chip.warn:Built, not shipped (#12)}"],
+          ["D5", "plugin/claude-plugin/ — Claude Code adapter", "{chip.ok:Done + distributed}"],
+          ["D6", "librarian/ — pocket-librarian, 6 tools, safety boundary", "{chip.ok:Done (v0.4.0)}"],
+          ["D7", "shared profile / _knowledge substitution loader", "{chip.ok:Done}"],
+          ["D8", "neutrality lint wired as a required CI check", "{chip.ok:Done}"],
+          ["D9", "README naming both formats + fidelity losses", "{chip.ok:Done}"]
+        ]
+      }
+    ]
+  },
+  {
+    "layout": "top",
+    "fit": "shrink",
+    "kicker": "Scorecard — acceptance criteria",
+    "footer": "Against build-brief §6.2 · verify.sh (47 checks) + bun (45 tests) now run in CI and the release gate",
+    "notes": "Seven of eight criteria are fully proven in CI. Criterion 1 is the only partial: proven end-to-end for Claude Code (validate + smoke + a live marketplace install), with the OpenCode instance pending #12.",
+    "blocks": [
+      {
+        "type": "heading",
+        "level": 1,
+        "text": "Seven of eight acceptance criteria are fully proven; the eighth waits on OpenCode"
+      },
+      {
+        "type": "table",
+        "head": ["Acceptance criterion", "Status"],
+        "rows": [
+          ["1 · Both harness formats load without double-registering", "{chip.warn:Claude proven; OpenCode pending (#12)}"],
+          ["2 · core/ is harness-pure (import lint)", "{chip.ok:Met}"],
+          ["3 · One shared MCP surface, no duplicated capability", "{chip.ok:Met}"],
+          ["4 · Librarian builds + verify gate + rebuild-from-scratch checksums", "{chip.ok:Met}"],
+          ["5 · Neutrality lint fails on a seeded identifier, zero on clean", "{chip.ok:Met}"],
+          ["6 · Stranger test — profile-driven, no edits to shipped defs", "{chip.ok:Met}"],
+          ["7 · Fail-loud substitution on a missing required key", "{chip.ok:Met}"],
+          ["8 · Profile validates against schema v1", "{chip.ok:Met}"]
+        ]
+      }
+    ]
+  },
+  {
+    "layout": "top",
+    "fit": "shrink",
+    "kicker": "Beyond the plan",
+    "footer": "Issues #13–#18, #20, #23, #25, #27, #31 · ADRs 0001–0003 · PRs #21–#33",
+    "notes": "This is the part a pure plan-vs-actual read misses: after the spec build closed, a large second wave neither the brief nor the epic scoped took the project from 'compiles to spec' to 'released and operable'. Worth calling out because it is most of the elapsed work.",
+    "blocks": [
+      {
+        "type": "heading",
+        "level": 1,
+        "text": "Most work since the epic was hardening and distribution the brief never scoped"
+      },
+      {
+        "type": "bullets",
+        "items": [
+          "**Field-eval hardening (#13–#18)** — record-original-first no longer caps at 5 KB, patrol resolves stale findings, orphan-noise + rule-severity fixes.",
+          "**Multi-desk topology (ADR 0002 → #23)** — XDG canonical store home, fail-closed store location, and a desk open-guard so a store can't be opened under the wrong desk.",
+          "**Store self-initialization (ADR 0003 → #31)** — tool commands auto-migrate a fresh store; no manual `migrate up` first-run papercut.",
+          "**Distribution substrate (#7, #25, #27)** — a `curl`-able `install.sh` with sha256 verification, SHA-pinned GitHub Actions, a `VERSION`-driven release pipeline, three user guides + recorded demos.",
+          "**Released v0.4.0** — four platform binaries + checksums + plugin bundle, and the full integration suite now runs in CI and the release gate."
+        ]
+      }
+    ]
+  },
+  {
+    "layout": "top",
+    "kicker": "Where we stand",
+    "footer": "main is CI-green · install: claude plugin marketplace add hsb3/desk-standard → install desk-standard@desk-standard",
+    "notes": "Snapshot of the current state in numbers. The marketplace install is proven end-to-end for Claude Code.",
+    "blocks": [
+      {
+        "type": "heading",
+        "level": 1,
+        "text": "v0.4.0 is released, CI-green, and installable today for Claude Code"
+      },
+      {
+        "type": "columns",
+        "columns": [
+          [
+            {
+              "type": "stat",
+              "value": "v0.4.0",
+              "label": "released",
+              "sub": "4 binaries + plugin bundle"
+            }
+          ],
+          [
+            {
+              "type": "stat",
+              "value": "17 / 22",
+              "label": "issues closed",
+              "sub": "5 open, all build work"
+            }
+          ],
+          [
+            {
+              "type": "stat",
+              "value": "92",
+              "label": "automated checks",
+              "sub": "47 verify + 45 bun tests"
+            }
+          ],
+          [
+            {
+              "type": "stat",
+              "value": "3",
+              "label": "ADRs recorded",
+              "sub": "all rulings in"
+            }
+          ]
+        ]
+      },
+      {
+        "type": "callout",
+        "variant": "success",
+        "title": "Proven end-to-end",
+        "text": "The darwin/arm64 binary downloads, runs, reports v0.4.0, and its sha256 matches the published checksums."
+      }
+    ]
+  },
+  {
+    "layout": "top",
+    "fit": "shrink",
+    "kicker": "The one blocker",
+    "footer": "Incident log 2026-07-17 · authed gh release download confirms the assets are valid — the gap is purely visibility",
+    "notes": "This is the only thing standing between us and the public install story. It is not a bug — install.sh is correct. Every unauthenticated URL the public flow needs 404s only because the repo is private. Making the repo public resolves all of them with zero code change. If it must stay private, install.sh would need token/gh auth (a design change).",
+    "blocks": [
+      {
+        "type": "heading",
+        "level": 1,
+        "text": "The public install path is blocked only by repo visibility, not by code"
+      },
+      {
+        "type": "bullets",
+        "items": [
+          "The public `curl | bash` flow fetches `install.sh`, `/releases/latest`, and `/releases/download/…` — all **404 while the repo is {warn:private}**.",
+          "install.sh's URL construction and checksum logic are **proven correct**: its URLs are byte-identical to the API's `browser_download_url`, and the authenticated download verifies.",
+          "The **only** missing link is the unauthenticated HTTP fetch — i.e. repo visibility."
+        ]
+      },
+      {
+        "type": "callout",
+        "variant": "warn",
+        "title": "Decision needed",
+        "text": "Make the repo public to unblock #7 (no code change), or add token/gh auth to install.sh if it stays private."
+      }
+    ]
+  },
+  {
+    "layout": "top",
+    "kicker": "Backlog",
+    "footer": "GitHub: hsb3/desk-standard · 5 open issues · no ruling gates the buildable ones",
+    "notes": "Ranked. #12 is the last piece of the original plan; the rest are follow-ups and extensions. #36 (SOP template library) was just filed and is explicitly a next-major-bump item.",
+    "blocks": [
+      {
+        "type": "heading",
+        "level": 1,
+        "text": "Five issues open — one closes the plan, the rest harden and extend"
+      },
+      {
+        "type": "table",
+        "head": ["Issue", "What it is", "Kind"],
+        "rows": [
+          ["#12", "Dual-format OpenCode instance from the common core", "Plan gap · needs ruling"],
+          ["#34", "Enforce shellcheck / actionlint / SHA-pin drift in CI", "Hardening"],
+          ["#35", "Unit-test self-init + TS MCP server behaviour", "Coverage"],
+          ["#19", "PocketBase-served webapp chat surface", "Deferred (ADR 0001)"],
+          ["#36", "Template SOP library — full ~20-type set", "Extension · v-next major"]
+        ]
+      }
+    ]
+  },
+  {
+    "layout": "top",
+    "kicker": "Verdict",
+    "footer": "No timelines by design — the brief is scored on deliverables + criteria, not a schedule",
+    "notes": "The honest answer to 'how are we doing against the plan': the plan is essentially met and we have already gone further than it in the directions that matter for a real launch. The remaining plan item is the second format.",
+    "blocks": [
+      {
+        "type": "heading",
+        "level": 1,
+        "text": "Ahead of the brief on delivery — the roadmap is now launch, not build"
+      },
+      {
+        "type": "bullets",
+        "items": [
+          "**Against the brief: delivered.** Epic closed, nine deliverables built, seven of eight criteria proven — plus a released binary the brief never asked for.",
+          "**The one open commitment** is the second harness format (OpenCode, #12) — architectural, and it wants an OpenCode-target ruling before fan-out.",
+          "**Phase shift.** The project is past 'build to spec' and into distribute-and-extend: launch (go public), the second format (#12), and the SOP template library (#36).",
+          "**Health is good** — all design rulings are in (three ADRs), main is CI-green, and everything still open is pure build work, not unresolved questions."
+        ]
+      }
+    ]
+  },
+  {
+    "kicker": "Decisions to unblock",
+    "notes": "Close on the three calls only Henry can make. The first is the highest-leverage and needs no engineering.",
+    "blocks": [
+      {
+        "type": "heading",
+        "level": 1,
+        "text": "Three calls to make"
+      },
+      {
+        "type": "bullets",
+        "items": [
+          "**Go public?** — unblocks the public `curl | bash` install, closing #7's last criterion. No code change.",
+          "**OpenCode-target ruling** — the shape of the second format, so #12 can fan out and the last plan item lands.",
+          "**#36 SOP library direction** — vendor-vs-sync and type↔classification, scoped as the next major bump."
+        ]
+      },
+      {
+        "type": "callout",
+        "variant": "accent",
+        "title": "The through-line",
+        "text": "The build is done and shipped; what is left is deciding how far to open it and how far to extend it."
+      }
+    ]
+  }
+]

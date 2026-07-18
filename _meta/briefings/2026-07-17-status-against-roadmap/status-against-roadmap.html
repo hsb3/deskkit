@@ -1,0 +1,736 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>desk-standard — status against the roadmap</title>
+<style>
+/*
+ * THEME SET (#559) — three deliberately-good palettes, boardroom/ivory quality bar:
+ *   boardroom (BASE)  crisp white / deep-navy   — the McKinsey/BCG default look
+ *   ivory             warm paper / consulting blue (print-friendly light)
+ *   midnight          deep navy / warm gold     (premium dark)
+ * The BASE `.dbx-deck` variables ARE boardroom, so an unspecified theme (and the
+ * legacy `theme:"default"`, which resolves to no `data-theme` attribute) renders
+ * boardroom. `[data-theme="boardroom"]` is a same-value alias for explicit callers.
+ * Every (fg,bg) pair across all three meets WCAG AA (≥ 4.5:1 text, ≥ 3:1 large) —
+ * see docs/themes.md "Contrast contract". Themes remap CSS VARIABLES ONLY, never
+ * layout/sizing/print rules.
+ */
+.dbx-deck {
+  --bg: #ffffff;
+  --bg-alt: #f3f6fa;
+  --fg: #11243a;
+  --muted: #5b6b7e;
+  --accent: #1a4e8a;
+  --accent-2: #1f6093;
+  --line: #dbe3ec;
+  --code-bg: #e9eff5;
+  --panel: #f1f5fa;
+  --pos: #15784a;
+  --neg: #bd2f1f;
+  /* Modular type scale (#559 / #277) — one ratio (Major Third, 1.25) so every
+   * tier is a visible step from the next. Hierarchy = size AND weight AND color
+   * (the weight/color steps live on the per-tier rules below). The renderer's
+   * block sizes route through these tokens — no magic font-sizes per block.
+   *   --fs-kicker (14)  < --fs-source (13→eyebrow/footer) is the small caps tier;
+   *   then body/subtitle/title/lead climb the ratio. --fs-lead doubles as the
+   *   oversized stat/hero tier. */
+  --fs-kicker: 14px;
+  --fs-source: 13px;
+  --fs-body: 24px;
+  --fs-subtitle: 30px;
+  --fs-title: 40px;
+  --fs-lead: 64px;
+  --mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  --sans: "IBM Plex Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  position: fixed;
+  inset: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--sans);
+  overflow: hidden;
+}
+/* boardroom = the base values, named for explicit callers. */
+.dbx-deck[data-theme="boardroom"] { --bg: #ffffff; --bg-alt: #f3f6fa; --fg: #11243a; --muted: #5b6b7e; --accent: #1a4e8a; --accent-2: #1f6093; --line: #dbe3ec; --code-bg: #e9eff5; --panel: #f1f5fa; --pos: #15784a; --neg: #bd2f1f; }
+.dbx-deck[data-theme="ivory"] { --bg: #f7f5f0; --bg-alt: #ece9e2; --fg: #1a1a1a; --muted: #5b5b5b; --accent: #1f4e79; --accent-2: #235a93; --line: #d9d4c8; --code-bg: #e4e0d6; --panel: #efece3; --pos: #157045; --neg: #b5311f; }
+.dbx-deck[data-theme="midnight"] { --bg: #0a0e27; --bg-alt: #161d44; --fg: #eaeeff; --muted: #9aa3d4; --accent: #f4b740; --accent-2: #7fb0ff; --line: #2a3568; --code-bg: #12183a; --panel: #161d44; --pos: #5fd99a; --neg: #ff8a82; }
+.dbx-deck *, .dbx-deck *::before, .dbx-deck *::after { box-sizing: border-box; margin: 0; padding: 0; }
+.dbx-deck #dbx-stage-wrap { position: absolute; inset: 0; display: grid; place-items: center; }
+.dbx-deck #dbx-stage { width: 1280px; height: 720px; position: relative; transform-origin: center center; }
+/* Bottom padding reserves a footer band so content never collides with the
+ * pinned footer (the footer sits at bottom:48px, ~36px tall band → ~84px). The
+ * content column lives above it; `center` splits the remaining whitespace evenly
+ * top+bottom so sparse slides read at optical center rather than pooling low. */
+.dbx-deck .dbx-slide { position: absolute; inset: 0; padding: 80px 96px 96px; opacity: 0; visibility: hidden; transform: translateX(40px); transition: opacity .35s ease, transform .35s ease; background: var(--bg); }
+.dbx-deck .dbx-slide.active { opacity: 1; visibility: visible; transform: translateX(0); z-index: 2; }
+.dbx-deck .dbx-slide.prev { transform: translateX(-40px); }
+/* Content wrapper (#564 auto-fit): the slide's flow content lives here, NOT on
+ * .dbx-slide, so the fit shrink hits ONLY the content — the footer band and
+ * the fixed canvas/chrome stay untouched. It fills the padded slide box and
+ * carries the column layout (center/top/fill) the slide used to. `--fit-scale`
+ * shrinks content to fit via `zoom`, NOT `transform: scale()` — Chromium's
+ * print path silently drops the transform inside this deck's pagination
+ * (screen + headless geometry honor it, page.pdf() paints unscaled; verified
+ * 2026-06-11), while zoom survives print AND reflows text at the larger
+ * virtual width, so the measured suggestion is an upper bound. `--fit-lh` is a
+ * line-height multiplier tightened first (down to ~0.8) before any scale. Both
+ * default to 1 → an un-fitted slide renders byte-identically to before. */
+.dbx-deck .dbx-content { height: 100%; display: flex; flex-direction: column; justify-content: center; gap: 4px; zoom: var(--fit-scale, 1); }
+/* Type tiers (#559): each block maps to a named scale token; hierarchy is size
+ * (token) + weight + color, not size alone. h1 = lead tier, h2 = title tier. */
+.dbx-deck h1 { font-size: var(--fs-lead); font-weight: 600; line-height: calc(1.05 * var(--fit-lh, 1)); letter-spacing: -.02em; margin-bottom: 24px; text-wrap: balance; }
+.dbx-deck h2 { font-size: var(--fs-title); font-weight: 600; line-height: calc(1.1 * var(--fit-lh, 1)); letter-spacing: -.01em; margin-bottom: 28px; text-wrap: balance; }
+.dbx-deck .accent { color: var(--accent); }
+.dbx-deck strong { font-weight: 600; }
+.dbx-deck .sem-accent { color: var(--accent); }
+.dbx-deck .sem-warn { color: var(--neg); }
+.dbx-deck .sem-ok { color: var(--pos); }
+.dbx-deck .sem-info { color: var(--accent-2); }
+.dbx-deck .dbx-chip { display: inline-block; font-family: var(--mono); font-size: .62em; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; padding: 2px 8px; border: 1px solid currentColor; border-radius: 4px; vertical-align: middle; line-height: 1.5; }
+.dbx-deck .dbx-chip-ok { color: var(--pos); }
+.dbx-deck .dbx-chip-warn { color: var(--neg); }
+.dbx-deck .dbx-chip-info { color: var(--accent-2); }
+.dbx-deck .dbx-chip-accent { color: var(--accent); }
+.dbx-deck .dbx-link { color: var(--accent-2); text-decoration: underline; text-underline-offset: 2px; }
+.dbx-deck .lead { font-size: var(--fs-body); color: var(--muted); max-width: 50ch; line-height: calc(1.5 * var(--fit-lh, 1)); text-wrap: balance; }
+/* Byline tier — distinct from `lead`: smaller, lighter, and letter-spaced so a
+ * title-slide subtitle reads as metadata, not a second lead. Sits one notch under
+ * `--fs-subtitle` (a deliberate sub-body byline, lighter weight + muted color). */
+.dbx-deck .dbx-subtitle { font-size: 20px; font-weight: 300; color: var(--muted); line-height: 1.4; letter-spacing: .01em; text-wrap: balance; }
+.dbx-deck .kicker { font-family: var(--mono); font-size: var(--fs-kicker); letter-spacing: .15em; text-transform: uppercase; color: var(--accent-2); margin-bottom: 20px; }
+.dbx-deck ul { list-style: none; display: flex; flex-direction: column; gap: 18px; }
+.dbx-deck li { font-size: var(--fs-body); line-height: calc(1.4 * var(--fit-lh, 1)); padding-left: 28px; position: relative; text-wrap: pretty; }
+.dbx-deck li::before { content: "\25B8"; color: var(--accent); position: absolute; left: 0; }
+.dbx-deck .fragment { opacity: 0; transition: opacity .3s ease; }
+.dbx-deck .fragmentVisible { opacity: 1; }
+/* Inline code chip: never break mid-token (a long const name like
+ * MCP_DECK_AUTH_TOKEN stays whole). The line may break before/after the chip. */
+.dbx-deck code { font-family: var(--mono); background: var(--code-bg); padding: 2px 8px; border-radius: 4px; font-size: .85em; color: var(--accent-2); white-space: nowrap; }
+.dbx-deck pre { font-family: var(--mono); background: var(--code-bg); border: 1px solid var(--line); border-radius: 8px; padding: 24px 28px; font-size: 17px; line-height: 1.6; overflow: auto; max-height: 460px; white-space: pre; }
+.dbx-deck pre code { background: none; padding: 0; color: var(--fg); font-size: inherit; white-space: inherit; }
+.dbx-deck table { border-collapse: collapse; font-size: 19px; width: 100%; font-variant-numeric: tabular-nums lining-nums; }
+.dbx-deck th, .dbx-deck td { text-align: left; padding: 12px 18px; border-bottom: 1px solid var(--line); }
+.dbx-deck th { font-family: var(--mono); font-size: 13px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.dbx-deck td:first-child { font-family: var(--mono); color: var(--accent-2); }
+.dbx-deck .columns { display: grid; gap: 40px; align-items: start; width: 100%; }
+.dbx-deck .column { display: flex; flex-direction: column; gap: 18px; min-width: 0; }
+/* Column-aware bullet/body scaling (#277 child G): dense multi-column slides
+ * (≥3 columns) step bullet + body type down so the narrower tracks stop
+ * cramping. Keyed off `data-cols` which the renderer sets on .columns. */
+.dbx-deck .columns[data-cols="3"] li, .dbx-deck .columns[data-cols="4"] li { font-size: 18px; padding-left: 22px; }
+.dbx-deck .columns[data-cols="3"] .lead, .dbx-deck .columns[data-cols="4"] .lead,
+.dbx-deck .columns[data-cols="3"] .dbx-callout-text, .dbx-deck .columns[data-cols="4"] .dbx-callout-text { font-size: 18px; }
+.dbx-deck .columns[data-cols="3"] p, .dbx-deck .columns[data-cols="4"] p { line-height: 1.4; }
+.dbx-deck .columns[data-cols="4"] { gap: 28px; }
+.dbx-deck .column > h1, .dbx-deck .column > h2 { margin-bottom: 8px; }
+.dbx-deck .dbx-svg { display: flex; justify-content: center; }
+.dbx-deck .dbx-svg svg { max-width: 100%; height: auto; max-height: 460px; }
+
+/* Native charts (#585) — theme-colored bar/line/donut, no axes-cleverness. */
+.dbx-deck .dbx-chart { width: 100%; max-width: 880px; }
+.dbx-deck .dbx-chart > svg { width: 100%; height: auto; display: block; }
+.dbx-deck .dbx-chart-bar { fill: var(--accent); }
+.dbx-deck .dbx-chart-line-path { stroke: var(--accent); stroke-width: 3; stroke-linejoin: round; stroke-linecap: round; }
+.dbx-deck .dbx-chart-dot { fill: var(--accent); }
+.dbx-deck .dbx-chart-baseline { stroke: var(--line); stroke-width: 1; }
+.dbx-deck .dbx-chart-value { font: 600 17px var(--sans); fill: var(--fg); text-anchor: middle; }
+.dbx-deck .dbx-chart-label { font: 500 15px var(--sans); fill: var(--muted); text-anchor: middle; }
+.dbx-deck .dbx-chart[data-kind="donut"] { display: flex; align-items: center; justify-content: center; gap: 44px; }
+.dbx-deck .dbx-chart[data-kind="donut"] > svg.dbx-donut-ring { width: 230px; height: 230px; flex: 0 0 auto; }
+.dbx-deck .dbx-chart-legend { display: flex; flex-direction: column; gap: 10px; font-size: 19px; }
+.dbx-deck .dbx-chart-legend-row { display: flex; align-items: center; gap: 12px; }
+.dbx-deck .dbx-chart-swatch { width: 14px; height: 14px; border-radius: 3px; flex: 0 0 auto; }
+.dbx-deck .dbx-chart-legend-value { color: var(--muted); font-variant-numeric: tabular-nums; }
+/* Layout variants live on the content wrapper (the flex column) — the slide box
+ * itself is just the positioned, padded canvas. */
+.dbx-deck .dbx-content[data-layout="top"] { justify-content: flex-start; }
+/* `center` is the default (the base rule already centers); stated explicitly so
+ * sparse slides split their whitespace evenly top+bottom and read at optical
+ * center rather than pooling at the bottom. */
+.dbx-deck .dbx-content[data-layout="center"] { justify-content: center; }
+/* `fill` distributes blocks across the canvas. The min `gap` is a sane floor so
+ * a 2-block fill slide doesn't fling its halves to the extremes — items sit at
+ * least 24px apart and space-between absorbs the rest. */
+.dbx-deck .dbx-content[data-layout="fill"] { justify-content: space-between; gap: clamp(24px, 6vh, 64px); }
+/* Whitespace-balance frame (#568) — orthogonal to layout, and TITLE-AWARE. A
+ * sparse slide leaves dead canvas; `balance` redistributes it WITHOUT disturbing
+ * the title. The renderer splits a balanced slide into a fixed HEADER region (the
+ * slide kicker + a leading `heading`, always pinned top-left) and a
+ * `.dbx-balance-body` flex region holding the remaining blocks — only the body
+ * region distributes/centers. These rules touch ONLY flexbox alignment, never the
+ * `zoom: var(--fit-scale)` from #564, so balance + auto-fit compose:
+ * balance distributes whitespace, auto-fit still shrinks an overflowing slide.
+ *
+ * `data-balance` on .dbx-content pins the header to the top (the body region then
+ * eats the remaining height). The body region is the flex column that actually
+ * distributes:
+ * v  — distribute body children DOWN (space-between) so a 3-callout slide stops
+ *      clustering up top and fills the height. Same min-gap floor as `fill` so a
+ *      2-block body doesn't fling its halves to the extremes.
+ * h  — center each body block's BOX on the cross-axis (`align-items: center`):
+ *      capped-width blocks (`lead` 50ch, `callout` 64ch) and the bullets list
+ *      center as units instead of left-pinning on the wide canvas. Text blocks
+ *      (heading/lead/callout) also center their TEXT; a `bullets` list keeps its
+ *      text LEFT-aligned inside the centered box so each `▸` marker stays attached
+ *      to its line (centering the line text would detach the absolute marker).
+ * both — v + h together (a separate selector to keep specificity equal). */
+.dbx-deck .dbx-content[data-balance] { justify-content: flex-start; }
+.dbx-deck .dbx-balance-body { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; gap: 4px; }
+.dbx-deck .dbx-balance-body[data-balance="v"], .dbx-deck .dbx-balance-body[data-balance="both"] { justify-content: space-between; gap: clamp(24px, 6vh, 64px); }
+/* A LONE body block (the common "title + one short steps/columns/kpi-row" slide)
+ * can't be distributed by space-between — it stays pinned to the top. Centre it
+ * instead so vertical balance actually balances. margin-block:auto absorbs the free
+ * space symmetrically (auto margins win over justify-content). #568 follow-up. */
+.dbx-deck .dbx-balance-body[data-balance="v"] > :only-child,
+.dbx-deck .dbx-balance-body[data-balance="both"] > :only-child { margin-block: auto; }
+.dbx-deck .dbx-balance-body[data-balance="h"], .dbx-deck .dbx-balance-body[data-balance="both"] { align-items: center; text-align: center; }
+/* Bullets: keep markers attached when h-balanced. `align-items: center` already
+ * centers the whole `ul` BOX (it shrinks to its widest line); re-left-aligning the
+ * text inside means each line's `▸` (absolute, left:0 of the li) sits right beside
+ * its text — instead of the line text floating to the box center, away from the
+ * marker. So the list reads as a centered block of left-aligned bullets. */
+.dbx-deck .dbx-balance-body[data-balance="h"] ul, .dbx-deck .dbx-balance-body[data-balance="both"] ul { text-align: left; }
+/* Footer clearance for VERTICAL balance: `space-between` pushes the last body
+ * child flush to the content box's bottom, which sits in the reserved footer band.
+ * When a footer is present, pad the bottom of the balanced body so the last block
+ * stays clear of it (mirrors the matrix's `:has(> .dbx-footer)` clearance). The
+ * `:has()` keys off the footer sibling (a child of .dbx-slide, not .dbx-content).
+ * Modern-Chromium-only — the PDF engine + target browsers support it; absent
+ * support degrades to the un-padded distribution, which still reads fine. */
+.dbx-deck .dbx-slide:has(> .dbx-footer) .dbx-balance-body[data-balance="v"],
+.dbx-deck .dbx-slide:has(> .dbx-footer) .dbx-balance-body[data-balance="both"] { padding-bottom: 40px; }
+/* Re-anchor the asymmetric `lead` measure when h-balanced: its default
+ * `max-width:50ch` is left-pinned, so center it as a block within the now-centered
+ * body region (margin auto belt-and-suspenders alongside the flex `align-items`). */
+.dbx-deck .dbx-balance-body[data-balance="h"] .lead, .dbx-deck .dbx-balance-body[data-balance="both"] .lead { margin-left: auto; margin-right: auto; }
+/* Standardized footer band: a fixed-height row pinned to the bottom so its
+ * baseline is identical slide-to-slide regardless of footer length. The slide's
+ * bottom padding (96px) reserves clearance so content can't overlap it. */
+.dbx-deck .dbx-footer { position: absolute; left: 96px; right: 96px; bottom: 48px; height: 18px; display: flex; align-items: center; font-family: var(--mono); font-size: var(--fs-source); line-height: 1.3; letter-spacing: .02em; color: var(--muted); }
+.dbx-deck .dbx-callout { background: var(--panel); border-left: 4px solid var(--accent); border-radius: 8px; padding: 22px 26px; display: flex; flex-direction: column; gap: 8px; max-width: 64ch; }
+.dbx-deck .dbx-callout-title { font-family: var(--mono); font-size: 13px; letter-spacing: .1em; text-transform: uppercase; color: var(--accent); }
+.dbx-deck .dbx-callout-text { font-size: 22px; line-height: calc(1.45 * var(--fit-lh, 1)); color: var(--fg); text-wrap: pretty; }
+.dbx-deck .dbx-callout-info { border-left-color: var(--accent-2); }
+.dbx-deck .dbx-callout-info .dbx-callout-title { color: var(--accent-2); }
+.dbx-deck .dbx-callout-success { border-left-color: var(--pos); }
+.dbx-deck .dbx-callout-success .dbx-callout-title { color: var(--pos); }
+.dbx-deck .dbx-callout-warn { border-left-color: var(--neg); }
+.dbx-deck .dbx-callout-warn .dbx-callout-title { color: var(--neg); }
+.dbx-deck .dbx-callout-sm { padding: 16px 20px; }
+.dbx-deck .dbx-callout-sm .dbx-callout-text { font-size: 18px; }
+.dbx-deck .dbx-callout-md { /* explicit no-op: md == the base .dbx-callout style (default when size is omitted) */ }
+.dbx-deck .dbx-callout-lg { max-width: 80ch; padding: 28px 32px; }
+.dbx-deck .dbx-callout-lg .dbx-callout-text { font-size: 26px; }
+.dbx-deck .dbx-callout-hero { max-width: none; padding: 40px 48px; gap: 16px; }
+.dbx-deck .dbx-callout-hero .dbx-callout-title { font-size: 15px; }
+.dbx-deck .dbx-callout-hero .dbx-callout-text { font-size: 34px; line-height: 1.3; }
+.dbx-deck .dbx-stat { display: flex; flex-direction: column; gap: 6px; }
+.dbx-deck .dbx-stat-value { font-size: var(--fs-lead); line-height: 1; letter-spacing: -.02em; font-weight: 600; color: var(--fg); font-variant-numeric: tabular-nums lining-nums; }
+.dbx-deck .dbx-stat-delta { font-family: var(--mono); font-size: 18px; color: var(--muted); }
+.dbx-deck .dbx-stat-delta.up { color: var(--pos); }
+.dbx-deck .dbx-stat-delta.up::before { content: "\2191 "; }
+.dbx-deck .dbx-stat-delta.down { color: var(--neg); }
+.dbx-deck .dbx-stat-delta.down::before { content: "\2193 "; }
+.dbx-deck .dbx-stat-label { font-size: 18px; color: var(--muted); line-height: 1.3; }
+.dbx-deck .dbx-stat-sub { font-family: var(--mono); font-size: 16px; color: var(--muted); line-height: 1.3; }
+.dbx-deck .dbx-quote { position: relative; padding-left: 40px; max-width: 40ch; }
+.dbx-deck .dbx-quote::before { content: "\201C"; position: absolute; left: -6px; top: -24px; font-size: 96px; line-height: 1; color: var(--accent); opacity: .35; }
+.dbx-deck .dbx-quote-text { font-size: 32px; line-height: 1.35; color: var(--fg); font-weight: 500; }
+.dbx-deck .dbx-quote-by { display: block; margin-top: 20px; font-family: var(--mono); font-size: 16px; font-style: normal; color: var(--accent-2); }
+.dbx-deck .dbx-divider { border: none; border-top: 1px solid var(--line); width: 100%; margin: 8px 0; }
+/* Matrix block (#277 P0): a grid with RESERVED gutter tracks so axis labels live
+ * in their own cells and never overprint the quadrants or footer.
+ *   col 1 = y-axis label gutter (rotated), col 2 = the 2x2 quadrants
+ *   row 1 = the 2x2 quadrants,            row 2 = x-axis label gutter
+ * The y labels stack top/bottom inside the left gutter; the x labels sit at the
+ * left/right ends of the bottom gutter. No absolute positioning, no overlap.
+ *
+ * Height is CAPPED, not driven by `aspect-ratio` (#277 residual): the grid used
+ * to derive its height from the column width (16/6.5), so a matrix under a
+ * heading+lead grew taller than the content box and its bottom x-axis row spilled
+ * into the reserved footer band (`.dbx-footer` at bottom:48px). `--dbx-matrix-h`
+ * is the total matrix max-height; the grid row is `minmax(0, 1fr)` so it shrinks
+ * to honor the cap instead of overflowing. The cap leaves the whole matrix (grid
+ * + 22px x-axis row + 10px row-gap) inside the content column, well clear of the
+ * footer. When a footer is present the cap tightens (rule below) for extra
+ * clearance; a no-footer matrix keeps the roomier cap so it doesn't look starved. */
+.dbx-deck .dbx-matrix { --dbx-matrix-h: 470px; display: grid; grid-template-columns: 22px 1fr; grid-template-rows: minmax(0, 1fr) 22px; column-gap: 14px; row-gap: 10px; max-height: var(--dbx-matrix-h); width: 100%; }
+.dbx-deck .dbx-matrix-grid { grid-column: 2; grid-row: 1; min-height: 0; display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; gap: 16px; }
+/* Footer present → reserve more room so the x-axis row clears the ~96px footer
+ * band with margin. `:has()` keys off the slide-level footer sibling (the footer
+ * is a child of .dbx-slide, not .dbx-content). Modern-Chromium-only — fine: the
+ * PDF engine + every target browser support it; absent support falls back to the
+ * roomier default cap, which still fits the content box. */
+.dbx-deck .dbx-slide:has(> .dbx-footer) .dbx-matrix { --dbx-matrix-h: 400px; }
+.dbx-deck .dbx-matrix-cell { border: 1px solid var(--line); border-radius: 8px; background: var(--bg-alt); padding: 16px 20px; display: flex; flex-direction: column; justify-content: center; gap: 8px; min-width: 0; overflow: hidden; }
+.dbx-deck .dbx-matrix-qt { font-size: 18px; font-weight: 600; color: var(--accent); }
+.dbx-deck .dbx-matrix-cell ul { gap: 6px; }
+.dbx-deck .dbx-matrix-cell li { font-size: 15px; padding-left: 20px; line-height: 1.3; }
+/* X labels: bottom gutter row, under the quadrants — left/right halves. */
+.dbx-deck .dbx-matrix-xaxis { grid-column: 2; grid-row: 2; display: flex; justify-content: space-between; align-items: center; }
+.dbx-deck .dbx-matrix-xlabel { font-family: var(--mono); font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+/* Y labels: left gutter column, rotated — top/bottom halves. */
+.dbx-deck .dbx-matrix-yaxis { grid-column: 1; grid-row: 1; display: flex; flex-direction: column; justify-content: space-between; align-items: center; }
+.dbx-deck .dbx-matrix-ylabel { writing-mode: vertical-rl; transform: rotate(180deg); font-family: var(--mono); font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.dbx-deck .dbx-timeline { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 24px; position: relative; }
+.dbx-deck .dbx-timeline::before { content: ""; position: absolute; top: 7px; left: 0; right: 0; height: 2px; background: var(--line); }
+.dbx-deck .dbx-tl-item { position: relative; padding-top: 32px; }
+.dbx-deck .dbx-tl-item::before { content: ""; position: absolute; top: 0; left: 0; width: 16px; height: 16px; border-radius: 50%; background: var(--accent); border: 3px solid var(--bg); }
+.dbx-deck .dbx-tl-label { font-family: var(--mono); font-size: 14px; letter-spacing: .08em; text-transform: uppercase; color: var(--accent-2); margin-bottom: 8px; }
+.dbx-deck .dbx-tl-title { font-size: 20px; font-weight: 600; color: var(--fg); margin-bottom: 4px; }
+.dbx-deck .dbx-tl-detail { font-size: 16px; color: var(--muted); line-height: 1.4; }
+/* Equal-width step columns with a uniform gutter. The renderer sets an explicit
+ * `grid-template-columns: repeat(N, 1fr)` so every step gets exactly 1fr and the
+ * 24px gutters are even (the last column has no trailing gutter, matching the
+ * left edge — so the row of steps is symmetric within the content column). */
+.dbx-deck .dbx-steps { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 24px; counter-reset: dbx-step; align-items: start; }
+.dbx-deck .dbx-step { position: relative; padding-top: 56px; }
+.dbx-deck .dbx-step::before { counter-increment: dbx-step; content: counter(dbx-step); position: absolute; top: 0; left: 0; width: 40px; height: 40px; border-radius: 50%; background: var(--accent); color: var(--bg); font-family: var(--mono); font-weight: 600; font-size: 18px; display: grid; place-items: center; }
+.dbx-deck .dbx-step-title { font-size: 21px; font-weight: 600; color: var(--fg); margin-bottom: 6px; text-wrap: balance; }
+.dbx-deck .dbx-step-detail { font-size: 16px; color: var(--muted); line-height: 1.4; text-wrap: pretty; }
+.dbx-deck #dbx-progress { position: fixed; top: 0; left: 0; height: 3px; background: var(--accent); width: 0; z-index: 50; transition: width .35s ease; }
+.dbx-deck #dbx-counter { position: fixed; bottom: 20px; right: 24px; font-family: var(--mono); font-size: 14px; color: var(--muted); z-index: 50; }
+.dbx-deck #dbx-counter b { color: var(--fg); }
+.dbx-deck #dbx-hint { position: fixed; bottom: 20px; left: 24px; font-family: var(--mono); font-size: 12px; color: var(--muted); z-index: 50; }
+.dbx-deck .dbx-navzone { position: fixed; top: 0; bottom: 0; width: 18%; z-index: 40; cursor: pointer; background: transparent; border: 0; padding: 0; appearance: none; }
+.dbx-deck #dbx-navprev { left: 0; }
+.dbx-deck #dbx-navnext { right: 0; }
+.dbx-deck #dbx-notes { position: fixed; left: 0; right: 0; bottom: 0; background: var(--bg-alt); border-top: 1px solid var(--line); padding: 20px 28px; font-size: 16px; color: var(--muted); transform: translateY(100%); transition: transform .3s ease; z-index: 55; max-height: 30vh; overflow: auto; }
+.dbx-deck #dbx-notes.show { transform: translateY(0); }
+.dbx-deck #dbx-notes::before { content: "SPEAKER NOTES"; display: block; font-family: var(--mono); font-size: 11px; letter-spacing: .12em; color: var(--accent); margin-bottom: 8px; }
+.dbx-deck.overview #dbx-stage-wrap { display: none; }
+.dbx-deck #dbx-overview { display: none; position: fixed; inset: 0; background: var(--bg); padding: 40px; overflow: auto; z-index: 60; }
+.dbx-deck.overview #dbx-overview { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px; align-content: start; }
+.dbx-deck .thumb { aspect-ratio: 16/9; border: 2px solid var(--line); border-radius: 8px; overflow: hidden; cursor: pointer; position: relative; background: var(--bg); }
+.dbx-deck .thumb.current { border-color: var(--accent); }
+.dbx-deck .thumb .mini { position: absolute; top: 0; left: 0; width: 1280px; height: 720px; transform: scale(.21875); transform-origin: top left; pointer-events: none; }
+.dbx-deck .thumb .mini .dbx-slide { position: relative; inset: auto; width: 100%; height: 100%; opacity: 1; visibility: visible; transform: none; transition: none; }
+.dbx-deck .thumb .num { position: absolute; top: 6px; left: 8px; font-family: var(--mono); font-size: 11px; color: var(--muted); z-index: 2; }
+@media print {
+  @page { size: 1280px 720px; margin: 0; }
+  html, body { overflow: visible; height: auto; margin: 0; padding: 0; }
+  .dbx-deck { position: static; overflow: visible; height: auto; }
+  .dbx-deck #dbx-stage-wrap { position: static; display: block; }
+  .dbx-deck #dbx-stage { transform: none !important; width: 1280px; height: auto; }
+  .dbx-deck .dbx-slide { position: relative; inset: auto; opacity: 1 !important; visibility: visible !important; transform: none !important; width: 1280px; height: 720px; page-break-inside: avoid; break-inside: avoid; }
+  .dbx-deck .dbx-slide + .dbx-slide { page-break-before: always; break-before: page; }
+  .dbx-deck .fragment { opacity: 1 !important; }
+  .dbx-deck #dbx-progress, .dbx-deck #dbx-counter, .dbx-deck #dbx-hint, .dbx-deck .dbx-navzone, .dbx-deck #dbx-notes, .dbx-deck #dbx-overview { display: none !important; }
+}
+</style>
+</head>
+<body class="dbx-deck">
+<div id="dbx-progress"></div>
+<div id="dbx-counter"><b id="dbx-cur">1</b> / <span id="dbx-total">1</span></div>
+<div id="dbx-hint">← → space · O overview · F fullscreen · S notes · P print</div>
+<button type="button" class="dbx-navzone" id="dbx-navprev" aria-label="Previous slide"></button>
+<button type="button" class="dbx-navzone" id="dbx-navnext" aria-label="Next slide"></button>
+<div id="dbx-stage-wrap"><div id="dbx-stage"></div></div>
+<div id="dbx-overview"></div>
+<div id="dbx-notes"></div>
+
+<script>
+const slides = [{"kicker":"Status readout","notes":"Render with theme: boardroom. Audience: Henry. Framing — this deck measures the project against the build brief (docs are the plan of record), not against a schedule.","blocks":[{"type":"heading","level":1,"text":"desk-standard — status against the roadmap"},{"type":"subtitle","text":"Progress vs. the build brief · v0.4.0 released · 2026-07-17"}]},{"kicker":"Bottom line up front","notes":"The one-slide story. Everything after this is the evidence.","layout":"top","footer":"Plan of record: _meta/build-brief.md §6 (deliverables D1–D9 + 8 acceptance criteria) · epic #1 closed 2026-07-16","fit":"shrink","blocks":[{"type":"heading","level":1,"text":"On plan and shipped — a second format and a launch call remain"},{"type":"subtitle","text":"The brief is essentially delivered; the project has already moved into distribute-and-extend."},{"type":"bullets","items":["**Built to spec** — the defining epic (#1) is closed; all nine deliverables exist, seven of eight criteria proven.","**Then hardened and released** — a field-eval + distribution wave the brief never scoped shipped a live **v0.4.0**.","**One plan-level gap** — the second harness format (OpenCode, {chip.warn:#12}) is not yet productionized.","**One decision blocks launch** — the public install 404s only because the repo is {warn:private}; going public fixes it, no code change."]}]},{"kicker":"The plan of record","notes":"Recap what we committed to, so the scorecards that follow have a yardstick. No timelines were ever in the brief — it is deliverables + mechanically-verifiable acceptance criteria.","layout":"top","footer":"Source: _meta/build-brief.md §3, §6.1 · docs/pocket-librarian-v1-spec.md","fit":"shrink","blocks":[{"type":"heading","level":1,"text":"The brief committed us to two products over one shared schema"},{"type":"bullets","items":["**Product A — the plugin**: a harness-pure `core/` + `mcp/` boundary, wrapped as **two formats** (Claude Code + OpenCode) from one implementation.","**Product B — the pocket-librarian**: a single Go binary (embedded PocketBase, eino loop), six desk tools as both CLI and MCP server, record-original-first.","**The contract — schema v1** both read, personalized only through `_knowledge/profile.yaml`.","**The hard rule — identity-neutrality as a required CI check**: no name/org/repo/issue token ships except as a `{{profile.…}}` placeholder.","Scored on **9 deliverables + 8 mechanically-verifiable criteria** — no dates, by design."]}]},{"kicker":"Scorecard — deliverables","notes":"D1–D9 are the concrete artifacts. Every one exists. The single caveat is D4: the OpenCode adapter is built and unit-tested, but the fully-productionized dual-format instance is the open #12.","layout":"top","footer":"Against build-brief §6.1 · all nine directories/artifacts exist on main, CI-green","fit":"shrink","blocks":[{"type":"heading","level":1,"text":"All nine deliverables are built — one still needs to ship as a second format"},{"type":"table","head":["#","Deliverable","Status"],"rows":[["D1","schema/ — schema v1 + profile block","{chip.ok:Done}"],["D2","plugin/core/ — harness-pure domain library","{chip.ok:Done}"],["D3","plugin/mcp/ — shared MCP tool boundary","{chip.ok:Done}"],["D4","plugin/opencode/ — OpenCode adapter","{chip.warn:Built, not shipped (#12)}"],["D5","plugin/claude-plugin/ — Claude Code adapter","{chip.ok:Done + distributed}"],["D6","librarian/ — pocket-librarian, 6 tools, safety boundary","{chip.ok:Done (v0.4.0)}"],["D7","shared profile / _knowledge substitution loader","{chip.ok:Done}"],["D8","neutrality lint wired as a required CI check","{chip.ok:Done}"],["D9","README naming both formats + fidelity losses","{chip.ok:Done}"]]}]},{"kicker":"Scorecard — acceptance criteria","notes":"Seven of eight criteria are fully proven in CI. Criterion 1 is the only partial: proven end-to-end for Claude Code (validate + smoke + a live marketplace install), with the OpenCode instance pending #12.","layout":"top","footer":"Against build-brief §6.2 · verify.sh (47 checks) + bun (45 tests) now run in CI and the release gate","fit":"shrink","blocks":[{"type":"heading","level":1,"text":"Seven of eight acceptance criteria are fully proven; the eighth waits on OpenCode"},{"type":"table","head":["Acceptance criterion","Status"],"rows":[["1 · Both harness formats load without double-registering","{chip.warn:Claude proven; OpenCode pending (#12)}"],["2 · core/ is harness-pure (import lint)","{chip.ok:Met}"],["3 · One shared MCP surface, no duplicated capability","{chip.ok:Met}"],["4 · Librarian builds + verify gate + rebuild-from-scratch checksums","{chip.ok:Met}"],["5 · Neutrality lint fails on a seeded identifier, zero on clean","{chip.ok:Met}"],["6 · Stranger test — profile-driven, no edits to shipped defs","{chip.ok:Met}"],["7 · Fail-loud substitution on a missing required key","{chip.ok:Met}"],["8 · Profile validates against schema v1","{chip.ok:Met}"]]}]},{"kicker":"Beyond the plan","notes":"This is the part a pure plan-vs-actual read misses: after the spec build closed, a large second wave neither the brief nor the epic scoped took the project from 'compiles to spec' to 'released and operable'. Worth calling out because it is most of the elapsed work.","layout":"top","footer":"Issues #13–#18, #20, #23, #25, #27, #31 · ADRs 0001–0003 · PRs #21–#33","fit":"shrink","blocks":[{"type":"heading","level":1,"text":"Most work since the epic was hardening and distribution the brief never scoped"},{"type":"bullets","items":["**Field-eval hardening (#13–#18)** — record-original-first no longer caps at 5 KB, patrol resolves stale findings, orphan-noise + rule-severity fixes.","**Multi-desk topology (ADR 0002 → #23)** — XDG canonical store home, fail-closed store location, and a desk open-guard so a store can't be opened under the wrong desk.","**Store self-initialization (ADR 0003 → #31)** — tool commands auto-migrate a fresh store; no manual `migrate up` first-run papercut.","**Distribution substrate (#7, #25, #27)** — a `curl`-able `install.sh` with sha256 verification, SHA-pinned GitHub Actions, a `VERSION`-driven release pipeline, three user guides + recorded demos.","**Released v0.4.0** — four platform binaries + checksums + plugin bundle, and the full integration suite now runs in CI and the release gate."]}]},{"kicker":"Where we stand","notes":"Snapshot of the current state in numbers. The marketplace install is proven end-to-end for Claude Code.","layout":"top","footer":"main is CI-green · install: claude plugin marketplace add hsb3/desk-standard → install desk-standard@desk-standard","blocks":[{"type":"heading","level":1,"text":"v0.4.0 is released, CI-green, and installable today for Claude Code"},{"type":"columns","columns":[[{"type":"stat","value":"v0.4.0","label":"released","sub":"4 binaries + plugin bundle"}],[{"type":"stat","value":"17 / 22","label":"issues closed","sub":"5 open, all build work"}],[{"type":"stat","value":"92","label":"automated checks","sub":"47 verify + 45 bun tests"}],[{"type":"stat","value":"3","label":"ADRs recorded","sub":"all rulings in"}]]},{"type":"callout","variant":"success","title":"Proven end-to-end","text":"The darwin/arm64 binary downloads, runs, reports v0.4.0, and its sha256 matches the published checksums."}]},{"kicker":"The one blocker","notes":"This is the only thing standing between us and the public install story. It is not a bug — install.sh is correct. Every unauthenticated URL the public flow needs 404s only because the repo is private. Making the repo public resolves all of them with zero code change. If it must stay private, install.sh would need token/gh auth (a design change).","layout":"top","footer":"Incident log 2026-07-17 · authed gh release download confirms the assets are valid — the gap is purely visibility","fit":"shrink","blocks":[{"type":"heading","level":1,"text":"The public install path is blocked only by repo visibility, not by code"},{"type":"bullets","items":["The public `curl | bash` flow fetches `install.sh`, `/releases/latest`, and `/releases/download/…` — all **404 while the repo is {warn:private}**.","install.sh's URL construction and checksum logic are **proven correct**: its URLs are byte-identical to the API's `browser_download_url`, and the authenticated download verifies.","The **only** missing link is the unauthenticated HTTP fetch — i.e. repo visibility."]},{"type":"callout","variant":"warn","title":"Decision needed","text":"Make the repo public to unblock #7 (no code change), or add token/gh auth to install.sh if it stays private."}]},{"kicker":"Backlog","notes":"Ranked. #12 is the last piece of the original plan; the rest are follow-ups and extensions. #36 (SOP template library) was just filed and is explicitly a next-major-bump item.","layout":"top","footer":"GitHub: hsb3/desk-standard · 5 open issues · no ruling gates the buildable ones","blocks":[{"type":"heading","level":1,"text":"Five issues open — one closes the plan, the rest harden and extend"},{"type":"table","head":["Issue","What it is","Kind"],"rows":[["#12","Dual-format OpenCode instance from the common core","Plan gap · needs ruling"],["#34","Enforce shellcheck / actionlint / SHA-pin drift in CI","Hardening"],["#35","Unit-test self-init + TS MCP server behaviour","Coverage"],["#19","PocketBase-served webapp chat surface","Deferred (ADR 0001)"],["#36","Template SOP library — full ~20-type set","Extension · v-next major"]]}]},{"kicker":"Verdict","notes":"The honest answer to 'how are we doing against the plan': the plan is essentially met and we have already gone further than it in the directions that matter for a real launch. The remaining plan item is the second format.","layout":"top","footer":"No timelines by design — the brief is scored on deliverables + criteria, not a schedule","blocks":[{"type":"heading","level":1,"text":"Ahead of the brief on delivery — the roadmap is now launch, not build"},{"type":"bullets","items":["**Against the brief: delivered.** Epic closed, nine deliverables built, seven of eight criteria proven — plus a released binary the brief never asked for.","**The one open commitment** is the second harness format (OpenCode, #12) — architectural, and it wants an OpenCode-target ruling before fan-out.","**Phase shift.** The project is past 'build to spec' and into distribute-and-extend: launch (go public), the second format (#12), and the SOP template library (#36).","**Health is good** — all design rulings are in (three ADRs), main is CI-green, and everything still open is pure build work, not unresolved questions."]}]},{"kicker":"Decisions to unblock","notes":"Close on the three calls only Henry can make. The first is the highest-leverage and needs no engineering.","blocks":[{"type":"heading","level":1,"text":"Three calls to make"},{"type":"bullets","items":["**Go public?** — unblocks the public `curl | bash` install, closing #7's last criterion. No code change.","**OpenCode-target ruling** — the shape of the second format, so #12 can fan out and the last plan item lands.","**#36 SOP library direction** — vendor-vs-sync and type↔classification, scoped as the next major bump."]},{"type":"callout","variant":"accent","title":"The through-line","text":"The build is done and shipped; what is left is deciding how far to open it and how far to extend it."}]}];
+const REPO = "hsb3/desk-standard";
+
+const esc = (s) => s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+// GitHub "owner/name" for #123 issue auto-linking (injected as REPO; "" when unset).
+const ISSUE_REPO = (typeof REPO !== "undefined" && REPO) ? REPO : "";
+// Per-slide auto-fit (#564). Index-aligned with `slides`; 1 = no change. The
+// renderer applies them to each slide's .dbx-content (scale + line-height). The
+// server injects real values only when a fit was opted in (slide fit:"shrink" /
+// export autofit:true); otherwise these stay all-1 and the deck is unchanged.
+const FIT_SCALES = (typeof FIT_SCALES_INJECT !== "undefined" && FIT_SCALES_INJECT) || slides.map(() => 1);
+const FIT_LH = (typeof FIT_LH_INJECT !== "undefined" && FIT_LH_INJECT) || slides.map(() => 1);
+// Inline markup:
+//   `code`  **bold**  {accent|warn|ok|info:text}  {chip.ok|warn|info|accent:text}
+//   [text](url)  bare http(s):// URLs  #123 (issue link when repo set)
+// Links emit <a href> so Chromium print-to-PDF turns them into clickable PDF
+// annotations. `&amp;` (from esc) is allowed in URLs so query strings survive.
+const inlineHTML = (s) => {
+  let h = esc(s)
+    .replace(/`([^`]+)`/g, "<code>$1</code>")
+    .replace(/\{chip\.(ok|warn|info|accent):([^}]+)\}/g, '<span class="dbx-chip dbx-chip-$1">$2</span>')
+    .replace(/\{(accent|warn|ok|info):([^}]+)\}/g, '<span class="sem-$1">$2</span>')
+    .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
+    // [text](url) → clickable link. Runs before bare-URL autolink so the URL
+    // inside the parens isn't re-linked.
+    .replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a class="dbx-link" href="$2">$1</a>')
+    // Bare http(s):// URL → clickable link. The negative lookbehind for (" >)
+    // skips URLs already inside an href="…" or as a markdown-link target so they
+    // aren't double-wrapped. Trailing . , ; : ) are left outside the link.
+    .replace(/(?<![">(])\bhttps?:\/\/[^\s<]+[^\s<.,;:)]/g, '<a class="dbx-link" href="$&">$&</a>');
+  // Full owner/repo#123 refs linkify UNCONDITIONALLY (#589) — the target repo is
+  // explicit, so no REPO arg is needed. Runs before the bare-#N pass; the bare
+  // regex can't re-match inside the emitted anchor text (the char before # is a
+  // word char), and the lookbehind skips refs inside URLs/paths (preceded by /).
+  h = h.replace(/(?<![\w/&.-])([A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?\/[A-Za-z0-9._-]+)#(\d+)\b/g, '<a class="dbx-link" href="https://github.com/$1/issues/$2">$1#$2</a>');
+  if (ISSUE_REPO) h = h.replace(/(?<![\w&])#(\d+)\b/g, '<a class="dbx-link" href="https://github.com/' + ISSUE_REPO + '/issues/$1">#$1</a>');
+  return h;
+};
+
+// Build one block element. ctx = { staged, isStatic, frag:{n} }. `staged`
+// gates fragment numbering: false inside columns, so nested reveal bullets
+// render whole.
+// --- Native charts (#585) ---------------------------------------------------
+// bar | line | donut rendered as inline SVG from a plain number array, colored
+// by the theme CSS variables. Deliberately minimal: no ticks, no grids, no axes.
+const CHART_PALETTE = ["var(--accent)", "var(--accent-2)", "var(--pos)", "var(--neg)", "var(--muted)"];
+function svgNode(tag, attrs) {
+  const el = document.createElementNS("http://www.w3.org/2000/svg", tag);
+  for (const k in attrs) el.setAttribute(k, String(attrs[k]));
+  return el;
+}
+function chartNum(v) {
+  return Number.isFinite(v) ? (Number.isInteger(v) ? v.toLocaleString("en-US") : String(v)) : "";
+}
+function buildChartEl(b) {
+  const wrap = document.createElement("div");
+  wrap.className = "dbx-chart";
+  wrap.setAttribute("data-kind", b.kind);
+  wrap.setAttribute("role", "img");
+  const labels = b.labels || [];
+  wrap.setAttribute("aria-label", b.kind + " chart" + (labels.length ? ": " + labels.join(", ") : ""));
+  const data = b.data.map(Number);
+
+  if (b.kind === "donut") {
+    // Share-of-total ring (negative values are clamped to 0 for shares) + an
+    // HTML legend. Segments use the stroke-dasharray technique: dashoffset
+    // C/4 - cumulative starts each arc at 12 o'clock and proceeds clockwise.
+    const SIZE = 220, R = 78, SW = 36, C = 2 * Math.PI * R;
+    const total = data.reduce((a, v) => a + Math.max(0, v), 0) || 1;
+    const svg = svgNode("svg", { viewBox: "0 0 " + SIZE + " " + SIZE, class: "dbx-donut-ring" });
+    let cum = 0;
+    data.forEach((v, i) => {
+      const frac = Math.max(0, v) / total;
+      if (frac <= 0) return;
+      svg.appendChild(svgNode("circle", {
+        cx: SIZE / 2, cy: SIZE / 2, r: R, fill: "none",
+        stroke: CHART_PALETTE[i % CHART_PALETTE.length],
+        "stroke-width": SW,
+        "stroke-dasharray": (frac * C) + " " + (C - frac * C),
+        "stroke-dashoffset": C * 0.25 - cum * C,
+      }));
+      cum += frac;
+    });
+    wrap.appendChild(svg);
+    const legend = document.createElement("div"); legend.className = "dbx-chart-legend";
+    data.forEach((v, i) => {
+      const row = document.createElement("div"); row.className = "dbx-chart-legend-row";
+      const sw = document.createElement("span"); sw.className = "dbx-chart-swatch";
+      sw.style.background = CHART_PALETTE[i % CHART_PALETTE.length]; row.appendChild(sw);
+      const lab = document.createElement("span"); lab.className = "dbx-chart-legend-label";
+      lab.innerHTML = inlineHTML(labels[i] || "Series " + (i + 1)); row.appendChild(lab);
+      const val = document.createElement("span"); val.className = "dbx-chart-legend-value";
+      val.textContent = chartNum(v) + " \u00b7 " + Math.round((Math.max(0, v) / total) * 100) + "%"; row.appendChild(val);
+      legend.appendChild(row);
+    });
+    wrap.appendChild(legend);
+    return wrap;
+  }
+
+  // bar + line share the frame: 720x300 viewBox, value labels above each
+  // point, optional labels below, a hairline on the zero baseline. A negative
+  // bar's value renders BELOW its end (yv + 20), so when the series dips
+  // negative the label row needs an extra band — otherwise the deepest bar's
+  // value collides with its x-label (QA'd 2026-06-11 on a net-velocity series).
+  const hasNeg = data.some((v) => v < 0);
+  const PAD_B_BASE = labels.length ? 36 : 14;
+  const W = 720, H = 300, PAD_T = 30, PAD_B = hasNeg && labels.length ? PAD_B_BASE + 20 : PAD_B_BASE, PAD_X = 10;
+  const plotH = H - PAD_T - PAD_B;
+  const lo = Math.min(0, Math.min.apply(null, data));
+  const hi = Math.max(0, Math.max.apply(null, data));
+  const span = hi - lo || 1;
+  const yOf = (v) => PAD_T + (1 - (v - lo) / span) * plotH;
+  const svg = svgNode("svg", { viewBox: "0 0 " + W + " " + H, preserveAspectRatio: "xMidYMid meet" });
+  svg.appendChild(svgNode("line", { x1: PAD_X, x2: W - PAD_X, y1: yOf(0), y2: yOf(0), class: "dbx-chart-baseline" }));
+  const n = data.length;
+
+  if (b.kind === "bar") {
+    const slot = (W - PAD_X * 2) / n;
+    const bw = Math.min(slot * 0.62, 110);
+    data.forEach((v, i) => {
+      const cx = PAD_X + slot * i + slot / 2;
+      const y0 = yOf(0), yv = yOf(v);
+      svg.appendChild(svgNode("rect", {
+        x: cx - bw / 2, y: Math.min(y0, yv), width: bw,
+        height: Math.max(Math.abs(y0 - yv), 2), class: "dbx-chart-bar",
+      }));
+      const val = svgNode("text", { x: cx, y: v < 0 ? yv + 20 : yv - 10, class: "dbx-chart-value" });
+      val.textContent = chartNum(v); svg.appendChild(val);
+      if (labels[i]) { const lab = svgNode("text", { x: cx, y: H - 12, class: "dbx-chart-label" }); lab.textContent = labels[i]; svg.appendChild(lab); }
+    });
+  } else {
+    const xOf = (i) => (n === 1 ? W / 2 : PAD_X + 26 + (W - (PAD_X + 26) * 2) * (i / (n - 1)));
+    svg.appendChild(svgNode("polyline", {
+      points: data.map((v, i) => xOf(i) + "," + yOf(v)).join(" "),
+      class: "dbx-chart-line-path", fill: "none",
+    }));
+    data.forEach((v, i) => {
+      const cx = xOf(i);
+      svg.appendChild(svgNode("circle", { cx: cx, cy: yOf(v), r: 5, class: "dbx-chart-dot" }));
+      const val = svgNode("text", { x: cx, y: yOf(v) - 12, class: "dbx-chart-value" });
+      val.textContent = chartNum(v); svg.appendChild(val);
+      if (labels[i]) { const lab = svgNode("text", { x: cx, y: H - 12, class: "dbx-chart-label" }); lab.textContent = labels[i]; svg.appendChild(lab); }
+    });
+  }
+  wrap.appendChild(svg);
+  return wrap;
+}
+
+function buildBlockEl(b, ctx) {
+  if (b.type === "heading") {
+    const h = document.createElement((b.level ?? 2) === 1 ? "h1" : "h2");
+    h.innerHTML = inlineHTML(b.text); return h;
+  } else if (b.type === "lead") {
+    const p = document.createElement("p"); p.className = "lead"; p.innerHTML = inlineHTML(b.text); return p;
+  } else if (b.type === "subtitle") {
+    const p = document.createElement("p"); p.className = "dbx-subtitle"; p.innerHTML = inlineHTML(b.text); return p;
+  } else if (b.type === "bullets") {
+    const ul = document.createElement("ul");
+    for (const item of b.items) {
+      const li = document.createElement("li"); li.innerHTML = inlineHTML(item);
+      if (ctx.staged && b.reveal) { li.classList.add("fragment"); li.dataset.frag = String(ctx.frag.n++); if (ctx.isStatic) li.classList.add("fragmentVisible"); }
+      ul.appendChild(li);
+    }
+    return ul;
+  } else if (b.type === "code") {
+    const pre = document.createElement("pre"); const code = document.createElement("code");
+    code.textContent = b.code; pre.appendChild(code); return pre;
+  } else if (b.type === "table") {
+    const t = document.createElement("table");
+    const thead = document.createElement("thead"); const htr = document.createElement("tr");
+    for (const h of b.head) { const th = document.createElement("th"); th.textContent = h; htr.appendChild(th); }
+    thead.appendChild(htr); t.appendChild(thead);
+    const tbody = document.createElement("tbody");
+    for (const row of b.rows) {
+      const tr = document.createElement("tr");
+      for (const cell of row) { const td = document.createElement("td"); td.innerHTML = inlineHTML(cell); tr.appendChild(td); }
+      tbody.appendChild(tr);
+    }
+    t.appendChild(tbody); return t;
+  } else if (b.type === "image") {
+    const img = document.createElement("img"); img.src = b.src; img.alt = b.alt || "";
+    img.style.maxHeight = (b.maxHeight || 460) + "px"; img.style.maxWidth = "100%"; img.style.borderRadius = "8px";
+    return img;
+  } else if (b.type === "svg") {
+    const d = document.createElement("div"); d.className = "dbx-svg";
+    d.setAttribute("role", "img"); d.setAttribute("aria-label", b.alt || ""); d.innerHTML = b.svg;
+    return d;
+  } else if (b.type === "chart") {
+    return buildChartEl(b);
+  } else if (b.type === "callout") {
+    const d = document.createElement("div"); d.className = "dbx-callout" + (b.variant ? " dbx-callout-" + b.variant : "") + (b.size ? " dbx-callout-" + b.size : "");
+    if (b.title) { const t = document.createElement("div"); t.className = "dbx-callout-title"; t.innerHTML = inlineHTML(b.title); d.appendChild(t); }
+    const tx = document.createElement("div"); tx.className = "dbx-callout-text"; tx.innerHTML = inlineHTML(b.text); d.appendChild(tx);
+    return d;
+  } else if (b.type === "stat") {
+    const d = document.createElement("div"); d.className = "dbx-stat";
+    const v = document.createElement("div"); v.className = "dbx-stat-value"; v.innerHTML = inlineHTML(b.value); d.appendChild(v);
+    if (b.delta) { const dl = document.createElement("div"); dl.className = "dbx-stat-delta" + (b.trend ? " " + b.trend : ""); dl.innerHTML = inlineHTML(b.delta); d.appendChild(dl); }
+    if (b.sub) { const su = document.createElement("div"); su.className = "dbx-stat-sub"; su.innerHTML = inlineHTML(b.sub); d.appendChild(su); }
+    if (b.label) { const l = document.createElement("div"); l.className = "dbx-stat-label"; l.innerHTML = inlineHTML(b.label); d.appendChild(l); }
+    return d;
+  } else if (b.type === "quote") {
+    const bq = document.createElement("blockquote"); bq.className = "dbx-quote";
+    const p = document.createElement("p"); p.className = "dbx-quote-text"; p.innerHTML = inlineHTML(b.text); bq.appendChild(p);
+    if (b.attribution) { const c = document.createElement("cite"); c.className = "dbx-quote-by"; c.innerHTML = inlineHTML(b.attribution); bq.appendChild(c); }
+    return bq;
+  } else if (b.type === "divider") {
+    const hr = document.createElement("hr"); hr.className = "dbx-divider"; return hr;
+  } else if (b.type === "matrix") {
+    // Grid with reserved gutter tracks (#277 P0): y labels in the left gutter
+    // column, x labels in the bottom gutter row, quadrants in the main cell.
+    // Each axis lives in its own wrapper so labels never overprint the grid.
+    const d = document.createElement("div"); d.className = "dbx-matrix";
+    if (b.yAxis) {
+      const ya = document.createElement("div"); ya.className = "dbx-matrix-yaxis";
+      const yt = document.createElement("span"); yt.className = "dbx-matrix-ylabel"; yt.textContent = b.yAxis[0]; ya.appendChild(yt);
+      const yb = document.createElement("span"); yb.className = "dbx-matrix-ylabel"; yb.textContent = b.yAxis[1]; ya.appendChild(yb);
+      d.appendChild(ya);
+    }
+    const grid = document.createElement("div"); grid.className = "dbx-matrix-grid";
+    for (const q of b.quadrants) {
+      const cell = document.createElement("div"); cell.className = "dbx-matrix-cell";
+      if (q.title) { const qt = document.createElement("div"); qt.className = "dbx-matrix-qt"; qt.innerHTML = inlineHTML(q.title); cell.appendChild(qt); }
+      if (q.items && q.items.length) { const ul = document.createElement("ul"); for (const it of q.items) { const li = document.createElement("li"); li.innerHTML = inlineHTML(it); ul.appendChild(li); } cell.appendChild(ul); }
+      grid.appendChild(cell);
+    }
+    d.appendChild(grid);
+    if (b.xAxis) {
+      const xa = document.createElement("div"); xa.className = "dbx-matrix-xaxis";
+      const xl = document.createElement("span"); xl.className = "dbx-matrix-xlabel"; xl.textContent = b.xAxis[0]; xa.appendChild(xl);
+      const xr = document.createElement("span"); xr.className = "dbx-matrix-xlabel"; xr.textContent = b.xAxis[1]; xa.appendChild(xr);
+      d.appendChild(xa);
+    }
+    return d;
+  } else if (b.type === "timeline") {
+    const d = document.createElement("div"); d.className = "dbx-timeline";
+    for (const m of b.milestones) {
+      const item = document.createElement("div"); item.className = "dbx-tl-item";
+      const lab = document.createElement("div"); lab.className = "dbx-tl-label"; lab.innerHTML = inlineHTML(m.label); item.appendChild(lab);
+      if (m.title) { const t = document.createElement("div"); t.className = "dbx-tl-title"; t.innerHTML = inlineHTML(m.title); item.appendChild(t); }
+      if (m.detail) { const dt = document.createElement("div"); dt.className = "dbx-tl-detail"; dt.innerHTML = inlineHTML(m.detail); item.appendChild(dt); }
+      d.appendChild(item);
+    }
+    return d;
+  } else if (b.type === "steps") {
+    const d = document.createElement("div"); d.className = "dbx-steps";
+    // Explicit equal columns (one 1fr per step) + a column-count signal, so the
+    // gutters are uniform and the row is symmetric within the content column.
+    d.dataset.steps = String(b.steps.length);
+    d.style.gridTemplateColumns = "repeat(" + b.steps.length + ", 1fr)";
+    for (const s of b.steps) {
+      const step = document.createElement("div"); step.className = "dbx-step";
+      const t = document.createElement("div"); t.className = "dbx-step-title"; t.innerHTML = inlineHTML(s.title); step.appendChild(t);
+      if (s.detail) { const dt = document.createElement("div"); dt.className = "dbx-step-detail"; dt.innerHTML = inlineHTML(s.detail); step.appendChild(dt); }
+      d.appendChild(step);
+    }
+    return d;
+  } else if (b.type === "columns") {
+    const wrap = document.createElement("div"); wrap.className = "columns";
+    wrap.dataset.cols = String(b.columns.length);
+    wrap.style.gridTemplateColumns = "repeat(" + b.columns.length + ", 1fr)";
+    for (const col of b.columns) {
+      const cdiv = document.createElement("div"); cdiv.className = "column";
+      for (const cb of col) { const el = buildBlockEl(cb, { staged: false, isStatic: ctx.isStatic, frag: ctx.frag }); if (el) cdiv.appendChild(el); }
+      wrap.appendChild(cdiv);
+    }
+    return wrap;
+  }
+  return null;
+}
+
+function buildSlide(slide, isStatic, fitIndex) {
+  const sec = document.createElement("section");
+  sec.className = "dbx-slide";
+  // Flow content lives in a wrapper so the fit shrink (#564, `zoom`-based — see
+  // the .dbx-content rule) hits ONLY the content — the footer (a direct child
+  // of .dbx-slide, absolutely positioned)
+  // and the fixed canvas/chrome stay put. data-layout moves to the wrapper (the
+  // flex column). buildSlide stays render-target-agnostic: the wrapper exists in
+  // both screen + print + PDF; --fit-scale/--fit-lh default to 1 unless a fit
+  // entry applies, so an un-fitted deck is visually unchanged.
+  const content = document.createElement("div");
+  content.className = "dbx-content";
+  if (slide.layout) content.dataset.layout = slide.layout;
+  // Whitespace-balance frame (#568): orthogonal to layout, and TITLE-AWARE. When
+  // `balance` is "v"/"h"/"both" the leading heading (and the slide kicker) stay
+  // pinned top-left as a fixed header; ONLY the body blocks beneath the title are
+  // distributed/centered, inside a `.dbx-balance-body` sub-region that carries
+  // `data-balance`. "none"/absent → no sub-region, flat content, `layout` alone
+  // governs (byte-identical to pre-#568). `data-balance` lives on .dbx-content too
+  // (drives `justify-content: flex-start` so the header pins to the top) AND on the
+  // body region (drives the distribution). Coexists with the #564 fit transform.
+  const balanced = slide.balance && slide.balance !== "none";
+  if (balanced) content.dataset.balance = slide.balance;
+  // Per-slide fit (scale + line-height tightening). FIT_SCALES / FIT_LH are
+  // index-aligned arrays injected alongside `slides` (1 = no change). Applied
+  // only when present and < 1 so the default path writes nothing.
+  if (typeof fitIndex === "number") {
+    const fs = (typeof FIT_SCALES !== "undefined" && FIT_SCALES[fitIndex]) || 1;
+    const flh = (typeof FIT_LH !== "undefined" && FIT_LH[fitIndex]) || 1;
+    if (fs && fs < 1) content.style.setProperty("--fit-scale", String(fs));
+    if (flh && flh < 1) content.style.setProperty("--fit-lh", String(flh));
+  }
+  const ctx = { staged: true, isStatic, frag: { n: 0 } };
+  // The kicker is slide-level metadata — it always pins top-left (header region),
+  // never enters the balanced body.
+  if (slide.kicker) { const d = document.createElement("div"); d.className = "kicker"; d.textContent = slide.kicker; content.appendChild(d); }
+  const blocks = slide.blocks;
+  // Title-aware balance (#568): if balanced AND the first block is a heading, that
+  // leading heading stays in the header region (top-left, alongside the kicker);
+  // the REMAINING blocks go into a `.dbx-balance-body` flex region that runs the
+  // distribution. A non-leading heading is an ordinary body block. When NOT
+  // balanced (or no leading heading) the flat path is unchanged.
+  const leadingHeadingIdx = balanced && blocks.length && blocks[0] && blocks[0].type === "heading" ? 0 : -1;
+  if (balanced) {
+    if (leadingHeadingIdx === 0) { const el = buildBlockEl(blocks[0], ctx); if (el) content.appendChild(el); }
+    const body = document.createElement("div");
+    body.className = "dbx-balance-body";
+    body.dataset.balance = slide.balance;
+    for (let i = leadingHeadingIdx + 1; i < blocks.length; i++) { const el = buildBlockEl(blocks[i], ctx); if (el) body.appendChild(el); }
+    content.appendChild(body);
+  } else {
+    for (const b of blocks) { const el = buildBlockEl(b, ctx); if (el) content.appendChild(el); }
+  }
+  sec.appendChild(content);
+  if (slide.footer) { const f = document.createElement("footer"); f.className = "dbx-footer"; f.innerHTML = inlineHTML(slide.footer); sec.appendChild(f); }
+  sec.dataset.frags = String(ctx.frag.n);
+  return sec;
+}
+
+const stage = document.getElementById("dbx-stage");
+const overview = document.getElementById("dbx-overview");
+const notesEl = document.getElementById("dbx-notes");
+const progress = document.getElementById("dbx-progress");
+const curEl = document.getElementById("dbx-cur");
+document.getElementById("dbx-total").textContent = slides.length;
+
+const els = slides.map((s, k) => { const el = buildSlide(s, false, k); stage.appendChild(el); return el; });
+let index = 0, step = 0;
+const clamp = (n) => Math.max(0, Math.min(slides.length - 1, n));
+const frags = (i) => parseInt(els[i].dataset.frags, 10);
+
+function render() {
+  els.forEach((el, k) => { el.classList.toggle("active", k === index); el.classList.toggle("prev", k < index); });
+  els[index].querySelectorAll(".fragment").forEach((li) => { li.classList.toggle("fragmentVisible", parseInt(li.dataset.frag, 10) < step); });
+  progress.style.width = (slides.length > 1 ? index / (slides.length - 1) * 100 : 100) + "%";
+  curEl.textContent = index + 1;
+  notesEl.textContent = slides[index].notes || "—";
+  document.querySelectorAll(".thumb").forEach((t, k) => t.classList.toggle("current", k === index));
+}
+function goto(n, atStep) { index = clamp(n); step = atStep || 0; location.hash = "/" + (index + 1); render(); }
+function next() { if (step < frags(index)) { step++; render(); } else if (index < slides.length - 1) goto(index + 1, 0); }
+function prev() { if (step > 0) { step--; render(); } else if (index > 0) goto(index - 1, frags(index - 1)); }
+
+window.addEventListener("keydown", (e) => {
+  if (document.body.classList.contains("overview") && !["o","O","Escape"].includes(e.key)) return;
+  switch (e.key) {
+    case "ArrowRight": case " ": case "PageDown": e.preventDefault(); next(); break;
+    case "ArrowLeft": case "PageUp": e.preventDefault(); prev(); break;
+    case "Home": goto(0, 0); break;
+    case "End": goto(slides.length - 1, 0); break;
+    case "f": case "F": document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen(); break;
+    case "s": case "S": notesEl.classList.toggle("show"); break;
+    case "p": case "P": window.print(); break;
+    case "o": case "O": case "Escape": toggleOverview(); break;
+  }
+});
+document.getElementById("dbx-navnext").onclick = next;
+document.getElementById("dbx-navprev").onclick = prev;
+
+let x0 = null;
+window.addEventListener("touchstart", (e) => x0 = e.touches[0].clientX);
+window.addEventListener("touchend", (e) => { if (x0 === null) return; const dx = e.changedTouches[0].clientX - x0; if (Math.abs(dx) > 50) (dx < 0 ? next : prev)(); x0 = null; });
+
+// Thumbnails are static once built, so build them lazily on first open and
+// keep the DOM — toggling overview no longer rebuilds every slide. render()
+// keeps the .current highlight in sync from the live `index`.
+let overviewBuilt = false;
+function buildOverview() {
+  if (overviewBuilt) return;
+  slides.forEach((s, k) => {
+    const t = document.createElement("div"); t.className = "thumb";
+    const mini = document.createElement("div"); mini.className = "mini"; mini.appendChild(buildSlide(s, true, k)); t.appendChild(mini);
+    const num = document.createElement("div"); num.className = "num"; num.textContent = k + 1; t.appendChild(num);
+    t.onclick = () => { index = k; step = 0; toggleOverview(); };
+    overview.appendChild(t);
+  });
+  overviewBuilt = true;
+}
+function toggleOverview() {
+  document.body.classList.toggle("overview");
+  if (document.body.classList.contains("overview")) { buildOverview(); render(); }
+  else { location.hash = "/" + (index + 1); render(); }
+}
+function fit() { const s = Math.min(window.innerWidth / 1280, window.innerHeight / 720); stage.style.transform = "scale(" + s + ")"; }
+function fromHash() { const m = location.hash.match(/\/(\d+)/); if (m) { index = clamp(parseInt(m[1], 10) - 1); step = 0; } }
+window.addEventListener("resize", fit);
+window.addEventListener("hashchange", () => { fromHash(); render(); });
+fit(); fromHash(); render();
+</script>
+</body>
+</html>
+

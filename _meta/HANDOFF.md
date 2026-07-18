@@ -45,16 +45,33 @@ public** (a deliberate launch decision — not taken autonomously). No code chan
 same URLs resolve the moment the repo is public. If it must stay private, install.sh would need
 token/`gh` auth instead (design change).
 
+**ON HOLD (Henry, 2026-07-17): going public AND OpenCode are both parked until Henry is
+satisfied with how the current build works in practice.** So #7's public-launch step (make the
+repo public) and #12 (the OpenCode second format) are deliberately deferred — the near-term
+focus is dogfooding/stabilizing the shipped Claude-Code v0.4.0, not opening or extending it. Do
+not action either without Henry's go-ahead. Buildable-but-safe follow-ups (#34 CI hardening,
+#35 coverage) can still proceed.
+
 Open backlog, ranked (no ruling gates the buildable ones):
 - **#12** — dual-format common-core fan-out (Claude + OpenCode instances; consumes
   `bun run package` as the seed). Architectural — likely needs an OpenCode-target ruling
-  before fan-out; scope as its own phased effort, not a flat wave.
+  before fan-out; scope as its own phased effort, not a flat wave. **ON HOLD (see above).**
 - **#34** — CI hardening: enforce shellcheck (incl. `install.sh`), actionlint, and a SHA-pin
   drift guard in CI (all exist locally/pre-commit but not in the pipeline). Follow-up from the
   release-prep audit.
 - **#35** — test coverage: unit-test `requireConfig` self-init for non-`query` commands +
   a behavioral test for the TS MCP server. Follow-up from the release-prep audit.
 - **#19** — PB-served webapp chat surface (deferred interactive follow-on; ADR 0001).
+- **#36** — Template SOP library (v-next **major**): grow the embedded template set from the
+  current 2 fixer templates to a full ~20-type SOP library, sourced from the headcase shared SOP
+  set (`_headcase/shared/sops/`, 22 `template.md`/`guide.md`/`example.md` triads). Needs a design
+  ruling first (vendor-vs-sync, type↔dir_kind classification, planner template-selection,
+  neutrality of vendored examples). Corrects the "librarian knows ~20 SOPs" premise — that catalog
+  never existed; the 2-template "templates-only" boundary was intentional, not 2-of-20.
+
+Filed 2026-07-17 (later): **#36** (Template SOP library, v-next major — see backlog) + a
+status-against-roadmap **briefing deck** at `_meta/briefings/2026-07-17-status-against-roadmap/`
+(deck.json + HTML + PDF).
 
 Shipped 2026-07-17: **#31** (PR #32, ADR 0003) + **docs/CI release-prep sweep** (PR #33), see
 §2. Earlier same day: **#7 / #25 / #27** (PRs #29 / #30 / #28), **#23** (PR #24), **NOTE.md
