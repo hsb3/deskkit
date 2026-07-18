@@ -43,8 +43,9 @@ func TestIsShutdownEOF(t *testing.T) {
 
 // TestExposedTools_GateComposition is the load-bearing test: the MCP surface applies the same
 // §5.4 registration-time write gate as the eino loop, and never exposes restore (§5.5).
-//   - default (LIBRARIAN_AUTONOMOUS_WRITES unset): {sweep, patrol, propose_fix, query} — 4
-//   - autonomous writes on: adds apply_fix only — 5
+//   - default (LIBRARIAN_AUTONOMOUS_WRITES unset): {sweep, patrol, propose_fix, query,
+//     record_feedback} — 5 (record_feedback is a DB-only write, ungated like the read tools)
+//   - autonomous writes on: adds apply_fix only — 6
 //   - restore never present in either state
 func TestExposedTools_GateComposition(t *testing.T) {
 	cases := []struct {
@@ -53,8 +54,8 @@ func TestExposedTools_GateComposition(t *testing.T) {
 		wantApply  bool
 		wantCount  int
 	}{
-		{"default (no autonomous writes)", false, false, 4},
-		{"autonomous writes on", true, true, 5},
+		{"default (no autonomous writes)", false, false, 5},
+		{"autonomous writes on", true, true, 6},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -63,7 +64,7 @@ func TestExposedTools_GateComposition(t *testing.T) {
 			for _, n := range ExposedTools(cfg) {
 				got[n] = true
 			}
-			for _, always := range []string{"sweep", "patrol", "propose_fix", "query"} {
+			for _, always := range []string{"sweep", "patrol", "propose_fix", "query", "record_feedback"} {
 				if !got[always] {
 					t.Errorf("autonomous=%v: expected %q exposed over MCP", tc.autonomous, always)
 				}
@@ -109,14 +110,16 @@ func TestNewServer_BuildsForBothGates(t *testing.T) {
 // is no longer used (the SDK cannot parse eino's key-value tags).
 func TestInputSchemaMap_MatchesStructs(t *testing.T) {
 	wantProps := map[string][]string{
-		"sweep":       {}, // parameterless: SweepInput has only an ignored (`json:"-"`) field
-		"patrol":      {"path"},
-		"propose_fix": {"run_id", "rules"},
-		"apply_fix":   {"run_id", "revision_ids"},
-		"query":       {"kind", "days"},
+		"sweep":           {}, // parameterless: SweepInput has only an ignored (`json:"-"`) field
+		"patrol":          {"path"},
+		"propose_fix":     {"run_id", "rules"},
+		"apply_fix":       {"run_id", "revision_ids"},
+		"query":           {"kind", "days"},
+		"record_feedback": {"kind", "summary", "detail", "context", "source"},
 	}
 	wantRequired := map[string][]string{
-		"query": {"kind"}, // only non-omitempty exposed field; all others are omitempty
+		"query":           {"kind"},              // only non-omitempty exposed field; all others are omitempty
+		"record_feedback": {"kind", "summary"}, // the two non-omitempty fields; detail/context/source are omitempty
 	}
 	for name, want := range wantProps {
 		typ, ok := toolInputTypes[name]

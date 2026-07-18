@@ -66,8 +66,9 @@ var toolInputTypes = map[string]reflect.Type{
 	"sweep":       reflect.TypeOf(tools.SweepInput{}),
 	"patrol":      reflect.TypeOf(tools.PatrolInput{}),
 	"propose_fix": reflect.TypeOf(tools.ProposeFixInput{}),
-	"apply_fix":   reflect.TypeOf(tools.ApplyFixInput{}),
-	"query":       reflect.TypeOf(tools.QueryInput{}),
+	"apply_fix":       reflect.TypeOf(tools.ApplyFixInput{}),
+	"query":           reflect.TypeOf(tools.QueryInput{}),
+	"record_feedback": reflect.TypeOf(tools.RecordFeedbackInput{}),
 }
 
 // ExposedTools returns the tool names this server registers for cfg: the §5.4 gate applied
@@ -180,6 +181,10 @@ func register(s *mcp.Server, name string, app core.App, cfg *config.Config) erro
 			// tools.Query already returns a JSON document (json.RawMessage); json.Marshal of a
 			// RawMessage is the bytes verbatim, so jsonContent forwards it unchanged.
 			return jsonContent(tools.Query(ctx, app, cfg, &in))
+		})
+	case "record_feedback":
+		mcp.AddTool(s, t, func(ctx context.Context, _ *mcp.CallToolRequest, in tools.RecordFeedbackInput) (*mcp.CallToolResult, any, error) {
+			return jsonContent(tools.RecordFeedback(ctx, app, cfg, &in))
 		})
 	default:
 		return fmt.Errorf("mcp: no outbound registrar for tool %q (restore is CLI-only, §5.5)", name)

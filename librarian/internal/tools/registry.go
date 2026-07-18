@@ -18,7 +18,8 @@ type ToolSpec struct {
 	AgentGated bool
 }
 
-// Registry is the frozen list of the six tools (spec §5). Order = the CLI/registration order.
+// Registry is the ordered list of the librarian's tools (spec §5, plus record_feedback). Order
+// = the CLI/registration order.
 //
 // Gate encoding (spec §5.4):
 //   - the autonomous serve agent gets {query, sweep, patrol, propose_fix} always, plus
@@ -33,6 +34,10 @@ var Registry = []ToolSpec{
 	{Name: "apply_fix", Description: "Commit a previously proposed fix to disk, byte-exact.", WritesFiles: true, AgentGated: true},
 	{Name: "restore", Description: "Reverse a change to the exact recorded original.", WritesFiles: true},
 	{Name: "query", Description: "Read-only questions over the file index and findings.", AgentDefault: true},
+	// record_feedback writes only to the feedback collection (no desk file), so it is an
+	// AgentDefault — available to every model-facing surface without the write gate that
+	// governs apply_fix. WritesFiles stays false.
+	{Name: "record_feedback", Description: "Record a problem or feedback entry to the store's feedback log.", AgentDefault: true},
 }
 
 // Spec returns the ToolSpec for name.

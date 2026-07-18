@@ -94,6 +94,29 @@ type RestoreResult struct {
 // --- §5.6 query ---
 
 type QueryInput struct {
-	Kind string `json:"kind" jsonschema:"description=One of: live_files recent orphans uncollapsed findings summary adoption;required"`
+	Kind string `json:"kind" jsonschema:"description=One of: live_files recent orphans uncollapsed findings summary adoption feedback;required"`
 	Days int    `json:"days,omitempty" jsonschema:"description=Window for 'recent'; default 7"`
+}
+
+// --- record_feedback ---
+//
+// The librarian's store-native feedback log. Records one row in the feedback collection when a
+// tool fails or a desk convention does not fit (kind=problem) or when the user explicitly asks
+// for a recording (kind=feedback). A DB-only write — not gated by LIBRARIAN_AUTONOMOUS_WRITES.
+// Descriptions are comma-free on purpose: eino's InferTool splits the jsonschema tag on
+// unescaped commas, so a comma would truncate the text the model sees.
+
+type RecordFeedbackInput struct {
+	Kind    string `json:"kind" jsonschema:"description=Entry type: 'problem' when a tool failed or a desk convention did not fit or 'feedback' when the user explicitly asked to record something;required"`
+	Summary string `json:"summary" jsonschema:"description=One-line summary of the problem or feedback;required"`
+	Detail  string `json:"detail,omitempty" jsonschema:"description=Optional longer detail such as full error text or reasoning"`
+	Context string `json:"context,omitempty" jsonschema:"description=Optional note on what the agent was doing when the entry was recorded such as the trigger tool or turn"`
+	Source  string `json:"source,omitempty" jsonschema:"description=Who originated the entry: 'agent' by default or 'user' when the user asked for the recording"`
+}
+
+type RecordFeedbackResult struct {
+	ID      string `json:"id"`
+	Kind    string `json:"kind"`
+	Status  string `json:"status"`
+	Message string `json:"message"`
 }

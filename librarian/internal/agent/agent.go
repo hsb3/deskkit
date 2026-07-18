@@ -141,6 +141,11 @@ func buildTools(app core.App, cfg *config.Config) ([]tool.BaseTool, error) {
 				return string(raw), nil // query already returns a JSON document
 			})
 		},
+		"record_feedback": func(name, desc string) (tool.InvokableTool, error) {
+			return toolutils.InferTool(name, desc, func(ctx context.Context, in tools.RecordFeedbackInput) (string, error) {
+				return jsonResult(tools.RecordFeedback(ctx, app, cfg, &in))
+			})
+		},
 	}
 
 	var out []tool.BaseTool
