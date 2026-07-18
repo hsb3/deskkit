@@ -53,8 +53,10 @@ func Query(ctx context.Context, app core.App, cfg *config.Config, in *QueryInput
 		raw, err = querySummary(app)
 	case "adoption":
 		raw, err = queryAdoption(app)
+	case "feedback":
+		raw, err = queryFeedback(app)
 	default:
-		return nil, fmt.Errorf("query: unknown kind %q (one of: live_files recent orphans uncollapsed findings summary adoption)", in.Kind)
+		return nil, fmt.Errorf("query: unknown kind %q (one of: live_files recent orphans uncollapsed findings summary adoption feedback)", in.Kind)
 	}
 	if err != nil {
 		return nil, translateUninitializedStoreError(err)
@@ -152,6 +154,25 @@ type adoptionResult struct {
 	Kind  string        `json:"kind"`
 	Count int           `json:"count"`
 	Rows  []adoptionRow `json:"rows"`
+}
+
+// feedbackBrief is one open feedback-log entry as the `feedback` query returns it: identity +
+// summary + source + status + created, with the full detail body included (spec: read-back
+// carries detail; source lets a harvest pass split agent-observed problems from user asks).
+type feedbackBrief struct {
+	ID      string `json:"id"`
+	Kind    string `json:"kind"`
+	Summary string `json:"summary"`
+	Detail  string `json:"detail"`
+	Source  string `json:"source"`
+	Status  string `json:"status"`
+	Created string `json:"created"`
+}
+
+type feedbackResult struct {
+	Kind    string          `json:"kind"`
+	Count   int             `json:"count"`
+	Entries []feedbackBrief `json:"entries"`
 }
 
 // --- pure helpers (unit-testable with hand-built fileRow/findingRow fixtures) ---
@@ -389,6 +410,29 @@ func querySummary(app core.App) (json.RawMessage, error) {
 		return nil, err
 	}
 	return json.Marshal(buildSummary(fileRowsFromRecords(fileRecs), findingRows))
+}
+
+// queryFeedback returns the OPEN feedback-log entries newest-first (by the created autodate).
+// Each entry carries id/kind/summary/status/created plus the full detail body. Resolved entries
+// are omitted — this is the actionable backlog, mirroring how `findings` shows only flagged rows.
+func queryFeedback(app core.App) (json.RawMessage, error) {
+	recs, err := app.FindRecordsByFilter("feedback", "status = 'open'", "-created", 0, 0, dbx.Params{})
+	if err != nil {
+		return nil, err
+	}
+	entries := make([]feedbackBrief, len(recs))
+	for i, r := range recs {
+		entries[i] = feedbackBrief{
+			ID:      r.Id,
+			Kind:    r.GetString("kind"),
+			Summary: r.GetString("summary"),
+			Detail:  r.GetString("detail"),
+			Source:  r.GetString("source"),
+			Status:  r.GetString("status"),
+			Created: r.GetString("created"),
+		}
+	}
+	return json.Marshal(feedbackResult{Kind: "feedback", Count: len(entries), Entries: entries})
 }
 
 func queryAdoption(app core.App) (json.RawMessage, error) {

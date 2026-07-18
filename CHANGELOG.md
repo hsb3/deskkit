@@ -16,6 +16,11 @@ for why this policy exists.
 
 - **`make install`** — build the version-stamped librarian binary and install it to `~/.local/bin`
   (override with `make install PREFIX=/usr/local`). The one-command update-from-source path.
+- **`record_feedback`** — the librarian can log feedback entries into its own store: a `problem`
+  entry when a tool fails or a desk convention doesn't fit mid-task, or a `feedback` entry when
+  the user asks it to record something. New `feedback` collection (migration 0013), the tool on
+  all surfaces (agent, chat, MCP) plus a `record-feedback` CLI subcommand, and a `feedback` kind
+  for `query` (open entries, newest first).
 - **Chat TUI UX pass.** Per-role left gutters (a thick accent bar for the user, a faint thin bar
   for the librarian), a per-turn `model · latency` footer, and a fuller bubbles/help footer:
   `ctrl+g` toggles the full keybind help, `ctrl+y` copies the last answer's raw markdown (with a

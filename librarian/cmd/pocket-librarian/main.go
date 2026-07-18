@@ -266,7 +266,7 @@ func main() {
 var storeTouchingCommands = map[string]bool{
 	"serve": true, "migrate": true, "superuser": true,
 	"sweep": true, "patrol": true, "propose-fix": true, "apply-fix": true,
-	"restore": true, "query": true, "agent": true, "chat": true,
+	"restore": true, "query": true, "record-feedback": true, "agent": true, "chat": true,
 	"mcp-serve": true, "gui": true,
 }
 
@@ -581,7 +581,7 @@ func registerToolCommands(app *pocketbase.PocketBase, cfg *config.Config, cfgErr
 	var queryPretty bool
 	queryCmd := &cobra.Command{
 		Use:   "query <kind>",
-		Short: "Read-only queries: live_files recent orphans uncollapsed findings summary adoption",
+		Short: "Read-only queries: live_files recent orphans uncollapsed findings summary adoption feedback",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := requireConfig(app, cfg, cfgErr)
@@ -608,6 +608,38 @@ func registerToolCommands(app *pocketbase.PocketBase, cfg *config.Config, cfgErr
 	queryCmd.Flags().IntVar(&queryDays, "days", 7, "window for 'recent'")
 	queryCmd.Flags().BoolVar(&queryPretty, "pretty", false, "render an aligned table instead of raw JSON (human-supervised workflow)")
 	app.RootCmd.AddCommand(queryCmd)
+
+	// record-feedback — write one entry to the store-native feedback log. Routes through the
+	// same tools.RecordFeedback the agent/chat/MCP surfaces call (spec §2.6). DB-only write:
+	// unlike apply-fix it touches no desk file, so it carries no write gate.
+	var fbKind, fbSummary, fbDetail, fbContext, fbSource string
+	recordFeedbackCmd := &cobra.Command{
+		Use:   "record-feedback",
+		Short: "Record a problem or feedback entry to the store's feedback log",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			c, err := requireConfig(app, cfg, cfgErr)
+			if err != nil {
+				return err
+			}
+			return printJSON(tools.RecordFeedback(cmd.Context(), app, c, &tools.RecordFeedbackInput{
+				Kind:    fbKind,
+				Summary: fbSummary,
+				Detail:  fbDetail,
+				Context: fbContext,
+				Source:  fbSource,
+			}))
+		},
+	}
+	recordFeedbackCmd.Flags().StringVar(&fbKind, "kind", "", "entry type: problem or feedback")
+	recordFeedbackCmd.Flags().StringVar(&fbSummary, "summary", "", "one-line summary")
+	recordFeedbackCmd.Flags().StringVar(&fbDetail, "detail", "", "optional longer detail")
+	recordFeedbackCmd.Flags().StringVar(&fbContext, "context", "", "optional note on what the agent was doing")
+	recordFeedbackCmd.Flags().StringVar(&fbSource, "source", "agent", "who originated the entry: agent or user")
+	// Declared required at the cobra layer so --help marks them and a missing flag fails fast
+	// with cobra's standard error (the tool re-validates values either way).
+	_ = recordFeedbackCmd.MarkFlagRequired("kind")
+	_ = recordFeedbackCmd.MarkFlagRequired("summary")
+	app.RootCmd.AddCommand(recordFeedbackCmd)
 
 	// agent <instruction> — Phase-1 MANUAL trigger for the eino ReAct loop (spec §6;
 	// agent_runs.trigger="manual"). One-shot separate process, like sweep/patrol: requires the
