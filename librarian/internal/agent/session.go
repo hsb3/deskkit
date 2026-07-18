@@ -11,9 +11,9 @@ package agent
 
 import (
 	"context"
+	"errors"
+	"sync"
 
-	"github.com/cloudwego/eino/compose"
-	einoagent "github.com/cloudwego/eino/flow/agent"
 	"github.com/cloudwego/eino/flow/agent/react"
 	"github.com/cloudwego/eino/schema"
 	"github.com/pocketbase/pocketbase/core"
@@ -41,6 +41,13 @@ type Session struct {
 	rc      *runCtx
 	history []*schema.Message
 	last    *schema.Message // most recent assistant output, used to finalize the run row
+
+	// mu guards the single-turn concurrency state. busy rejects overlapping turns; termErr
+	// carries the terminal turn's real error object (StreamTurn's Event is serializable-only,
+	// so this is how Turn preserves context.Canceled identity for callers).
+	mu      sync.Mutex
+	busy    bool
+	termErr error
 }
 
 // NewSession builds the chat model, the gated tool slice, and the ReAct agent exactly as
@@ -75,32 +82,35 @@ func NewSession(ctx context.Context, app core.App, cfg *config.Config) (*Session
 	}, nil
 }
 
-// Turn appends the user input to the running history, drives one full ReAct loop over the
-// ENTIRE history (so prior turns are in context), appends the assistant reply back onto the
-// history, persists the final assistant message (as Run does for its final out), and returns
-// the assistant text. A loop error is returned to the caller; the transcript up to the last
-// model call is already persisted by the callback.
+// Turn drives one full ReAct loop and returns the final assistant text (or the terminal
+// error). It is a thin blocking drain over StreamTurn, so the REPL and the streaming TUI share
+// ONE persistence/history code path. The user message, per-turn hwm baseline, final/partial
+// persistence, history append, and rollback all happen inside StreamTurn (stream.go). A loop
+// error is returned to the caller with its identity preserved (a canceled turn returns
+// context.Canceled), matching the pre-streaming contract.
 func (s *Session) Turn(ctx context.Context, userInput string) (string, error) {
-	s.history = append(s.history, schema.UserMessage(userInput))
-
-	handler := s.rc.persistHandler() // the ONE persistence mechanism (persist.go)
-	out, genErr := s.agent.Generate(ctx, s.history,
-		einoagent.WithComposeOptions(compose.WithCallbacks(handler)))
-	if genErr != nil {
-		return "", genErr
-	}
-	if out != nil {
-		s.history = append(s.history, out)
-		s.history = capHistory(s.history)
-		s.last = out
-		// The final assistant message never appears in a later model INPUT, so the
-		// input-side callback does not capture it; persist it here exactly as Run() does.
-		if perr := s.rc.persist(out); perr != nil {
-			s.app.Logger().Error("persist final message", "run", s.run.Id, "err", perr)
+	var final string
+	var sawErr bool
+	var errText string
+	for ev := range s.StreamTurn(ctx, userInput) {
+		switch ev.Kind {
+		case EventFinal:
+			final = ev.Content
+		case EventError:
+			sawErr = true
+			errText = ev.Err
 		}
-		return out.Content, nil
 	}
-	return "", nil
+	if sawErr {
+		s.mu.Lock()
+		te := s.termErr
+		s.mu.Unlock()
+		if te != nil {
+			return "", te
+		}
+		return "", errors.New(errText)
+	}
+	return final, nil
 }
 
 // capHistory keeps at most maxHistoryMessages of the most recent conversation, dropping the
