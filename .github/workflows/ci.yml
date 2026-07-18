@@ -54,6 +54,11 @@ jobs:
       - name: Version-sync — VERSION vs shipped manifests
         run: node scripts/check-version-sync.mjs
 
+      # Kit-manifest drift: the root kits.yaml must agree with the kits/ tree in both directions
+      # (0013 S4(a); ported per #49). Fails naming any missing/untracked kit dir or file.
+      - name: Kit-manifest drift guard — kits.yaml vs kits/ tree
+        run: node scripts/check-kits.mjs
+
       # Advisory only (never fails the build): nudges when user-facing changes have piled up
       # under plugin/ or librarian/ since the last v* tag without a VERSION bump. The hard gate
       # (a documented CHANGELOG section for the tagged version) lives in release.yml.
