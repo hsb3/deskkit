@@ -46,7 +46,24 @@ question), and `docs/development/tapes/chat.tape`'s 30s answer sleep is tight on
 (only matters on manual re-record; committed GIF verified good). The `make install` + docs-split
 work sits in `CHANGELOG.md [Unreleased]` (no tag cut yet — dev-facing).
 
+**NEXT SESSION FOCUS (Henry's directive, 2026-07-18): the chat-TUI UX pass.** From a UAT
+dogfood of `pocket-librarian chat`. Plan is to land **#45 + #44 + #43 in ONE PR**:
+- **#44 (bug, do FIRST — priority-0 dep)** — chat answers are near-invisible on a *light*
+  terminal: streaming body is hard-coded ANSI bright-white (`Color("15")`) and finalized
+  answers use glamour's fixed `DarkStyle`; the `styles.go` "adaptive" comment is wrong. The
+  trap: you CANNOT just enable `WithAutoStyle`/`AdaptiveColor` — their runtime OSC-11 query
+  leaks into the textarea, the exact defect ADR 0004 + `internal/tui/defects_test.go` guard.
+  Fix = detect background ONCE before `tea.NewProgram(...).Run()`, or a `--theme`/`LIBRARIAN_THEME`
+  flag; keep it static-after-startup. Screenshot repro in the issue.
+- **#45 (enhancement, the focus)** — research modern AI-chat-TUI conventions (Claude Code,
+  aider, Crush, Elia…) → gap list → apply. Assumes #44's readability fix is in.
+- **#43 (enhancement)** — config bootstrap is clunky: native `pocket-librarian init` +
+  first-run prompt so users stop hand-authoring env/profile. Distinct surface from the TUI, but
+  Henry wants it in the same PR. Design Qs (overlap with plugin `desk-setup`, one source of
+  truth for the starter profile) are in the issue.
+
 **Open backlog, ranked** (no ruling gates the buildable ones):
+- **#45 / #44 / #43** — the chat-TUI UX pass above (next session's focus).
 - **#12** — dual-format Claude+OpenCode fan-out (consumes `bun run package` as the seed).
   Architectural; needs an OpenCode-target ruling before fan-out. **ON HOLD (above).**
 - **#34** — CI hardening: enforce shellcheck (incl. `install.sh`) + actionlint + a SHA-pin drift
@@ -63,6 +80,13 @@ work sits in `CHANGELOG.md [Unreleased]` (no tag cut yet — dev-facing).
 
 ## 2. Recent deliveries (newest first — full detail in the cited PRs / ADRs / git)
 
+- **2026-07-18 — profile-first docs onramp** (PR #46). Fixed a getting-started
+  self-inconsistency: §4 told non-devs to `export DESK_ROOT`/`DESK_NAME` even though step 2
+  already fills `_knowledge/profile.yaml`, which the librarian auto-discovers by walk-up
+  (`internal/config/config.go` `Load`→`DiscoverProfile`; a profile with `desk.name` +
+  `root: "."` needs zero exports from inside the desk). Reframed env as the *override* (bare
+  folder / dev build from `librarian/`), added a `chat` pointer. Mirrored in `librarian/README`
+  + root README. Docs-only. Grew out of a UAT dogfooding session that also filed #43/#44/#45.
 - **2026-07-18 — make install + docs dev/use split** (PR #42). `make install` (root →
   `librarian/Makefile`) builds the version-stamped binary into `~/.local/bin` (override `PREFIX=`);
   prompted by a stale on-PATH binary — `/plugin` updates the plugin, NOT the standalone binary
@@ -96,6 +120,10 @@ work sits in `CHANGELOG.md [Unreleased]` (no tag cut yet — dev-facing).
 
 ## 3. Where to start next
 
+- **Chat-TUI UX pass (#45 + #44 + #43) — the top priority.** Full brief and the #44
+  rendering trap are in §1. Order: fix #44 (readability) first, then #45 (UX to modern
+  standards), fold in #43 (config `init`); one PR per Henry's directive. Live proof via VHS
+  on BOTH a light and a dark terminal (tapes in `docs/development/tapes/`).
 - **Cut the next release** when `[Unreleased]` warrants — follow `docs/development/releasing.md`
   (bump VERSION + 3 manifests → roll `[Unreleased]` into a dated CHANGELOG section →
   `make release-prep` → tag). `check-changelog` gates the tag; `make version-status` flags drift.
