@@ -19,7 +19,10 @@ type fakeStreamer struct {
 	ctx   context.Context
 	input string
 	calls int
+	runID string
 }
+
+func (f *fakeStreamer) RunID() string { return f.runID }
 
 func (f *fakeStreamer) StreamTurn(ctx context.Context, userInput string) <-chan agent.Event {
 	f.ctx = ctx
@@ -31,14 +34,24 @@ func (f *fakeStreamer) StreamTurn(ctx context.Context, userInput string) <-chan 
 	return f.ch
 }
 
-// newTestModel builds a model sized to an 80x24 terminal and ready to drive.
+// newTestModel builds a model sized to an 80x24 terminal and ready to drive, against an empty
+// fake session provider (no resumable conversations). Tests that exercise the picker/resume paths
+// use newTestModelWithProvider to inject a populated fake.
 func newTestModel(t *testing.T) (model, *fakeStreamer) {
 	t.Helper()
+	m, fs, _ := newTestModelWithProvider(t, &fakeProvider{})
+	return m, fs
+}
+
+// newTestModelWithProvider builds a ready 80x24 model against the given session provider, so the
+// picker/new-conversation/resume paths can be driven with a fake that needs no real Session.
+func newTestModelWithProvider(t *testing.T, provider *fakeProvider) (model, *fakeStreamer, *fakeProvider) {
+	t.Helper()
 	cfg := &config.Config{DeskName: "test-desk", LLMProvider: "openai", LLMModel: "test-model"}
-	fs := &fakeStreamer{}
-	m := newModel(context.Background(), fs, cfg)
+	fs := &fakeStreamer{runID: "live-run"}
+	m := newModel(context.Background(), fs, provider, cfg)
 	next, _ := m.Update(tea.WindowSizeMsg{Width: 80, Height: 24})
-	return next.(model), fs
+	return next.(model), fs, provider
 }
 
 // send routes one message through Update and returns the resulting model (dropping the command:

@@ -24,16 +24,71 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/glamour"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/pocketbase/pocketbase/core"
 
 	"github.com/example/pocket-librarian/internal/agent"
 	"github.com/example/pocket-librarian/internal/config"
 )
 
-// streamer is the model's view of an agent.Session: the single method it needs to drive a turn.
-// *agent.Session satisfies it; a fake satisfies it in tests, so the model needs no real Session,
-// DB, or LLM to unit-test Update.
+// streamer is the model's view of an agent.Session: driving a turn, plus the run identity the
+// picker needs to exclude the live session from the resume offers. *agent.Session satisfies it;
+// a fake satisfies it in tests, so the model needs no real Session, DB, or LLM to unit-test
+// Update.
 type streamer interface {
 	StreamTurn(ctx context.Context, userInput string) <-chan agent.Event
+	RunID() string
+}
+
+// sessionProvider is the model's view of the agent package's conversation lifecycle: listing
+// resumable runs, resuming one, opening a fresh one, and closing a session. Keeping it an
+// interface means Update never imports agent.ListConversations / ResumeSession / NewSession
+// directly, so the picker + session-swap paths are unit-testable with a fake (picker_test.go).
+type sessionProvider interface {
+	list(limit int, excludeRunID string) ([]agent.ConversationInfo, error)
+	resume(ctx context.Context, runID string) (streamer, []agent.TranscriptEntry, error)
+	fresh(ctx context.Context) (streamer, error)
+	closeSession(ctx context.Context, s streamer) error
+}
+
+// agentProvider is the production sessionProvider: a thin adapter over the agent package bound to
+// the app and resolved config. It is separate from the model's cfg (which the header still needs).
+type agentProvider struct {
+	app core.App
+	cfg *config.Config
+}
+
+// list returns the most recent resumable conversations for the picker, excluding the caller's
+// own live run.
+func (p *agentProvider) list(limit int, excludeRunID string) ([]agent.ConversationInfo, error) {
+	return agent.ListConversations(p.app, limit, excludeRunID)
+}
+
+// resume rebuilds a live Session over an existing run and returns it (as a streamer) with the
+// human-facing transcript. *agent.Session satisfies streamer.
+func (p *agentProvider) resume(ctx context.Context, runID string) (streamer, []agent.TranscriptEntry, error) {
+	s, ts, err := agent.ResumeSession(ctx, p.app, p.cfg, runID)
+	if err != nil {
+		return nil, nil, err
+	}
+	return s, ts, nil
+}
+
+// fresh opens a brand-new Session and returns it as a streamer.
+func (p *agentProvider) fresh(ctx context.Context) (streamer, error) {
+	s, err := agent.NewSession(ctx, p.app, p.cfg)
+	if err != nil {
+		return nil, err
+	}
+	return s, nil
+}
+
+// closeSession finalizes a session's agent_runs row. A non-*agent.Session streamer (a test fake)
+// or a nil session is a no-op.
+func (p *agentProvider) closeSession(ctx context.Context, s streamer) error {
+	if as, ok := s.(*agent.Session); ok && as != nil {
+		return as.Close(ctx)
+	}
+	return nil
 }
 
 // Layout constants: the header and footer are one line each; the input textarea is a fixed
@@ -86,42 +141,47 @@ func (e *entry) matchStep(callID string) int {
 	return -1
 }
 
-// keymap is the surface's binding table — the single place keys are declared, which is also the
-// Phase-4 mount seam: the conversation picker (ctrl+o) and new-conversation (ctrl+n) bindings
-// belong here when that phase lands. They are intentionally NOT declared or handled yet.
+// keymap is the surface's binding table — the single place keys are declared. openPicker (ctrl+o)
+// opens the conversation-resume overlay and newConversation (ctrl+n) starts a fresh conversation;
+// both are no-ops while a turn is streaming (like send), so no in-flight turn is ever disturbed.
 type keymap struct {
-	send        key.Binding
-	newline     key.Binding
-	cancel      key.Binding
-	toggleSteps key.Binding
-	scrollUp    key.Binding
-	scrollDown  key.Binding
-	quit        key.Binding
-	// Phase 4 (do not build here): openPicker key.Binding // ctrl+o
-	//                              newConversation key.Binding // ctrl+n
+	send            key.Binding
+	newline         key.Binding
+	cancel          key.Binding
+	toggleSteps     key.Binding
+	scrollUp        key.Binding
+	scrollDown      key.Binding
+	quit            key.Binding
+	openPicker      key.Binding
+	newConversation key.Binding
 }
 
 func defaultKeymap() keymap {
 	return keymap{
-		send:        key.NewBinding(key.WithKeys("enter")),
-		newline:     key.NewBinding(key.WithKeys("alt+enter")),
-		cancel:      key.NewBinding(key.WithKeys("esc")),
-		toggleSteps: key.NewBinding(key.WithKeys("ctrl+t")),
-		scrollUp:    key.NewBinding(key.WithKeys("pgup")),
-		scrollDown:  key.NewBinding(key.WithKeys("pgdown")),
-		quit:        key.NewBinding(key.WithKeys("ctrl+c")),
+		send:            key.NewBinding(key.WithKeys("enter")),
+		newline:         key.NewBinding(key.WithKeys("alt+enter")),
+		cancel:          key.NewBinding(key.WithKeys("esc")),
+		toggleSteps:     key.NewBinding(key.WithKeys("ctrl+t")),
+		scrollUp:        key.NewBinding(key.WithKeys("pgup")),
+		scrollDown:      key.NewBinding(key.WithKeys("pgdown")),
+		quit:            key.NewBinding(key.WithKeys("ctrl+c")),
+		openPicker:      key.NewBinding(key.WithKeys("ctrl+o")),
+		newConversation: key.NewBinding(key.WithKeys("ctrl+n")),
 	}
 }
 
-// model is the chat surface. picker is the Phase-4 overlay mount point — always nil in Phases
-// 2-3; View reserves the slot where it will render.
+// model is the chat surface. picker is the conversation-resume overlay: nil when closed, and it
+// only ever lives while NOT streaming (ctrl+o opens it only when no turn is in flight). provider
+// is the session lifecycle boundary (list/resume/fresh/close), an interface so Update stays
+// testable without a real Session.
 type model struct {
-	baseCtx context.Context
-	sess    streamer
+	baseCtx  context.Context
+	sess     streamer
+	provider sessionProvider
 
-	deskName string
-	provider string
-	llmModel string
+	deskName    string
+	llmProvider string
+	llmModel    string
 
 	styles   styleSet
 	keymap   keymap
@@ -145,12 +205,13 @@ type model struct {
 	height int
 	ready  bool
 
-	// picker *pickerModel // Phase 4 — conversation picker overlay (ctrl+o); nil until then.
+	picker *pickerModel // conversation-resume overlay (ctrl+o); nil when closed.
 }
 
 // newModel builds the chat model against an injected streamer (the real *agent.Session in
-// production, a fake in tests) and the resolved config for the header.
-func newModel(baseCtx context.Context, sess streamer, cfg *config.Config) model {
+// production, a fake in tests), the session provider (list/resume/fresh/close), and the resolved
+// config for the header.
+func newModel(baseCtx context.Context, sess streamer, provider sessionProvider, cfg *config.Config) model {
 	ta := textarea.New()
 	ta.Placeholder = "Ask the librarian… (enter to send, alt+enter for a newline)"
 	ta.Prompt = "▏ "
@@ -164,16 +225,17 @@ func newModel(baseCtx context.Context, sess streamer, cfg *config.Config) model 
 	sp := spinner.New(spinner.WithSpinner(spinner.Dot))
 
 	return model{
-		baseCtx:  baseCtx,
-		sess:     sess,
-		deskName: cfg.DeskName,
-		provider: cfg.LLMProvider,
-		llmModel: cfg.LLMModel,
-		styles:   newStyles(),
-		keymap:   defaultKeymap(),
-		ta:       ta,
-		vp:       viewport.New(0, 0),
-		sp:       sp,
+		baseCtx:     baseCtx,
+		sess:        sess,
+		provider:    provider,
+		deskName:    cfg.DeskName,
+		llmProvider: cfg.LLMProvider,
+		llmModel:    cfg.LLMModel,
+		styles:      newStyles(),
+		keymap:      defaultKeymap(),
+		ta:          ta,
+		vp:          viewport.New(0, 0),
+		sp:          sp,
 	}
 }
 
@@ -227,10 +289,13 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 // handleKey routes a keypress. Send/cancel/quit/steps are intercepted; scrolling goes to the
-// viewport; everything else (typing, alt+enter newline) goes to the textarea.
+// viewport; everything else (typing, alt+enter newline) goes to the textarea. ctrl+c quits from
+// anywhere (even with the overlay open); otherwise, when the picker overlay is open every key
+// routes to it first (handlePickerKey).
 func (m model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	switch {
-	case key.Matches(msg, m.keymap.quit):
+	// ctrl+c is honored before the overlay so the picker can never trap the user. The picker only
+	// lives while NOT streaming, so this path is only ever the immediate-quit branch when open.
+	if key.Matches(msg, m.keymap.quit) {
 		// ctrl+c: if a turn is in flight, cancel it and mark quitting; the existing pump keeps
 		// draining and turnDoneMsg then quits (never Close a channel mid-flight). Otherwise quit
 		// immediately. No new waitForEvent is issued here — exactly one pump is ever in flight.
@@ -243,11 +308,16 @@ func (m model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		return m, tea.Quit
+	}
 
+	if m.picker != nil {
+		return m.handlePickerKey(msg)
+	}
+
+	switch {
 	case key.Matches(msg, m.keymap.cancel):
 		// esc cancels an in-flight turn (footer → "cancelling…"); the pump drains to the terminal
 		// event, which may take a moment because eino cannot abort a stuck provider stream.
-		// Phase-4 seam: when a picker overlay is open, esc closes it instead.
 		if m.streaming && m.cancelTurn != nil {
 			m.cancelTurn()
 			m.cancelling = true
@@ -258,6 +328,12 @@ func (m model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.showSteps = !m.showSteps
 		m.refreshViewport()
 		return m, nil
+
+	case key.Matches(msg, m.keymap.openPicker):
+		return m.openPicker()
+
+	case key.Matches(msg, m.keymap.newConversation):
+		return m.newConversation()
 
 	case key.Matches(msg, m.keymap.send):
 		if m.streaming {
@@ -279,6 +355,123 @@ func (m model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.ta, cmd = m.ta.Update(msg)
 		return m, cmd
 	}
+}
+
+// openPicker opens the conversation-resume overlay. It is a no-op while a turn is streaming (so no
+// in-flight turn is ever disturbed) or when the picker is already open. It lists the recent
+// conversations synchronously — a fast local DB read — and sizes the overlay to the viewport area.
+// A list error leaves the picker closed rather than crashing the surface.
+func (m model) openPicker() (tea.Model, tea.Cmd) {
+	if m.streaming || m.picker != nil {
+		return m, nil
+	}
+	convos, err := m.provider.list(pickerLimit, m.sess.RunID())
+	if err != nil {
+		return m, nil // degraded: keep the surface open, just do not present a picker
+	}
+	m.picker = newPicker(convos, m.vp.Width, m.vp.Height)
+	return m, nil
+}
+
+// newConversation abandons the current conversation and starts a fresh one. It is a no-op while a
+// turn is streaming. It closes the current session, opens a fresh one, and resets the transcript.
+// The close-before-open ordering is safe with no drain: ctrl+n is a no-op while streaming, so
+// there is never an in-flight turn to drain at swap time.
+func (m model) newConversation() (tea.Model, tea.Cmd) {
+	if m.streaming {
+		return m, nil
+	}
+	_ = m.provider.closeSession(m.baseCtx, m.sess)
+	fresh, err := m.provider.fresh(m.baseCtx)
+	if err != nil {
+		// Degraded: the fresh session failed to build. Keep the old session live (do not nil out
+		// sess) so the surface stays usable rather than stranded on a dead session.
+		return m, nil
+	}
+	m.sess = fresh
+	m.entries = nil
+	m.inflightIdx = -1
+	m.picker = nil
+	m.refreshViewport()
+	return m, nil
+}
+
+// handlePickerKey routes a keypress while the overlay is open: esc closes it, enter resumes the
+// selected conversation, and any other key drives the inner list (cursor movement). Because the
+// picker only lives while NOT streaming (ctrl+o/ctrl+n are no-ops mid-turn), there is never an
+// in-flight turn to drain at swap time, so closing the current session before opening the resumed
+// one is safe immediately — this is how the picker path respects the engine's drain contract.
+func (m model) handlePickerKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch {
+	case key.Matches(msg, m.keymap.cancel):
+		// esc closes the overlay. There is no in-flight turn to cancel here (the picker only opens
+		// while not streaming), so esc is purely "dismiss the overlay".
+		m.picker = nil
+		m.refreshViewport()
+		return m, nil
+
+	case key.Matches(msg, m.keymap.send):
+		runID := m.picker.selectedRunID()
+		if runID == "" {
+			return m, nil
+		}
+		_ = m.provider.closeSession(m.baseCtx, m.sess)
+		newSess, transcript, err := m.provider.resume(m.baseCtx, runID)
+		if err != nil {
+			// Degraded: resume failed. Keep the old session live and just dismiss the overlay.
+			m.picker = nil
+			m.refreshViewport()
+			return m, nil
+		}
+		m.sess = newSess
+		m.entries = entriesFromTranscript(transcript)
+		m.inflightIdx = -1
+		m.picker = nil
+		m.refreshViewport()
+		return m, nil
+
+	default:
+		cmd := m.picker.Update(msg)
+		return m, cmd
+	}
+}
+
+// pickerLimit bounds how many recent conversations the resume overlay lists.
+const pickerLimit = 50
+
+// entriesFromTranscript maps a resumed conversation's transcript to display entries, one entry per
+// TranscriptEntry (the rows are already ordered and capped by the agent package). All entries are
+// finalized (they are history, not streaming). A user row is a user bubble; a plain assistant row
+// is an assistant bubble; a tool-calling assistant row and a tool row each become an assistant
+// entry carrying a single done step (the assistant's row keeps its commentary text; the tool's row
+// keeps its result text). An unrecognized role is skipped.
+func entriesFromTranscript(ts []agent.TranscriptEntry) []entry {
+	out := make([]entry, 0, len(ts))
+	for _, t := range ts {
+		switch t.Role {
+		case "user":
+			out = append(out, entry{role: roleUser, text: t.Text, finalized: true})
+		case "assistant":
+			if t.ToolName == "" {
+				out = append(out, entry{role: roleAssistant, text: t.Text, finalized: true})
+			} else {
+				out = append(out, entry{
+					role:      roleAssistant,
+					steps:     []step{{tool: t.ToolName, commentary: t.Text, done: true}},
+					finalized: true,
+				})
+			}
+		case "tool":
+			out = append(out, entry{
+				role:      roleAssistant,
+				steps:     []step{{tool: t.ToolName, result: t.Text, done: true}},
+				finalized: true,
+			})
+		default:
+			// Unknown role: skip rather than render a misleading bubble.
+		}
+	}
+	return out
 }
 
 // startTurn opens one streaming turn: derive a cancelable turn context, hand the input to the
@@ -368,6 +561,9 @@ func (m *model) resize(w, h int) {
 	m.ta.SetWidth(w)
 	m.ta.SetHeight(inputHeight)
 	m.renderer = newRenderer(w)
+	if m.picker != nil {
+		m.picker.SetSize(w, vpHeight) // the overlay occupies the viewport area
+	}
 	m.refreshViewport()
 }
 
@@ -443,10 +639,15 @@ func (m model) View() string {
 	if !m.ready {
 		return "initializing…"
 	}
-	// Phase-4 seam: when a picker overlay is active it will render in place of the viewport here.
+	// When the resume overlay is open it renders in place of the transcript viewport; the header,
+	// input, and footer stay put so the surface never loses its frame.
+	body := m.vp.View()
+	if m.picker != nil {
+		body = m.picker.View()
+	}
 	return lipgloss.JoinVertical(lipgloss.Left,
 		m.renderHeader(),
-		m.vp.View(),
+		body,
 		m.ta.View(),
 		m.renderFooter(),
 	)
@@ -455,14 +656,14 @@ func (m model) View() string {
 // renderHeader renders `desk · provider/model`, clipped to the terminal width.
 func (m model) renderHeader() string {
 	left := m.styles.headerAccent.Render(m.deskName)
-	right := m.styles.header.Render(" · " + m.provider + "/" + m.llmModel)
+	right := m.styles.header.Render(" · " + m.llmProvider + "/" + m.llmModel)
 	return clip(left+right, m.width)
 }
 
 // renderFooter renders the keybind hints and the live state (streaming spinner / cancelling…
 // / ready), clipped to the terminal width.
 func (m model) renderFooter() string {
-	hints := "enter send · alt+enter newline · ctrl+t steps · pgup/pgdn scroll · esc cancel · ctrl+c quit"
+	hints := "enter send · ctrl+o resume · ctrl+n new · ctrl+t steps · pgup/pgdn scroll · esc cancel · ctrl+c quit"
 	var state string
 	switch {
 	case m.cancelling:

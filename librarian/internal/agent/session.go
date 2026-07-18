@@ -128,6 +128,12 @@ func capHistory(h []*schema.Message) []*schema.Message {
 	return append([]*schema.Message(nil), h[len(h)-maxHistoryMessages:]...)
 }
 
+// RunID identifies the session's agent_runs row, so a caller listing resumable conversations
+// (ListConversations) can exclude the session's own live run from the offers.
+func (s *Session) RunID() string {
+	return s.run.Id
+}
+
 // Close finalizes the session's agent_runs row to its terminal state using the last output.
 // Errors are non-fatal (logged, returned) so a caller can ignore them at shutdown.
 func (s *Session) Close(ctx context.Context) error {
