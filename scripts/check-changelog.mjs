@@ -19,7 +19,12 @@ function fail(msg) {
   process.exit(1);
 }
 
-const version = readFileSync(join(REPO_ROOT, "VERSION"), "utf8").trim();
+let version;
+try {
+  version = readFileSync(join(REPO_ROOT, "VERSION"), "utf8").trim();
+} catch (err) {
+  fail(`could not read VERSION (${err.message}).`);
+}
 
 let changelog;
 try {

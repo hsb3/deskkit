@@ -10,15 +10,16 @@
 //   VERSION <  last tag  → warn (VERSION is behind the last tag — unexpected).
 // Degrades to a soft note when git history/tags aren't available (e.g. a shallow CI checkout).
 
-import { execSync } from "node:child_process";
+import { execFileSync } from "node:child_process";
 import { readFileSync as read } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 
+// Run git with an argv array (no shell) — no interpolation surface for tag names.
 function git(args) {
-  return execSync(`git ${args}`, { cwd: REPO_ROOT, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
+  return execFileSync("git", args, { cwd: REPO_ROOT, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
 }
 
 // Compare two "x.y.z" strings. Returns -1 / 0 / 1.
@@ -31,12 +32,19 @@ function cmpSemver(a, b) {
   return 0;
 }
 
-const version = read(join(REPO_ROOT, "VERSION"), "utf8").trim();
+let version;
+try {
+  version = read(join(REPO_ROOT, "VERSION"), "utf8").trim();
+} catch (err) {
+  // Advisory must never fail the build — degrade to a soft note even if VERSION is unreadable.
+  console.log(`version-status: (advisory) could not read VERSION (${err.message}) — skipping.`);
+  process.exit(0);
+}
 
 let lastTag = "";
 try {
   // Newest v-prefixed tag by semver order. Empty if there are no tags (or a tagless shallow clone).
-  lastTag = git("tag --list 'v*' --sort=-v:refname").split("\n")[0].trim();
+  lastTag = git(["tag", "--list", "v*", "--sort=-v:refname"]).split("\n")[0].trim();
 } catch {
   console.log("version-status: (advisory) git tags unavailable — skipping drift check.");
   process.exit(0);
@@ -74,7 +82,7 @@ if (c < 0) {
 // VERSION == last tag: any product change since the tag is unreleased work with no bump.
 let changed = [];
 try {
-  const out = git(`diff --name-only ${lastTag}..HEAD -- plugin librarian`);
+  const out = git(["diff", "--name-only", `${lastTag}..HEAD`, "--", "plugin", "librarian"]);
   changed = out ? out.split("\n").filter(Boolean) : [];
 } catch {
   console.log(`version-status: (advisory) can't diff ${lastTag}..HEAD (shallow clone?) — skipping drift check.`);
