@@ -48,6 +48,13 @@ cp _knowledge/profile.example.yaml _knowledge/profile.yaml
 $EDITOR _knowledge/profile.yaml
 ```
 
+Working from a plain folder instead (no plugin scaffold to copy from)? Once the
+librarian is built (step 3), `pocket-librarian init [dir]` is the fastest path to a
+working profile: it writes the minimal `_knowledge/profile.yaml` a folder needs — desk
+name from the folder's basename, `root: "."` — with `--force` to overwrite and
+`--with-env` to also scaffold a `.env` naming your LLM API-key env var. It never touches
+anything outside `_knowledge/` and `.env`, and never creates the store.
+
 The profile validates against schema v1. You can check it with the plugin's
 `profile_validate` MCP tool (see `plugin-guide.md`); a well-formed profile returns
 `{"valid":true,"errors":[]}`, and every scaffold placeholder resolves from it via
@@ -97,15 +104,21 @@ $ pocket-librarian sweep
 ```
 
 > **Env vars are the override, not the requirement.** Two cases still need them:
-> - **A bare folder with no profile** (a scratch or UAT dir) — either drop a one-line
->   `_knowledge/profile.yaml` in it (`desk:` with `name:` and `root: "."`), or set the vars
->   for the session: `export DESK_ROOT=/path/to/desk DESK_NAME=my-desk`.
+> - **A bare folder with no profile** (a scratch or UAT dir) — either run
+>   `pocket-librarian init` in it (writes that one-line `_knowledge/profile.yaml` for you),
+>   drop the file in by hand (`desk:` with `name:` and `root: "."`), or set the vars for the
+>   session: `export DESK_ROOT=/path/to/desk DESK_NAME=my-desk`.
 > - **Running the dev build from `librarian/`** (`./pocket-librarian …`) — you're outside the
 >   desk tree, so the profile isn't on the walk-up path; export the two vars.
 >
 > Env always wins over the profile. Either way the store lives outside the desk tree, at
 > `$XDG_DATA_HOME/pocket-librarian/<DESK_NAME>/` (see
 > `decisions/0002-multi-desk-topology-store-per-desk.md`).
+>
+> On an interactive terminal, you don't even have to remember `init`: any store-touching
+> command run where config can't resolve offers to scaffold it for you ("Set up this
+> folder as a desk? [Y/n]") and continues on accept. `--no-input` (or a non-TTY, e.g. CI)
+> skips the prompt and keeps the prior fail-closed error.
 
 Index the tree, then flag violations — no setup step needed, `sweep` creates the store on
 first run. `sweep` and `patrol` are LLM-free and **never write desk files** — `patrol` is a

@@ -49,7 +49,7 @@ func newTestModelWithProvider(t *testing.T, provider *fakeProvider) (model, *fak
 	t.Helper()
 	cfg := &config.Config{DeskName: "test-desk", LLMProvider: "openai", LLMModel: "test-model"}
 	fs := &fakeStreamer{runID: "live-run"}
-	m := newModel(context.Background(), fs, provider, cfg)
+	m := newModel(context.Background(), fs, provider, cfg, themeDark)
 	next, _ := m.Update(tea.WindowSizeMsg{Width: 80, Height: 24})
 	return next.(model), fs, provider
 }
@@ -76,9 +76,9 @@ func TestWindowSizeMsg_Sizing(t *testing.T) {
 	if m.vp.Width != 80 {
 		t.Errorf("viewport width = %d, want 80", m.vp.Width)
 	}
-	// height 24 - header(1) - footer(1) - input(3) = 19
-	if m.vp.Height != 19 {
-		t.Errorf("viewport height = %d, want 19", m.vp.Height)
+	// height 24 - header(1) - footer(1) - input(3) - input border(2) = 17
+	if m.vp.Height != 17 {
+		t.Errorf("viewport height = %d, want 17", m.vp.Height)
 	}
 	if m.renderer == nil {
 		t.Error("markdown renderer not built on WindowSizeMsg")

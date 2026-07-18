@@ -50,11 +50,114 @@ func TestFirstSubcommand(t *testing.T) {
 		{"hooksWatch value form before the subcommand", []string{"--hooksWatch", "true", "serve"}, "serve"},
 		{"hooksPool value form before the subcommand", []string{"--hooksPool", "25", "serve"}, "serve"},
 		{"multiple jsvm-style value flags before the subcommand", []string{"--hooksDir", "/x", "--hooksPool", "25", "sweep"}, "sweep"},
+		// The narrated residual gap: a value flag NOT on globalValueFlags still shadows the
+		// subcommand token — its value is treated as the subcommand. Pinned as current behavior
+		// (documented in the globalValueFlags comment as "a genuinely novel unrecognized
+		// value-flag ... could still shadow the subcommand token the same way"), not endorsed.
+		{"unrecognized value flag shadows the subcommand", []string{"--novel", "/x", "serve"}, "/x"},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			if got := firstSubcommand(c.args); got != c.want {
 				t.Errorf("firstSubcommand(%v) = %q, want %q", c.args, got, c.want)
+			}
+		})
+	}
+}
+
+func TestSubcommandIndex(t *testing.T) {
+	cases := []struct {
+		name string
+		args []string
+		want int
+	}{
+		{"bare subcommand", []string{"sweep"}, 0},
+		{"value flag then subcommand", []string{"--dir", "/x", "serve"}, 2},
+		{"equals form does not skip a value token", []string{"--dir=/x", "serve"}, 1},
+		{"boolean global flag before the subcommand", []string{"--dev", "serve"}, 1},
+		{"two value flags before the subcommand", []string{"--dir", "/x", "--queryTimeout", "5", "query"}, 4},
+		{"no subcommand (bare invocation)", []string{}, -1},
+		{"only flags, no subcommand", []string{"--dev"}, -1},
+		{"trailing value flag with no value", []string{"--dir"}, -1},
+		{"unrecognized value flag shadows the subcommand", []string{"--novel", "/x", "serve"}, 1},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			if got := subcommandIndex(c.args); got != c.want {
+				t.Errorf("subcommandIndex(%v) = %d, want %d", c.args, got, c.want)
+			}
+		})
+	}
+}
+
+func TestIsInitInvocation(t *testing.T) {
+	cases := []struct {
+		name string
+		args []string
+		want bool
+	}{
+		{"bare init", []string{"init"}, true},
+		{"value flag before init", []string{"--dir", "/x", "init"}, true},
+		{"init with force flag", []string{"init", "--force"}, true},
+		{"init with help long flag", []string{"init", "--help"}, false},
+		{"init with help short flag anywhere", []string{"init", "-h"}, false},
+		{"help short flag before init", []string{"-h", "init"}, false},
+		{"a different subcommand", []string{"serve"}, false},
+		{"bare invocation", []string{}, false},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			if got := isInitInvocation(c.args); got != c.want {
+				t.Errorf("isInitInvocation(%v) = %v, want %v", c.args, got, c.want)
+			}
+		})
+	}
+}
+
+func TestHasNoInputFlag(t *testing.T) {
+	cases := []struct {
+		name string
+		args []string
+		want bool
+	}{
+		{"bare no-input", []string{"init", "--no-input"}, true},
+		{"equals true", []string{"init", "--no-input=true"}, true},
+		{"equals false still present", []string{"init", "--no-input=false"}, true},
+		{"absent", []string{"init", "--force"}, false},
+		{"similar prefix does not match", []string{"--no-inputs"}, false},
+		{"empty args", []string{}, false},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			if got := hasNoInputFlag(c.args); got != c.want {
+				t.Errorf("hasNoInputFlag(%v) = %v, want %v", c.args, got, c.want)
+			}
+		})
+	}
+}
+
+func TestStripNoInput(t *testing.T) {
+	cases := []struct {
+		name string
+		args []string
+		want []string
+	}{
+		{"strips bare token", []string{"--no-input", "/dir"}, []string{"/dir"}},
+		{"strips equals form", []string{"--no-input=true", "/dir"}, []string{"/dir"}},
+		{"leaves other flags", []string{"--force", "/dir"}, []string{"--force", "/dir"}},
+		{"strips only the no-input token", []string{"--no-input", "--force", "/dir"}, []string{"--force", "/dir"}},
+		{"nothing to strip", []string{}, []string{}},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			got := stripNoInput(c.args)
+			if len(got) != len(c.want) {
+				t.Fatalf("stripNoInput(%v) = %v, want %v", c.args, got, c.want)
+			}
+			for i := range got {
+				if got[i] != c.want[i] {
+					t.Fatalf("stripNoInput(%v) = %v, want %v", c.args, got, c.want)
+				}
 			}
 		})
 	}

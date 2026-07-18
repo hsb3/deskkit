@@ -18,3 +18,10 @@ type eventMsg struct {
 // further events will arrive. It is the single place the model flips streaming off and
 // re-enables input, so it is emitted exactly once per turn (when <-ch reports !ok).
 type turnDoneMsg struct{}
+
+// toastExpireMsg clears the transient footer toast (a copy confirmation or error) after its
+// display window elapses. seq stamps the toast that scheduled it: a later toast bumps the model's
+// sequence, so a stale expiry for a superseded toast is ignored and never clears a newer one.
+type toastExpireMsg struct {
+	seq int
+}

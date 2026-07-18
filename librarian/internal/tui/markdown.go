@@ -23,29 +23,33 @@ import (
 // produces sane output instead of wrapping to one character per line.
 const minWrap = 20
 
-// glamourStyle resolves the markdown style ONCE, from a fixed default, never from a runtime
-// terminal query. glamour's WithAutoStyle asks the terminal for its background color (an OSC 11
-// query, plus a DSR probe) at renderer-build time — which, because the renderer is (re)built on
-// WindowSizeMsg AFTER the Bubble Tea program has started its own stdin reader, races that reader
-// and leaks the terminal's escape-sequence RESPONSE into the textarea as typed input. Pinning a
-// static style removes the query entirely. GLAMOUR_STYLE still overrides for operators who want
-// a light or custom theme; "auto" is rejected because it reintroduces the query.
-func glamourStyle() string {
+// glamourStyle resolves the markdown style ONCE, from the theme decided at startup, never from a
+// runtime terminal query. glamour's WithAutoStyle asks the terminal for its background color (an
+// OSC 11 query, plus a DSR probe) at renderer-build time — which, because the renderer is
+// (re)built on WindowSizeMsg AFTER the Bubble Tea program has started its own stdin reader, races
+// that reader and leaks the terminal's escape-sequence RESPONSE into the textarea as typed input.
+// Pinning a static per-theme style removes the query entirely: themeLight maps to glamour's fixed
+// LightStyleConfig, everything else to its DarkStyleConfig. GLAMOUR_STYLE still overrides for
+// operators who want a custom theme; "auto" is rejected because it reintroduces the query.
+func glamourStyle(theme string) string {
 	if s := os.Getenv("GLAMOUR_STYLE"); s != "" && s != styles.AutoStyle {
 		return s
+	}
+	if theme == themeLight {
+		return styles.LightStyle
 	}
 	return styles.DarkStyle
 }
 
-// newRenderer builds a glamour renderer whose word-wrap matches the given inner width, using a
-// statically resolved style (never a terminal query — see glamourStyle). On any construction
-// error it returns nil; renderMarkdown treats a nil renderer as "plain text".
-func newRenderer(width int) *glamour.TermRenderer {
+// newRenderer builds a glamour renderer whose word-wrap matches the given inner width, using the
+// statically resolved per-theme style (never a terminal query — see glamourStyle). On any
+// construction error it returns nil; renderMarkdown treats a nil renderer as "plain text".
+func newRenderer(width int, theme string) *glamour.TermRenderer {
 	if width < minWrap {
 		width = minWrap
 	}
 	r, err := glamour.NewTermRenderer(
-		glamour.WithStandardStyle(glamourStyle()),
+		glamour.WithStandardStyle(glamourStyle(theme)),
 		glamour.WithWordWrap(width),
 	)
 	if err != nil {

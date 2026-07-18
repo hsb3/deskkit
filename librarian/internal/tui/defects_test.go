@@ -15,24 +15,27 @@ import (
 // of the fixed "dark" style, a GLAMOUR_STYLE override, and an explicit rejection of "auto" (which
 // would reintroduce the query) together assert the query can never happen.
 func TestGlamourStyle_NoRuntimeQuery(t *testing.T) {
-	t.Run("default is static dark, not auto", func(t *testing.T) {
+	t.Run("resolved theme picks a static style, never auto", func(t *testing.T) {
 		t.Setenv("GLAMOUR_STYLE", "")
-		if got := glamourStyle(); got != styles.DarkStyle {
-			t.Errorf("default style = %q, want %q (never the querying auto style)", got, styles.DarkStyle)
+		if got := glamourStyle(themeDark); got != styles.DarkStyle {
+			t.Errorf("dark theme style = %q, want %q (never the querying auto style)", got, styles.DarkStyle)
 		}
-		if glamourStyle() == styles.AutoStyle {
-			t.Fatal("default resolved to the auto style, which triggers a terminal query")
+		if got := glamourStyle(themeLight); got != styles.LightStyle {
+			t.Errorf("light theme style = %q, want %q (glamour's static light config)", got, styles.LightStyle)
+		}
+		if glamourStyle(themeDark) == styles.AutoStyle || glamourStyle(themeLight) == styles.AutoStyle {
+			t.Fatal("a resolved theme produced the auto style, which triggers a terminal query")
 		}
 	})
-	t.Run("GLAMOUR_STYLE overrides", func(t *testing.T) {
+	t.Run("GLAMOUR_STYLE overrides the theme", func(t *testing.T) {
 		t.Setenv("GLAMOUR_STYLE", "light")
-		if got := glamourStyle(); got != "light" {
-			t.Errorf("style = %q, want light (GLAMOUR_STYLE must win)", got)
+		if got := glamourStyle(themeDark); got != "light" {
+			t.Errorf("style = %q, want light (GLAMOUR_STYLE must win over the theme)", got)
 		}
 	})
-	t.Run("auto is rejected back to dark", func(t *testing.T) {
+	t.Run("auto is rejected back to the theme default", func(t *testing.T) {
 		t.Setenv("GLAMOUR_STYLE", styles.AutoStyle)
-		if got := glamourStyle(); got != styles.DarkStyle {
+		if got := glamourStyle(themeDark); got != styles.DarkStyle {
 			t.Errorf("style = %q, want %q (an explicit auto must not reintroduce the query)", got, styles.DarkStyle)
 		}
 	})
@@ -64,15 +67,25 @@ func TestCtrlT_TogglesNeverQuits(t *testing.T) {
 	}
 }
 
-// TestAssistantStyle_HighContrast guards the Defect-2 fix: the streaming answer body must carry
-// an explicit bright foreground so it never renders at the terminal's (possibly low-contrast)
-// default, and it must be visibly distinct from the faint step-line style.
+// TestAssistantStyle_HighContrast guards the Defect-2 fix across both static themes: the
+// streaming answer body must carry an explicit high-contrast foreground for the resolved
+// background — bright white on dark, black on light — so it never renders at the terminal's
+// (possibly invisible) default, and it must stay visibly distinct from the faint step-line style.
 func TestAssistantStyle_HighContrast(t *testing.T) {
-	st := newStyles()
-	if got := st.assistant.GetForeground(); got != lipgloss.Color("15") {
-		t.Errorf("assistant foreground = %v, want bright white (15)", got)
+	cases := []struct {
+		theme string
+		want  lipgloss.Color
+	}{
+		{themeDark, lipgloss.Color("15")}, // bright white on a dark background
+		{themeLight, lipgloss.Color("0")}, // black on a light background
 	}
-	if st.assistant.GetForeground() == st.step.GetForeground() {
-		t.Error("assistant body and faint step lines share a foreground; answer must be brighter")
+	for _, tc := range cases {
+		st := newStyles(tc.theme)
+		if got := st.assistant.GetForeground(); got != tc.want {
+			t.Errorf("%s: assistant foreground = %v, want %v", tc.theme, got, tc.want)
+		}
+		if st.assistant.GetForeground() == st.step.GetForeground() {
+			t.Errorf("%s: assistant body and faint step lines share a foreground; answer must stand out", tc.theme)
+		}
 	}
 }
