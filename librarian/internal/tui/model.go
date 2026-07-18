@@ -95,13 +95,36 @@ func (p *agentProvider) closeSession(ctx context.Context, s streamer) error {
 	return nil
 }
 
-// Layout constants: the header and footer are one line each; the input textarea is a fixed
-// height. The viewport takes whatever height remains.
+// Layout constants: the header and footer are one full-width line each; the input textarea is a
+// fixed inner height wrapped in a rounded border (inputBorderHeight rows: one top, one bottom).
+// The viewport takes whatever height remains.
 const (
-	headerHeight = 1
-	footerHeight = 1
-	inputHeight  = 3
+	headerHeight      = 1
+	footerHeight      = 1
+	inputHeight       = 3
+	inputBorderHeight = 2 // rounded input box: top + bottom border rows added around the textarea
 )
+
+// maxMeasure caps the transcript's readable text width. Wide terminals keep a comfortable measure
+// instead of stretching a line the full width of the screen; full-width chrome (the header/footer
+// bars, the input border) still spans the real terminal width — only the text measure is capped.
+const maxMeasure = 120
+
+// measureWidth is the capped text measure for the transcript: min(terminalWidth - chrome, 120),
+// floored at minWrap so a very narrow terminal still wraps sanely. chrome reserves the two columns
+// the left gutter/block border + its trailing space consume, so a gutter-prefixed line at the full
+// measure still fits the viewport width. Kept pure so the clamp is unit-tested without a terminal.
+func measureWidth(termWidth int) int {
+	const chrome = 2 // left gutter glyph + its trailing space (or the block border + padding)
+	w := termWidth - chrome
+	if w > maxMeasure {
+		w = maxMeasure
+	}
+	if w < minWrap {
+		w = minWrap
+	}
+	return w
+}
 
 // role distinguishes a transcript entry's author.
 type role int
@@ -244,9 +267,10 @@ type model struct {
 	cancelTurn context.CancelFunc
 	events     <-chan agent.Event
 
-	width  int
-	height int
-	ready  bool
+	width    int
+	height   int
+	contentW int // capped transcript text measure (measureWidth); drives glamour wrap + user blocks
+	ready    bool
 
 	picker *pickerModel // conversation-resume overlay (ctrl+o); nil when closed.
 }
@@ -258,7 +282,8 @@ type model struct {
 func newModel(baseCtx context.Context, sess streamer, provider sessionProvider, cfg *config.Config, theme string) model {
 	ta := textarea.New()
 	ta.Placeholder = "Ask the librarian… (enter to send, alt+enter for a newline)"
-	ta.Prompt = "▏ "
+	// No textarea prompt glyph: the rounded input box border is the composing-line cue now.
+	ta.Prompt = ""
 	ta.ShowLineNumbers = false
 	ta.CharLimit = 0
 	// Plain enter is the send key (handled in Update); rebind the textarea's own newline to
@@ -737,18 +762,23 @@ func (m *model) handleEvent(ev agent.Event) {
 func (m *model) resize(w, h int) {
 	m.width = w
 	m.height = h
+	m.contentW = measureWidth(w)
 	m.ready = true
 
-	vpHeight := h - headerHeight - footerHeight - inputHeight
+	vpHeight := h - headerHeight - footerHeight - inputHeight - inputBorderHeight
 	if vpHeight < 1 {
 		vpHeight = 1
 	}
 	m.vp.Width = w
 	m.vp.Height = vpHeight
-	m.ta.SetWidth(w)
+	// The textarea sits inside the rounded input box; reserve the two columns its left/right
+	// border consume so the box spans the full terminal width without wrapping.
+	m.ta.SetWidth(w - 2)
 	m.ta.SetHeight(inputHeight)
 	m.hlp.Width = w // the help footer truncates its short view to the terminal width
-	m.renderer = newRenderer(w, m.theme)
+	// Glamour wraps at the CAPPED measure, not the raw width — the transcript keeps a readable
+	// line length on a wide terminal even though the bars span the whole screen.
+	m.renderer = newRenderer(m.contentW, m.theme)
 	if m.picker != nil {
 		m.picker.SetSize(w, vpHeight) // the overlay occupies the viewport area
 	}
@@ -779,16 +809,23 @@ func (m model) renderTranscript() string {
 	return strings.Join(parts, "\n\n")
 }
 
-// renderEntry renders one transcript item: the role label, then steps (assistant only), the
-// body bubble (glamour once finalized, plain while streaming), any interrupted/error badge, and —
-// for a finished assistant turn — a faint per-turn footer. The whole block is prefixed with a
-// colored left gutter (thick accent ▌ for the user, faint thin │ for the librarian) so turns are
-// visually separated even under NO_COLOR, where lipgloss strips the color but the glyph remains.
+// renderEntry renders one transcript item. A USER turn is a block: a thick ▌ accent left border,
+// left padding, and a subtle per-theme fill (renderEntry above). An ASSISTANT turn keeps the role
+// label, then steps, the body bubble (glamour once finalized, plain while streaming), any
+// interrupted/error badge, and — for a finished turn — a faint per-turn footer, all prefixed with
+// a faint thin │ gutter and NO background fill (answers stay on the terminal background for maximum
+// readability). Both role treatments survive NO_COLOR: lipgloss strips the color but the ▌ / │
+// glyphs remain, so turns stay visually separated colorless.
 func (m model) renderEntry(e entry) string {
 	switch e.role {
 	case roleUser:
-		content := m.styles.roleLabel.Render("you") + "\n" + m.styles.user.Render(e.text)
-		return applyGutter(content, m.styles.userGutter, "▌")
+		// A user turn is a BLOCK: a thick ▌ accent left border + left padding + a subtle block
+		// fill spanning the capped measure, so it reads as a raised surface distinct from the
+		// header/footer bars. The label and text carry the block fill too, so the tint is
+		// continuous behind the text rather than only in the trailing pad. Under NO_COLOR the
+		// fill and border color drop via the color profile, but the ▌ glyph remains as structure.
+		inner := m.styles.userLabel.Render("you") + "\n" + m.styles.user.Render(e.text)
+		return m.styles.userBlock.Width(m.contentW).Render(inner)
 
 	default: // roleAssistant
 		var b strings.Builder
@@ -873,30 +910,55 @@ func (m model) View() string {
 	return lipgloss.JoinVertical(lipgloss.Left,
 		m.renderHeader(),
 		body,
-		m.ta.View(),
+		m.renderInput(),
 		m.renderFooter(),
 	)
 }
 
-// renderHeader renders `desk · provider/model`, clipped to the terminal width.
+// renderHeader renders `desk · provider/model` as a full-width bar: a subtle per-theme background
+// fill spanning the whole terminal width, bold accent desk name, muted provider/model. The bar
+// segments each carry the fill so it is continuous behind the text; the outer bar pads the rest
+// and truncates to width so the one-line bar never wraps.
 func (m model) renderHeader() string {
 	left := m.styles.headerAccent.Render(m.deskName)
 	right := m.styles.header.Render(" · " + m.llmProvider + "/" + m.llmModel)
-	return clip(left+right, m.width)
+	return m.styles.headerBar.Width(m.width).MaxWidth(m.width).Render(left + right)
 }
 
-// renderFooter renders the self-documenting keybind help (bubbles/help: one-line ShortHelp, or the
-// grouped FullHelp when ctrl+g toggled ShowAll) plus the live state segment. The state shows a
-// transient toast when one is set (copy confirmation / error); otherwise the streaming/cancelling/
-// ready indicator, with a "▼ new output" hint appended while the reader has scrolled up mid-stream.
-// Under reduced motion the animated spinner is replaced by static "working…" text. Clipped to width.
+// renderInput renders the textarea wrapped in a rounded, full-width border box. The border color
+// is a state cue, not a lock: accent when ready for input, faint while a turn is streaming (typing
+// still works throughout). The textarea was sized to width-2 in resize so the box spans the full
+// terminal width.
+func (m model) renderInput() string {
+	border := m.styles.inputBorder
+	if m.streaming {
+		border = m.styles.inputBorderBusy
+	}
+	return border.Render(m.ta.View())
+}
+
+// renderFooter renders the self-documenting keybind help (bubbles/help) plus the live state
+// segment. When ctrl+g has toggled ShowAll, the grouped full help renders as an un-barred overlay
+// on the terminal background (a multi-line list, kept legible). Otherwise it is a full-width status
+// bar: a subtle per-theme fill matching the header bar, with the help hints on the left and the
+// live state on the right. The state shows a transient toast when set (copy confirmation / error);
+// otherwise the streaming/cancelling/ready indicator, with a "▼ new output" hint appended while the
+// reader has scrolled up mid-stream. Under reduced motion the animated spinner is replaced by
+// static "working…" text. The bar segments carry the fill so it is continuous behind the text.
 func (m model) renderFooter() string {
+	// ctrl+g expansion: a grouped overlay list on the terminal background, not a bar.
+	if m.hlp.ShowAll {
+		hlp := m.hlp
+		hlp.Styles = m.styles.help
+		return hlp.View(m.keymap)
+	}
+
 	var state string
 	switch {
 	case m.toast != "":
-		state = m.styles.toast.Render(m.toast)
+		state = m.styles.toast.Render("  " + m.toast)
 	case m.cancelling:
-		state = m.styles.footerState.Render("cancelling…")
+		state = m.styles.footerState.Render("  cancelling…")
 	case m.streaming:
 		work := "working…"
 		if !m.reduced {
@@ -905,25 +967,19 @@ func (m model) renderFooter() string {
 		if !m.vp.AtBottom() {
 			work += "  ▼ new output"
 		}
-		state = m.styles.footerState.Render(work)
+		state = m.styles.footerState.Render("  " + work)
 	default:
-		state = m.styles.footerState.Render("ready")
+		state = m.styles.footerState.Render("  ready")
 	}
 
 	// Reserve room for the always-visible state segment; the help hints fill whatever remains and
 	// truncate themselves to fit (bubbles/help), so the live state is never clipped off the end.
+	// The help uses the barred palette so its segments sit on the status-bar fill.
 	hlp := m.hlp
-	if w := m.width - lipgloss.Width(state) - 2; w > 0 {
+	hlp.Styles = m.styles.helpBar
+	if w := m.width - lipgloss.Width(state); w > 0 {
 		hlp.Width = w
 	}
 	hints := hlp.View(m.keymap)
-	return clip(hints+"  "+state, m.width)
-}
-
-// clip hard-limits a rendered line to width display cells, so header/footer never wrap.
-func clip(s string, width int) string {
-	if width <= 0 {
-		return s
-	}
-	return lipgloss.NewStyle().MaxWidth(width).Render(s)
+	return m.styles.footerBar.Width(m.width).MaxWidth(m.width).Render(hints + state)
 }

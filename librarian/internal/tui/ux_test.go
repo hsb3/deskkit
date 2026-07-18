@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 
 	"github.com/example/pocket-librarian/internal/agent"
 )
@@ -80,16 +81,80 @@ func TestReducedMotion_FooterText(t *testing.T) {
 	}
 }
 
-// TestGutterStyles_DifferByRole: each theme defines distinct left-gutter styles for the two roles
-// (accent for the user, faint for the librarian) so turns are visually separated.
+// TestGutterStyles_DifferByRole: each theme distinguishes the two roles' left-edge treatment —
+// the user block's accent ▌ border vs the librarian's faint │ gutter — so turns are visually
+// separated. The user block also carries a fill and the assistant does not; both are asserted here.
 func TestGutterStyles_DifferByRole(t *testing.T) {
 	for _, theme := range []string{themeDark, themeLight} {
 		st := newStyles(theme)
-		u := st.userGutter.GetForeground()
+		u := st.userBlock.GetBorderLeftForeground()
 		a := st.assistantGutter.GetForeground()
 		if u == a {
-			t.Errorf("%s: user and assistant gutter share foreground %v; roles must be distinguishable", theme, u)
+			t.Errorf("%s: user block border and assistant gutter share foreground %v; roles must be distinguishable", theme, u)
 		}
+		if st.userBlock.GetBackground() == (lipgloss.NoColor{}) {
+			t.Errorf("%s: user block has no fill; it must read as a raised surface", theme)
+		}
+		if st.assistant.GetBackground() != (lipgloss.NoColor{}) {
+			t.Errorf("%s: assistant body carries a fill; answers must stay on the terminal background", theme)
+		}
+	}
+}
+
+// TestSurfaceStyles_PerTheme pins the new app-chrome treatment: the header bar, footer bar, and
+// user block each carry a concrete per-theme fill that DIFFERS between light and dark (the whole
+// point of a per-theme tone), and the two bar surfaces sit on a different plane than the user
+// block within a theme. The input-border color is a ready/busy state cue (accent vs faint), which
+// is shared across themes, so it is pinned by state difference, not by a per-theme difference.
+func TestSurfaceStyles_PerTheme(t *testing.T) {
+	dark := newStyles(themeDark)
+	light := newStyles(themeLight)
+
+	cases := []struct {
+		name       string
+		dark, lite lipgloss.TerminalColor
+	}{
+		{"header bar", dark.headerBar.GetBackground(), light.headerBar.GetBackground()},
+		{"footer bar", dark.footerBar.GetBackground(), light.footerBar.GetBackground()},
+		{"user block", dark.userBlock.GetBackground(), light.userBlock.GetBackground()},
+	}
+	for _, c := range cases {
+		if c.dark == (lipgloss.NoColor{}) || c.lite == (lipgloss.NoColor{}) {
+			t.Errorf("%s: missing a fill (dark=%v light=%v); the surface must be tinted", c.name, c.dark, c.lite)
+		}
+		if c.dark == c.lite {
+			t.Errorf("%s: fill %v is shared across themes; it must be a per-theme tone", c.name, c.dark)
+		}
+	}
+
+	// Bars and user blocks are different planes within a theme (raised block vs bar surface).
+	if dark.headerBar.GetBackground() == dark.userBlock.GetBackground() {
+		t.Error("dark: header bar and user block share a fill; bars and blocks must read as different surfaces")
+	}
+	if light.headerBar.GetBackground() == light.userBlock.GetBackground() {
+		t.Error("light: header bar and user block share a fill; bars and blocks must read as different surfaces")
+	}
+
+	// Input border: ready (accent) vs busy (faint) must differ so the streaming state is legible.
+	if dark.inputBorder.GetBorderLeftForeground() == dark.inputBorderBusy.GetBorderLeftForeground() {
+		t.Error("input border: ready and busy share a color; the streaming cue would be invisible")
+	}
+}
+
+// TestMeasureWidth_CapsAt120: the transcript text measure clamps at 120 on a wide terminal and
+// passes through (minus the gutter chrome) below the cap, floored at minWrap on a tiny terminal.
+func TestMeasureWidth_CapsAt120(t *testing.T) {
+	if got := measureWidth(400); got != maxMeasure {
+		t.Errorf("measureWidth(400) = %d, want the %d cap", got, maxMeasure)
+	}
+	if got := measureWidth(122); got != maxMeasure {
+		t.Errorf("measureWidth(122) = %d, want the %d cap (chrome pulls 122 exactly to the cap)", got, maxMeasure)
+	}
+	if got := measureWidth(80); got != 78 {
+		t.Errorf("measureWidth(80) = %d, want 78 (pass-through below the cap, minus 2 chrome cols)", got)
+	}
+	if got := measureWidth(5); got != minWrap {
+		t.Errorf("measureWidth(5) = %d, want the %d floor", got, minWrap)
 	}
 }
 
