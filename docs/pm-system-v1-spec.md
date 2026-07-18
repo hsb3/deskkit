@@ -109,7 +109,7 @@ librarian/
 │   ├── config/     # Load (env > profile > default), StoreDir (XDG), profile
 │   ├── bootstrap/  # CheckDeskGuard (deskCarryingCollections), EnsureSuperuser
 │   ├── desklib/    # checksum, frontmatter parse, git meta, write_exact, ignore
-│   ├── tools/      # the six tools + registry.go (ToolSpec, Registry, AgentTools §5.4 gate)
+│   ├── tools/      # the SEVEN tools + registry.go (ToolSpec, Registry, AgentTools §5.4 gate)
 │   ├── agent/      # eino ReAct loop, Session, buildTools (map name→InvokableTool builder)
 │   ├── mcp/        # MCP stdio server (switch name→handler; toolInputTypes map)
 │   ├── tui/        # full-screen Bubble Tea TUI (ADR 0004)
@@ -121,8 +121,11 @@ librarian/
 
 Two facts about this layout drive the refactor:
 
-1. **The tool core is librarian-specific.** `internal/tools/registry.go` hardcodes the six
-   librarian tools as `Registry`. Both model-facing surfaces bind tools by a name-keyed switch:
+1. **The tool core is librarian-specific.** `internal/tools/registry.go` hardcodes the
+   **seven** librarian tools as `Registry`: the original six (`sweep`, `patrol`, `propose_fix`,
+   `apply_fix`, `restore`, `query`) **plus `record_feedback`** (added since the original spec —
+   a D2 builder migrating "the six tools" would under-migrate; several codebase comments still
+   say "six"). Both model-facing surfaces bind tools by a name-keyed switch:
    `internal/agent/agent.go`'s `buildTools` uses a `map[string]func(...)` of eino-tool builders,
    and `internal/mcp/server.go`'s `register` uses a `switch name` plus a `toolInputTypes` map.
    Neither can admit a second module's tools without generalization.
@@ -134,7 +137,8 @@ Two facts about this layout drive the refactor:
 
 ```text
 librarian/
-├── cmd/deskkit/main.go               # renamed spine; wires core + the enabled module set
+├── cmd/pocket-librarian/main.go      # the spine; wires core + the enabled module set
+│                                     #   (renamed to cmd/deskkit/ in D2b — AFTER the D2 gate; §2.10)
 ├── internal/
 │   ├── core/
 │   │   ├── app/         # PB bootstrap, NewWithConfig, OnServe orchestration
@@ -147,7 +151,7 @@ librarian/
 │   └── modules/
 │       ├── librarian/   # all existing librarian code, moved verbatim, registered as a module
 │       │   ├── collections/ (the 0001..0013 migrations, re-homed, ids preserved)
-│       │   ├── tools/   # the six tools (unchanged bodies)
+│       │   ├── tools/   # the seven tools (unchanged bodies; incl. record_feedback)
 │       │   ├── hooks/, tui/, prompt/, agent/, desklib/, provider/, setup/
 │       │   └── module.go   # implements core.Module; also implements core.DocumentValidator
 │       └── pm/          # NEW — the PM module
@@ -159,9 +163,14 @@ librarian/
 │           └── module.go       # implements core.Module; consumes core.DocumentValidator
 ```
 
-The binary is renamed from `pocket-librarian` to a neutral chassis name (this spec uses
-`deskkit`; the owner confirms the final name at build time — see §13). The `librarian`
-subcommand group and all librarian behavior are preserved (§2.7).
+The binary rename (`pocket-librarian` → `deskkit`; owner-approved, name included) is
+**deliberately NOT part of D2**: `verify.sh` builds `./cmd/pocket-librarian` (line 112), so a
+rename inside D2 would contradict the §2.7 "verify.sh passes unchanged" gate. D2 keeps
+`cmd/pocket-librarian/` and `verify.sh` untouched; the rename ships as its own slice **D2b**
+(§2.10), sequenced immediately after the D2 gate has been demonstrated green. The librarian's
+tool subcommands **stay top-level** (`sweep`, `patrol`, `chat`, …) — there is no `librarian`
+command group, in D2 or after; moving them would break `verify.sh` and the §2.7 gate. The new
+`pm` group (§5.3) is the only command group.
 
 ### 2.4 The module registration interface
 
@@ -237,7 +246,7 @@ every surface without editing agent/mcp/cli by hand:
 // package core/toolcore
 type ToolSpec struct {
     Module       string          // owning module (namespacing + provenance)
-    Name         string          // e.g. "get_context", "advance_item"
+    Name         string          // e.g. "get_context", "transition_item"
     Description  string
     InputType    reflect.Type    // replaces mcp.toolInputTypes; drives schema reflection
     WritesFiles  bool
@@ -256,8 +265,9 @@ type ToolSpec struct {
 - **TUI/eino** binding: `buildTools` becomes a loop over the merged registry rather than a
   name-keyed builder map.
 
-The librarian's six `ToolSpec`s move under `modules/librarian/tools` unchanged in behavior; the
-PM tool family (§5.1) is added under `modules/pm/tools`.
+The librarian's **seven** `ToolSpec`s (six original + `record_feedback`) move under
+`modules/librarian/tools` unchanged in behavior; the PM tool family (§5.1) is added under
+`modules/pm/tools`.
 
 ### 2.7 Zero-behavior-change guarantee (D2 gate)
 
@@ -273,9 +283,31 @@ is preserved.* Concretely:
 - `pm` is registered but `Enabled()` defaults `false`, so a D2-only build is behaviorally
   identical to today's binary. The PM collections are not created and no PM surface appears until
   a desk opts in (§8.1).
+- **`cmd/pocket-librarian/` and `verify.sh` stay untouched in D2.** The binary/store rename is
+  D2b (§2.10), a separate slice that runs only after this gate has been demonstrated green.
+- The codebase's own stale "six tools" comments are corrected to seven during the move (§2.2
+  fact 1) — a comment-only fix, inside the zero-*behavior*-change envelope.
 
 Any test that changes is a regression to fix, not a test to update — the gate is that the
 *existing* suite is green as-is.
+
+### 2.10 D2b — the chassis rename (owner-approved)
+
+The owner has approved renaming the binary to **`deskkit`**. It ships as its own slice,
+**D2b**, sequenced immediately after the D2 zero-change gate is green — a deliberately
+librarian-visible change with its own acceptance, never mixed into D2:
+
+- `cmd/pocket-librarian/` → `cmd/deskkit/`; `verify.sh` (line 112 build path) and both
+  Makefiles are updated **in the same commit**; acceptance = full suite + verify gate green
+  *after* the rename.
+- **The store home renames with the binary** (`config.AppDirName`:
+  `$XDG_DATA_HOME/pocket-librarian/<DESK>/` → `$XDG_DATA_HOME/deskkit/<DESK>/`), with an
+  explicit **automatic path migration**: on startup, if the new home is absent and the old
+  `pocket-librarian/<DESK>/` directory exists, move it to the new home and log one line. No
+  desk loses its store across the rename.
+- ADR 0002's store-path literal gets a **dated correction callout** in the same PR that ships
+  D2b (per the repo's decision-record discipline: a correction, not a supersession — the
+  store-per-desk decision stands; only the literal path changed).
 
 ### 2.8 The migration framework + meta collection (R5.5b, R7.1)
 
@@ -293,12 +325,34 @@ Core owns `core/migrate`. Each `Migration` is tagged with its owning module. The
 
 **Interpretation flagged (§13):** PocketBase's own migration runner and `migratecmd` are global
 and compile-time. To keep the D2 zero-change gate, the librarian's migrations continue to run
-through the existing PocketBase runner; `core/migrate` wraps that runner, tags each applied
-migration with its module, and maintains `module_schema_versions` as the *logical* per-module
-version of record. **Feature gating (§2.9) controls whether a module's collections are physically
-created**: when `pm.Enabled()` is false, the PM migrations are not registered into the runner at
-all, so a librarian-only desk has no PM collections (true physical omission, not inert tables).
-Flipping the gate on runs the PM migrations and stamps `module_schema_versions`.
+through the existing PocketBase runner; `core/migrate` wraps that runner and maintains
+`module_schema_versions` as the *logical* per-module version of record. **Feature gating (§2.9)
+controls whether a module's collections are physically created**: when `pm.Enabled()` is false,
+the PM migrations are not registered into the runner at all, so a librarian-only desk has no PM
+collections (true physical omission, not inert tables). Flipping the gate on runs the PM
+migrations and stamps `module_schema_versions`.
+
+**The mechanism, pinned (binding on D2/D3 builders):**
+
+- **(a) PM migrations MUST NOT use the librarian's `init()` + `m.Register` self-registration
+  pattern.** The librarian's migration files register themselves into PocketBase's global list
+  via package `init()` + a blank import — unconditional at compile time. A PM migration written
+  that way would register regardless of the feature gate and **break it**. Instead, the PM
+  module's `Migrations()` manifest (§2.4) returns its ordered up/down pairs as values, and
+  `core/migrate` registers them into the PocketBase runner **programmatically, only when
+  `pm.Enabled(cfg)` is true**, before the runner executes. A D3 builder copying the librarian
+  migration-file pattern is a bug, and test §10.6 catches it (PM collections must not exist on
+  a gated-off desk).
+- **(b) Librarian migrations `0001..0013` keep their existing `init()`/blank-import path through
+  the PB runner unchanged** (the D2 zero-change gate). Per-module stamping works by
+  **observation, not interception**: after the runner completes (post-`RunAppMigrations` /
+  post-automigrate, at the same points the store is opened today), `core/migrate` reads
+  PocketBase's `_migrations` applied-list and matches applied migration file basenames against
+  each enabled module's declared manifest — the librarian module's `Migrations()` lists its
+  `NNNN_*.go` basenames (a manifest-vs-disk drift test keeps this list honest); the PM module's
+  manifest is its programmatic list from (a). It then upserts each module's
+  `module_schema_versions` row with the highest applied sequence number for that module. One
+  stamping mechanism, both registration styles.
 
 ### 2.9 Feature gating (R5.5c, R1.3)
 
@@ -376,9 +430,11 @@ A small, code-enforced machine, deliberately separate from `status_label`:
 - **`blocked`** is a side-state (R2.2): setting it preserves the current phase and stores a
   `restore_phase`; clearing it returns the item to `restore_phase`. Advance is refused while
   blocked.
-- **Gates run on the `advance` edges** (§4): an advance is admitted by the machine, then the gate
-  engine checks the target phase's required documents; either can refuse. `reopen`/`demote` are
-  never document-gated (you can always walk work backward).
+- **Gates bind edges per the gate config** (§4): a transition is admitted by the machine, then
+  the gate engine evaluates whatever requirements the desk's gate config binds to that edge;
+  either can refuse. **By default only forward (advance) edges carry gates**; `reopen`/`demote`
+  are legal edges with **no gate unless the config binds one** (walking work backward is
+  ungated by default).
 
 The machine table lives in `modules/pm/statemachine` as data-in-code; extending it (e.g. a
 fast-track edge, R1.4) is a code change, not a config change — deliberate (§9).
@@ -440,7 +496,7 @@ outgoing gating edges and applies the rule to each B.
 | Field | Type | Notes |
 |---|---|---|
 | `item` | relation → items | |
-| `from_phase`,`to_phase` | text | (or `block`/`unblock`/`claim`/`gate-refused` event kinds) |
+| `from_phase`,`to_phase` | text | (or `block`/`unblock`/`claim`/`gate_refused` event kinds) |
 | `event` | select | `advance`,`demote`,`reopen`,`block`,`unblock`,`claim`,`release`,`gate_refused` |
 | `actor` | text | who: a human handle or an agent id (R2.5) |
 | `actor_kind` | select | `human`,`agent` |
@@ -491,19 +547,23 @@ prompt-dependent (R3.1).
 
 ### 4.1 Enforcement point (R3.1)
 
-The gate check lives in the PM module's `advance` path — the single code path every surface
-(MCP/CLI/TUI) routes through — *not* in a prompt or an agent instruction. Sequence for
-`advance(item, target_phase)`:
+The gate check lives in the PM module's transition path — the single code path every surface
+(MCP/CLI/TUI) routes through — *not* in a prompt or an agent instruction. **One generic
+transition tool serves every legal edge**: `transition_item(item, target_phase)` (advance,
+demote, and reopen are all requests through this one tool; the machine derives the edge kind
+from current → target phase). Sequence:
 
 1. The state machine admits the edge, else refuse ("no legal transition `X→Y`").
-2. If `item.blocked`, refuse ("item is blocked: `<reason>`").
+2. If `item.blocked` and the edge is a forward (advance) edge, refuse ("item is blocked:
+   `<reason>`").
 3. If a live foreign claim exists, refuse (R2.6).
-4. The gate engine resolves the required artifacts for `(item.type, target_phase)` from
-   `desk_config` (§4.2), calls `DocumentValidator.Verdict(...)` per artifact (§2.5), and refuses
-   with the **exact list of what is missing** if any verdict is unsatisfied (R3.1). Example
-   refusal: *"cannot advance decision item to terminal: required document (type=decision,
-   status=accepted) at `_structure/decisions/0021-x.md` is at status `proposed`, needs
-   `accepted`."*
+4. The gate engine looks up the requirements the desk's gate config binds to
+   `(item.type, edge)` (§4.2) — **forward edges by default; demote/reopen carry no gate unless
+   the config binds one** — calls `DocumentValidator.Verdict(...)` per required artifact (§2.5),
+   and refuses with the **exact list of what is missing** if any verdict is unsatisfied (R3.1).
+   Example refusal: *"cannot advance decision item to terminal: required document
+   (type=decision, status=accepted) at `_structure/decisions/0021-x.md` is at status
+   `proposed`, needs `accepted`."* An edge with no bound gate passes this step trivially.
 5. On success: write the new phase, append a `transitions` row, run the cascade scan (§3.5), emit
    the realtime event (§5.4).
 
@@ -543,7 +603,10 @@ traits:
 - **Per-type rules** map `(type, transition)` → required documents.
 - **Traits** compose cross-cutting requirements by matching an item field (or its pointed doc's
   frontmatter), so a rule like "anything that governs desk operations needs an accepted decision"
-  is written once (R3.3).
+  is written once (R3.3). A trait's `match` predicate may reference either a **first-class item
+  field** or a **frontmatter field of the item's pointed document** — as `governs` above, which
+  is not an `items` field but doc frontmatter, resolved through the validation seam (§2.5), never
+  by reading librarian collections.
 - Effective requirements for a transition = the per-type rule ∪ every matching trait.
 - The loader validates this YAML against the gate-config schema on write; an invalid config is
   rejected (fail-loud, R7 discipline) rather than silently disabling gates.
@@ -583,7 +646,7 @@ The same three surfaces as the librarian — MCP (agents), CLI (scripts/owner), 
 | `get_item` | no | one item + its notes, deps, recent transitions, ancestor chain |
 | `create_item` | yes | add a work item to the graph |
 | `update_item` | yes | edit first-class fields (version-checked; R2.6) |
-| `advance_item` | yes | request a phase transition (runs the machine + gates; §4.1) |
+| `transition_item` | yes | request any legal phase transition — advance/demote/reopen — via `(item, target_phase)` (runs the machine + gates; §4.1) |
 | `block_item` / `unblock_item` | yes | set/clear the blocked side-state |
 | `add_note` | yes | attach a phase-scoped note (§3.7) |
 | `link_items` | yes | create a typed dependency edge (§3.4) |
@@ -592,9 +655,10 @@ The same three surfaces as the librarian — MCP (agents), CLI (scripts/owner), 
 Write tools carry the `WritesFiles=false` flag semantics adapted to "mutates the store" — the
 §5.4 librarian write gate governs *desk-file* writes; PM tools write only the store, so they are
 not behind `LIBRARIAN_AUTONOMOUS_WRITES`. The PM module MAY define its own gate for autonomous
-`advance` if a desk wants agents read-only over the graph (a `PM_AUTONOMOUS_WRITES` flag,
+transitions if a desk wants agents read-only over the graph (a `PM_AUTONOMOUS_WRITES` flag,
 mirroring the librarian pattern) — this spec ships it defaulting **on** for PM writes (agents are
-expected to drive the graph) while keeping `advance`'s document gates as the real safety (§13).
+expected to drive the graph) while keeping `transition_item`'s document gates as the real
+safety (§13).
 
 ### 5.2 `get_context` — the cold-start briefing (R4.2)
 
@@ -623,7 +687,7 @@ One call returns the desk's working state, replacing the hand-maintained handoff
 
 ### 5.3 CLI + TUI
 
-- **CLI**: a `pm` command group (`deskkit pm context`, `pm advance <id> --to review`,
+- **CLI**: a `pm` command group (`deskkit pm context`, `pm transition <id> --to review`,
   `pm list --court owner`, …). The owner/script surface. `--actor` sets the audit actor;
   `--json` is the default machine contract (mirrors the librarian tools' JSON-first output).
 - **TUI**: PM views mounted into the shared Bubble Tea TUI (ADR 0004) via `Module.TUIViews()` — a
@@ -722,6 +786,11 @@ function of the desk's documents + `desk_config`. A rebuild = fresh store → ru
 the import → identical graph. The `module_schema_versions` meta collection makes the target
 schema state explicit and checkable.
 
+The D2b rename (§2.10) moves the store *home* but never its contents' semantics: the automatic
+path migration (old `pocket-librarian/<DESK>/` → new home, one logged line) is a directory
+move, and a post-move rebuild-from-scratch at the new home must produce the identical store —
+the reproducibility gate runs against the renamed layout too.
+
 ### 8.3 Version + migration discipline (R7.1)
 
 - Explicit schema versioning per module via `module_schema_versions` (§2.8). A desk on version X
@@ -754,6 +823,12 @@ v1 is stated.
   would read. Not built: no driver loop, no worktree/circuit-breaker orchestration.
 - **R1.3 — minimal-first.** The whole PM module is feature-gated off by default (§2.9) so v1 can
   ship in the binary and prove out on one desk before any desk is required to adopt it.
+- **R5.2 (partial) — portfolio read-only fan-out.** The cross-desk read-only portfolio view is
+  **explicitly LATER** (ADR 0002 itself frames it as "if one ever materializes"). **Constraint on
+  v1:** the store layout keeps all desks enumerable under one XDG application root
+  (`$XDG_DATA_HOME/<app>/<DESK>/` — one subdirectory per desk), so a read-only fan-out reader
+  can later be added by iterating that root, without any schema or layout change. Not built: no
+  fan-out surface, no cross-desk query.
 
 Also parked (open question in requirements, not a requirement): the ruling-form pattern (HTML Q/A
 + markdown export) as a first-class workflow surface. v1 leaves room via `notes` + `pointer`
@@ -770,7 +845,8 @@ The build is done when the repo's own hard gates pass (not when an agent says so
   refusal names exactly what is missing; then satisfy the document and assert the advance
   succeeds. A gate that cannot be made to fail is not proven.
 - **10.2 State-machine legality (R2.2).** Every illegal edge is refused by the machine before
-  gates; `blocked` blocks advance; reopen/demote are never document-gated.
+  gates; `blocked` blocks advance; demote/reopen pass ungated by default and are gated when
+  (and only when) the desk's config binds a gate to them.
 - **10.3 Cascade (R2.4).** auto clears once; auto-reopen re-blocks on regression; manual surfaces
   but does not auto-clear; permanent never clears. `unblock_at` releases at the named phase, not
   before.
@@ -805,7 +881,8 @@ parallel and gates only the gate-vocabulary reconciliation (§4.3).
 | Slice | Deliverable | Done when | Parallelism |
 |---|---|---|---|
 | **D1** (`#49`) | Kit port + schema-v1 reconciliation | 23 kits ported, neutrality-lint green, `kits.yaml` drift-guard red-able, every schema-gap disposition recorded | Parallel with D2; gates §4.3 vocabulary |
-| **D2** | Core + module refactor (R5.5) | §2.7 zero-behavior-change gate green (existing verify + full suite unchanged, stable ids preserved); `pm` registered but disabled | Serial foundation — blocks D3–D5 |
+| **D2** | Core + module refactor (R5.5) — NO rename: `cmd/pocket-librarian` + `verify.sh` untouched; migrates all SEVEN librarian tools (incl. `record_feedback`) and corrects the codebase's stale "six tools" comments during the move | §2.7 zero-behavior-change gate green (existing verify + full suite unchanged, stable ids preserved); `pm` registered but disabled | Serial foundation — blocks D2b, D3–D5 |
+| **D2b** | Chassis rename (§2.10): binary → `deskkit`, store home → `$XDG_DATA_HOME/deskkit/<DESK>/` with automatic path migration; verify.sh + Makefiles updated in the same commit; ADR 0002 dated correction callout in the same PR | Full suite + verify gate green AFTER the rename; old-store auto-migration observed (one logged line) | Immediately after the D2 gate is demonstrated green; before D4's surface docs freeze names |
 | **D3** | PM module: collections, machine, cascade, concurrency, gate engine (R2, R3) | §10.1–10.6 green; gates refuse naming what is missing | After D2; consumes D1 vocabulary for §4.3 |
 | **D4** | Surfaces: PM tool family on the shared core → MCP/CLI/TUI, `get_context`, realtime (R4) | §10.10 parity green; `get_context` returns the four sets; realtime emits on transitions | After D3 (needs the tools' core functions) |
 | **D5** | Complementary plugin: skills, agent defs, hooks, `.mcp.json` (R5.1, R5.3) | Plugin loads; neutrality green; a session-open skill renders the briefing | After D4 (needs the MCP surface); parallel with D6 |
@@ -844,7 +921,7 @@ coverage contract for D6's requirements-coverage acceptance criterion.
 | R4.3 realtime events | SHOULD → adopted | §5.4 |
 | R4.4 autonomous queue-drain | LATER | §9 (constraint: claim + append-only sufficient) |
 | R5.1 in-repo complementary plugin + PM module | MUST | §6, §2.3 |
-| R5.2 store-per-desk, config layering, open-guard, read-only portfolio | MUST | §2.1, §2.9, §3.1 desk field, §7 |
+| R5.2 store-per-desk, config layering, open-guard | MUST | §2.1, §2.9, §3.1 desk field, §7 — built; **portfolio read-only fan-out: LATER (§9)**, with the v1 constraint that all desks stay enumerable under one XDG root so fan-out needs no schema/layout change |
 | R5.3 identity-neutral artifacts | MUST | §6.2 |
 | R5.4 single-binary posture | SHOULD → adopted | §2 (one binary, embedded PB) |
 | R5.5 unified app+store, core+modules, 3 disciplines | MUST | §2 (whole section) |
@@ -862,10 +939,13 @@ coverage contract for D6's requirements-coverage acceptance criterion.
 Where the requirements left a genuine design choice, this spec makes a concrete one. Each is
 flagged here for the foreman/owner to review; none is claimed as ruled.
 
-1. **Binary/chassis rename.** The unified binary is renamed from `pocket-librarian` to a neutral
-   chassis name (`deskkit` used throughout as a placeholder). Rationale: it now serves two
-   modules; a librarian-named binary misrepresents the chassis. *Owner confirms the final name.*
-   Alternative: keep `pocket-librarian` and treat the librarian as the eponymous base module.
+1. **Binary/chassis rename — approved, and sequenced OUT of D2.** The owner has approved
+   renaming the unified binary to `deskkit` (it now serves two modules; a librarian-named binary
+   misrepresents the chassis). The design decision this spec takes is the **sequencing and store
+   handling**: the rename ships as its own slice D2b after the D2 zero-change gate (never inside
+   D2, which would contradict the "verify.sh passes unchanged" gate), the store home renames with
+   the binary, and an automatic old→new path migration plus an ADR 0002 dated correction callout
+   ship with it (§2.10).
 2. **Default `status_label` vocabulary** (§3.3): `backlog`/`next` (queue), `active` (work),
    `in-review` (review), `done`/`dropped`/`superseded` (terminal), `blocked`/`waiting` (flag).
    Small and neutral; fully editable per desk. The requirements left the exact set open.
@@ -884,8 +964,10 @@ flagged here for the foreman/owner to review; none is claimed as ruled.
    not a write flag, so agents may drive the graph by default; a `PM_AUTONOMOUS_WRITES=false` desk
    can make agents read-only. Alternative: default off (mirror the librarian's `apply_fix` gate);
    rejected because graph mutation is the PM system's whole point and it writes no desk files.
-10. **Realtime (R4.3) and secrets/portfolio/concurrency SHOULDs adopted**, not argued down —
-    each is cheap on the existing chassis (PB-native realtime; the seam; the version token).
+10. **Realtime (R4.3) and secrets/concurrency SHOULDs adopted**, not argued down — each is
+    cheap on the existing chassis (PB-native realtime; the seam; the version token). The R5.2
+    portfolio read-only fan-out is NOT adopted in v1 — it is LATER (§9), with the enumerable
+    one-XDG-root layout as the designed-for constraint.
 
 ### Interpretations / deviations to report
 
@@ -898,7 +980,7 @@ flagged here for the foreman/owner to review; none is claimed as ruled.
   both. See §2.8.
 - **The current tool-core surfaces are not module-ready** (verified): `internal/agent`'s
   `buildTools` name-keyed builder map and `internal/mcp`'s `switch name` + `toolInputTypes` map
-  are both hardcoded to the six librarian tools. D2 must generalize them into `core/toolcore`
+  are both hardcoded to the seven librarian tools. D2 must generalize them into `core/toolcore`
   (§2.6) before D4 can add PM tools — this is real refactor work, not just a file move, and is the
   main risk to the "pure move" framing of D2.
 - **No conflict found** between the requirements and the codebase on the core chassis facts
