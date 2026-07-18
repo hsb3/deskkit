@@ -5,11 +5,19 @@
 // Single-mechanism design (how double-persist is avoided): the callback fires on each
 // ChatModel node INPUT (model inputs are always concrete messages, never streams, so this
 // fires reliably regardless of whether the provider streams). Each model input is the
-// CUMULATIVE conversation so far, so a per-run high-water mark persists only the messages
-// appended since the previous model call — the initial system+user, and every intermediate
-// assistant(tool_calls)+tool turn. The FINAL assistant message (the loop's Generate output)
-// never appears in a later model input and is persisted once by Run() after Generate returns.
+// CUMULATIVE conversation so far, so a high-water mark persists only the messages appended
+// since the previous model call — the initial system+user, and every intermediate
+// assistant(tool_calls)+tool turn. The FINAL assistant message (the loop's output) never
+// appears in a later model input and is persisted once by the caller after the loop returns.
 // The tool functions themselves never persist messages.
+//
+// hwm scope — per RUN for the one-shot Run(), but RE-BASELINED PER TURN for a multi-turn
+// Session. A Session's model input restarts every turn at [system]+history+[userN], so a
+// single per-run hwm would re-persist the prior turn's rows (duplicate) or skip the new user
+// row (drop). StreamTurn (stream.go) therefore sets rc.hwm = 1 + len(history) before each
+// turn's first model call (0 on the very first turn so the system row persists exactly once).
+// With that baseline the first delta of every turn is exactly [userN], and the exactly-once
+// [system, u1, a1, u2, a2, …] transcript shape holds across turns.
 //
 // messages.run always targets the agent_runs record's 15-char system id (rc.runID), never
 // run_label (§4.7/§4.8/§6.5).
@@ -31,9 +39,10 @@ import (
 )
 
 // runCtx carries the runID and a mutex-guarded monotonic seq counter for one run. seq is
-// strictly increasing per run, backed by the unique (run, seq) index (§4.7). hwm is the
-// count of model-input messages already persisted; steps counts model generations
-// (= assistant turns) for agent_runs.step_count.
+// strictly increasing per run, backed by the unique (run, seq) index (§4.7). hwm is the count
+// of leading model-input messages already persisted (re-baselined per turn by StreamTurn for a
+// multi-turn Session; see the file header); steps counts model generations (= assistant turns)
+// for agent_runs.step_count.
 type runCtx struct {
 	app   core.App
 	cfg   *config.Config
