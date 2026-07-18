@@ -10,6 +10,9 @@ Status: Accepted (corrected 2026-07-17) — 2026-07-16
 >    `runChat`), with no bubbletea/tview/tcell dependency. The word "TUI" at the Decision heading
 >    and in the rationale below (and the `-tui-` filename slug) is loose usage; read it as
 >    "terminal session / REPL," the accurate term this ADR already uses in the Decision body.
+>    **This clarification is superseded by ADR 0004:** `chat` is now a full-screen Bubble Tea
+>    TUI when interactive, with the line REPL retained as the piped/non-TTY and `--plain` path.
+>    ADR 0001's Decision (terminal surface first, webapp deferred as option b) still stands.
 > 2. **The "≤2 commands (`migrate up`, then `chat`)" figure below is superseded by ADR 0003.**
 >    Tool commands now self-initialize the store, so `chat` needs no prior `migrate up` — the path
 >    is one command.

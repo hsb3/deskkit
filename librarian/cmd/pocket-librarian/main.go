@@ -183,8 +183,11 @@ func main() {
 		if f := c.RunE; f != nil {
 			c.RunE = func(cmd *cobra.Command, args []string) error {
 				err := f(cmd, args)
-				if err != nil && cmdErr == nil {
-					cmdErr = err
+				if err != nil {
+					err = annotateLockErr(err)
+					if cmdErr == nil {
+						cmdErr = err
+					}
 				}
 				return err
 			}
@@ -192,7 +195,7 @@ func main() {
 	}
 
 	if err := app.Start(); err != nil {
-		log.Fatal(err)
+		log.Fatal(annotateLockErr(err))
 	}
 	if cmdErr != nil {
 		os.Exit(1)
@@ -308,6 +311,20 @@ func requireConfig(app core.App, cfg *config.Config, cfgErr error) (*config.Conf
 		app.Logger().Error("seed system prompt", "err", err)
 	}
 	return cfg, nil
+}
+
+// annotateLockErr adds a short hint to a SQLite "database is locked" failure — the shape
+// requireConfig's store-open/migration step (and PocketBase's own Bootstrap, reached from
+// app.Start() before any RunE) hits when another process, typically a concurrently running
+// `serve`, already holds the desk's store open. Detection is a simple case-insensitive
+// substring match on "locked" rather than a typed sqlite error, since the underlying error
+// crosses several wrapping layers (dbx, mattn/go-sqlite3) before reaching here; a non-lock
+// error is returned unchanged.
+func annotateLockErr(err error) error {
+	if err == nil || !strings.Contains(strings.ToLower(err.Error()), "locked") {
+		return err
+	}
+	return fmt.Errorf("%w; is another pocket-librarian process (e.g. `serve`) already running against this desk?", err)
 }
 
 // registerToolCommands wires the six tool subcommands + gui onto the PocketBase RootCmd.
@@ -456,9 +473,12 @@ func registerToolCommands(app *pocketbase.PocketBase, cfg *config.Config, cfgErr
 	}
 	app.RootCmd.AddCommand(agentCmd)
 
-	// chat — interactive multi-turn stewardship session (REPL) over the eino loop (ADR 0001:
-	// terminal surface first). Like `agent`, a one-shot process that opens the DB directly, so
-	// it requires a prior `migrate up` (or serve). Scope stays desk stewardship: the session
+	// chat — interactive multi-turn stewardship session over the eino loop (ADR 0001: terminal
+	// surface first). On a real terminal this runs the full-screen TUI (internal/tui, ADR 0004);
+	// runChat below is the line-oriented REPL fallback used when stdio is piped or --plain is
+	// passed.
+	// Like `agent`, it self-initializes the store on first run via requireConfig (ADR 0003) — no
+	// prior `migrate up` or `serve` is required. Scope stays desk stewardship: the session
 	// inherits the gated tool set (restore never exposed; apply_fix only when
 	// LIBRARIAN_AUTONOMOUS_WRITES is set) and the data-backed system prompt — not a general chat.
 	chatCmd := &cobra.Command{
