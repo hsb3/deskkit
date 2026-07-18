@@ -174,6 +174,14 @@ seed_r1_task "$DESK_CHAT_LIGHT/tasks/status-update.md"
 seed_stray_note "$DESK_CHAT_LIGHT/NOTES.md"
 run_lib "$DESK_CHAT_LIGHT" "$XDG_CHAT_LIGHT" example-desk migrate up > /dev/null
 
+# --- desk G: init-onramp.tape ---------------------------------------------------------------
+# Deliberately BARE: no profile, no env, no migrate — the recording's whole point is that the
+# first-run onramp scaffolds the profile itself and the store self-initializes afterward. The
+# desk name in the GIF is the folder basename, so the dir name below is part of the recording.
+DESK_INIT="$SCRATCH/desks/demo-desk"
+XDG_INIT="$SCRATCH/xdg/init-onramp"
+mkdir -p "$DESK_INIT" "$XDG_INIT"
+
 # --- record ------------------------------------------------------------------------------
 # Each tape's Hidden preamble reads its scratch desk root / XDG home from the env vars set here
 # (MEDIA_DESK_ROOT / MEDIA_XDG_HOME / MEDIA_STORE_ONE); only the DESK_ROOT/DESK_NAME exports the
@@ -192,6 +200,7 @@ record_tape sweep-and-findings.tape "$DESK_SWEEP" "$XDG_SWEEP"
 record_tape patrol.tape "$DESK_PATROL" "$XDG_PATROL"
 record_tape propose-apply-restore.tape "$DESK_APPLY" "$XDG_APPLY"
 record_tape open-guard.tape "$DESK_GUARD" "$XDG_GUARD" "$STORE_ONE"
+record_tape init-onramp.tape "$DESK_INIT" "$XDG_INIT"
 
 # The chat tapes need a real LLM provider key (their live `sweep` tool call talks to
 # Anthropic) — skip them, with a clear log line, when the operator hasn't exported one. Guarded
