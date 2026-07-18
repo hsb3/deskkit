@@ -36,8 +36,21 @@ ruled the draft client/server TUI spec (his executive desk,
 **in-process** Bubble Tea TUI (see §2). `chat` now runs a full-screen TUI on a terminal
 (REPL when piped / `--plain`), with streaming, tool steps, markdown, cancel, and
 conversation resume (ctrl+o) — recorded as **ADR 0004**. Live-verified end to end (§2).
-Remaining follow-ons, all small: VERSION bump 0.4.0 → 0.5.0 at next release (sync-guarded
-flow); two accepted review nits from PR #40 to fold into a future touch — the locked-store
+
+**v0.5.0 RELEASED (2026-07-18) — the TUI shipped under a tag, and the missing-bump gap is now
+guarded.** The chat TUI had merged under a stale VERSION 0.4.0; PR #41 bumped to 0.5.0, added a
+`CHANGELOG.md` (Keep a Changelog), and installed a two-tier missing-bump guard (**ADR 0005**):
+`check-changelog.mjs` (hard release gate — a tagged VERSION must have a non-empty CHANGELOG
+section; wired into `make release-prep` + `release.yml`) and `check-version-status.mjs`
+(non-blocking advisory — `make version-status` + a CI step — that warns when `plugin/`/`librarian/`
+changed since the last tag without a bump). `docs/releasing.md` is the runbook. `git tag v0.5.0`
+was pushed; the release workflow succeeded and published a non-draft/non-prerelease **v0.5.0**
+(4 binaries + `checksums.txt` + plugin bundle). Verified authoritatively: the darwin/arm64 binary
+downloads, runs, reports `version 0.5.0`, and its sha256 matches the published `checksums.txt`.
+The repo-visibility blocker on the *public* curl|bash path (below) is unchanged.
+
+Remaining follow-ons from the TUI build, all small: two accepted review nits from PR #40 to fold
+into a future touch — the locked-store
 hint's substring match could false-positive on a path containing "locked" (harmless: hint is
 phrased as a question), and `docs/media/chat.tape`'s 30s answer sleep is tight for slow API
 days (only matters on manual re-record; committed GIF verified good). Watch item from PR #38
@@ -91,7 +104,29 @@ Shipped 2026-07-17: **#31** (PR #32, ADR 0003) + **docs/CI release-prep sweep** 
 §2. Earlier same day: **#7 / #25 / #27** (PRs #29 / #30 / #28), **#23** (PR #24), **NOTE.md
 punch list** (PR #26).
 
-## 2. Last sessions delivered (2026-07-18): chat TUI, all 5 phases
+## 2. Last session delivered (2026-07-18, later): v0.5.0 release + versioning workflow
+
+**Significant chat-TUI enhancements had merged without a version bump; this session closed that
+and hardened against a repeat.** Shipped as **PR #41** (squash `5c67e06`), then tagged + released.
+
+- **Version bump 0.4.0 → 0.5.0** — root `VERSION` + the three manifests (version-sync green).
+- **`CHANGELOG.md`** (Keep a Changelog): full `[0.5.0]` chat-TUI entry, concise `[0.4.0]` retro
+  (first tagged release), empty `[Unreleased]`. Pre-`0.4.0` history stays in git.
+- **Missing-bump guard (ADR 0005)** — release-gate + advisory, chosen over per-PR enforcement
+  (which taxes refactor/test PRs and noises the changelog). `scripts/check-changelog.mjs` (hard
+  gate: tagged VERSION must have a documented CHANGELOG section — in `release-prep` + `release.yml`);
+  `scripts/check-version-status.mjs` (non-blocking advisory: product drift since last tag without
+  a bump — `make version-status` + a CI step; `ci.yml` checkout gained `fetch-depth: 0` so it can
+  see tags; **always exits 0**). Both **negative-tested**: the gate exits 1 on an undocumented
+  version; the advisory reproduced the actual drift (files under plugin/librarian since v0.4.0,
+  VERSION unmoved). claude-review caught one real bug (bare VERSION read broke the advisory's
+  exit-0 guarantee) — fixed (try/catch + `execFileSync` argv, no shell surface) in `cc48d07`.
+- **Docs**: ADR 0005, `docs/releasing.md` runbook, README pointers (CHANGELOG + releasing),
+  `getting-started` `--version` output → 0.5.0, ADR index row.
+- **Released**: `make release-prep` green → `git tag v0.5.0 && git push --tags` → workflow
+  published v0.5.0 (assets verified: binary runs, reports 0.5.0, sha256 matches checksums.txt).
+
+## 2-tui. Earlier same day (2026-07-18): chat TUI, all 5 phases
 
 **Phases 4–5 (same day, follow-on session): resume + docs — BUILD COMPLETE.**
 PR #39 (squash `2c66b2e`): conversation resume. `agent/resume.go` — `ListConversations`
@@ -342,9 +377,11 @@ Review cycle noted one accepted trade-off (migration 0012 down-path `return nil`
 
 ## 3. Where to start building
 
-**The TUI build is done** (all 5 phases merged — see §1). Next candidates, in rough order:
-release v0.5.0 when ready (VERSION bump via the sync-guarded flow, tag, verify assets like
-v0.4.0 in §1-prior); the repo-visibility decision gating the curl|bash install path (§1
+**The TUI build is done AND released as v0.5.0** (see §1/§2). Next candidates, in rough order:
+future releases follow **`docs/releasing.md`** (bump VERSION + 3 manifests → move `[Unreleased]`
+into a dated CHANGELOG section → `make release-prep` → tag) — `check-changelog` now gates the tag
+and `make version-status` flags accumulated drift; the repo-visibility decision gating the
+curl|bash install path (§1
 PRIOR PRIORITY, unchanged); the deferred webapp surface (ADR 0001 option b) now has its
 substrate ready — `StreamTurn`'s JSON-taggable events (ADR 0004) marshal straight onto an
 SSE route. For any new streaming/TUI work, gates per §4 and live proof via the §2 VHS
@@ -370,7 +407,14 @@ or profile scalars in skill prose).
   `make verify` (verify.sh, 47 checks — **now also runs in CI + the release gate**, PR #33) ·
   `make package` (drift guard) · `node scripts/check-version-sync.mjs`. CI (`ci.yml`) is the
   aggregate required check. Note: shellcheck + actionlint are NOT yet CI-enforced (→ #34).
-  Bumping any version = edit root `VERSION` + the three manifests (sync-guarded).
+- **Versioning/release (ADR 0005, since PR #41 — runbook `docs/releasing.md`)**: SemVer on the
+  single root `VERSION`; a bump = edit `VERSION` + the three manifests (sync-guarded) **and** move
+  `[Unreleased]` CHANGELOG entries into a dated `## [<version>]` section. `check-changelog.mjs` is
+  a **hard gate** (release-prep + release.yml) — a tag with no CHANGELOG section fails.
+  `check-version-status.mjs` is a **non-blocking advisory** (`make version-status` + a CI step,
+  always exit 0) that warns when `plugin/`/`librarian/` drifted past the last tag without a bump.
+  `ci.yml` checks out `fetch-depth: 0` for it. Both scripts + CHANGELOG live outside the neutrality
+  surface (repo root / `scripts/`).
 - **Generated, never hand-edit**: `plugin/claude-plugin/mcp/server.js` and
   `plugin/claude-plugin/schema/profile.schema.yaml` — regen with `cd plugin && bun run package`;
   CI drift-guards them. Bundle output is byte-identical across macOS/linux (proven).
