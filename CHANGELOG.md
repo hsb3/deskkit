@@ -48,7 +48,7 @@ for why this policy exists.
 
 - **Chat TUI migrated to the Charm v2 stack** (bubbletea v2, lipgloss v2, bubbles v2,
   glamour v2 — the `charm.land` modules), recorded as
-  [ADR 0006](docs/decisions/0006-tui-charm-v2-stack.md). No feature or visual changes: the
+  [ADR 0007](docs/decisions/0007-tui-charm-v2-stack.md). No feature or visual changes: the
   TUI keeps rendering on the terminal's own background, the theme is still resolved once
   pre-program (flag > env > one background probe), and no terminal query ever runs after
   startup — glamour v2 removing auto-style detection makes part of that guarantee

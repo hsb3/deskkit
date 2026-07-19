@@ -104,7 +104,7 @@ the crew adjusts to what reads well.
    being hand-rolled twice.
 
 **The short version — five checkboxes (all RULED 2026-07-18, per recommendation):**
-- [x] #53A: migrate to Charm v2 — **yes** (ADR 0006)
+- [x] #53A: migrate to Charm v2 — **yes** (ADR 0007)
 - [x] #53B: **terminal background** (painted background revisitable later on v2)
 - [x] #51A: **sessions-list-first** launch when threads exist
 - [x] #51B: **truncation titles** for v1, model titles later

@@ -56,7 +56,7 @@ GIFs re-recorded with the final chrome post-merge. Deferred UX items are recorde
 **RULED 2026-07-18 — all five TUI roadmap recommendations accepted verbatim** (memo, now
 marked decided: `_meta/briefings/2026-07-18-tui-roadmap-rulings/README.md`; rulings also
 commented on #51/#52/#53): #53 Charm-v2 migration GO with terminal background retained +
-no-query rule kept pre-program-only (**ADR 0006**, committed on `feat/tui-charm-v2` @
+no-query rule kept pre-program-only (**ADR 0007**, committed on `feat/tui-charm-v2` @
 57f1a76); #51 sessions-list-first launch + truncation titles + rename/delete v1; #52 defer
 dollar-cost, add the `models.context_window` profile override key (schema change).
 
@@ -66,7 +66,7 @@ main tree). A background builder is migrating `librarian/internal/tui` to the v2
 them blind**. It ran long (resumed twice, was on the last test fixes). If this session was
 cleared and the builder's report is lost: `git status`/`go build ./... && go test ./...` in
 librarian/ shows where it stopped; finish per the migration map below, then verify (grep
-`github.com/charmbracelet` under librarian must be EMPTY), commit, PR (cite ADR 0006), VHS
+`github.com/charmbracelet` under librarian must be EMPTY), commit, PR (cite ADR 0007), VHS
 re-record for parity proof. Migration map essentials: v2 modules use the **charm.land vanity
 paths** (`charm.land/{bubbletea,lipgloss,bubbles,glamour}/v2` — bubbletea v2.0.8, lipgloss
 v2.0.5, bubbles v2.1.1, glamour v2.0.1; each repo has `UPGRADE_GUIDE_V2.md`); `View()`

@@ -2,7 +2,7 @@ module github.com/example/pocket-librarian
 
 // Resolved floor: PocketBase v0.39.6 go.mod declares go 1.25.0 (spec §3.1, verified).
 // Use a 1.25.x toolchain. A go 1.23 directive will NOT compile the dependency graph.
-// Bumped 1.25.0 -> 1.25.8 by the Charm v2 TUI stack migration (ADR 0006): glamour v2 v2.0.1's
+// Bumped 1.25.0 -> 1.25.8 by the Charm v2 TUI stack migration (ADR 0007): glamour v2 v2.0.1's
 // own go.mod declares go 1.25.8, and `go get`/`go mod tidy` raised this module's directive to
 // match (go 1.25.8 is still "a 1.25.x toolchain" per the line above).
 go 1.25.8

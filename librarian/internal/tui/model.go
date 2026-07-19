@@ -917,7 +917,7 @@ func fmtDuration(d time.Duration) string {
 // field (not a tea.WithAltScreen ProgramOption), and every return path below sets it — a path that
 // forgot it would silently drop the surface out of the alternate screen mid-run. BackgroundColor is
 // deliberately left nil in both paths: the TUI renders on the terminal's own background (ADR 0004 /
-// ADR 0006), never overriding it.
+// ADR 0007), never overriding it.
 func (m model) View() tea.View {
 	if !m.ready {
 		v := tea.NewView("initializing…")
