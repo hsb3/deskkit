@@ -1,11 +1,12 @@
 #!/usr/bin/env node
 // Version-sync drift guard. The repo carries one canonical version in the root VERSION file;
-// three shipped manifests must agree with it:
-//   - plugin/claude-plugin/.claude-plugin/plugin.json   (the installed Claude plugin)
+// the shipped manifests must agree with it:
+//   - plugin/claude-plugin/.claude-plugin/plugin.json   (the installed desk-standard plugin)
 //   - plugin/package.json                               (the plugin build package)
-//   - .claude-plugin/marketplace.json                   (plugins[].version in the marketplace)
-// Exits 1 (listing every disagreement) if any of the three differs from VERSION; exits 0 when
-// all four match. Runs under plain Node (no deps), like the other scripts/ guards.
+//   - plugin/desk-pm/.claude-plugin/plugin.json         (the installed desk-pm plugin, D5)
+//   - .claude-plugin/marketplace.json                   (each plugins[].version in the marketplace)
+// Exits 1 (listing every disagreement) if any manifest differs from VERSION; exits 0 when all
+// match. Runs under plain Node (no deps), like the other scripts/ guards.
 
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -28,14 +29,28 @@ const SOURCES = [
     pick: (j) => j.version,
   },
   {
-    label: ".claude-plugin/marketplace.json (plugins[0].version)",
+    label: "plugin/desk-pm/.claude-plugin/plugin.json",
+    file: "plugin/desk-pm/.claude-plugin/plugin.json",
+    pick: (j) => j.version,
+  },
+  {
+    label: ".claude-plugin/marketplace.json (desk-standard plugins[].version)",
     file: ".claude-plugin/marketplace.json",
-    pick: (j) =>
-      Array.isArray(j.plugins) && j.plugins.length === 0
-        ? "<plugins array is empty>"
-        : j.plugins?.[0]?.version,
+    pick: (j) => marketplaceVersion(j, "desk-standard"),
+  },
+  {
+    label: ".claude-plugin/marketplace.json (desk-pm plugins[].version)",
+    file: ".claude-plugin/marketplace.json",
+    pick: (j) => marketplaceVersion(j, "desk-pm"),
   },
 ];
+
+// Find a marketplace plugin's version by name (robust to reordering / new entries).
+function marketplaceVersion(j, name) {
+  if (!Array.isArray(j.plugins) || j.plugins.length === 0) return "<plugins array is empty>";
+  const entry = j.plugins.find((p) => p?.name === name);
+  return entry ? entry.version : `<no plugins[] entry named ${name}>`;
+}
 
 const mismatches = [];
 for (const src of SOURCES) {
@@ -57,4 +72,4 @@ if (mismatches.length > 0) {
   process.exit(1);
 }
 
-console.log(`version-sync: OK — VERSION + 3 manifests all at ${canonical}.`);
+console.log(`version-sync: OK — VERSION + ${SOURCES.length} manifests all at ${canonical}.`);

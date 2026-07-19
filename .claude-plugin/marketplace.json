@@ -13,6 +13,15 @@
       "author": {
         "name": "Henry Burden"
       }
+    },
+    {
+      "name": "desk-pm",
+      "source": "./plugin/desk-pm",
+      "description": "The desk work graph as an agent surface: a session-open cold-start briefing, gated item advancement, and triage skills plus a PM-operator agent over the deskkit binary's PM MCP tools. Complements desk-standard; feature-gated behind PM_ENABLED. Personalize via the desk profile and desk_config, never by editing shipped definitions.",
+      "version": "0.6.0",
+      "author": {
+        "name": "Henry Burden"
+      }
     }
   ]
 }
