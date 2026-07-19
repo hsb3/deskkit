@@ -96,15 +96,20 @@ func TestAdoptionDryRun(t *testing.T) {
 	t.Logf("XDG data home (temp)        : %s", tmpXDG)
 	t.Logf("resolved scratch store home : %s", scratchStore)
 	t.Logf("canonical real-home default : %s", realHomeStore)
-	if _, serr := os.Stat(scratchStore); !os.IsNotExist(serr) {
-		t.Fatalf("scratch store home must not exist (dry-run must not write a live store), stat err = %v", serr)
-	}
-	if realHomeStore != "" {
-		if _, serr := os.Stat(realHomeStore); !os.IsNotExist(serr) {
-			t.Fatalf("canonical real-home store %q must not exist for a dry-run, stat err = %v", realHomeStore, serr)
-		}
-	}
-	t.Logf("OBSERVED: neither store home exists — the dry-run wrote no live desk on disk.")
+	// Setup guard: neither store home exists yet (the import below hasn't run). The load-bearing
+	// assertion is the post-run re-check registered just below — that is what proves the dry-run
+	// itself wrote no live desk. mustNotExist distinguishes "exists" from an unrelated stat error
+	// (a bare !os.IsNotExist would mask e.g. a permission error as a "must not exist" failure).
+	mustNotExist(t, "scratch store home", scratchStore)
+	mustNotExist(t, "canonical real-home store", realHomeStore)
+	t.Logf("SETUP OK: neither store home exists before import.")
+	// PROOF 4 (post-condition): after the ENTIRE dry-run has run, re-assert neither home ever
+	// materialized. Registered now so it runs last, closing the proof against the real operations.
+	t.Cleanup(func() {
+		mustNotExist(t, "scratch store home (post-run)", scratchStore)
+		mustNotExist(t, "canonical real-home store (post-run)", realHomeStore)
+		t.Logf("OBSERVED (post-run): neither store home exists — the dry-run wrote no live desk on disk.")
+	})
 
 	// ─────────────────────────────────────────────────────────────────────────────────────────
 	// SEED — populate the scratch engine via the import seam (the same path §10.8 and D8 use).
@@ -148,7 +153,9 @@ func TestAdoptionDryRun(t *testing.T) {
 	for _, tr := range cold.RecentTransitions {
 		t.Logf("  - item=%s event=%s from=%s to=%s actor=%s", tr.Item, tr.Event, tr.From, tr.To, tr.Actor)
 	}
-	if b, _ := json.Marshal(cold.Counts); b != nil {
+	if b, merr := json.Marshal(cold.Counts); merr != nil {
+		t.Fatalf("marshal cold-start counts: %v", merr)
+	} else {
 		t.Logf("counts: %s", string(b))
 	}
 
@@ -210,6 +217,9 @@ func TestAdoptionDryRun(t *testing.T) {
 	// Capture the EXACT refusal message via the runner's own engine (the doc is absent by
 	// default — r.val holds no verdict for decPtr yet). This is the same engine + validator the
 	// runner drives; the direct call is a read-only observation of the refusal text.
+	// Invariant this relies on: a REFUSED transition does not bump the item's optimistic-concurrency
+	// version, so r.version(threadAlphaID) below stays valid for the subsequent runner steps. If the
+	// engine ever starts versioning refused attempts, this probe must re-read the version afterward.
 	es, ok := r.surface.(engineSurface)
 	if !ok {
 		t.Fatalf("engine runner surface is %T, want engineSurface", r.surface)
@@ -303,6 +313,22 @@ func transitionsHave(rows []engine.TransitionRow, item, event string) bool {
 		}
 	}
 	return false
+}
+
+// mustNotExist fails the test if path exists, and separately fails on any non-IsNotExist stat
+// error (so a permission error can't masquerade as a clean "does not exist"). Empty path is a
+// no-op (the canonical real-home path is "" when os.UserHomeDir fails).
+func mustNotExist(t *testing.T, label, path string) {
+	t.Helper()
+	if path == "" {
+		return
+	}
+	switch _, err := os.Stat(path); {
+	case err == nil:
+		t.Fatalf("%s %q must not exist (dry-run must not write a live store)", label, path)
+	case !os.IsNotExist(err):
+		t.Fatalf("stat %s %q: unexpected error: %v", label, path, err)
+	}
 }
 
 func blockedOf(t *testing.T, app pbcore.App, id string) bool {
