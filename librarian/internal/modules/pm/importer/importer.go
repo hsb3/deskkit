@@ -303,7 +303,14 @@ func GraphSnapshot(ctx context.Context, eng *engine.Engine) (Snapshot, error) {
 		if snap.Deps[i].From != snap.Deps[j].From {
 			return snap.Deps[i].From < snap.Deps[j].From
 		}
-		return snap.Deps[i].To < snap.Deps[j].To
+		if snap.Deps[i].To != snap.Deps[j].To {
+			return snap.Deps[i].To < snap.Deps[j].To
+		}
+		// (From,To) can repeat: e_createDep dedups by the (from,to,kind) triple, so two edges
+		// with the same endpoints but different Kind legitimately coexist. Kind completes the
+		// identity and is the deterministic tiebreaker — without it their relative order is
+		// undefined and Canonical() becomes non-deterministic (§8.2).
+		return snap.Deps[i].Kind < snap.Deps[j].Kind
 	})
 	return snap, nil
 }
