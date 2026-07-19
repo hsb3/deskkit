@@ -32,7 +32,7 @@ copy into every new desk.
 ## The harvest procedure
 
 1. **Collect.** Read the INS-nn ledger from every live desk's `_meta/improvement-log.md`. (When
-   the pocket-librarian is available, it can gather these across desks through the MCP tools;
+   the deskkit is available, it can gather these across desks through the MCP tools;
    otherwise read them directly.)
 2. **Triage — transferable vs desk-local.** An entry is **transferable** when its lesson
    generalizes to any desk (a convention is ambiguous, missing, or wrong). It is **desk-local**
@@ -70,5 +70,5 @@ friction that shaped it.
 
 The harvest loop evolves the **standard and this plugin** — it does not touch desk work-state
 (the board owns that, K2) and does not mutate desk files itself. Applying a rule change to an
-existing desk (re-scaffolding, migrating) is the `desk-setup` skill's and the pocket-librarian's
+existing desk (re-scaffolding, migrating) is the `desk-setup` skill's and the deskkit's
 job; harvest-loop produces the revised rules, not the desk edits.

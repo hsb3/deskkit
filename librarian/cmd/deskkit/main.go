@@ -1,4 +1,4 @@
-// Command pocket-librarian is the single Go binary that serves PocketBase, runs the agent
+// Command deskkit is the single Go binary that serves PocketBase, runs the agent
 // loop under `serve` (later slice), and exposes the seven tools as CLI subcommands. This
 // spine wires: pocketbase.New(), migratecmd (automigrate), the blank-imported migrations,
 // first-run seeding (ignore boundary + system prompt) on serve, and the Cobra subcommands
@@ -50,7 +50,7 @@ import (
 
 // version is stamped at build time via ldflags (-X main.version=<VERSION>), wired from the
 // repo-root VERSION file by the librarian Makefile and the release workflow. A bare `go build`
-// leaves the default "dev", so `pocket-librarian --version` prints the real version only for
+// leaves the default "dev", so `deskkit --version` prints the real version only for
 // make/release builds.
 var version = "dev"
 
@@ -90,7 +90,7 @@ func main() {
 	// flags. Non-TTY or --no-input => today's fail-closed behavior, byte-identical error.
 	noInput := hasNoInputFlag(os.Args[1:])
 
-	// Absent --dir, the store defaults to $XDG_DATA_HOME/pocket-librarian/<DESK_NAME>/ (falling
+	// Absent --dir, the store defaults to $XDG_DATA_HOME/deskkit/<DESK_NAME>/ (falling
 	// back to ~/.local/share/...), replacing PocketBase's cwd/exe-relative pb_data (ADR 0002 §2).
 	var defaultDataDir string
 	var locErr error
@@ -106,8 +106,13 @@ func main() {
 			// Pre-create the store dir 0700 so it is not group/world-readable — PocketBase's own
 			// bootstrap would otherwise MkdirAll it 0777. Only when actually about to open the
 			// store: a non-store command (e.g. --help) must not materialize a data dir.
+			// The D2b legacy-store auto-migration (spec §2.10) runs FIRST: a no-op unless the
+			// new home is absent and an old pocket-librarian/<DESK_NAME>/ store exists, so it
+			// must look before this MkdirAll materializes the new home.
 			if storeTouching {
-				if mkErr := os.MkdirAll(dir, 0o700); mkErr != nil {
+				if mgErr := store.MigrateLegacyStoreDir(cfg.DeskName); mgErr != nil {
+					locErr = mgErr
+				} else if mkErr := os.MkdirAll(dir, 0o700); mkErr != nil {
 					locErr = fmt.Errorf("cannot create the store directory %s: %w; pass --dir <path>", dir, mkErr)
 				}
 			}
@@ -137,7 +142,7 @@ func main() {
 				wd, _ := os.Getwd()
 				res, ierr := setup.InitProfile(wd, setup.InitOptions{}, nil)
 				if ierr != nil {
-					fmt.Fprintf(os.Stderr, "pocket-librarian: %v\n", ierr)
+					fmt.Fprintf(os.Stderr, "deskkit: %v\n", ierr)
 					os.Exit(1)
 				}
 				res.WriteSummary(os.Stdout)
@@ -147,6 +152,8 @@ func main() {
 					cfg, cfgErr = newCfg, nil
 					if dir, serr := store.StoreDir(cfg.DeskName); serr != nil {
 						locErr = fmt.Errorf("cannot resolve the store location: %w; pass --dir <path>", serr)
+					} else if mgErr := store.MigrateLegacyStoreDir(cfg.DeskName); mgErr != nil {
+						locErr = mgErr
 					} else if mkErr := os.MkdirAll(dir, 0o700); mkErr != nil {
 						locErr = fmt.Errorf("cannot create the store directory %s: %w; pass --dir <path>", dir, mkErr)
 					} else {
@@ -156,7 +163,7 @@ func main() {
 			}
 		}
 		if locErr != nil {
-			fmt.Fprintf(os.Stderr, "pocket-librarian: %v\n", locErr)
+			fmt.Fprintf(os.Stderr, "deskkit: %v\n", locErr)
 			os.Exit(1)
 		}
 	}
@@ -174,7 +181,7 @@ func main() {
 	// bug), so it is fatal.
 	reg, regErr := module.Register(cfg, librarian.New(), pm.New())
 	if regErr != nil {
-		log.Fatalf("pocket-librarian: module registration: %v", regErr)
+		log.Fatalf("deskkit: module registration: %v", regErr)
 	}
 	moduleReg = reg
 
@@ -184,7 +191,7 @@ func main() {
 	})
 
 	// Override PocketBase's own RootCmd.Version (defaults to its embedded "(untracked)") with the
-	// ldflags-stamped repo version, so `pocket-librarian --version` reports THIS binary's release.
+	// ldflags-stamped repo version, so `deskkit --version` reports THIS binary's release.
 	app.RootCmd.Version = version
 
 	// --no-input suppresses the first-run onramp prompt (fail closed on unresolved config, for
@@ -192,7 +199,7 @@ func main() {
 	// decision in main() reads it manually from os.Args (it fires before cobra parses flags).
 	app.RootCmd.PersistentFlags().Bool("no-input", false, "never prompt; fail closed when config is unresolved (scripts/CI)")
 
-	// Automigrate on startup; also `pocket-librarian migrate up`. See §11.3 open item 1:
+	// Automigrate on startup; also `deskkit migrate up`. See §11.3 open item 1:
 	// confirm the automigrate generated-migration behavior in the run environment. migrate is
 	// schema-only and deliberately skips the desk open-guard (ADR 0002 §3): it writes no desk
 	// rows, so running it against another desk's store is harmless.
@@ -216,7 +223,7 @@ func main() {
 			// direct os.Exit above) fails closed with a non-zero exit; mirror that here since
 			// normal RunE-error propagation is invisible for this command.
 			if err := store.CheckDeskGuard(e.App, cfg.DeskName); err != nil {
-				fmt.Fprintf(os.Stderr, "pocket-librarian: %v\n", err)
+				fmt.Fprintf(os.Stderr, "deskkit: %v\n", err)
 				os.Exit(1)
 			}
 			// Module-schema versioning (spec §2.8): migrations have already run by OnServe, so
@@ -225,7 +232,7 @@ func main() {
 			// zero-change envelope the librarian is the only enabled module and its version matches
 			// its highest migration, so the guard never trips; stamping is non-fatal bookkeeping.
 			if err := migrate.GuardDowngrade(e.App, moduleReg.MigrateModules()); err != nil {
-				fmt.Fprintf(os.Stderr, "pocket-librarian: %v\n", err)
+				fmt.Fprintf(os.Stderr, "deskkit: %v\n", err)
 				os.Exit(1)
 			}
 			if err := migrate.StampModules(e.App, moduleReg.MigrateModules()); err != nil {
@@ -425,7 +432,7 @@ func runInit(args []string) int {
 	cmd := newInitCmd()
 	cmd.SetArgs(stripNoInput(tail))
 	if err := cmd.Execute(); err != nil {
-		fmt.Fprintf(os.Stderr, "pocket-librarian: %v\n", err)
+		fmt.Fprintf(os.Stderr, "deskkit: %v\n", err)
 		return 1
 	}
 	return 0
@@ -534,7 +541,7 @@ func annotateLockErr(err error) error {
 	if err == nil || !strings.Contains(strings.ToLower(err.Error()), "locked") {
 		return err
 	}
-	return fmt.Errorf("%w; is another pocket-librarian process (e.g. `serve`) already running against this desk?", err)
+	return fmt.Errorf("%w; is another deskkit process (e.g. `serve`) already running against this desk?", err)
 }
 
 // registerToolCommands wires the seven tool subcommands + gui onto the PocketBase RootCmd.
@@ -848,7 +855,7 @@ func runChat(ctx context.Context, app core.App, cfg *config.Config) error {
 	}
 	defer func() { _ = sess.Close(ctx) }()
 
-	fmt.Printf("pocket-librarian session for desk %q — type a request; 'exit', 'quit', or Ctrl-D to end.\n", cfg.DeskName)
+	fmt.Printf("deskkit session for desk %q — type a request; 'exit', 'quit', or Ctrl-D to end.\n", cfg.DeskName)
 	sc := bufio.NewScanner(os.Stdin)
 	sc.Buffer(make([]byte, 0, 64*1024), 1024*1024) // allow long pasted requests
 	for {

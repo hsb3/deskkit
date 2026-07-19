@@ -35,7 +35,7 @@ Settle these before Phase 1; they bind every phase.
   greenfield runbook. If it is not installable in the environment, the skill **degrades to a
   docs-driven mode**: follow the same phases by hand against the `conventions-standard` docs,
   rendering placeholders manually instead of via the tool.
-- **pocket-librarian installed**, for the final baseline. The recommended path is **downloading
+- **deskkit installed**, for the final baseline. The recommended path is **downloading
   the published release artifact and verifying its checksum** before first use. Release-built binaries
   report their release version via `--version`; a binary that prints `dev` was built from
   source without the version stamp — pin such a build from its source commit, not `--version`.

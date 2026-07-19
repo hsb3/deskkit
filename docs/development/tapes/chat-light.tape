@@ -6,7 +6,7 @@
 # GIF).
 Output docs/media/chat-light.gif
 
-Require pocket-librarian
+Require deskkit
 
 Set Shell "bash"
 Set FontSize 14
@@ -34,7 +34,7 @@ Enter
 Sleep 500ms
 Type "export DESK_NAME=example-desk" Enter
 Sleep 700ms
-Type "pocket-librarian chat --theme light" Enter
+Type "deskkit chat --theme light" Enter
 Sleep 1500ms
 
 Type "Sweep this desk, then tell me in one sentence what's in it." Enter

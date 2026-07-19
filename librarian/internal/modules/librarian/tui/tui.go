@@ -1,4 +1,4 @@
-// Package tui is the full-screen Bubble Tea chat surface for `pocket-librarian chat` on a real
+// Package tui is the full-screen Bubble Tea chat surface for `deskkit chat` on a real
 // terminal. It drives the SAME agent.Session the line REPL uses (one conversation, one gated
 // tool set, one persistence path); the REPL remains the piped / non-TTY / --plain fallback. The
 // package lives outside cmd/ so the model's Update is unit-testable without a terminal.

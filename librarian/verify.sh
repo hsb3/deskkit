@@ -1,5 +1,5 @@
 #!/bin/bash
-# verify.sh — the pocket-librarian Phase-1 verify gate (spec §9.4), adapted to the
+# verify.sh — the deskkit Phase-1 verify gate (spec §9.4), adapted to the
 # single-binary Go CLI: build, migrate, seed the spec's four concrete fixtures (§9.4 table)
 # into a THROWAWAY scratch desk under mktemp (never a real desk), then drive the tool chain
 # sweep -> patrol -> propose-fix -> apply-fix -> restore, asserting the record-original-first
@@ -24,7 +24,7 @@
 set -uo pipefail
 cd "$(dirname "$0")" || exit 1
 
-BIN="pocket-librarian"
+BIN="deskkit"
 PASS=0
 FAIL=0
 N=0
@@ -63,17 +63,17 @@ snapshot() {
     | xargs -0 shasum -a 256
 }
 
-WORK=$(mktemp -d "${TMPDIR:-/tmp}/pocket-librarian-verify.XXXXXX")
+WORK=$(mktemp -d "${TMPDIR:-/tmp}/deskkit-verify.XXXXXX")
 
 # Hermetic store home (ADR 0002 §2): point XDG_DATA_HOME at a throwaway scratch for the WHOLE
 # run. Every store-touching command now resolves its store to
-# $XDG_DATA_HOME/pocket-librarian/<DESK_NAME> when no --dir is passed, so exporting a scratch
+# $XDG_DATA_HOME/deskkit/<DESK_NAME> when no --dir is passed, so exporting a scratch
 # XDG_DATA_HOME guarantees NO check — including the new resolution/guard checks below — can ever
 # touch the operator's real ~/.local/share store. Exported so every child process inherits it.
-XDG_DATA_HOME=$(mktemp -d "${TMPDIR:-/tmp}/pocket-librarian-xdg.XXXXXX")
+XDG_DATA_HOME=$(mktemp -d "${TMPDIR:-/tmp}/deskkit-xdg.XXXXXX")
 export XDG_DATA_HOME
 # The main run drives the "verify-desk" desk; with no --dir its store resolves to this dir.
-STORE="$XDG_DATA_HOME/pocket-librarian/verify-desk"
+STORE="$XDG_DATA_HOME/deskkit/verify-desk"
 
 # Section 13's own scratch dirs are declared (empty) here, before the EXIT trap is installed,
 # so ONE trap covers the whole script — including a SIGINT mid-section-13, after these are
@@ -82,6 +82,7 @@ STORE="$XDG_DATA_HOME/pocket-librarian/verify-desk"
 XDG2=""
 DESK2=""
 DIR3=""
+XDG4=""
 
 cleanup() {
   chmod -R u+w "$WORK" 2>/dev/null || true
@@ -91,6 +92,7 @@ cleanup() {
   [ -n "$XDG2" ] && { chmod -R u+w "$XDG2" 2>/dev/null || true; rm -rf "$XDG2"; }
   [ -n "$DESK2" ] && { chmod -R u+w "$DESK2" 2>/dev/null || true; rm -rf "$DESK2"; }
   [ -n "$DIR3" ] && { chmod -R u+w "$DIR3" 2>/dev/null || true; rm -rf "$DIR3"; }
+  [ -n "$XDG4" ] && { chmod -R u+w "$XDG4" 2>/dev/null || true; rm -rf "$XDG4"; }
 }
 trap cleanup EXIT
 
@@ -99,8 +101,8 @@ trap cleanup EXIT
 run_lib() { DESK_ROOT="$WORK" DESK_NAME="verify-desk" ./"$BIN" "$@"; }
 
 # Single-writer guard (spec §2.7): refuse to blow away the store out from under a live `serve`.
-if [ -f .pocket-librarian.pid ] && kill -0 "$(cat .pocket-librarian.pid)" 2>/dev/null; then
-  echo "FATAL: a serve process is running (pid $(cat .pocket-librarian.pid)) — run 'make stop' first." >&2
+if [ -f .deskkit.pid ] && kill -0 "$(cat .deskkit.pid)" 2>/dev/null; then
+  echo "FATAL: a serve process is running (pid $(cat .deskkit.pid)) — run 'make stop' first." >&2
   exit 1
 fi
 
@@ -109,7 +111,7 @@ echo
 
 # --- 0. build + clean the scratch store ---------------------------------------------------
 rm -rf "$STORE"
-go build -o "$BIN" ./cmd/pocket-librarian
+go build -o "$BIN" ./cmd/deskkit
 check "build ./$BIN" $?
 
 # --- 0b. self-initialization (ADR 0003) ---------------------------------------------------
@@ -341,15 +343,15 @@ check "root --help lists the chat command" $?
 # Self-contained: its own throwaway XDG home + desk roots, isolated from the main run's store.
 # XDG2/DESK2/DIR3 are declared (empty) up top, next to the main WORK/XDG_DATA_HOME scratch
 # dirs, so the single EXIT trap removes them too — no separate cleanup13 trap/call needed.
-XDG2=$(mktemp -d "${TMPDIR:-/tmp}/pocket-librarian-xdg2.XXXXXX")
-DESK2=$(mktemp -d "${TMPDIR:-/tmp}/pocket-librarian-desk2.XXXXXX")
-DIR3=$(mktemp -d "${TMPDIR:-/tmp}/pocket-librarian-dir3.XXXXXX")
+XDG2=$(mktemp -d "${TMPDIR:-/tmp}/deskkit-xdg2.XXXXXX")
+DESK2=$(mktemp -d "${TMPDIR:-/tmp}/deskkit-desk2.XXXXXX")
+DIR3=$(mktemp -d "${TMPDIR:-/tmp}/deskkit-dir3.XXXXXX")
 
-# (i) no --dir + XDG_DATA_HOME set -> store created at $XDG/pocket-librarian/<DESK_NAME>.
+# (i) no --dir + XDG_DATA_HOME set -> store created at $XDG/deskkit/<DESK_NAME>.
 XDG_DATA_HOME="$XDG2" DESK_ROOT="$DESK2" DESK_NAME="desk-one" ./"$BIN" migrate up > /dev/null 2>&1
 RC=$?
-[ "$RC" -eq 0 ] && [ -d "$XDG2/pocket-librarian/desk-one" ]
-check "no --dir: store resolves to \$XDG_DATA_HOME/pocket-librarian/<DESK_NAME>" $?
+[ "$RC" -eq 0 ] && [ -d "$XDG2/deskkit/desk-one" ]
+check "no --dir: store resolves to \$XDG_DATA_HOME/deskkit/<DESK_NAME>" $?
 
 # populate a desk row so the open-guard has a stored desk to compare against.
 XDG_DATA_HOME="$XDG2" DESK_ROOT="$DESK2" DESK_NAME="desk-one" ./"$BIN" sweep > /dev/null 2>&1
@@ -359,7 +361,7 @@ check "no --dir: sweep populates the XDG-resolved store" $?
 # both desks. DESK_NAME is itself the store's dir name, so the mismatch the guard defends
 # against (ADR 0002 §3) is a copy-pasted --dir / env pointing a second desk at the first's
 # store; --dir at desk-one's store while configuring "desk-two" reproduces exactly that.
-STORE_ONE="$XDG2/pocket-librarian/desk-one"
+STORE_ONE="$XDG2/deskkit/desk-one"
 GUARD_OUT=$(DESK_ROOT="$DESK2" DESK_NAME="desk-two" ./"$BIN" query summary --dir "$STORE_ONE" 2>&1)
 RC=$?
 [ "$RC" -ne 0 ] \
@@ -370,8 +372,24 @@ check "desk open-guard: mismatched DESK_NAME on the same store refused (rc=$RC),
 # (iii) explicit --dir wins: store lands at the chosen dir, NOT under XDG.
 XDG_DATA_HOME="$XDG2" DESK_ROOT="$DESK2" DESK_NAME="desk-three" ./"$BIN" migrate up --dir "$DIR3" > /dev/null 2>&1
 RC=$?
-[ "$RC" -eq 0 ] && [ -f "$DIR3/data.db" ] && [ ! -d "$XDG2/pocket-librarian/desk-three" ]
+[ "$RC" -eq 0 ] && [ -f "$DIR3/data.db" ] && [ ! -d "$XDG2/deskkit/desk-three" ]
 check "--dir overrides the XDG default (store lands at the explicit dir, not XDG)" $?
+
+# --- 14. legacy store-home auto-migration (D2b, spec §2.10) -------------------------------
+# A pre-rename store at $XDG/pocket-librarian/<DESK_NAME>/ must move to $XDG/deskkit/<DESK_NAME>/
+# on startup — exactly one logged line, contents intact. Fresh-XDG runs (section 13 (i)) already
+# prove the no-old-home case is a silent no-op.
+XDG4=$(mktemp -d "${TMPDIR:-/tmp}/deskkit-xdg4.XXXXXX")
+mkdir -p "$XDG4/pocket-librarian/legacy-desk"
+echo "legacy-marker" > "$XDG4/pocket-librarian/legacy-desk/marker.txt"
+MIG_OUT=$(XDG_DATA_HOME="$XDG4" DESK_ROOT="$DESK2" DESK_NAME="legacy-desk" ./"$BIN" migrate up 2>&1)
+RC=$?
+[ "$RC" -eq 0 ] \
+  && [ -d "$XDG4/deskkit/legacy-desk" ] \
+  && [ ! -d "$XDG4/pocket-librarian/legacy-desk" ] \
+  && [ "$(cat "$XDG4/deskkit/legacy-desk/marker.txt" 2>/dev/null)" = "legacy-marker" ] \
+  && [ "$(echo "$MIG_OUT" | grep -c 'deskkit: migrated store')" -eq 1 ]
+check "legacy store auto-migrated to the deskkit home (one log line; contents intact)" $?
 
 # --- done ----------------------------------------------------------------------------------
 echo

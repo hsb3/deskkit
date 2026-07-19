@@ -12,7 +12,7 @@ org, repo, or issue number:
   (`profile_get`, `profile_validate`, `template_render`, `knowledge_index`), wrapped for Claude
   Code as a plugin with four skills (`desk-setup`, `conventions-standard`, `harvest-loop`,
   `brownfield-adoption`).
-- **`librarian/`** — pocket-librarian, a single Go binary (embedded PocketBase) that indexes a
+- **`librarian/`** — deskkit, a single Go binary (embedded PocketBase) that indexes a
   desk's files, flags convention violations, and can propose + apply fixes under a
   record-original-first safety boundary — every applied fix is byte-exact reversible via
   `restore`. Exposes its tools as an MCP server (`restore` is deliberately CLI-only, and
@@ -73,7 +73,7 @@ $EDITOR _knowledge/profile.yaml
 claude --plugin-dir ./plugin/claude-plugin
 ```
 
-Steering a plain folder instead of the plugin scaffold? `pocket-librarian init [dir]`
+Steering a plain folder instead of the plugin scaffold? `deskkit init [dir]`
 (built in "Running the librarian" below) writes the minimal zero-export profile above —
 desk name from the folder's basename — without the plugin's other placeholders; see
 `docs/getting-started.md` §2.
@@ -93,13 +93,13 @@ make sweep    # index the desk tree
 make patrol   # flag rule violations — dry-run, never writes
 ```
 
-The store self-initializes on first run — `./pocket-librarian migrate up` is optional. The
+The store self-initializes on first run — `./deskkit migrate up` is optional. The
 exports above are needed here only because `make` runs from `librarian/`; with the binary on
 your `PATH` and a `_knowledge/profile.yaml` in the desk (`desk.name` + `root: "."`), running
-`pocket-librarian` from inside the desk needs no env vars. See `docs/getting-started.md` §4.
+`deskkit` from inside the desk needs no env vars. See `docs/getting-started.md` §4.
 
 `apply-fix` is deliberately not a Makefile target — it's supervised-only, run by hand, and
-every fix it applies can be reversed with `./pocket-librarian restore --by-path <path>`.
+every fix it applies can be reversed with `./deskkit restore --by-path <path>`.
 
 Beyond the CLI: `make gui` opens the embedded PocketBase admin console
 (`http://127.0.0.1:8090/_/`) over the desk's index, and `mcp-serve` exposes the tool core to
@@ -114,7 +114,7 @@ plugin/
   mcp/              stdio MCP server (profile_get, profile_validate, template_render, knowledge_index)
   opencode/         frozen spike — not shipped in v1
   claude-plugin/    Claude Code adapter: manifest, .mcp.json, skills/
-librarian/          pocket-librarian: Go binary, embedded PocketBase, MCP server + CLI
+librarian/          deskkit: Go binary, embedded PocketBase, MCP server + CLI
 schema/             schema v1 — shared by plugin/ and librarian/
 _knowledge/         your personalization root (profile + freeform background)
 docs/               product specs, ADRs, and the getting-started / plugin / librarian guides

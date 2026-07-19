@@ -3,7 +3,7 @@
 # 0014). Regenerate: bash scripts/record-media.sh (never hand-edit the GIF).
 Output docs/media/propose-apply-restore.gif
 
-Require pocket-librarian
+Require deskkit
 
 Set Shell "bash"
 Set FontSize 14
@@ -33,13 +33,13 @@ Type "export DESK_NAME=example-desk" Enter
 Sleep 500ms
 Type "cat tasks/status-update.md" Enter
 Sleep 1200ms
-Type "pocket-librarian propose-fix" Enter
+Type "deskkit propose-fix" Enter
 Sleep 1300ms
-Type "pocket-librarian apply-fix" Enter
+Type "deskkit apply-fix" Enter
 Sleep 1300ms
 Type "cat tasks/status-update.md" Enter
 Sleep 1200ms
-Type "pocket-librarian restore --by-path tasks/status-update.md" Enter
+Type "deskkit restore --by-path tasks/status-update.md" Enter
 Sleep 1300ms
 Type "cat tasks/status-update.md" Enter
 Sleep 1200ms

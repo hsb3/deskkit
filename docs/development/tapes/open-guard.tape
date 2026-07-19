@@ -3,7 +3,7 @@
 # Regenerate: bash scripts/record-media.sh (never hand-edit the GIF).
 Output docs/media/open-guard.gif
 
-Require pocket-librarian
+Require deskkit
 
 Set Shell "bash"
 Set FontSize 14
@@ -35,11 +35,11 @@ Enter
 Sleep 500ms
 Type "export DESK_NAME=example-desk" Enter
 Sleep 700ms
-Type "pocket-librarian query summary --pretty" Enter
+Type "deskkit query summary --pretty" Enter
 Sleep 1800ms
 
 Type "export DESK_NAME=another-desk" Enter
 Sleep 700ms
-Type `pocket-librarian query summary --dir "$STORE_ONE_DIR"`
+Type `deskkit query summary --dir "$STORE_ONE_DIR"`
 Enter
 Sleep 2800ms

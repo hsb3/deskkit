@@ -5,7 +5,7 @@
 # bash scripts/record-media.sh (never hand-edit the GIF).
 Output docs/media/init-onramp.gif
 
-Require pocket-librarian
+Require deskkit
 
 Set Shell "bash"
 Set FontSize 14
@@ -31,7 +31,7 @@ Show
 # A bare folder: no profile, no DESK_* env — the command can't resolve config and offers init.
 Type "ls -a" Enter
 Sleep 1s
-Type "pocket-librarian query summary" Enter
+Type "deskkit query summary" Enter
 Sleep 1.5s
 Type "y" Enter
 Sleep 2.5s
@@ -39,6 +39,6 @@ Sleep 2.5s
 # What the onramp wrote, and that the next run needs no prompt at all.
 Type "cat _knowledge/profile.yaml" Enter
 Sleep 3s
-Type "pocket-librarian query summary" Enter
+Type "deskkit query summary" Enter
 Sleep 2.5s
 Sleep 2s

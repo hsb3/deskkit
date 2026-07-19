@@ -139,7 +139,7 @@ set, the one secrets home, the decision spine, and the five-layer skeleton.
 adherence checklist**: nine testable rule statements and a non-mutating procedure that
 reports `path — rule — what is wrong` deltas and changes nothing. Mechanical enforcement —
 scan, flag, auto-fix, restore — is deliberately **not** this skill's job; that belongs to
-the pocket-librarian (see `librarian-guide.md`), and this skill defines the very rules those
+the deskkit (see `librarian-guide.md`), and this skill defines the very rules those
 tools enforce so the two never own the same fact twice.
 
 ## `harvest-loop` — evolve the standard from real use
