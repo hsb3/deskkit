@@ -29,8 +29,28 @@ for why this policy exists.
   optimistic-concurrency version tokens + claim TTL (`PM_CLAIM_TTL`, default 30m). The
   librarian module's `DocumentValidator` seam is now fully wired (desk-file read +
   frontmatter parse + schema-v1 validation); gate evaluation consumes it and fails closed
-  without it. Surfaces (`pm` CLI/MCP/TUI) are the next slice (D4); the shipped default gate
-  rules are a seed the owner may re-rule.
+  without it. The shipped default gate rules are a seed the owner may re-rule.
+- **PM surfaces — CLI, MCP tools, TUI views** (D4, `docs/pm-system-v1-spec.md` §5, epic #55).
+  The PM tool family is exposed on all three surfaces over one engine (parity asserted by a
+  test): the **twelve PM MCP tools** (`get_context`, `list_items`, `get_item`, `create_item`,
+  `update_item`, `transition_item`, `block_item`, `unblock_item`, `add_note`, `link_items`,
+  `claim_item`, `release_item`) on `deskkit mcp-serve`; the matching `deskkit pm <sub>` CLI
+  group (`context`, `list`, `get`, `create`, `update`, `transition`, `block`, `unblock`, `note`,
+  `link`, `claim`, `release`) — JSON-first, present only when the module is enabled; and three
+  TUI views (`pm context` landing / `pm board` / `pm item`) mounted into the full-screen TUI.
+  `get_context` is the single-call cold-start briefing (active, blocked, stalled, recent
+  transitions). The three read tools are always agent-available; the nine write tools are gated
+  behind `PM_AUTONOMOUS_WRITES` (default ON) — a desk can make agents read-only over the graph
+  while the document gate stays the real safety. PM tools write only the store, never desk files.
+  Realtime events emit on transitions under `serve`. New PM env vars: `PM_AUTONOMOUS_WRITES`,
+  `PM_STALLED_DAYS` (default 14).
+- **`desk-pm` complementary plugin** (D5, `docs/pm-system-v1-spec.md` §6, epic #55). A separate
+  Claude Code plugin (shared marketplace) that turns the PM graph into an agent surface over the
+  MCP tools: the `pm-session-open`, `pm-advance-item`, and `pm-triage` skills; a `pm-operator`
+  agent that operates the graph over the twelve tools but never authors gate documents or writes
+  a repo; a `SessionStart` hook injecting `deskkit pm context` (silent no-op when PM is off or
+  `deskkit` is absent); and a `.mcp.json` launching `deskkit mcp-serve` with `PM_ENABLED=true`.
+  Identity-neutral by construction — no person, org, repo, issue, or desk name is hardcoded.
 
 ### Changed
 

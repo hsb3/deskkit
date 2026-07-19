@@ -227,6 +227,35 @@ desk files; the `apply-fix` boundary below still holds.
 }
 ```
 
+## The PM work graph (optional, off by default)
+
+`deskkit` carries a second capability alongside the librarian: the **PM module**, a
+document-gated work graph. Work items move through a rigid `queue → work → review → terminal`
+phase machine, and a phase advance is **refused until the document that phase requires exists and
+validates** against schema v1 — the same schema-v1 engine the librarian uses, reached through a
+narrow in-process seam (`docs/decisions/0008-pm-core-modules-architecture.md`).
+
+It is **feature-gated OFF by default**. On a fresh desk there is no `pm` command, no PM tools, and
+no PM collections in the store. Enable it per desk:
+
+```bash
+export PM_ENABLED=true        # or set modules.pm.enabled: true in _knowledge/profile.yaml
+./deskkit migrate up          # runs the PM migrations, creates the five PM collections
+```
+
+With it on, the `pm` command group and the twelve PM MCP tools appear:
+
+```bash
+./deskkit pm create --title "Ship the widget" --type task --court crew
+./deskkit pm transition <id> --to work    # refused, naming the missing document, until it validates
+./deskkit pm context                      # one-call briefing: active, blocked, stalled, recent
+```
+
+`PM_AUTONOMOUS_WRITES` (default `true`) gates whether agents get the write tools over MCP; the
+document gate is the real safety regardless. Full surface reference — every `pm` subcommand, the
+MCP tools, the TUI views, the `desk-pm` plugin, and the adoption path — is in
+[`../docs/pm-guide.md`](../docs/pm-guide.md).
+
 ## Triggers — the wake layer under `serve`
 
 `serve` (only `serve` — one-shot CLI commands never enqueue tasks) runs three triggers
