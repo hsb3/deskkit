@@ -897,40 +897,56 @@ edits to them (one owner per wave), disjoint-scope the module trees.
 
 ## 12. Requirements-traceability table
 
-Every requirement id → the section that covers it (or its LATER disposition). This table is the
-coverage contract for D6's requirements-coverage acceptance criterion.
+Every requirement id → the section that covers it (or its LATER disposition), and the named
+test that verifies the shipped implementation. This table is the coverage contract for D6's
+requirements-coverage acceptance criterion. Unqualified `Test…` names are Go tests under
+`librarian/internal/`; the tree home is given where it is not the PM module engine. Rows whose
+disposition is LATER, or which are architectural/doctrine (build- or policy-enforced rather
+than unit-tested), name the enforcing artifact and are called out in the note below the table.
 
-| Req | MUST/SHOULD/LATER | Covered by |
-|---|---|---|
-| R1.1 serve concurrent non-issue threads | MUST | §1.1, §3.1 |
-| R1.2 no external PM SaaS | MUST | §1.1, §2 (self-hosted on the chassis) |
-| R1.3 minimal provable v1 | MUST | §1.2, §2.9 (feature gate), §9 |
-| R1.4 fast-track mode | LATER | §9 (constraint: gate separate from phase write) |
-| R2.1 universal self-referencing item | MUST | §3.1 |
-| R2.2 rigid machine ⟂ status labels | MUST | §3.2, §3.3 |
-| R2.3 court/pointer/type/severity/priority | MUST | §3.1 |
-| R2.4 typed edges, unblock_at, cascade | MUST | §3.4, §3.5 |
-| R2.5 append-only audit + actor attribution | MUST | §3.6 |
-| R2.6 optimistic concurrency + claim TTL | SHOULD → adopted | §3.6 |
-| R3.1 server-enforced transitions, names what's missing | MUST | §4.1 |
-| R3.2 artifacts = librarian-validated documents | MUST | §4.4, §2.5; notes §3.7 |
-| R3.3 gate rules in editable per-desk YAML + traits | MUST | §4.2 |
-| R3.4 kit/type ids as reference vocabulary | MUST | §4.3 (depends on D1/#49) |
-| R4.1 MCP+CLI+TUI on one tool core | MUST | §5.1, §5.3, §2.6 |
-| R4.2 get_context single-call cold-start | MUST | §5.2 |
-| R4.3 realtime events | SHOULD → adopted | §5.4 |
-| R4.4 autonomous queue-drain | LATER | §9 (constraint: claim + append-only sufficient) |
-| R5.1 in-repo complementary plugin + PM module | MUST | §6, §2.3 |
-| R5.2 store-per-desk, config layering, open-guard | MUST | §2.1, §2.9, §3.1 desk field, §7 — built; **portfolio read-only fan-out: LATER (§9)**, with the v1 constraint that all desks stay enumerable under one XDG root so fan-out needs no schema/layout change |
-| R5.3 identity-neutral artifacts | MUST | §6.2 |
-| R5.4 single-binary posture | SHOULD → adopted | §2 (one binary, embedded PB) |
-| R5.5 unified app+store, core+modules, 3 disciplines | MUST | §2 (whole section) |
-| R6.1 GitHub board stays truth; read-only linkage | MUST | §7 |
-| R6.2 librarian write boundary carries over | MUST | §7 |
-| R6.3 secrets never in store | SHOULD → adopted | §7 |
-| R7.1 explicit schema/config versioning + migration | MUST | §2.8, §8.3 |
-| R7.2 rebuild-from-scratch reproducibility | MUST | §8.2 |
-| R7.3 adoption path for the desk | SHOULD → adopted | §8.1 |
+| Req | MUST/SHOULD/LATER | Covered by | Verified by (test) |
+|---|---|---|---|
+| R1.1 serve concurrent non-issue threads | MUST | §1.1, §3.1 | `TestFixtures_ThroughBothSurfaces`, `TestRunner_ReplaysImportedItems` (`.../pm/scenario`) |
+| R1.2 no external PM SaaS | MUST | §1.1, §2 (self-hosted on the chassis) | Architectural — embedded PocketBase, no network dep (build/`verify.sh`); no unit test |
+| R1.3 minimal provable v1 | MUST | §1.2, §2.9 (feature gate), §9 | `TestEnabled_Gate` (`.../pm`), `TestAdoptionDryRun` (`.../pm/scenario`) |
+| R1.4 fast-track mode | LATER | §9 (constraint: gate separate from phase write) | LATER — deferred; not built, no test |
+| R2.1 universal self-referencing item | MUST | §3.1 | `TestGetItem_Detail`, `TestImport_BuildsTheGraph` (`.../pm/importer`) |
+| R2.2 rigid machine ⟂ status labels | MUST | §3.2, §3.3 | `TestEdge_Legality`, `TestDefaultStatusLabels` (`.../pm/statemachine`), `TestSetStatusLabelRoutesThroughMachine` |
+| R2.3 court/pointer/type/severity/priority | MUST | §3.1 | `TestListItems_Filters`, `TestGetItem_Detail` |
+| R2.4 typed edges, unblock_at, cascade | MUST | §3.4, §3.5 | `TestCascadeAuto`, `TestCascadeAutoReopen`, `TestCascadeManualAndPermanent`, `TestCascadeMultiBlocker`, `TestLinkIsBlockedByCanonicalizes` |
+| R2.5 append-only audit + actor attribution | MUST | §3.6 | `TestAuditTrail` |
+| R2.6 optimistic concurrency + claim TTL | SHOULD → adopted | §3.6 | `TestVersionMismatchRefused`, `TestClaimSemantics`, `TestClaimTTLFromDeskConfig`, `TestReleaseClearsClaim` |
+| R3.1 server-enforced transitions, names what's missing | MUST | §4.1 | `TestGateRefusedThenSatisfied`, `TestIllegalEdgeRefusedBeforeGates`, `TestBlockedRefusesAdvanceOnly` |
+| R3.2 artifacts = librarian-validated documents | MUST | §4.4, §2.5; notes §3.7 | `TestGateFailsClosedWithoutValidator`, `TestEvaluate_StubValidator` (`.../pm/gates`) |
+| R3.3 gate rules in editable per-desk YAML + traits | MUST | §4.2 | `TestDeskConfigOverridesDefaults`, `TestTraitCompositionThroughFrontmatter`, `TestParseRules_SpecExample`, `TestEffective_TraitComposition` (`.../pm/gates`) |
+| R3.4 kit/type ids as reference vocabulary | MUST | §4.3 (depends on D1/#49) | `TestParseRules_Refuses` (rejects unknown type/status/edge), `TestDefaultRulesYAML_Parses` (`.../pm/gates`) |
+| R4.1 MCP+CLI+TUI on one tool core | MUST | §5.1, §5.3, §2.6 | `TestGetContext_SurfaceParity`, `TestToolBodies_EndToEnd` (`.../pm/tools`) |
+| R4.2 get_context single-call cold-start | MUST | §5.2 | `GetContext` (`.../pm/engine/queries.go`) via `TestGetContext_FourSets`, `TestGetContext_ActiveOrdering`; cold-start observed by `TestAdoptionDryRun` |
+| R4.3 realtime events | SHOULD → adopted | §5.4 | `TestRealtime_EmitsOnTransitions` (`.../pm`) |
+| R4.4 autonomous queue-drain | LATER | §9 (constraint: claim + append-only sufficient) | LATER — deferred; not built, no test |
+| R5.1 in-repo complementary plugin + PM module | MUST | §6, §2.3 | `plugin/desk-pm.test.ts` (skills/agent/tool-reference suite), `TestGatedOnDeskHasPMSurfaces` (`.../pm/gatedon`) |
+| R5.2 store-per-desk, config layering, open-guard | MUST | §2.1, §2.9, §3.1 desk field, §7 — built; **portfolio read-only fan-out: LATER (§9)**, with the v1 constraint that all desks stay enumerable under one XDG root so fan-out needs no schema/layout change | `TestStoreDir_EmbedsDeskName` (`.../core/store`), `TestCheckDeskGuard_MismatchOnFilesRowErrors` (`.../core/store`), `TestLoadDotEnvNeverOverrides` (`.../core/config`) |
+| R5.3 identity-neutral artifacts | MUST | §6.2 | `scripts/check-neutrality.mjs` lint (in `make check` + CI); `plugin/desk-pm.test.ts` neutrality assertions |
+| R5.4 single-binary posture | SHOULD → adopted | §2 (one binary, embedded PB) | Architectural — release cross-compile + `verify.sh`; no unit test |
+| R5.5 unified app+store, core+modules, 3 disciplines | MUST | §2 (whole section) | `TestNoLibrarianImports`, `TestNoSelfRegisteredMigrations`, `TestMigrations_MatchOwnedCollections` (`.../pm`); `scripts/check-core-purity.mjs` |
+| R6.1 GitHub board stays truth; read-only linkage | MUST | §7 | `TestSpecs_NoDeskFileWrites` (`.../pm/tools`); board-linkage otherwise doctrine (§7), no automated test |
+| R6.2 librarian write boundary carries over | MUST | §7 | `TestSpecs_NoDeskFileWrites` (`.../pm/tools`) — PM tools write only the store, never desk files |
+| R6.3 secrets never in store | SHOULD → adopted | §7 | Doctrine (§7) — no automated test; see note below |
+| R7.1 explicit schema/config versioning + migration | MUST | §2.8, §8.3 | `TestGatedOnDeskCreatesPMCollectionsAndStamps`, `TestPMDownMigrationsReverse` (`.../pm/gatedon`) |
+| R7.2 rebuild-from-scratch reproducibility | MUST | §8.2 | `TestRebuildReproducibility`, `TestDepSnapshotKindTiebreak` (`.../pm/importer/rebuild_test.go`) |
+| R7.3 adoption path for the desk | SHOULD → adopted | §8.1 | `TestAdoptionDryRun` (`.../pm/scenario/dryrun_test.go`) |
+
+**Coverage notes.** Every MUST/SHOULD requirement that is a built behavior has a named
+verifying test above. Four rows are intentionally not unit-tested and are enforced elsewhere:
+**R1.4** and **R4.4** are LATER (deferred, not built); **R1.2** and **R5.4** are architectural
+(one binary with embedded PocketBase, no network dependency — verified by the release
+cross-compile and `verify.sh`, not a unit test); and **R6.3** (secrets never in the store) is a
+handling doctrine (§7) with no automated guard — a candidate for a future negative test. The
+D8 adoption oracle `TestAdoptionDryRun` (§8.1) exercises R7.3 end-to-end and, in one run,
+observes the R4.2 cold-start briefing, an R3.1 gate refused-then-satisfied, and an R2.4
+dependency auto-unblock — never writing the live desk. R7.2 reproducibility is doubly pinned:
+`TestRebuildReproducibility` plus `TestDepSnapshotKindTiebreak`, which fixes the (from,to)-tie
+sort determinism (issue #71).
 
 ---
 
