@@ -30,6 +30,13 @@ bun.lockb
 
 
 logs/
+# --- _meta/ operations: secrets/live-ops stay local; the empty dir survives a clone (ADR-0006, dotfiles-agents) ---
+_meta/operations/*
+!_meta/operations/.gitkeep
+
+# --- desk-toolkit bytecode ---
+_meta/plans/_utils/__pycache__/
+
 # --- Claude Code (machine-local; per the desk standard: narrow ignores, track deliberate config) ---
 .claude/settings.local.json
 .claude/worktrees/

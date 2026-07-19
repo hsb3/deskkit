@@ -1,0 +1,18 @@
+# _meta/mise-en-place.yml — per-repo variance manifest (tracked by default; ADR-0006).
+# The standards define the invariants; this file is the ONLY home for per-repo variance.
+# Field reference: the mise-en-place-scaffold skill's references/manifest.md.
+# Readers: repo-compliance-audit + mise-en-place-scaffold consume default_branch,
+# required_folders, required_files; the gh_* / board_title fields are declared here for
+# the github-project-board skill. Unknown fields are tolerated by both readers.
+owner: "hsb3"        # GitHub owner
+repo: "desk-standard"
+default_branch: main # e.g. dev in some orgs
+gh_issue_labels: []  # [{name, color, description}] — consumed by github-project-board
+gh_milestones: []    # [{title, description}] — consumed by github-project-board
+board_title: ""
+required_folders: [] # repo-specific additions beyond the standard
+# No root tests/ by design: Go tests live in librarian/, TS tests in plugin/. Do NOT declare
+# tests/ here — required_folders entries are auto-created (empty) by the scaffold, which would
+# manufacture the very dir this repo omits. Broader code-repo conformance (CLAUDE.md, AGENTS.md,
+# docs/CHARTER.md, tests/) is deferred to the desk-standard design review, tracked off this repo.
+required_files: []
