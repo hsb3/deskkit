@@ -15,12 +15,15 @@ import (
 	"github.com/pocketbase/pocketbase/tests"
 
 	"github.com/example/pocket-librarian/internal/core/config"
+	"github.com/example/pocket-librarian/internal/core/mcp"
 	"github.com/example/pocket-librarian/internal/core/migrate"
 	"github.com/example/pocket-librarian/internal/core/module"
 	"github.com/example/pocket-librarian/internal/core/toolcore"
 	"github.com/example/pocket-librarian/internal/modules/librarian"
 	"github.com/example/pocket-librarian/internal/modules/pm"
 	"github.com/example/pocket-librarian/internal/modules/pm/collections"
+	pmtools "github.com/example/pocket-librarian/internal/modules/pm/tools"
+	pmtui "github.com/example/pocket-librarian/internal/modules/pm/tui"
 
 	// Librarian migrations register via init()+blank-import as in main: this desk runs BOTH
 	// modules, proving the two version rows stay independent (R7.1).
@@ -102,6 +105,77 @@ func TestGatedOnDeskCreatesPMCollectionsAndStamps(t *testing.T) {
 	gerr := migrate.GuardDowngrade(app, reg.MigrateModules())
 	if gerr == nil || !strings.Contains(gerr.Error(), "refusing to downgrade") {
 		t.Fatalf("store ahead of binary must refuse, got %v", gerr)
+	}
+}
+
+// TestGatedOnDeskHasPMSurfaces is the D4 half of the ON proof (spec §2.9/§5): with pm
+// enabled, the merged registry carries librarian(7) + pm(12) tools, the model-facing gate
+// exposes the PM family (all twelve with PM_AUTONOMOUS_WRITES on — the shipped default —
+// and only the three reads with it off), the MCP server builds over the merged set, and the
+// three PM TUI views mount.
+func TestGatedOnDeskHasPMSurfaces(t *testing.T) {
+	t.Cleanup(toolcore.Reset)
+	toolcore.Reset()
+	cfg := &config.Config{
+		DeskRoot: t.TempDir(), DeskName: "pm-desk", PMEnabled: true, PMAutonomousWrites: true,
+	}
+	reg, err := module.Register(cfg, librarian.New(), pm.New())
+	if err != nil {
+		t.Fatalf("module.Register: %v", err)
+	}
+
+	if got := len(toolcore.AllTools()); got != 19 {
+		t.Fatalf("gated-on registry holds %d tools, want 7+12=19", got)
+	}
+	exposed := map[string]bool{}
+	for _, n := range mcp.ExposedTools(cfg) {
+		exposed[n] = true
+	}
+	for _, name := range pmtools.ToolNames() {
+		if !exposed[name] {
+			t.Errorf("PM tool %q not exposed on the model-facing surface with writes on", name)
+		}
+	}
+	// restore stays excluded (§5.5) and apply_fix stays behind ITS OWN librarian gate.
+	if exposed["restore"] || exposed["apply_fix"] {
+		t.Error("librarian gating must be unchanged by the pm module")
+	}
+	if s, serr := mcp.NewServer(nil, cfg); serr != nil || s == nil {
+		t.Fatalf("gated-on MCP server build: %v", serr)
+	}
+
+	// PM_AUTONOMOUS_WRITES=false: agents are read-only over the graph (§13 item 9).
+	toolcore.Reset()
+	roCfg := &config.Config{
+		DeskRoot: cfg.DeskRoot, DeskName: "pm-desk", PMEnabled: true, PMAutonomousWrites: false,
+	}
+	if _, err := module.Register(roCfg, librarian.New(), pm.New()); err != nil {
+		t.Fatalf("module.Register (read-only): %v", err)
+	}
+	roExposed := map[string]bool{}
+	for _, n := range mcp.ExposedTools(roCfg) {
+		roExposed[n] = true
+	}
+	for _, name := range []string{"get_context", "list_items", "get_item"} {
+		if !roExposed[name] {
+			t.Errorf("read tool %q must stay exposed with writes off", name)
+		}
+	}
+	for _, name := range []string{"create_item", "transition_item", "claim_item"} {
+		if roExposed[name] {
+			t.Errorf("write tool %q exposed despite PM_AUTONOMOUS_WRITES=false", name)
+		}
+	}
+
+	// The three PM TUI views mount, landing view first (spec §5.3).
+	views := reg.TUIViews(nil, cfg)
+	if len(views) != 3 || views[0].Name() != pmtui.ContextViewName {
+		names := make([]string, len(views))
+		for i, v := range views {
+			names[i] = v.Name()
+		}
+		t.Fatalf("gated-on TUI views = %v, want [%s %s %s]",
+			names, pmtui.ContextViewName, pmtui.BoardViewName, pmtui.DetailViewName)
 	}
 }
 
