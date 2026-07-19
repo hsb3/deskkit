@@ -87,6 +87,33 @@ Inside that session, the `desk-setup` skill scaffolds a new desk from your profi
 `conventions-standard` and `harvest-loop` run the standing checks and the periodic
 improvement-log pass.
 
+## Install the `deskkit` binary
+
+The release workflow publishes a prebuilt `deskkit` binary for macOS and Linux (amd64 + arm64)
+on every `v*` tag, so you don't need the Go toolchain to run it on another machine.
+
+**While this repo is private,** download the release asset with an authenticated `gh` (the public
+`install.sh` one-liner below only works once the repo is public):
+
+```bash
+mkdir -p ~/.local/bin
+os=$(uname -s | tr '[:upper:]' '[:lower:]')                 # darwin | linux
+arch=$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/')   # amd64 | arm64
+gh release download --repo hsb3/desk-standard \
+  --pattern "deskkit_*_${os}_${arch}" \
+  --output ~/.local/bin/deskkit --clobber
+chmod +x ~/.local/bin/deskkit
+deskkit --version    # -> 0.7.0
+```
+
+`gh release download` with no tag picks the latest release; make sure `~/.local/bin` is on your
+`PATH`.
+
+**Once the repo is public,** the bundled installer does download + sha256-verify + install in one
+step: `curl -fsSL https://raw.githubusercontent.com/hsb3/desk-standard/main/install.sh | bash`.
+From a source checkout, `make install` builds and installs the version-stamped binary to
+`~/.local/bin`.
+
 ## Running the librarian
 
 ```bash
