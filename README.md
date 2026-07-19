@@ -16,7 +16,11 @@ org, repo, or issue number:
   desk's files, flags convention violations, and can propose + apply fixes under a
   record-original-first safety boundary — every applied fix is byte-exact reversible via
   `restore`. Exposes its tools as an MCP server (`restore` is deliberately CLI-only, and
-  `apply_fix` is gated behind an env flag) and a CLI over one tool core.
+  `apply_fix` is gated behind an env flag) and a CLI over one tool core. The same binary also
+  carries the **PM module** — a document-gated work graph (items move through a rigid phase
+  machine; a phase advance is refused until the document that phase requires validates),
+  feature-gated **OFF by default** and enabled per desk with `PM_ENABLED`. See
+  [docs/pm-guide.md](docs/pm-guide.md) and the complementary `desk-pm` plugin.
 - **`schema/`** — schema v1: the shared, product-neutral contract both `plugin/` and
   `librarian/` read as their rule/structure source.
 
@@ -129,13 +133,15 @@ Docs split into two tracks — see **[docs/README.md](docs/README.md)** for the 
 - **[docs/getting-started.md](docs/getting-started.md)** — install, fill your profile, build the librarian, first sweep + patrol.
 - **[docs/plugin-guide.md](docs/plugin-guide.md)** — the four skills as user journeys: when to reach for each, what you get.
 - **[docs/librarian-guide.md](docs/librarian-guide.md)** — the daily loop: sweep → patrol → fix → byte-exact restore.
-- `plugin/README.md`, `schema/README.md`, `librarian/README.md` — per-product operator detail.
+- **[docs/pm-guide.md](docs/pm-guide.md)** — the PM work graph: enable it, the phase machine + gates, and the CLI / MCP / TUI / `desk-pm` plugin surfaces.
+- `plugin/README.md`, `plugin/desk-pm/README.md`, `schema/README.md`, `librarian/README.md` — per-product operator detail.
 
 **Developing it** — build, test, release:
 
 - **[docs/development/](docs/development/)** — the contributor overview: build/test gates, media regeneration, and how to cut a release.
 - `docs/pocket-librarian-v1-spec.md` — the librarian's product and technical spec.
-- `docs/decisions/` — architecture decision records (interactive surface, multi-desk topology, store self-initialization, chat TUI, versioning policy).
+- `docs/pm-system-v1-spec.md` — the PM system's product and technical spec (core+modules refactor, PM module, gates, surfaces, plugin).
+- `docs/decisions/` — architecture decision records (interactive surface, multi-desk topology, store self-initialization, chat TUI, versioning policy, kit port, Charm v2 stack, PM core+modules architecture).
 - **[CHANGELOG.md](CHANGELOG.md)** — what changed in each release.
 - `_meta/build-brief.md` — the build brief this repo was built from (repo shape, acceptance criteria, parallelism).
 - `_meta/m-05-data-surfaces.md` — the profile / `_knowledge/` design and the neutrality lint.
