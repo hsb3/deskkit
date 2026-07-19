@@ -82,6 +82,9 @@ test("every PM tool is referenced by at least one skill or the agent (no undocum
 
 // Store/config data-field names that are legitimately two-word snake_case but are NOT tools
 // (get_context response fields + the desk_config collection). Kept tiny and explicit.
+// MAINTENANCE: if a skill/agent begins referencing another two-word snake_case data field in
+// prose, add it here — otherwise the ToolNames-anchored guard below will (correctly) flag it
+// as an unrecognized identifier.
 const NON_TOOL_FIELDS = new Set([
   "by_court", "by_phase", "desk_config", "recent_transitions", "status_label",
 ]);

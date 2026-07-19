@@ -30,6 +30,8 @@ fi
 
 # Emit only a real JSON-object briefing; PM-off (cobra error on stdout, exit 0), usage text,
 # and empty output all fall through to a silent no-op — the contract holds regardless.
+# Strip any leading whitespace first (current output has none; defensive if the format shifts).
+context="${context#"${context%%[![:space:]]*}"}"
 case "$context" in
   '{'*) ;;
   *) exit 0 ;;
