@@ -11,4 +11,8 @@ gh_issue_labels: []  # [{name, color, description}] — consumed by github-proje
 gh_milestones: []    # [{title, description}] — consumed by github-project-board
 board_title: ""
 required_folders: [] # repo-specific additions beyond the standard
+# No root tests/ by design: Go tests live in librarian/, TS tests in plugin/. Do NOT declare
+# tests/ here — required_folders entries are auto-created (empty) by the scaffold, which would
+# manufacture the very dir this repo omits. Broader code-repo conformance (CLAUDE.md, AGENTS.md,
+# docs/CHARTER.md, tests/) is deferred to the desk-standard design review, tracked off this repo.
 required_files: []

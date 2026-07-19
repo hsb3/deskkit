@@ -1,9 +1,10 @@
 # `_meta/` — the local working desk
 
 This repo follows the **code-desk** meta-structure convention: a slim set of folders that orient
-coding agents and humans on the next release. `_meta/` is tracked by default (ADR-0006); the only
-ignored path is `operations/` content (secrets / live-ops), which stays machine-local while the
-empty dir survives a clone.
+coding agents and humans on the next release. `_meta/` is tracked by default (ADR-0006 in
+`dotfiles-agents`, the estate-wide track-by-default decision — not this repo's local ADR-0006);
+the only ignored path is `operations/` content (secrets / live-ops), which stays machine-local
+while the empty dir survives a clone.
 
 | Entry | Purpose |
 |---|---|

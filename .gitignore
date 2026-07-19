@@ -27,7 +27,7 @@ bun.lockb
 
 
 logs/
-# --- _meta/ operations: secrets/live-ops stay local; the empty dir survives a clone (ADR-0006) ---
+# --- _meta/ operations: secrets/live-ops stay local; the empty dir survives a clone (ADR-0006, dotfiles-agents) ---
 _meta/operations/*
 !_meta/operations/.gitkeep
 
