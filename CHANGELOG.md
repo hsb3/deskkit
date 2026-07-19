@@ -43,7 +43,7 @@ for why this policy exists.
   behind `PM_AUTONOMOUS_WRITES` (default ON) — a desk can make agents read-only over the graph
   while the document gate stays the real safety. PM tools write only the store, never desk files.
   Realtime events emit on transitions under `serve`. New PM env vars: `PM_AUTONOMOUS_WRITES`,
-  `PM_STALLED_DAYS` (default 14), `PM_CLAIM_TTL` (default 30m).
+  `PM_STALLED_DAYS` (default 14).
 - **`desk-pm` complementary plugin** (D5, `docs/pm-system-v1-spec.md` §6, epic #55). A separate
   Claude Code plugin (shared marketplace) that turns the PM graph into an agent surface over the
   MCP tools: the `pm-session-open`, `pm-advance-item`, and `pm-triage` skills; a `pm-operator`

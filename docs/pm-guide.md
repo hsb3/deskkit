@@ -58,7 +58,7 @@ first startup, with one logged line — no desk loses its store across the renam
 - **Court** (who holds the item): `owner`, `desk`, `crew`, `vendor`, `external-session`.
 - **Dependencies** are typed edges: `blocks`, `is-blocked-by`, `relates-to`. A `blocks` edge
   carries an `unblock-at` phase (`work` / `review` / `terminal`) and a cascade mode (`auto`,
-  `auto-reopen`, `manual`, `permanent`).
+  `manual`, `auto-reopen`, `permanent`).
 - **Concurrency:** every mutation is version-checked (optimistic concurrency); `claim`/`release`
   give an item a TTL'd claim so two agents never double-work it.
 - **Audit:** every transition appends an immutable row; a refusal lands as a `gate_refused` audit
@@ -77,7 +77,7 @@ and a gate/engine refusal prints its refusal line, never a usage dump. Audit ide
 | `pm list` | Filtered work-graph query | `--phase` `--court` `--type` `--blocked true\|false` `--parent <id>` |
 | `pm get <id>` | One item with notes, dependencies, transitions, ancestors | — |
 | `pm create` | Add a work item (starts at `queue`) | `--title` (required) `--type` `--parent` `--court` `--pointer` `--severity low\|medium\|high` `--priority N` |
-| `pm update <id>` | Edit first-class fields (empty flag = unchanged) | `--title` `--type` `--court` `--pointer` `--severity` `--priority` `--properties <json>` `--status-label` `--version N` |
+| `pm update <id>` | Edit first-class fields (empty flag = unchanged; `--priority 0` also = unchanged — `0` is the zero-value sentinel, not a settable priority) | `--title` `--type` `--court` `--pointer` `--severity` `--priority` `--properties <json>` `--status-label` `--version N` |
 | `pm transition <id>` | Request a phase transition; gates may refuse | `--to queue\|work\|review\|terminal` (required) `--version N` |
 | `pm block <id>` | Set the blocked side-state (preserves the phase) | `--reason` `--version N` |
 | `pm unblock <id>` | Clear the blocked side-state | `--reason` `--version N` |
