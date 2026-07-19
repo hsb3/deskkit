@@ -13,6 +13,8 @@ for why this policy exists.
 
 ## [Unreleased]
 
+## [0.7.0] — 2026-07-19
+
 ### Added
 
 - **PM module — collections, state machine, gates** (D3, `docs/pm-system-v1-spec.md` §3–§4,
@@ -51,6 +53,9 @@ for why this policy exists.
   a repo; a `SessionStart` hook injecting `deskkit pm context` (silent no-op when PM is off or
   `deskkit` is absent); and a `.mcp.json` launching `deskkit mcp-serve` with `PM_ENABLED=true`.
   Identity-neutral by construction — no person, org, repo, issue, or desk name is hardcoded.
+- Adoption dry-run (`TestAdoptionDryRun`): seeds a scratch store from a neutral manifest via the
+  importer, observes `get_context` cold-start, a gate refused-then-satisfied, and a dependency
+  auto-unblock, proving the live desk is never written (spec §8.1).
 
 ### Changed
 
@@ -61,6 +66,12 @@ for why this policy exists.
   (one logged line) — no desk loses its store across the rename. `install.sh` falls back to the
   pre-rename asset name for releases up to v0.6.0; ADR 0002's store-path literal carries a dated
   correction. The Go module path (`github.com/example/pocket-librarian`) is unchanged.
+
+### Fixed
+
+- dep-snapshot sort now tiebreaks on `Kind` so two edges sharing a (from,to) pair but differing
+  in kind order deterministically, removing a flaky false-failure in the rebuild-reproducibility
+  oracle (issue #71).
 
 ## [0.6.0] — 2026-07-18
 
