@@ -12,6 +12,8 @@ for why this policy exists.
 
 ## [Unreleased]
 
+## [0.6.0] — 2026-07-18
+
 ### Added
 
 - **SOP kit library (`kits/`) + schema-v1 doc-type dimension.** The 23 headcase SOP kits
@@ -46,6 +48,10 @@ for why this policy exists.
 
 ### Changed
 
+- **Core + modules architecture.** The librarian is refactored into a shared `internal/core/`
+  (config, store, migrate, mcp, schema, module registry) with librarian-specific code moved under
+  `internal/modules/librarian/`, making the librarian the first module on a reusable substrate.
+  Internal reorganization only — no change to the CLI, MCP tool surface, schema, or store layout.
 - **Chat TUI migrated to the Charm v2 stack** (bubbletea v2, lipgloss v2, bubbles v2,
   glamour v2 — the `charm.land` modules), recorded as
   [ADR 0007](docs/decisions/0007-tui-charm-v2-stack.md). No feature or visual changes: the
