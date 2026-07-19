@@ -15,7 +15,14 @@ set -euo pipefail
 
 command -v deskkit >/dev/null 2>&1 || exit 0
 
-context="$(deskkit pm context 2>/dev/null)" || exit 0
+# Bound the call so a stuck store (e.g. the DB held by a running `deskkit serve`) can never
+# hang session start. `timeout` is not on stock macOS, so use it only when present; without
+# it the `|| exit 0` still makes a nonzero exit a silent no-op.
+if command -v timeout >/dev/null 2>&1; then
+  context="$(timeout 5s deskkit pm context 2>/dev/null)" || exit 0
+else
+  context="$(deskkit pm context 2>/dev/null)" || exit 0
+fi
 [ -z "$context" ] && exit 0
 
 header="PM work graph — cold-start briefing (from \`deskkit pm context\`). The desk's active, blocked, and stalled work follows as JSON. Use the pm-session-open skill to render it and pick the next item."

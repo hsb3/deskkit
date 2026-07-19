@@ -95,8 +95,10 @@ test("no invented PM surface names leak into the skills or agent", () => {
   ];
   for (const bad of INVENTED) {
     // Word-boundary match so a real name is not flagged as containing a shorter invented one
-    // (e.g. `list_items` must not trip the `list_item` entry).
-    expect(new RegExp(`\\b${bad}\\b`).test(corpus)).toBe(false);
+    // (e.g. `list_items` must not trip the `list_item` entry). Escape any regex metachars a
+    // future entry might carry.
+    const esc = bad.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    expect(new RegExp(`\\b${esc}\\b`).test(corpus)).toBe(false);
   }
   // Any mcp__desk-pm__<x> reference must name one of the twelve tools.
   for (const m of corpus.matchAll(/mcp__desk-pm__([a-z_]+)/g)) {
@@ -111,18 +113,29 @@ test("the advance-item skill enumerates exactly the four real phases", () => {
   expect(md).not.toMatch(/phase[s]?[^.\n]*\bbacklog\b/i);
 });
 
-test("the read tools are the fallback surface named for a read-only (PM_AUTONOMOUS_WRITES=false) desk", () => {
-  const md = read(join("skills", "pm-session-open", "SKILL.md")) +
-    read(join("agents", "pm-operator.md"));
-  expect(md).toContain("PM_AUTONOMOUS_WRITES");
-  for (const t of PM_READ_TOOLS) expect(md.includes(t)).toBe(true);
+test("every write-capable artifact documents the read-only (PM_AUTONOMOUS_WRITES=false) fallback", () => {
+  // All three skills and the agent describe what changes when writes are gated off — a
+  // refactor that drops the boundary in any one of them fails here.
+  const files = [
+    join("skills", "pm-session-open", "SKILL.md"),
+    join("skills", "pm-advance-item", "SKILL.md"),
+    join("skills", "pm-triage", "SKILL.md"),
+    join("agents", "pm-operator.md"),
+  ];
+  for (const f of files) expect(read(f)).toContain("PM_AUTONOMOUS_WRITES");
+  // The three read tools stay available in that mode — named across the corpus.
+  const corpus = files.map(read).join("\n");
+  for (const t of PM_READ_TOOLS) expect(corpus.includes(t)).toBe(true);
 });
 
 test("hooks.json wires a SessionStart command hook to the shipped script", () => {
   const j = JSON.parse(read(join("hooks", "hooks.json")));
   const ss = j.hooks?.SessionStart;
   expect(Array.isArray(ss)).toBe(true);
-  const cmd = ss[0].hooks[0];
+  const entry = ss?.[0];
+  expect(entry).toBeDefined();
+  const cmd = entry?.hooks?.[0];
+  expect(cmd).toBeDefined();
   expect(cmd.type).toBe("command");
   expect(cmd.command).toContain("session-briefing.sh");
   expect(cmd.command).toContain("${CLAUDE_PLUGIN_ROOT}");

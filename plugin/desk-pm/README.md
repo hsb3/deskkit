@@ -43,7 +43,10 @@ The PM tool family (frozen in D4): `get_context`, `list_items`, `get_item`, `cre
 
 - `deskkit mcp-serve` and the hook's `deskkit pm context` open the store directly, so they must
   not run concurrently with `deskkit serve` (single-writer SQLite). When serve holds the DB the
-  hook errors and no-ops.
+  hook bounds the call (`timeout 5s` when available) and no-ops.
+- `${CLAUDE_PLUGIN_ROOT}` in `hooks/hooks.json` is set by the plugin loader at install time to
+  this bundle's path; the hook command resolves against it, so the plugin works wherever it is
+  installed.
 - **Identity-neutral by construction** (spec §6.2): no artifact hardcodes a person, org, repo,
   issue, or desk name. All desk identity flows through the desk profile and `desk_config`.
 
