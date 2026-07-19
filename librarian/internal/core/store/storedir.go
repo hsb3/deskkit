@@ -2,6 +2,7 @@ package store
 
 import (
 	"fmt"
+	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -78,7 +79,11 @@ func MigrateLegacyStoreDir(deskName string) error {
 			_ = os.RemoveAll(newDir) // don't leave a half-copied new home behind
 			return fmt.Errorf("store: migrate legacy store %s -> %s: %w", oldDir, newDir, cpErr)
 		}
-		_ = os.RemoveAll(oldDir) // best-effort; data is safely in the new home
+		// Best-effort cleanup; data is safely in the new home either way (the next startup
+		// no-ops on "new home exists"), but tell the operator when the old copy lingers.
+		if rmErr := os.RemoveAll(oldDir); rmErr != nil {
+			fmt.Fprintf(os.Stderr, "deskkit: migrated store to %s but could not remove the old home %s: %v (safe to remove manually)\n", newDir, oldDir, rmErr)
+		}
 	}
 	fmt.Fprintf(os.Stderr, "deskkit: migrated store %s -> %s\n", oldDir, newDir)
 	return nil
@@ -103,10 +108,24 @@ func copyTree(src, dst string) error {
 		if d.IsDir() {
 			return os.MkdirAll(target, info.Mode().Perm())
 		}
-		b, ferr := os.ReadFile(p)
-		if ferr != nil {
-			return ferr
-		}
-		return os.WriteFile(target, b, info.Mode().Perm())
+		return copyFile(p, target, info.Mode().Perm())
 	})
+}
+
+// copyFile streams src to dst (a SQLite store file can be large — never load it whole).
+func copyFile(src, dst string, perm fs.FileMode) error {
+	in, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer in.Close()
+	out, err := os.OpenFile(dst, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, perm)
+	if err != nil {
+		return err
+	}
+	if _, err = io.Copy(out, in); err != nil {
+		out.Close()
+		return err
+	}
+	return out.Close()
 }

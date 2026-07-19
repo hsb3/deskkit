@@ -66,6 +66,28 @@ func TestMigrateLegacyStoreDir_NoopWhenNewHomeExists(t *testing.T) {
 	}
 }
 
+func TestMigrateLegacyStoreDir_ErrorWhenNewParentUncreatable(t *testing.T) {
+	xdg := t.TempDir()
+	t.Setenv("XDG_DATA_HOME", xdg)
+
+	// Seed a legacy store so the migration would proceed.
+	oldDir := filepath.Join(xdg, legacyAppDirName, "desk-err")
+	if err := os.MkdirAll(oldDir, 0o700); err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+	// Block MkdirAll by planting a regular file where the deskkit/ parent dir must go.
+	if err := os.WriteFile(filepath.Join(xdg, AppDirName), []byte("block"), 0o600); err != nil {
+		t.Fatalf("block: %v", err)
+	}
+
+	if err := MigrateLegacyStoreDir("desk-err"); err == nil {
+		t.Fatal("expected an error when the new home's parent cannot be created, got nil")
+	}
+	if _, err := os.Stat(oldDir); err != nil {
+		t.Fatalf("legacy store must be untouched on a failed migration: %v", err)
+	}
+}
+
 func TestMigrateLegacyStoreDir_NoopWhenNoLegacyHome(t *testing.T) {
 	xdg := t.TempDir()
 	t.Setenv("XDG_DATA_HOME", xdg)
