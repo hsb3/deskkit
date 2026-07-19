@@ -84,7 +84,11 @@ func main() {
 	// and `--dir=<path>` forms). When present, the location is whatever the operator chose and
 	// the unresolved-location guard does not apply.
 	explicitDir := hasDirFlag(os.Args[1:])
-	storeTouching := isStoreTouchingInvocation(os.Args[1:])
+	// `pm` is store-touching only when the pm module is enabled (spec §2.9): with PM off the
+	// group is not even registered, so guarding (and pre-creating the store dir for) an
+	// unknown command would be wrong.
+	storeTouching := isStoreTouchingInvocation(os.Args[1:]) ||
+		(firstSubcommand(os.Args[1:]) == "pm" && cfg != nil && cfg.PMEnabled)
 	// --no-input (root persistent flag; also registered on app.RootCmd below for help/usage) is
 	// read manually here because the first-run onramp is decided in main() BEFORE cobra parses
 	// flags. Non-TTY or --no-input => today's fail-closed behavior, byte-identical error.
@@ -271,6 +275,13 @@ func main() {
 				if err := mod.RegisterHooks(e.App, cfg); err != nil {
 					app.Logger().Error("register module hooks", "module", mod.Name(), "err", err)
 				}
+				// Realtime is serve-only (spec §5.4): core wires each enabled module's optional
+				// RealtimeSource capability here, so one-shot CLI commands never emit events.
+				if rs, ok := mod.(module.RealtimeSource); ok {
+					if err := rs.RegisterRealtime(e.App); err != nil {
+						app.Logger().Error("register module realtime", "module", mod.Name(), "err", err)
+					}
+				}
 			}
 			trigger.StartClaimer(context.Background(), e.App, cfg, agentAction)
 		} else {
@@ -283,23 +294,29 @@ func main() {
 
 	// PocketBase's Execute() runs RootCmd.Execute() in a goroutine and discards its
 	// error (upstream: "leave to the commands to decide whether to print their error"),
-	// so a failing RunE would exit 0. Wrap every registered subcommand's RunE to record
-	// the first error, and exit non-zero after Start() returns (post-cleanup).
+	// so a failing RunE would exit 0. Wrap every registered subcommand's RunE — RECURSIVELY,
+	// since the `pm` group nests its commands a level down (spec §5.3) — to record the first
+	// error, and exit non-zero after Start() returns (post-cleanup).
 	var cmdErr error
-	for _, c := range app.RootCmd.Commands() {
-		if f := c.RunE; f != nil {
-			c.RunE = func(cmd *cobra.Command, args []string) error {
-				err := f(cmd, args)
-				if err != nil {
-					err = annotateLockErr(err)
-					if cmdErr == nil {
-						cmdErr = err
+	var wrapRunE func(cmds []*cobra.Command)
+	wrapRunE = func(cmds []*cobra.Command) {
+		for _, c := range cmds {
+			if f := c.RunE; f != nil {
+				c.RunE = func(cmd *cobra.Command, args []string) error {
+					err := f(cmd, args)
+					if err != nil {
+						err = annotateLockErr(err)
+						if cmdErr == nil {
+							cmdErr = err
+						}
 					}
+					return err
 				}
-				return err
 			}
+			wrapRunE(c.Commands())
 		}
 	}
+	wrapRunE(app.RootCmd.Commands())
 
 	if err := app.Start(); err != nil {
 		log.Fatal(annotateLockErr(err))
@@ -554,6 +571,13 @@ func registerToolCommands(app *pocketbase.PocketBase, cfg *config.Config, cfgErr
 	// triggers Bootstrap (see runInit). NOT added to storeTouchingCommands: it opens no store.
 	app.RootCmd.AddCommand(newInitCmd())
 
+	// pm — the work-graph command group (spec §5.3), registered ONLY when the pm module is
+	// enabled (§2.9: with PM off, PM surfaces are absent; `deskkit pm` is then cobra's normal
+	// unknown-command error). See pm.go.
+	if cfg != nil && cfg.PMEnabled {
+		registerPMCommands(app, cfg, cfgErr)
+	}
+
 	// sweep
 	app.RootCmd.AddCommand(&cobra.Command{
 		Use:   "sweep",
@@ -763,7 +787,9 @@ func registerToolCommands(app *pocketbase.PocketBase, cfg *config.Config, cfgErr
 				// string below, so the error is structurally impossible here — discard it explicitly.
 				themeFlag, _ = cmd.Flags().GetString("theme") //nolint:errcheck // "theme" is a registered string flag
 			}
-			return tui.Run(cmd.Context(), app, c, tui.ResolveTheme(themeFlag))
+			// Module TUI views (spec §5.3) are collected lazily against the LIVE app/config:
+			// the pm views when that module is enabled, none otherwise.
+			return tui.Run(cmd.Context(), app, c, tui.ResolveTheme(themeFlag), moduleReg.TUIViews(app, c))
 		},
 	}
 	chatCmd.Flags().Bool("plain", false, "force the line-oriented REPL instead of the full-screen TUI")

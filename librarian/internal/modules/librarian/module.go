@@ -18,6 +18,7 @@ import (
 	"github.com/example/pocket-librarian/internal/core/module"
 	"github.com/example/pocket-librarian/internal/core/schema"
 	"github.com/example/pocket-librarian/internal/core/toolcore"
+	"github.com/example/pocket-librarian/internal/core/tuiview"
 	"github.com/example/pocket-librarian/internal/modules/librarian/desklib"
 	"github.com/example/pocket-librarian/internal/modules/librarian/tools"
 	"github.com/example/pocket-librarian/internal/modules/librarian/trigger"
@@ -57,6 +58,10 @@ func (*Mod) OwnedCollections() []string {
 
 // Tools returns the librarian's seven tool specs.
 func (*Mod) Tools() []toolcore.ToolSpec { return tools.Specs() }
+
+// TUIViews is nil for the librarian: the chat transcript IS its TUI surface (ADR 0004); it
+// contributes no extra mounted views (spec §5.3 — the plug-point exists for other modules).
+func (*Mod) TUIViews(core.App, *config.Config) []tuiview.View { return nil }
 
 // Migrations lists the librarian's 0001..0013 migrations. All are SelfRegistered: their
 // bodies still call PocketBase's m.Register via their own init() (blank-imported by main via

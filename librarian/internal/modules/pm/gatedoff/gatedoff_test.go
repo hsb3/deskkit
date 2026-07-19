@@ -16,11 +16,14 @@ import (
 	"github.com/pocketbase/pocketbase/tests"
 
 	"github.com/example/pocket-librarian/internal/core/config"
+	"github.com/example/pocket-librarian/internal/core/mcp"
 	"github.com/example/pocket-librarian/internal/core/migrate"
 	"github.com/example/pocket-librarian/internal/core/module"
 	"github.com/example/pocket-librarian/internal/core/toolcore"
+	"github.com/example/pocket-librarian/internal/modules/librarian"
 	"github.com/example/pocket-librarian/internal/modules/pm"
 	"github.com/example/pocket-librarian/internal/modules/pm/collections"
+	pmtools "github.com/example/pocket-librarian/internal/modules/pm/tools"
 
 	// The librarian's migrations register via init()+blank-import exactly as in main — this
 	// desk is a normal librarian desk that simply has not enabled pm.
@@ -71,5 +74,53 @@ func TestGatedOffDeskHasNoPMCollections(t *testing.T) {
 	}
 	if rec, _ := app.FindFirstRecordByFilter("module_schema_versions", "module = 'pm'", nil); rec != nil {
 		t.Error("a gated-off desk must have no pm row in module_schema_versions")
+	}
+}
+
+// TestGatedOffDeskHasNoPMSurfaces is the D4 half of the OFF proof (spec §2.9): on a
+// librarian-only desk, no PM tool reaches ANY surface — the shared tool registry holds none,
+// the model-facing gate (agent/MCP: toolcore.ExposedTools) exposes none, the MCP server
+// registers none, and no PM TUI view is mounted. The librarian's own surface set is exactly
+// what it was on main.
+func TestGatedOffDeskHasNoPMSurfaces(t *testing.T) {
+	t.Cleanup(toolcore.Reset)
+	toolcore.Reset()
+	cfg := &config.Config{DeskRoot: t.TempDir(), DeskName: "librarian-only-desk"} // PMEnabled false
+	reg, err := module.Register(cfg, librarian.New(), pm.New())
+	if err != nil {
+		t.Fatalf("module.Register: %v", err)
+	}
+
+	// The merged registry holds ONLY the librarian's seven tools.
+	if got := len(toolcore.AllTools()); got != 7 {
+		t.Fatalf("gated-off registry holds %d tools, want the librarian's 7", got)
+	}
+	for _, name := range pmtools.ToolNames() {
+		if _, ok := toolcore.Spec(name); ok {
+			t.Errorf("PM tool %q present in the registry on a gated-off desk", name)
+		}
+	}
+
+	// The model-facing surfaces (eino agent + MCP share ExposedTools) see the unchanged
+	// librarian set: 5 tools without autonomous writes, 6 with — never a PM tool.
+	exposed := map[string]bool{}
+	for _, n := range mcp.ExposedTools(cfg) {
+		exposed[n] = true
+	}
+	if len(exposed) != 5 {
+		t.Errorf("gated-off MCP exposes %d tools, want the librarian's 5 (%v)", len(exposed), exposed)
+	}
+	for _, name := range pmtools.ToolNames() {
+		if exposed[name] {
+			t.Errorf("PM tool %q exposed over MCP on a gated-off desk", name)
+		}
+	}
+	if s, err := mcp.NewServer(nil, cfg); err != nil || s == nil {
+		t.Fatalf("gated-off MCP server must still build for the librarian: %v", err)
+	}
+
+	// No PM TUI views are mounted (spec §5.3 gating).
+	if views := reg.TUIViews(nil, cfg); len(views) != 0 {
+		t.Errorf("gated-off desk mounts %d TUI views, want 0", len(views))
 	}
 }

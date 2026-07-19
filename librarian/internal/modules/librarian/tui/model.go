@@ -31,6 +31,7 @@ import (
 	"github.com/pocketbase/pocketbase/core"
 
 	"github.com/example/pocket-librarian/internal/core/config"
+	"github.com/example/pocket-librarian/internal/core/tuiview"
 	"github.com/example/pocket-librarian/internal/modules/librarian/agent"
 )
 
@@ -190,6 +191,7 @@ type keymap struct {
 	quit            key.Binding
 	openPicker      key.Binding
 	newConversation key.Binding
+	cycleViews      key.Binding
 }
 
 func defaultKeymap() keymap {
@@ -207,13 +209,16 @@ func defaultKeymap() keymap {
 		quit:            key.NewBinding(key.WithKeys("ctrl+c"), key.WithHelp("ctrl+c", "quit")),
 		openPicker:      key.NewBinding(key.WithKeys("ctrl+o"), key.WithHelp("ctrl+o", "resume")),
 		newConversation: key.NewBinding(key.WithKeys("ctrl+n"), key.WithHelp("ctrl+n", "new")),
+		// Module views (spec §5.3): disabled until attachViews mounts a non-empty set, so a
+		// librarian-only desk's surface (keys + help) is unchanged.
+		cycleViews: key.NewBinding(key.WithKeys("ctrl+p"), key.WithHelp("ctrl+p", "views"), key.WithDisabled()),
 	}
 }
 
 // ShortHelp is the one-line help footer's binding order (bubbles/help KeyMap). It surfaces the
 // everyday keys; the rest live under the ctrl+g full-help expansion.
 func (k keymap) ShortHelp() []key.Binding {
-	return []key.Binding{k.send, k.openPicker, k.newConversation, k.copyLast, k.toggleSteps, k.help, k.quit}
+	return []key.Binding{k.send, k.openPicker, k.newConversation, k.cycleViews, k.copyLast, k.toggleSteps, k.help, k.quit}
 }
 
 // FullHelp is the grouped expansion shown when ctrl+g toggles ShowAll (bubbles/help KeyMap),
@@ -221,7 +226,7 @@ func (k keymap) ShortHelp() []key.Binding {
 func (k keymap) FullHelp() [][]key.Binding {
 	return [][]key.Binding{
 		{k.send, k.newline, k.cancel},
-		{k.openPicker, k.newConversation, k.copyLast},
+		{k.openPicker, k.newConversation, k.cycleViews, k.copyLast},
 		{k.toggleSteps, k.scrollUp, k.scrollDown, k.historyPrev, k.historyNext},
 		{k.help, k.quit},
 	}
@@ -273,6 +278,12 @@ type model struct {
 	ready    bool
 
 	picker *pickerModel // conversation-resume overlay (ctrl+o); nil when closed.
+
+	// Module-contributed views (spec §5.3; host_views.go): views is the mounted set (empty on
+	// a librarian-only desk), activeView the index of the one occupying the body region, or
+	// -1 when the chat transcript is showing.
+	views      []tuiview.View
+	activeView int
 }
 
 // newModel builds the chat model against an injected streamer (the real *agent.Session in
@@ -323,6 +334,7 @@ func newModel(baseCtx context.Context, sess streamer, provider sessionProvider, 
 		history:     newHistory(nil),
 		reduced:     reducedMotion(os.Getenv("NO_COLOR")),
 		inflightIdx: -1,
+		activeView:  -1,
 	}
 }
 
@@ -349,6 +361,16 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case tea.KeyPressMsg:
 		return m.handleKey(msg)
+
+	case tuiview.SwitchMsg:
+		// A view asked the host to activate a named sibling (e.g. the pm board's enter opening
+		// the item detail). Unknown names are ignored.
+		for i, v := range m.views {
+			if v.Name() == msg.Name {
+				return m.activateView(i)
+			}
+		}
+		return m, nil
 
 	case eventMsg:
 		m.handleEvent(msg.ev)
@@ -420,6 +442,12 @@ func (m model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m.handlePickerKey(msg)
 	}
 
+	// A mounted module view is active: it owns the keys (esc back to chat, ctrl+p next view,
+	// everything else routed to the view) — see host_views.go.
+	if m.activeView >= 0 {
+		return m.handleViewKey(msg)
+	}
+
 	switch {
 	case key.Matches(msg, m.keymap.cancel):
 		// esc cancels an in-flight turn (footer → "cancelling…"); the pump drains to the terminal
@@ -434,6 +462,13 @@ func (m model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.showSteps = !m.showSteps
 		m.refreshViewport()
 		return m, nil
+
+	case key.Matches(msg, m.keymap.cycleViews):
+		// Enter the mounted module views (first view); a no-op when none are mounted.
+		if len(m.views) == 0 {
+			return m, nil
+		}
+		return m.activateView(0)
 
 	case key.Matches(msg, m.keymap.openPicker):
 		return m.openPicker()
@@ -791,6 +826,9 @@ func (m *model) resize(w, h int) {
 	if m.picker != nil {
 		m.picker.SetSize(w, vpHeight) // the overlay occupies the viewport area
 	}
+	for _, v := range m.views {
+		v.SetSize(w, vpHeight) // module views occupy the same body region as the transcript
+	}
 	m.refreshViewport()
 }
 
@@ -921,10 +959,14 @@ func (m model) View() tea.View {
 		return v
 	}
 	// When the resume overlay is open it renders in place of the transcript viewport; the header,
-	// input, and footer stay put so the surface never loses its frame.
+	// input, and footer stay put so the surface never loses its frame. An active module view
+	// (spec §5.3) occupies the same body region, padded to the viewport height so the input box
+	// and footer never jump.
 	body := m.vp.View()
 	if m.picker != nil {
 		body = m.picker.View()
+	} else if m.activeView >= 0 && m.activeView < len(m.views) {
+		body = padToHeight(m.views[m.activeView].Render(), m.vp.Height())
 	}
 	content := lipgloss.JoinVertical(lipgloss.Left,
 		m.renderHeader(),
@@ -968,6 +1010,10 @@ func (m model) renderInput() string {
 // reader has scrolled up mid-stream. Under reduced motion the animated spinner is replaced by
 // static "working…" text. The bar segments carry the fill so it is continuous behind the text.
 func (m model) renderFooter() string {
+	// An active module view gets its own footer (name + switcher hints; host_views.go).
+	if m.activeView >= 0 {
+		return m.viewFooter()
+	}
 	// ctrl+g expansion: a grouped overlay list on the terminal background, not a bar.
 	if m.hlp.ShowAll {
 		hlp := m.hlp
