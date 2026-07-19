@@ -144,5 +144,3 @@ Docs split into two tracks — see **[docs/README.md](docs/README.md)** for the 
 - `docs/pm-system-v1-spec.md` — the PM system's product and technical spec (core+modules refactor, PM module, gates, surfaces, plugin).
 - `docs/decisions/` — architecture decision records (interactive surface, multi-desk topology, store self-initialization, chat TUI, versioning policy, kit port, Charm v2 stack, PM core+modules architecture).
 - **[CHANGELOG.md](CHANGELOG.md)** — what changed in each release.
-- `_meta/build-brief.md` — the build brief this repo was built from (repo shape, acceptance criteria, parallelism).
-- `_meta/m-05-data-surfaces.md` — the profile / `_knowledge/` design and the neutrality lint.
