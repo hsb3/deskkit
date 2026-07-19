@@ -15,6 +15,9 @@ _knowledge/profile.md
 *.o
 *.test
 
+# --- PocketBase runtime store (never committed; the real store lives under $XDG_DATA_HOME) ---
+pb_data/
+
 # --- Node / TS (plugin/opencode, plugin/claude-plugin) ---
 node_modules/
 dist/
