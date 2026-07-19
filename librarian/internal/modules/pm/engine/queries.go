@@ -150,7 +150,7 @@ func (e *Engine) GetContext(ctx context.Context, stalledDays int) (*ContextResul
 		}
 		if it.GetBool("blocked") {
 			bi := BlockedItem{ItemSummary: summarize(it), BlockingItems: []string{}}
-			bi.BlockingItems, bi.BlockedReason = e.blockingState(it.Id, lastTransition)
+			bi.BlockingItems, bi.BlockedReason = e.blockingState(it.Id)
 			res.Blocked = append(res.Blocked, bi)
 			surfaced = append(surfaced, it)
 			continue
@@ -232,7 +232,7 @@ func (e *Engine) transitionIndex(byID map[string]*core.Record) (map[string]time.
 // blockingState resolves a blocked item's §5.2 fields: the blocking items via the dependency
 // graph (incoming gating edges whose rule still holds it), and the blocked_reason from the
 // latest block audit row's detail.
-func (e *Engine) blockingState(itemID string, _ map[string]time.Time) ([]string, string) {
+func (e *Engine) blockingState(itemID string) ([]string, string) {
 	blocking := []string{}
 	edges, err := e.App.FindRecordsByFilter("dependencies",
 		"to = {:to} && kind = 'blocks'", "", 0, 0, map[string]any{"to": itemID})
@@ -254,14 +254,11 @@ func (e *Engine) blockingState(itemID string, _ map[string]time.Time) ([]string,
 			}
 		}
 	}
+	// blocked_reason = the newest block audit row's detail (§3.6 detail carries the why).
 	reason := ""
-	if rec, rerr := e.App.FindFirstRecordByFilter("transitions",
-		"item = {:i} && event = 'block'", map[string]any{"i": itemID}); rerr == nil && rec != nil {
-		// FindFirstRecordByFilter has no sort; fetch the newest block row explicitly.
-		if rows, lerr := e.App.FindRecordsByFilter("transitions",
-			"item = {:i} && event = 'block'", "-created", 1, 0, map[string]any{"i": itemID}); lerr == nil && len(rows) > 0 {
-			reason = rows[0].GetString("detail")
-		}
+	if rows, lerr := e.App.FindRecordsByFilter("transitions",
+		"item = {:i} && event = 'block'", "-created", 1, 0, map[string]any{"i": itemID}); lerr == nil && len(rows) > 0 {
+		reason = rows[0].GetString("detail")
 	}
 	sort.Strings(blocking)
 	return blocking, reason
