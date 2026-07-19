@@ -22,12 +22,13 @@ decision records (e.g. 0013–0016) referenced from the build brief — annotate
 
 ## 1. Current standing + top priority
 
-**v0.5.0 is released and CI-green on `main`.** Both products ship at 0.5.0 off the single root
+**v0.6.0 is released and CI-green on `main`.** Both products ship at 0.6.0 off the single root
 `VERSION`: the plugin (live marketplace — `claude plugin marketplace add hsb3/desk-standard` →
 `claude plugin install desk-standard@desk-standard`, proven) and the `pocket-librarian` binary
-(release assets verified — downloads, runs, sha256 matches `checksums.txt`). All product rulings
-are in; open work is pure build. Cutting the next release just follows
-`docs/development/releasing.md` (§3, §4).
+(release assets verified — darwin/arm64 downloads, runs `--version` → 0.6.0, sha256 matches
+`checksums.txt`). All four platform binaries + the plugin bundle published. The on-PATH binary
+was refreshed to 0.6.0 via `make install`. All product rulings are in; open work is pure build.
+Cutting the next release just follows `docs/development/releasing.md` (§3, §4).
 
 **Active blocker — the public `curl|bash` install path is gated on repo visibility.** The repo is
 PRIVATE, so every unauthenticated URL `install.sh` needs (`raw…/install.sh`, `/releases/latest`,
@@ -89,8 +90,9 @@ before the toolchain catches up. Full rationale in the #58 close comment.
 **Then:** #52's session-layer token plumbing (stack-independent) and #51 on v2 — both build on
 the modules/ layout at `librarian/internal/modules/librarian/tui/`.
 
-**Release note:** `[Unreleased]` now holds the whole TUI pass + `record_feedback` + `make
-install` — a solid 0.6.0. Cut per `docs/development/releasing.md` when Henry wants it.
+**Release note:** the TUI pass + `record_feedback` + `make install` + the SOP kit library +
+the Charm v2 migration + the core+modules refactor all shipped in **v0.6.0** (tagged, released,
+assets verified). `[Unreleased]` is now empty; the next bump starts accumulating from here.
 
 **Open backlog, ranked** (no ruling gates the buildable ones):
 - **#12** — dual-format Claude+OpenCode fan-out (consumes `bun run package` as the seed).
@@ -109,6 +111,12 @@ install` — a solid 0.6.0. Cut per `docs/development/releasing.md` when Henry w
 
 ## 2. Recent deliveries (newest first — full detail in the cited PRs / ADRs / git)
 
+- **2026-07-19 — v0.6.0 release** (PR #61, tag `v0.6.0`). Minor bump 0.5.0→0.6.0: VERSION +
+  3 manifests + `[Unreleased]` CHANGELOG rolled into a dated `[0.6.0]` section (SOP kit library,
+  `make install`, `record_feedback`, chat-TUI UX pass, `init` onramp, Charm v2 migration,
+  core+modules refactor). PR CI + claude-review green, squash-merged; `make release-prep` green
+  from clean main; release.yml published all four platform binaries + plugin bundle + checksums;
+  darwin/arm64 asset verified (runs, sha256 matches). On-PATH binary refreshed via `make install`.
 - **2026-07-18 — record_feedback** (PR #54, open; issue #50): `feedback` collection
   (migration 0013), tool on all surfaces + CLI subcommand, `query feedback` kind,
   system-prompt nudge. Built in a worktree off main, independent of the TUI branch.
