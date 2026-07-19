@@ -43,6 +43,8 @@ type Config struct {
 	AgentMaxStep        int           // AGENT_MAX_STEP
 	PMEnabled           bool          // PM_ENABLED / profile modules.pm.enabled (spec §2.9; default off)
 	PMClaimTTL          time.Duration // PM_CLAIM_TTL — pm claim horizon (spec §3.6; default 30m)
+	PMAutonomousWrites  bool          // PM_AUTONOMOUS_WRITES (spec §5.1/§13 item 9; default ON — the document gate is the real safety)
+	PMStalledDays       int           // PM_STALLED_DAYS — get_context stalled threshold (spec §5.2; default 14)
 }
 
 // EntityDirMap returns the frontmatter-type -> configured-directory map the sweep/patrol
@@ -113,6 +115,11 @@ func Load() (*Config, error) {
 	// profileScalar renders a YAML bool as "true"/"false", supplying the fallback default.
 	c.PMEnabled = envBool("PM_ENABLED", ps("modules.pm.enabled") == "true")
 	c.PMClaimTTL = envDuration("PM_CLAIM_TTL", 30*time.Minute)
+	// PM surface write gate (spec §5.1, §13 item 9): DEFAULT ON — PM tools write only the
+	// store (never desk files), and the real safety is transition_item's document gates; a
+	// desk that wants agents read-only over the graph sets PM_AUTONOMOUS_WRITES=false.
+	c.PMAutonomousWrites = envBool("PM_AUTONOMOUS_WRITES", true)
+	c.PMStalledDays = envInt("PM_STALLED_DAYS", 14)
 	c.LLMMaxTokens = envInt("LLM_MAX_TOKENS", 4096)
 	c.AgentMaxStep = envInt("AGENT_MAX_STEP", 12)
 	c.ClaimerPollInterval = envDuration("CLAIMER_POLL_INTERVAL", 5*time.Second)
