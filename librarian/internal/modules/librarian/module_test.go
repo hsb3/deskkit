@@ -209,3 +209,24 @@ func TestFrontmatter_Reader(t *testing.T) {
 		t.Fatalf("absent file must yield an empty map, got %v %v", fm, err)
 	}
 }
+
+// TestVerdict_RefusesTraversalOutsideDeskRoot: a pointer that escapes DESK_ROOT (via `..` or
+// an absolute path elsewhere) can never satisfy a gate, and Frontmatter returns nothing for it.
+func TestVerdict_RefusesTraversalOutsideDeskRoot(t *testing.T) {
+	m := verdictEnv(t)
+	ctx := context.Background()
+
+	outside := filepath.Join(filepath.Dir(m.cfg.DeskRoot), "outside.md")
+	if err := os.WriteFile(outside, []byte("---\ntype: decision\nstatus: accepted\n---\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	for _, ptr := range []string{"../outside.md", "a/../../outside.md", outside} {
+		v, err := m.Verdict(ctx, ptr, schema.ArtifactRequirement{Type: "decision"})
+		if err != nil || v.Exists || v.Satisfied {
+			t.Errorf("pointer %q escaping DESK_ROOT must fail closed: %+v %v", ptr, v, err)
+		}
+		if fm, _ := m.Frontmatter(ctx, ptr); len(fm) != 0 {
+			t.Errorf("Frontmatter(%q) must return nothing outside DESK_ROOT, got %v", ptr, fm)
+		}
+	}
+}

@@ -103,6 +103,10 @@ func upDependencies(app core.App) error {
 	c.Fields.Add(&core.SelectField{Name: "cascade", MaxSelect: 1,
 		Values: []string{"auto", "manual", "auto-reopen", "permanent"}})
 	c.Fields.Add(&core.TextField{Name: "desk"})
+	// Both directions are hot paths: the cascade scan queries outgoing edges (from), the
+	// auto-unblock check queries incoming edges (to).
+	c.AddIndex("idx_dependencies_from", false, "`from`", "")
+	c.AddIndex("idx_dependencies_to", false, "`to`", "")
 	return app.Save(c)
 }
 

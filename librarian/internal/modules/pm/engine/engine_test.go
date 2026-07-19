@@ -12,6 +12,7 @@ import (
 	"github.com/example/pocket-librarian/internal/core/config"
 	"github.com/example/pocket-librarian/internal/core/schema"
 	"github.com/example/pocket-librarian/internal/modules/pm/collections"
+	"github.com/example/pocket-librarian/internal/modules/pm/gates"
 )
 
 // stubValidator drives the gate engine with no librarian internals (test lane §10.5: the PM
@@ -555,5 +556,75 @@ func TestAuditTrail(t *testing.T) {
 		row.GetString("delegation_parent") != "lead-session" ||
 		row.GetString("from_phase") != "queue" || row.GetString("to_phase") != "work" {
 		t.Fatalf("audit row fields wrong: %v", row.PublicExport())
+	}
+}
+
+// TestReleaseClearsClaim: the holder releasing a live claim actually clears it (holder +
+// expiry), and the item is claimable by someone else immediately after.
+func TestReleaseClearsClaim(t *testing.T) {
+	e := newEngine(t, nil)
+	alice := Actor{Name: "agent-alice", Kind: "agent"}
+	bob := Actor{Name: "agent-bob", Kind: "agent"}
+	item := mustCreate(t, e, CreateItemInput{Title: "r", Type: "analysis"})
+	item, err := e.Claim(context.Background(), item.Id, item.GetInt("version"), alice)
+	if err != nil {
+		t.Fatal(err)
+	}
+	item, err = e.Release(context.Background(), item.Id, item.GetInt("version"), alice)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if item.GetString("claimed_by") != "" || !item.GetDateTime("claim_expires").Time().IsZero() {
+		t.Fatalf("release must clear holder + expiry, got %q / %v",
+			item.GetString("claimed_by"), item.GetDateTime("claim_expires"))
+	}
+	if _, err := e.Claim(context.Background(), item.Id, item.GetInt("version"), bob); err != nil {
+		t.Fatalf("released item must be claimable, got %v", err)
+	}
+}
+
+// TestSetStatusLabelVersionSingleBump: a cross-phase label write is ONE logical mutation —
+// the caller's version advances exactly once (the Transition's bump; the label pin adds none).
+func TestSetStatusLabelVersionSingleBump(t *testing.T) {
+	e := newEngine(t, nil)
+	item := mustCreate(t, e, CreateItemInput{Title: "vb", Type: "analysis"})
+	before := item.GetInt("version")
+	item, err := e.SetStatusLabel(context.Background(), item.Id, "active", before, human)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if item.GetInt("version") != before+1 {
+		t.Fatalf("cross-phase SetStatusLabel must bump exactly once: %d -> %d", before, item.GetInt("version"))
+	}
+	if item.GetString("status_label") != "active" || item.GetString("phase") != "work" {
+		t.Fatalf("label/phase wrong: %s/%s", item.GetString("status_label"), item.GetString("phase"))
+	}
+}
+
+// TestDeskConfigHookRejectsBadLabels drives the write-time validation the pm module's hooks
+// enforce (validateDeskConfigRecord is exercised via gates.ParseLabels here — the hook
+// binding itself is a one-line BindFunc over the same function).
+func TestDeskConfigHookRejectsBadLabels(t *testing.T) {
+	if _, err := gates.ParseLabels(`{"someday": "not-a-phase"}`); err == nil {
+		t.Fatal("status_labels with an unknown phase must be refused")
+	}
+	if _, err := gates.ParseLabels(`{"someday": "queue"}`); err != nil {
+		t.Fatalf("valid status_labels must parse: %v", err)
+	}
+	// And through a stored desk_config row: the engine's loader fails LOUD on read.
+	e := newEngine(t, nil)
+	col, _ := e.App.FindCollectionByNameOrId("desk_config")
+	rec := core.NewRecord(col)
+	rec.Set("desk", "test-desk")
+	rec.Set("status_labels", `{"someday": "not-a-phase"}`)
+	if err := e.App.Save(rec); err != nil { // hooks not bound in this bare test app
+		t.Fatal(err)
+	}
+	item := mustCreate(t, e, CreateItemInput{Title: "h", Type: "analysis"})
+	_, terr := e.Transition(context.Background(), TransitionInput{
+		ItemID: item.Id, TargetPhase: "work", Version: item.GetInt("version"), Actor: human,
+	})
+	if terr == nil || IsRefusal(terr) || !strings.Contains(terr.Error(), "status_labels") {
+		t.Fatalf("invalid stored status_labels must be a loud engine error, got %v", terr)
 	}
 }

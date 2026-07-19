@@ -1,5 +1,13 @@
 package gates
 
+import (
+	"encoding/json"
+	"fmt"
+	"strings"
+
+	"github.com/example/pocket-librarian/internal/modules/pm/statemachine"
+)
+
 // DefaultRulesYAML is the shipped default gate ruleset a desk starts from when its
 // desk_config carries no rules row yet (spec §4.2, §3.8).
 //
@@ -31,3 +39,26 @@ gates:
 // DefaultConfig returns the parsed shipped default. The default is compile-time constant and
 // covered by TestDefaultRulesYAML_Parses, so a parse failure here is a build defect.
 func DefaultConfig() (*Config, error) { return ParseRules(DefaultRulesYAML) }
+
+// ParseLabels parses a desk_config.status_labels JSON (label -> phase). Empty/null means "no
+// override" (nil map, keep the seeded default); an unknown phase is a loud error (§3.8
+// fail-loud). Shared by the engine's config loader and the pm module's write-time hook.
+func ParseLabels(raw string) (map[string]statemachine.Phase, error) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" || raw == "null" || raw == "{}" {
+		return nil, nil
+	}
+	var m map[string]string
+	if err := json.Unmarshal([]byte(raw), &m); err != nil {
+		return nil, fmt.Errorf("status_labels: %w", err)
+	}
+	out := make(map[string]statemachine.Phase, len(m))
+	for label, phase := range m {
+		p, err := statemachine.ParsePhase(phase)
+		if err != nil {
+			return nil, fmt.Errorf("status_labels: label %q: %w", label, err)
+		}
+		out[label] = p
+	}
+	return out, nil
+}

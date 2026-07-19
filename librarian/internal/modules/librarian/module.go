@@ -110,9 +110,9 @@ func (m *Mod) Verdict(_ context.Context, pointer string, req schema.ArtifactRequ
 	if strings.Contains(pointer, "://") {
 		return fail(fmt.Sprintf("pointer %q is not a desk file; a document gate needs a file path", pointer))
 	}
-	abs := pointer
-	if !filepath.IsAbs(abs) {
-		abs = filepath.Join(m.cfg.DeskRoot, pointer)
+	abs, ok := m.resolveDeskPath(pointer)
+	if !ok {
+		return fail(fmt.Sprintf("pointer %q resolves outside the desk root; a document gate reads desk files only", pointer))
 	}
 	b, err := os.ReadFile(abs)
 	if err != nil {
@@ -162,13 +162,30 @@ func (m *Mod) Frontmatter(_ context.Context, pointer string) (map[string]any, er
 	if m.cfg == nil || m.cfg.DeskRoot == "" || pointer == "" || strings.Contains(pointer, "://") {
 		return map[string]any{}, nil
 	}
-	abs := pointer
-	if !filepath.IsAbs(abs) {
-		abs = filepath.Join(m.cfg.DeskRoot, pointer)
+	abs, ok := m.resolveDeskPath(pointer)
+	if !ok {
+		return map[string]any{}, nil
 	}
 	b, err := os.ReadFile(abs)
 	if err != nil {
 		return map[string]any{}, nil
 	}
 	return desklib.ParseFrontmatter(string(b)), nil
+}
+
+// resolveDeskPath resolves a document pointer against DESK_ROOT and CONTAINS it there: a
+// relative pointer joins the root, an absolute pointer is accepted only if already inside the
+// root, and any `..` traversal escaping the root is refused (a gate whose purpose is document
+// provenance must not read arbitrary filesystem paths).
+func (m *Mod) resolveDeskPath(pointer string) (string, bool) {
+	root := filepath.Clean(m.cfg.DeskRoot)
+	abs := pointer
+	if !filepath.IsAbs(abs) {
+		abs = filepath.Join(root, pointer)
+	}
+	abs = filepath.Clean(abs)
+	if abs != root && !strings.HasPrefix(abs, root+string(filepath.Separator)) {
+		return "", false
+	}
+	return abs, true
 }

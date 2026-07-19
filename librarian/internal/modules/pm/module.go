@@ -77,12 +77,16 @@ func (*Mod) RegisterHooks(app core.App, cfg *config.Config) error {
 }
 
 // validateDeskConfigRecord fail-louds an invalid desk_config write (§4.2: an invalid config
-// is rejected rather than silently disabling gates).
+// is rejected rather than silently disabling gates). Both the gate rules YAML and the
+// status_labels JSON are checked — the engine re-validates on read either way.
 func validateDeskConfigRecord(rec *core.Record) error {
 	if rulesYAML := rec.GetString("rules"); rulesYAML != "" {
 		if _, err := gates.ParseRules(rulesYAML); err != nil {
 			return err
 		}
+	}
+	if _, err := gates.ParseLabels(rec.GetString("status_labels")); err != nil {
+		return err
 	}
 	return nil
 }

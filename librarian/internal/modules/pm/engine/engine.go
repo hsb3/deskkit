@@ -87,7 +87,7 @@ func (e *Engine) loadDeskConfig() (*deskConfig, error) {
 		dc.rules = parsed
 	}
 	if labelsRaw := rec.Get("status_labels"); labelsRaw != nil {
-		if labels, lerr := parseLabels(rec.GetString("status_labels")); lerr != nil {
+		if labels, lerr := gates.ParseLabels(rec.GetString("status_labels")); lerr != nil {
 			return nil, fmt.Errorf("desk_config for desk %q holds invalid status_labels: %w", e.desk(), lerr)
 		} else if len(labels) > 0 {
 			dc.labels = labels
@@ -97,28 +97,6 @@ func (e *Engine) loadDeskConfig() (*deskConfig, error) {
 		dc.claimTTL = time.Duration(mins) * time.Minute
 	}
 	return dc, nil
-}
-
-// parseLabels parses the desk_config.status_labels JSON (label -> phase). Empty/null keeps
-// the seeded default; an unknown phase is a loud error (fail-loud, §3.8).
-func parseLabels(raw string) (map[string]statemachine.Phase, error) {
-	raw = strings.TrimSpace(raw)
-	if raw == "" || raw == "null" || raw == "{}" {
-		return nil, nil
-	}
-	var m map[string]string
-	if err := json.Unmarshal([]byte(raw), &m); err != nil {
-		return nil, err
-	}
-	out := make(map[string]statemachine.Phase, len(m))
-	for label, phase := range m {
-		p, err := statemachine.ParsePhase(phase)
-		if err != nil {
-			return nil, fmt.Errorf("label %q: %w", label, err)
-		}
-		out[label] = p
-	}
-	return out, nil
 }
 
 func (e *Engine) desk() string {
@@ -630,7 +608,9 @@ func (e *Engine) tryAutoUnblock(ctx context.Context, targetID string, actor Acto
 	if err != nil {
 		return err
 	}
-	if !target.GetBool("blocked") {
+	// Desk scope (defense in depth): Link desk-validates both ends, but an edge written
+	// outside the engine must never let a cascade mutate another desk's item.
+	if target.GetString("desk") != e.desk() || !target.GetBool("blocked") {
 		return nil
 	}
 	incoming, err := e.App.FindRecordsByFilter("dependencies",
@@ -668,7 +648,8 @@ func (e *Engine) reblock(ctx context.Context, targetID string, actor Actor, caus
 	if err != nil {
 		return err
 	}
-	if target.GetBool("blocked") ||
+	// Desk scope: mirror tryAutoUnblock — never re-block a foreign desk's item.
+	if target.GetString("desk") != e.desk() || target.GetBool("blocked") ||
 		statemachine.Phase(target.GetString("phase")) == statemachine.Terminal {
 		return nil
 	}
@@ -718,8 +699,10 @@ func (e *Engine) SetStatusLabel(ctx context.Context, itemID, label string, versi
 	if terr != nil {
 		return nil, terr
 	}
+	// Transition already bumped the version and wrote the audit row; this save only pins the
+	// exact requested label (Transition set the phase's default) — no second bump, so the
+	// caller's version+1 expectation and the audit trail stay aligned.
 	moved.Set("status_label", label)
-	bump(moved)
 	if err := e.App.Save(moved); err != nil {
 		return nil, err
 	}
