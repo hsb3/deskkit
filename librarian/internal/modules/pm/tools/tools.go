@@ -5,6 +5,7 @@ package tools
 
 import (
 	"context"
+	"time"
 
 	"github.com/pocketbase/pocketbase/core"
 
@@ -152,6 +153,8 @@ func AddNote(ctx context.Context, app core.App, cfg *cfgpkg.Config, v schema.Doc
 	return &noteResult{Note: engine.NoteRow{
 		Phase: rec.GetString("phase"), Key: rec.GetString("key"), Body: rec.GetString("body"),
 		Actor: rec.GetString("actor"), ActorKind: rec.GetString("actor_kind"),
+		// At mirrors GetItem's note rows (review finding: it was left empty here).
+		At: rec.GetDateTime("created").Time().UTC().Format(time.RFC3339),
 	}}, nil
 }
 

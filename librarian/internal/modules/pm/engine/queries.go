@@ -194,10 +194,14 @@ func (e *Engine) deskItems() ([]*core.Record, error) {
 }
 
 // transitionIndex scans this desk's transitions newest-first and returns each item's last
-// transition time plus the capped recent set (§5.2). transitions carries no desk column, so
-// desk scope is derived through the item relation (byID = this desk's items).
+// transition time plus the capped recent set (§5.2). transitions carries no desk column;
+// desk scope is pushed into the QUERY via relation traversal (item.desk — the same filter
+// language the API rules use), so other desks' rows are never loaded (review finding: the
+// table is append-only and only ever grows). The byID membership check stays as cheap
+// defense in depth.
 func (e *Engine) transitionIndex(byID map[string]*core.Record) (map[string]time.Time, []TransitionRow, error) {
-	recs, err := e.App.FindRecordsByFilter("transitions", "id != ''", "-created", 0, 0, nil)
+	recs, err := e.App.FindRecordsByFilter("transitions", "item.desk = {:d}", "-created", 0, 0,
+		map[string]any{"d": e.desk()})
 	if err != nil {
 		return nil, nil, err
 	}
@@ -236,6 +240,11 @@ func (e *Engine) blockingState(itemID string) ([]string, string) {
 	blocking := []string{}
 	edges, err := e.App.FindRecordsByFilter("dependencies",
 		"to = {:to} && kind = 'blocks'", "", 0, 0, map[string]any{"to": itemID})
+	if err != nil {
+		// Log rather than silently return empty (review finding): a failed query would
+		// otherwise read as "no blockers" on a blocked item — misleading surfaced data.
+		e.App.Logger().Error("pm: blockingState load dependencies", "item", itemID, "err", err)
+	}
 	if err == nil {
 		for _, edge := range edges {
 			holds := false
@@ -431,15 +440,31 @@ func (e *Engine) GetItem(ctx context.Context, itemID string) (*ItemDetail, error
 		}
 	}
 
-	items, err := e.deskItems()
-	if err == nil {
-		byID := map[string]*core.Record{}
-		for _, it := range items {
-			byID[it.Id] = it
-		}
-		d.Ancestors = ancestorChain(item, byID)
-	}
+	d.Ancestors = e.ancestorChainByHop(item)
 	return d, nil
+}
+
+// ancestorChainByHop walks the parent chain with one targeted read per hop (review finding:
+// chains are a few items deep, so per-hop lookups beat loading the whole desk on every
+// get_item). Cycle/broken links terminate the walk; returns root..parent order.
+func (e *Engine) ancestorChainByHop(item *core.Record) []string {
+	var reversed []string
+	seen := map[string]bool{item.Id: true}
+	cur := item.GetString("parent")
+	for cur != "" && !seen[cur] {
+		seen[cur] = true
+		reversed = append(reversed, cur)
+		parent, err := e.App.FindRecordById("items", cur)
+		if err != nil {
+			break
+		}
+		cur = parent.GetString("parent")
+	}
+	chain := make([]string, len(reversed))
+	for i, id := range reversed {
+		chain[len(reversed)-1-i] = id
+	}
+	return chain
 }
 
 // UpdateItemInput edits an item's first-class fields (§5.1 update_item; version-checked,

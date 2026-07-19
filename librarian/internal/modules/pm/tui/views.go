@@ -215,6 +215,11 @@ func (v *detailView) Init() tea.Cmd {
 }
 
 func (v *detailView) Update(msg tea.Msg) (tuiview.View, tea.Cmd) {
+	// Reload when the board moved the selection under us (review finding: state changes
+	// belong in Init/Update, never in Render — Render stays a pure read).
+	if v.loadedFor != v.st.selected {
+		return v, v.Init()
+	}
 	if k, ok := msg.(tea.KeyPressMsg); ok && k.String() == "r" {
 		return v, v.Init()
 	}
@@ -226,9 +231,6 @@ func (v *detailView) SetSize(w, h int) { v.width, v.height = w, h }
 func (v *detailView) Render() string {
 	if v.st.selected == "" {
 		return "pm item: nothing selected — pick an item on the board (enter) first"
-	}
-	if v.loadedFor != v.st.selected {
-		v.Init() // selection moved since last activation; reload lazily
 	}
 	if v.err != nil {
 		return "pm item: " + v.err.Error()

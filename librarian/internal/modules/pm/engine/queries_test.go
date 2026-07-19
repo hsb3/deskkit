@@ -8,7 +8,9 @@ import (
 )
 
 // backdate rewrites an item's created timestamp via raw SQL — autodate fields ignore explicit
-// sets, and the stalled computation (§5.2) needs an old item.
+// sets, and the stalled computation (§5.2) needs an old item. The string-interpolated SQL is
+// INTENTIONAL and test-only (controlled literal inputs; PB's filter APIs cannot bypass the
+// autodate guard) — do not copy this pattern into production code.
 func backdate(t *testing.T, e *Engine, table, id string, ago time.Duration) {
 	t.Helper()
 	ts := time.Now().Add(-ago).UTC().Format("2006-01-02 15:04:05.000Z")

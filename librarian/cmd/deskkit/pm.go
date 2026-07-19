@@ -66,16 +66,19 @@ func registerPMCommands(app *pocketbase.PocketBase, cfg *config.Config, cfgErr e
 	}
 
 	// resolveVersion returns the explicit --version when set (>= 0), else the item's current
-	// version (CLI convenience; see the package comment).
-	resolveVersion := func(app pbcore.App, itemID string, flag int) (int, error) {
+	// version (CLI convenience; see the package comment). The lookup is DESK-SCOPED (review
+	// finding): an item id from another desk must read as "not on this desk", never leak its
+	// version across the boundary. cfg is non-nil here — callers run requireConfig first.
+	resolveVersion := func(app pbcore.App, c *config.Config, itemID string, flag int) (int, error) {
 		if flag >= 0 {
 			return flag, nil
 		}
-		rec, err := app.FindRecordById("items", itemID)
-		if err != nil {
-			return 0, fmt.Errorf("no item %q on this desk", itemID)
+		recs, err := app.FindRecordsByFilter("items", "id = {:id} && desk = {:desk}", "", 1, 0,
+			map[string]any{"id": itemID, "desk": c.DeskName})
+		if err != nil || len(recs) == 0 {
+			return 0, fmt.Errorf("no item %q on desk %q", itemID, c.DeskName)
 		}
-		return rec.GetInt("version"), nil
+		return recs[0].GetInt("version"), nil
 	}
 
 	// pm context
@@ -166,7 +169,7 @@ func registerPMCommands(app *pocketbase.PocketBase, cfg *config.Config, cfgErr e
 			if err != nil {
 				return err
 			}
-			ver, verr := resolveVersion(app, args[0], updateVersion)
+			ver, verr := resolveVersion(app, c, args[0], updateVersion)
 			if verr != nil {
 				return verr
 			}
@@ -174,7 +177,7 @@ func registerPMCommands(app *pocketbase.PocketBase, cfg *config.Config, cfgErr e
 			return printJSON(pmtools.UpdateItem(cmd.Context(), app, c, pmValidator(), &ui))
 		},
 	}
-	updateCmd.Flags().IntVar(&updateVersion, "version", -1, "version token you read (omit = use current)")
+	updateCmd.Flags().IntVar(&updateVersion, "version", -1, "version token you read, >= 1 (omit = use the item's current version)")
 	updateCmd.Flags().StringVar(&ui.Title, "title", "", "new title")
 	updateCmd.Flags().StringVar(&ui.Type, "type", "", "new schema-v1/kit type")
 	updateCmd.Flags().StringVar(&ui.Court, "court", "", "new court")
@@ -197,7 +200,7 @@ func registerPMCommands(app *pocketbase.PocketBase, cfg *config.Config, cfgErr e
 			if err != nil {
 				return err
 			}
-			ver, verr := resolveVersion(app, args[0], transitionVersion)
+			ver, verr := resolveVersion(app, c, args[0], transitionVersion)
 			if verr != nil {
 				return verr
 			}
@@ -208,7 +211,7 @@ func registerPMCommands(app *pocketbase.PocketBase, cfg *config.Config, cfgErr e
 		},
 	}
 	transitionCmd.Flags().StringVar(&toPhase, "to", "", "target phase: queue, work, review, terminal")
-	transitionCmd.Flags().IntVar(&transitionVersion, "version", -1, "version token you read (omit = use current)")
+	transitionCmd.Flags().IntVar(&transitionVersion, "version", -1, "version token you read, >= 1 (omit = use the item's current version)")
 	_ = transitionCmd.MarkFlagRequired("to")
 	pmCmd.AddCommand(transitionCmd)
 
@@ -224,7 +227,7 @@ func registerPMCommands(app *pocketbase.PocketBase, cfg *config.Config, cfgErr e
 			if err != nil {
 				return err
 			}
-			ver, verr := resolveVersion(app, args[0], blockVersion)
+			ver, verr := resolveVersion(app, c, args[0], blockVersion)
 			if verr != nil {
 				return verr
 			}
@@ -233,7 +236,7 @@ func registerPMCommands(app *pocketbase.PocketBase, cfg *config.Config, cfgErr e
 		},
 	}
 	blockCmd.Flags().StringVar(&blockReason, "reason", "", "why the item is blocked (audit detail)")
-	blockCmd.Flags().IntVar(&blockVersion, "version", -1, "version token you read (omit = use current)")
+	blockCmd.Flags().IntVar(&blockVersion, "version", -1, "version token you read, >= 1 (omit = use the item's current version)")
 	pmCmd.AddCommand(blockCmd)
 
 	var unblockReason string
@@ -247,7 +250,7 @@ func registerPMCommands(app *pocketbase.PocketBase, cfg *config.Config, cfgErr e
 			if err != nil {
 				return err
 			}
-			ver, verr := resolveVersion(app, args[0], unblockVersion)
+			ver, verr := resolveVersion(app, c, args[0], unblockVersion)
 			if verr != nil {
 				return verr
 			}
@@ -256,7 +259,7 @@ func registerPMCommands(app *pocketbase.PocketBase, cfg *config.Config, cfgErr e
 		},
 	}
 	unblockCmd.Flags().StringVar(&unblockReason, "reason", "", "why the block clears (audit detail)")
-	unblockCmd.Flags().IntVar(&unblockVersion, "version", -1, "version token you read (omit = use current)")
+	unblockCmd.Flags().IntVar(&unblockVersion, "version", -1, "version token you read, >= 1 (omit = use the item's current version)")
 	pmCmd.AddCommand(unblockCmd)
 
 	// pm note <id>
@@ -312,7 +315,7 @@ func registerPMCommands(app *pocketbase.PocketBase, cfg *config.Config, cfgErr e
 			if err != nil {
 				return err
 			}
-			ver, verr := resolveVersion(app, args[0], claimVersion)
+			ver, verr := resolveVersion(app, c, args[0], claimVersion)
 			if verr != nil {
 				return verr
 			}
@@ -320,7 +323,7 @@ func registerPMCommands(app *pocketbase.PocketBase, cfg *config.Config, cfgErr e
 				&pmtools.ClaimItemInput{ItemID: args[0], Version: ver, ActorFields: actor()}))
 		},
 	}
-	claimCmd.Flags().IntVar(&claimVersion, "version", -1, "version token you read (omit = use current)")
+	claimCmd.Flags().IntVar(&claimVersion, "version", -1, "version token you read, >= 1 (omit = use the item's current version)")
 	pmCmd.AddCommand(claimCmd)
 
 	var releaseVersion int
@@ -333,7 +336,7 @@ func registerPMCommands(app *pocketbase.PocketBase, cfg *config.Config, cfgErr e
 			if err != nil {
 				return err
 			}
-			ver, verr := resolveVersion(app, args[0], releaseVersion)
+			ver, verr := resolveVersion(app, c, args[0], releaseVersion)
 			if verr != nil {
 				return verr
 			}
@@ -341,7 +344,7 @@ func registerPMCommands(app *pocketbase.PocketBase, cfg *config.Config, cfgErr e
 				&pmtools.ReleaseItemInput{ItemID: args[0], Version: ver, ActorFields: actor()}))
 		},
 	}
-	releaseCmd.Flags().IntVar(&releaseVersion, "version", -1, "version token you read (omit = use current)")
+	releaseCmd.Flags().IntVar(&releaseVersion, "version", -1, "version token you read, >= 1 (omit = use the item's current version)")
 	pmCmd.AddCommand(releaseCmd)
 
 	// A gate refusal (or any engine refusal) is an EXPECTED domain outcome on this JSON-first
