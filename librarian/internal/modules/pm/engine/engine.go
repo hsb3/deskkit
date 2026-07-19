@@ -108,6 +108,12 @@ func (e *Engine) desk() string {
 
 // CreateItemInput seeds one work item (§3.1). Phase defaults to queue.
 type CreateItemInput struct {
+	// ID, when non-empty, pins the new record's id instead of auto-generating one. It exists
+	// for the deterministic import path (§8.1/§8.2 rebuild reproducibility): a manifest-derived
+	// id makes a rebuild byte-identical, ids included. It must be a valid PocketBase record id
+	// (15 chars of [a-z0-9]); the importer derives one that fits. "" keeps the normal
+	// auto-generated id, so every non-import caller is unaffected.
+	ID       string
 	Title    string
 	Type     string
 	Parent   string // parent item id; "" = a root
@@ -129,6 +135,9 @@ func (e *Engine) CreateItem(ctx context.Context, in CreateItemInput) (*core.Reco
 		return nil, err
 	}
 	rec := core.NewRecord(col)
+	if in.ID != "" {
+		rec.Id = in.ID // deterministic import id (§8.2); "" leaves PocketBase to auto-generate
+	}
 	rec.Set("desk", e.desk())
 	rec.Set("title", in.Title)
 	rec.Set("type", in.Type)

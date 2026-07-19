@@ -1,0 +1,175 @@
+package importer
+
+import (
+	"context"
+	"regexp"
+	"testing"
+	"time"
+
+	"github.com/pocketbase/pocketbase/tests"
+
+	"github.com/example/pocket-librarian/internal/core/config"
+	"github.com/example/pocket-librarian/internal/modules/pm/collections"
+	"github.com/example/pocket-librarian/internal/modules/pm/engine"
+)
+
+// newEngine boots a fresh test app on the named desk with the pm collections applied directly
+// (no global registration, cannot pollute other tests' migration lists), and returns an
+// engine over it. No validator: the import writes only items + edges — it never advances a
+// gated transition, so no DocumentValidator is needed.
+func newEngine(t *testing.T, desk string) *engine.Engine {
+	t.Helper()
+	app, err := tests.NewTestApp()
+	if err != nil {
+		t.Fatalf("tests.NewTestApp: %v", err)
+	}
+	t.Cleanup(app.Cleanup)
+	for _, mig := range collections.Migrations() {
+		if err := mig.Up(app); err != nil {
+			t.Fatalf("apply pm migration %q: %v", mig.Basename, err)
+		}
+	}
+	return &engine.Engine{
+		App: app,
+		Cfg: &config.Config{DeskRoot: t.TempDir(), DeskName: desk, PMClaimTTL: 30 * time.Minute},
+	}
+}
+
+// sampleManifest is an identity-neutral fixture graph: an epic with two children, one of which
+// blocks the other (auto, unblock_at review), plus a standalone relates-to link. Generic names
+// only (R5.3) — no real desk/person/repo.
+func sampleManifest() Manifest {
+	return Manifest{
+		Items: []ManifestItem{
+			{Key: "epic-alpha", Title: "Ship the widget", Type: "epic", Court: "owner", Priority: 1},
+			{Key: "task-spec", Title: "Write the spec", Type: "task", Court: "desk", Parent: "epic-alpha", Pointer: "tasks/spec.md", Priority: 1},
+			{Key: "task-build", Title: "Build the widget", Type: "task", Court: "crew", Parent: "epic-alpha", Priority: 2},
+			{Key: "note-item", Title: "A loosely related note", Type: "analysis", Court: "desk"},
+		},
+		Deps: []ManifestDep{
+			{From: "task-spec", To: "task-build", Kind: "blocks", UnblockAt: "review", Cascade: "auto"},
+			{From: "note-item", To: "epic-alpha", Kind: "relates-to"},
+		},
+	}
+}
+
+var idRe = regexp.MustCompile(`^[a-z0-9]{15}$`)
+
+// TestItemID_ShapeAndDeterminism: the derived id fits PocketBase's record-id constraint and is
+// a pure function of (desk, key) — the property §8.2 reproducibility rests on.
+func TestItemID_ShapeAndDeterminism(t *testing.T) {
+	a := ItemID("desk-one", "task-spec")
+	b := ItemID("desk-one", "task-spec")
+	if a != b {
+		t.Fatalf("ItemID must be deterministic: %q != %q", a, b)
+	}
+	if !idRe.MatchString(a) {
+		t.Fatalf("ItemID %q must be 15 lowercase-hex chars (PB record-id constraint)", a)
+	}
+	if ItemID("desk-two", "task-spec") == a {
+		t.Fatal("ItemID must be desk-scoped: same key on two desks must differ")
+	}
+	if ItemID("desk-one", "task-build") == a {
+		t.Fatal("different keys on one desk must differ")
+	}
+}
+
+// TestImport_BuildsTheGraph: the manifest becomes the expected items + edges, with parent/root
+// denormalization and the initial block effect the engine's Link applies.
+func TestImport_BuildsTheGraph(t *testing.T) {
+	eng := newEngine(t, "desk-one")
+	ctx := context.Background()
+
+	res, err := Import(ctx, eng, sampleManifest())
+	if err != nil {
+		t.Fatalf("Import: %v", err)
+	}
+	if res.CreatedItems != 4 || res.CreatedDeps != 2 {
+		t.Fatalf("expected 4 items + 2 deps, got %d items / %d deps", res.CreatedItems, res.CreatedDeps)
+	}
+
+	// The child's parent + root point at the epic's deterministic id (§3.1 denormalization).
+	epicID := ItemID("desk-one", "epic-alpha")
+	spec, err := eng.App.FindRecordById("items", ItemID("desk-one", "task-spec"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if spec.GetString("parent") != epicID || spec.GetString("root") != epicID {
+		t.Fatalf("child parent/root wrong: parent=%q root=%q want %q",
+			spec.GetString("parent"), spec.GetString("root"), epicID)
+	}
+
+	// task-spec blocks task-build (unblock_at review); at import time the blocker is in queue,
+	// so the target starts blocked (the engine's Link applied the initial block effect).
+	build, err := eng.App.FindRecordById("items", ItemID("desk-one", "task-build"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !build.GetBool("blocked") {
+		t.Fatal("task-build must be blocked by the unsatisfied blocks edge at import time")
+	}
+}
+
+// TestImport_Idempotent: a second import into the same store creates nothing new and leaves the
+// graph identical (§8.1 "the import is idempotent and desk-scoped").
+func TestImport_Idempotent(t *testing.T) {
+	eng := newEngine(t, "desk-one")
+	ctx := context.Background()
+	if _, err := Import(ctx, eng, sampleManifest()); err != nil {
+		t.Fatalf("first import: %v", err)
+	}
+	before, err := GraphSnapshot(ctx, eng)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	res, err := Import(ctx, eng, sampleManifest())
+	if err != nil {
+		t.Fatalf("second import: %v", err)
+	}
+	if res.CreatedItems != 0 || res.CreatedDeps != 0 {
+		t.Fatalf("re-import must create nothing, got %d items / %d deps", res.CreatedItems, res.CreatedDeps)
+	}
+	if res.SkippedItems != 4 || res.SkippedDeps != 2 {
+		t.Fatalf("re-import must skip all, got %d items / %d deps skipped", res.SkippedItems, res.SkippedDeps)
+	}
+	after, err := GraphSnapshot(ctx, eng)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if before.Canonical() != after.Canonical() {
+		t.Fatalf("re-import changed the graph:\n--- before ---\n%s\n--- after ---\n%s",
+			before.Canonical(), after.Canonical())
+	}
+}
+
+// TestImport_RejectsBadManifest: unknown parent / dependency references and duplicate keys fail
+// loudly before any write (fail-loud discipline, R7).
+func TestImport_RejectsBadManifest(t *testing.T) {
+	ctx := context.Background()
+	cases := []struct {
+		name string
+		m    Manifest
+	}{
+		{"dup key", Manifest{Items: []ManifestItem{{Key: "a", Title: "A"}, {Key: "a", Title: "A2"}}}},
+		{"unknown parent", Manifest{Items: []ManifestItem{{Key: "a", Title: "A", Parent: "ghost"}}}},
+		{"unknown dep end", Manifest{
+			Items: []ManifestItem{{Key: "a", Title: "A"}},
+			Deps:  []ManifestDep{{From: "a", To: "ghost", Kind: "blocks", UnblockAt: "work", Cascade: "auto"}},
+		}},
+		{"empty key", Manifest{Items: []ManifestItem{{Title: "no key"}}}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			eng := newEngine(t, "desk-one")
+			if _, err := Import(ctx, eng, tc.m); err == nil {
+				t.Fatal("expected a loud manifest error, got nil")
+			}
+			// No partial write: the store holds no items.
+			items, _ := eng.App.FindRecordsByFilter("items", "desk = {:d}", "", 0, 0, map[string]any{"d": "desk-one"})
+			if len(items) != 0 {
+				t.Fatalf("a rejected manifest must write nothing, found %d items", len(items))
+			}
+		})
+	}
+}
