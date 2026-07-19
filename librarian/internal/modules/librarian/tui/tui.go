@@ -18,6 +18,7 @@ import (
 	"github.com/pocketbase/pocketbase/core"
 
 	"github.com/example/pocket-librarian/internal/core/config"
+	"github.com/example/pocket-librarian/internal/core/tuiview"
 )
 
 // Run opens a Session eagerly (so a build/config failure surfaces before the alternate screen
@@ -25,7 +26,9 @@ import (
 // then drains any in-flight turn and closes the Session. It returns the program's error, or a
 // Close error when the program itself succeeded. theme is the concrete palette ("light"/"dark")
 // the caller resolved in the pre-program safe window (see ResolveTheme) — never "auto".
-func Run(ctx context.Context, app core.App, cfg *config.Config, theme string) error {
+// views are the module-contributed TUI views (spec §5.3; empty on a librarian-only desk —
+// the ctrl+p switcher then stays disabled and the surface is byte-identical to before).
+func Run(ctx context.Context, app core.App, cfg *config.Config, theme string, views []tuiview.View) error {
 	// No global-renderer background pin is needed (or possible) under lipgloss v2: there is no
 	// shared renderer, and every color this surface uses is a concrete per-theme value. The
 	// embedded bubbles components that previously leaned on lipgloss's adaptive background cache
@@ -43,7 +46,9 @@ func Run(ctx context.Context, app core.App, cfg *config.Config, theme string) er
 
 	// WithAltScreen is gone in v2: alt-screen is now a per-frame tea.View field (model.View sets
 	// v.AltScreen = true on every returned View, in every code path).
-	p := tea.NewProgram(newModel(ctx, sess, provider, cfg, theme), tea.WithContext(ctx))
+	mdl := newModel(ctx, sess, provider, cfg, theme)
+	mdl.attachViews(views)
+	p := tea.NewProgram(mdl, tea.WithContext(ctx))
 	final, runErr := p.Run()
 
 	// The final model may hold a DIFFERENT session than the one opened above: the user may have
