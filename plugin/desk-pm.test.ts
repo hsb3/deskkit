@@ -80,27 +80,47 @@ test("every PM tool is referenced by at least one skill or the agent (no undocum
   }
 });
 
-test("no invented PM surface names leak into the skills or agent", () => {
+// Store/config data-field names that are legitimately two-word snake_case but are NOT tools
+// (get_context response fields + the desk_config collection). Kept tiny and explicit.
+const NON_TOOL_FIELDS = new Set([
+  "by_court", "by_phase", "desk_config", "recent_transitions", "status_label",
+]);
+
+// The guard, as a pure function so it can be proven red on an injected fake. Returns the list
+// of tool-shaped identifiers that are neither a real PM tool nor an allowlisted data field.
+function unknownToolTokens(text: string): string[] {
+  const bad: string[] = [];
+  for (const m of text.matchAll(/\b[a-z]+_[a-z]+\b/g)) {
+    const tok = m[0];
+    if (PM_TOOLS.includes(tok) || NON_TOOL_FIELDS.has(tok)) continue;
+    bad.push(tok);
+  }
+  return bad;
+}
+
+test("every tool-shaped identifier in the skills/agent is one of the twelve real PM tools", () => {
+  // Assert against the real ToolNames() set — not a hardcoded blocklist — so a BARE invented
+  // tool name (e.g. `archive_item`, no mcp__ prefix) fails without needing to be enumerated.
   const corpus = [
     ...SKILL_NAMES.map((n) => read(join("skills", n, "SKILL.md"))),
     read(join("agents", "pm-operator.md")),
     read("README.md"),
   ].join("\n");
-  // Plausible-but-nonexistent tools an author might reach for. None of these are real.
-  const INVENTED = [
-    "advance_item", "complete_item", "close_item", "finish_item", "move_item",
-    "delete_item", "remove_item", "add_item", "assign_item", "comment_item",
-    "resolve_item", "reopen_item", "demote_item", "promote_item", "set_status",
-    "get_items", "list_item", "list_context", "get_briefing",
-  ];
-  for (const bad of INVENTED) {
-    // Word-boundary match so a real name is not flagged as containing a shorter invented one
-    // (e.g. `list_items` must not trip the `list_item` entry). Escape any regex metachars a
-    // future entry might carry.
-    const esc = bad.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    expect(new RegExp(`\\b${esc}\\b`).test(corpus)).toBe(false);
-  }
-  // Any mcp__desk-pm__<x> reference must name one of the twelve tools.
+  expect(unknownToolTokens(corpus)).toEqual([]);
+});
+
+test("the tool-name guard is red-able (catches a bare invented tool name)", () => {
+  // Proof the guard can fail: an injected fake must be reported.
+  expect(unknownToolTokens("first `archive_item`, then `get_item`.")).toEqual(["archive_item"]);
+  // A real tool and an allowlisted field are both accepted.
+  expect(unknownToolTokens("`transition_item` updates `status_label`.")).toEqual([]);
+});
+
+test("any mcp__desk-pm__<x> reference names one of the twelve tools", () => {
+  const corpus = [
+    ...SKILL_NAMES.map((n) => read(join("skills", n, "SKILL.md"))),
+    read(join("agents", "pm-operator.md")),
+  ].join("\n");
   for (const m of corpus.matchAll(/mcp__desk-pm__([a-z_]+)/g)) {
     expect(PM_TOOLS).toContain(m[1]!);
   }
@@ -148,12 +168,15 @@ test("the SessionStart hook script exists and is executable", () => {
   expect(mode & 0o111).toBeGreaterThan(0); // some execute bit set
 });
 
-test("the hook self-gates (no-ops when deskkit is absent or PM is off)", () => {
+test("the hook self-gates on binary-absent AND on non-JSON stdout (PM-off contract)", () => {
   const sh = read(join("hooks", "session-briefing.sh"));
   expect(sh).toContain("command -v deskkit");
   expect(sh).toContain("deskkit pm context");
-  // Both failure paths exit 0 silently.
   expect(sh).toContain("|| exit 0");
+  // The load-bearing guard: emit ONLY when stdout is a JSON object. A PM-off desk exits 0 with
+  // a cobra error on stdout at exit 0, so an exit-code / non-empty check is insufficient.
+  expect(sh).toMatch(/case\s+"\$context"/);
+  expect(sh).toContain("'{'*)");
 });
 
 test("the marketplace registers desk-pm alongside desk-standard, version-synced", () => {
