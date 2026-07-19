@@ -1,7 +1,7 @@
 _Session-to-session bridge for desk-standard. Read this before working; update it at the end
 of any substantial session. Secret-free — live URLs/credentials belong in `_meta/operations/`
 (untracked) if that dir is ever created._
-Status: active (2026-07-18)
+Status: active (2026-07-19)
 
 # HANDOFF
 
@@ -60,24 +60,33 @@ no-query rule kept pre-program-only (**ADR 0007**, committed on `feat/tui-charm-
 57f1a76); #51 sessions-list-first launch + truncation titles + rename/delete v1; #52 defer
 dollar-cost, add the `models.context_window` profile override key (schema change).
 
-**IN FLIGHT — the #53 v2 migration build, branch `feat/tui-charm-v2`** (checked out in the
-main tree). A background builder is migrating `librarian/internal/tui` to the v2 modules —
-**uncommitted working-tree edits under librarian/ are ITS work; do not discard or commit
-them blind**. It ran long (resumed twice, was on the last test fixes). If this session was
-cleared and the builder's report is lost: `git status`/`go build ./... && go test ./...` in
-librarian/ shows where it stopped; finish per the migration map below, then verify (grep
-`github.com/charmbracelet` under librarian must be EMPTY), commit, PR (cite ADR 0007), VHS
-re-record for parity proof. Migration map essentials: v2 modules use the **charm.land vanity
-paths** (`charm.land/{bubbletea,lipgloss,bubbles,glamour}/v2` — bubbletea v2.0.8, lipgloss
-v2.0.5, bubbles v2.1.1, glamour v2.0.1; each repo has `UPGRADE_GUIDE_V2.md`); `View()`
-returns `tea.View` with `v.AltScreen = true` asserted in EVERY path; `tea.KeyMsg` →
-`tea.KeyPressMsg` (space is now `"space"`; verify the alt+enter string); viewport/textarea/
-help fields → Set*/getter methods; textarea styles via `SetStyles` with concrete per-theme
-values (replaces the deleted `lipgloss.SetHasDarkBackground` pin); glamour keeps our own
-GLAMOUR_STYLE handling (WithAutoStyle is gone in v2); theme probe = pre-program
-`lipgloss.HasDarkBackground(os.Stdin, os.Stdout)` (termenv dep drops).
+**DONE 2026-07-19 — the #53 v2 migration is PR #59: green, mergeable, awaiting Henry.**
+Branch `feat/tui-charm-v2`: migration verified (build/vet/full tests, no-v1-imports grep,
+make check/test), rebased onto the moved main, ci + claude-review pass, all four review
+threads fixed (c17c802) and replied. **ADR renumbered 0006 → 0007** (PR #57, landed from a
+parallel session, took 0006 for the kit-port ADR). Live parity proven in a REAL terminal
+(tmux send-keys/capture-pane, full ready→streaming→ready cycle byte-clean) — that proof, not
+re-recorded GIFs, is the PR's parity artifact.
 
-**Then:** #52's session-layer token plumbing (stack-independent) and #51 on v2.
+**SEQUENCING DECISION IN HENRY'S COURT — PR #59 vs PR #60.** A parallel workstream (epic
+#55) landed #56/#57 on main 2026-07-18 evening and opened **PR #60** (`refactor/core-modules`,
+92 files) which MOVES `librarian/internal/tui/` → `librarian/internal/modules/librarian/tui/`.
+Direct structural collision. Recommendation (commented on both PRs): merge **#59 first**;
+#60 absorbs the v2 import swap in its rebase (its move rewrites those import paths anyway).
+If #60 goes first instead, #59 must be re-targeted onto the moved paths and re-verified.
+
+**#58 — chat-GIF re-record blocked by an xterm.js canvas-renderer bug (investigated,
+disposition open).** Re-recording chat tapes on v2 deterministically shows a one-cell stale
+glyph ("rready") — VHS-environment-only. Full evidence on the issue: our emitted bytes are
+provably correct (raw pty capture replays clean through the exact xterm-headless version
+ttyd bundles); VHS hardcodes `-t rendererType=canvas`, whose stale-glyph bug class is
+documented upstream (xtermjs #3548/#3617); no reachable flag fixes it (dom renderer 4–9×
+slower, never completed; customGlyphs/sixel flags don't help). Committed GIFs deliberately
+stay v1-era. Disposition options ranked on #58 (accept / product-side full-line-repaint
+dodge / toolchain pinning dig).
+
+**Then:** #52's session-layer token plumbing (stack-independent) and #51 on v2 (both build
+on whichever tree layout wins the #59/#60 sequencing).
 
 **Release note:** `[Unreleased]` now holds the whole TUI pass + `record_feedback` + `make
 install` — a solid 0.6.0. Cut per `docs/development/releasing.md` when Henry wants it.
