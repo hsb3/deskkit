@@ -60,33 +60,34 @@ no-query rule kept pre-program-only (**ADR 0007**, committed on `feat/tui-charm-
 57f1a76); #51 sessions-list-first launch + truncation titles + rename/delete v1; #52 defer
 dollar-cost, add the `models.context_window` profile override key (schema change).
 
-**DONE 2026-07-19 — the #53 v2 migration is PR #59: green, mergeable, awaiting Henry.**
-Branch `feat/tui-charm-v2`: migration verified (build/vet/full tests, no-v1-imports grep,
-make check/test), rebased onto the moved main, ci + claude-review pass, all four review
-threads fixed (c17c802) and replied. **ADR renumbered 0006 → 0007** (PR #57, landed from a
-parallel session, took 0006 for the kit-port ADR). Live parity proven in a REAL terminal
-(tmux send-keys/capture-pane, full ready→streaming→ready cycle byte-clean) — that proof, not
-re-recorded GIFs, is the PR's parity artifact.
+**MERGED 2026-07-19 — #59 (v2 migration) then #60 (core+modules refactor), in that order.**
+The #59-first sequencing was executed as recommended: #59 squash-merged clean (ci +
+claude-review green), then #60 rebased onto the new main. The rebase's rename detection paired
+#59's v2-modified tui files with #60's move correctly — v2 code landed at the new module path
+`librarian/internal/modules/librarian/tui/`, zero v1 imports, old `internal/tui/` gone. **One
+drift caught by `go vet`:** #59's new regression-guard test `defects_test.go` still imported the
+pre-move `internal/config`; git took #59's copy so #60's path rewrite missed it. Fixed to
+`internal/core/config` (config moved under `internal/core/` in #60), amended into the rebased
+commit. Full gates green post-fix (check/test/verify-47/package/version-sync) and on merged
+`main` (build+vet). **ADR renumbered 0006 → 0007** (PR #57 took 0006 for the kit-port ADR).
+Live v2 parity was proven in a REAL terminal (tmux capture, byte-clean) — the PR's parity
+artifact, not re-recorded GIFs (see #58). Current tree layout is the modules/ layout: any
+new TUI work (#51/#52) targets `librarian/internal/modules/librarian/tui/`.
 
-**SEQUENCING DECISION IN HENRY'S COURT — PR #59 vs PR #60.** A parallel workstream (epic
-#55) landed #56/#57 on main 2026-07-18 evening and opened **PR #60** (`refactor/core-modules`,
-92 files) which MOVES `librarian/internal/tui/` → `librarian/internal/modules/librarian/tui/`.
-Direct structural collision. Recommendation (commented on both PRs): merge **#59 first**;
-#60 absorbs the v2 import swap in its rebase (its move rewrites those import paths anyway).
-If #60 goes first instead, #59 must be re-targeted onto the moved paths and re-verified.
+**#58 — CLOSED 2026-07-19 as won't-fix (upstream, cosmetic, docs unaffected).** One-more-pass
+determination: re-recording was never actually necessary — ADR 0007 mandates the v2 migration
+ship *zero visual change*, so the committed v1-era GIFs depict the v2 product accurately;
+nothing in the docs is stale. The glitch (one-cell stale footer glyph "rready") is
+VHS-environment-only — our emitted bytes replay clean through ttyd's exact xterm-headless
+version; VHS hardcodes `-t rendererType=canvas`, whose stale-glyph bug (xtermjs #3548/#3617,
+fixes in #4189/#4101) is newer than ttyd 1.7.7 bundles, with no newer ttyd stable to pin.
+Product-side footer-repaint dodge rejected (global perf workaround defeating v2's cell-diff
+renderer to satisfy a broken recording tool; real terminals clean). Auto-resolves for free on
+a future VHS/ttyd xterm.js bump — reopen only if a real visual redesign needs fresh captures
+before the toolchain catches up. Full rationale in the #58 close comment.
 
-**#58 — chat-GIF re-record blocked by an xterm.js canvas-renderer bug (investigated,
-disposition open).** Re-recording chat tapes on v2 deterministically shows a one-cell stale
-glyph ("rready") — VHS-environment-only. Full evidence on the issue: our emitted bytes are
-provably correct (raw pty capture replays clean through the exact xterm-headless version
-ttyd bundles); VHS hardcodes `-t rendererType=canvas`, whose stale-glyph bug class is
-documented upstream (xtermjs #3548/#3617); no reachable flag fixes it (dom renderer 4–9×
-slower, never completed; customGlyphs/sixel flags don't help). Committed GIFs deliberately
-stay v1-era. Disposition options ranked on #58 (accept / product-side full-line-repaint
-dodge / toolchain pinning dig).
-
-**Then:** #52's session-layer token plumbing (stack-independent) and #51 on v2 (both build
-on whichever tree layout wins the #59/#60 sequencing).
+**Then:** #52's session-layer token plumbing (stack-independent) and #51 on v2 — both build on
+the modules/ layout at `librarian/internal/modules/librarian/tui/`.
 
 **Release note:** `[Unreleased]` now holds the whole TUI pass + `record_feedback` + `make
 install` — a solid 0.6.0. Cut per `docs/development/releasing.md` when Henry wants it.
