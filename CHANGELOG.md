@@ -13,6 +13,25 @@ for why this policy exists.
 
 ## [Unreleased]
 
+### Added
+
+- **PM module — collections, state machine, gates** (D3, `docs/pm-system-v1-spec.md` §3–§4,
+  epic #55). The document-gated work graph lands as a feature-gated module (`PM_ENABLED` /
+  profile `modules.pm.enabled`; OFF by default): five collections (`items`, `dependencies`,
+  `transitions`, `notes`, `desk_config`) created by PROGRAMMATIC migrations only when the
+  module is enabled — a librarian-only desk gets no PM collections, physically; the rigid
+  queue→work→review→terminal machine with the `blocked` side-state; per-desk editable YAML
+  gate rules (validated against the schema-v1/kit vocabulary, now embedded from
+  `schema/doctypes.yaml` with a byte-identity drift guard) + cross-cutting traits; the §4.1
+  transition path (machine → blocked → claim → gates → write + audit + cascade) with
+  refusals that name exactly what is missing and land as `gate_refused` audit rows; typed
+  dependency edges with `auto`/`auto-reopen`/`manual`/`permanent` cascade semantics;
+  optimistic-concurrency version tokens + claim TTL (`PM_CLAIM_TTL`, default 30m). The
+  librarian module's `DocumentValidator` seam is now fully wired (desk-file read +
+  frontmatter parse + schema-v1 validation); gate evaluation consumes it and fails closed
+  without it. Surfaces (`pm` CLI/MCP/TUI) are the next slice (D4); the shipped default gate
+  rules are a seed the owner may re-rule.
+
 ### Changed
 
 - **Chassis rename: `pocket-librarian` → `deskkit`** (D2b, `docs/pm-system-v1-spec.md` §2.10,

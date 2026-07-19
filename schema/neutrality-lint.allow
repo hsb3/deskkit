@@ -26,3 +26,10 @@ librarian/verify.sh
 # Doc-internal ordinal: "build-brief punch-list #1" references item 1 of a punch list, not a
 # GitHub issue. (Token-scoped so the rest of the file stays under the lint.)
 librarian/internal/modules/librarian/desklib/desklib.go | #1
+
+# Embedded vocabulary copy (PM D3): go:embed cannot reach outside the Go module, so
+# core/schema vendors a BYTE-IDENTICAL copy of the repo-root schema/doctypes.yaml (which the
+# lint does not scan — SCAN_DIRS covers plugin/librarian/kits). A drift test enforces the
+# byte identity, so the copy cannot diverge; its provenance comments legitimately carry the
+# same issue ordinals the canonical file carries.
+librarian/internal/core/schema/doctypes.yaml

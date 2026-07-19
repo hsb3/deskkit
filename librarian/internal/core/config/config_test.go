@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 )
 
 func TestLoadDotEnvNeverOverrides(t *testing.T) {
@@ -89,4 +90,63 @@ func chdir(t *testing.T, dir string) func() {
 		t.Fatal(err)
 	}
 	return func() { _ = os.Chdir(prev) }
+}
+
+// TestLoadPMGate covers the D3 additions: PM_ENABLED env > profile modules.pm.enabled > off
+// (spec §2.9), and PM_CLAIM_TTL (spec §3.6, default 30m).
+func TestLoadPMGate(t *testing.T) {
+	dir := t.TempDir()
+	restore := chdir(t, dir)
+	defer restore()
+	t.Setenv("DESK_ROOT", dir)
+	t.Setenv("DESK_NAME", "example-desk")
+
+	// Default: off, 30m.
+	os.Unsetenv("PM_ENABLED")
+	os.Unsetenv("PM_CLAIM_TTL")
+	cfg, err := Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.PMEnabled {
+		t.Error("PMEnabled must default off")
+	}
+	if cfg.PMClaimTTL != 30*time.Minute {
+		t.Errorf("PMClaimTTL default = %v, want 30m", cfg.PMClaimTTL)
+	}
+
+	// Profile turns it on when env is unset.
+	if err := os.MkdirAll(filepath.Join(dir, "_knowledge"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	profile := "desk:\n  name: example-desk\nmodules:\n  pm:\n    enabled: true\n"
+	if err := os.WriteFile(filepath.Join(dir, "_knowledge", "profile.yaml"), []byte(profile), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err = Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !cfg.PMEnabled {
+		t.Error("profile modules.pm.enabled: true must enable pm")
+	}
+
+	// Env wins over the profile.
+	t.Setenv("PM_ENABLED", "false")
+	cfg, err = Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.PMEnabled {
+		t.Error("PM_ENABLED=false env must beat the profile's true")
+	}
+
+	t.Setenv("PM_CLAIM_TTL", "45m")
+	cfg, err = Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.PMClaimTTL != 45*time.Minute {
+		t.Errorf("PM_CLAIM_TTL=45m not honored: %v", cfg.PMClaimTTL)
+	}
 }

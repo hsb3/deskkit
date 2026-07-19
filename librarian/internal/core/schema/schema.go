@@ -30,3 +30,13 @@ type Verdict struct {
 type DocumentValidator interface {
 	Verdict(ctx context.Context, pointer string, req ArtifactRequirement) (Verdict, error)
 }
+
+// FrontmatterReader is the optional companion seam for trait predicates (spec §4.2): a trait's
+// `match` may reference a frontmatter field of the item's POINTED document, resolved "through
+// the validation seam, never by reading librarian collections". Verdict alone cannot answer an
+// arbitrary-field lookup, so the librarian module also implements this; the gate engine
+// type-asserts for it and treats its absence as "field not present" (the trait simply does not
+// match — fail-safe, not fail-closed, because a trait is an ADDITIVE requirement).
+type FrontmatterReader interface {
+	Frontmatter(ctx context.Context, pointer string) (map[string]any, error)
+}
