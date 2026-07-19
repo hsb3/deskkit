@@ -128,15 +128,15 @@ jobs:
           GOARCH: ${{ matrix.goarch }}
         run: |
           version="$(cat ../VERSION)"
-          out="pocket-librarian_${version}_${{ matrix.goos }}_${{ matrix.goarch }}"
-          go build -ldflags "-X main.version=${version}" -o "${out}" ./cmd/pocket-librarian
+          out="deskkit_${version}_${{ matrix.goos }}_${{ matrix.goarch }}"
+          go build -ldflags "-X main.version=${version}" -o "${out}" ./cmd/deskkit
           echo "built ${out}"
 
       - name: Upload binary artifact
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: pocket-librarian_${{ matrix.goos }}_${{ matrix.goarch }}
-          path: librarian/pocket-librarian_*_${{ matrix.goos }}_${{ matrix.goarch }}
+          name: deskkit_${{ matrix.goos }}_${{ matrix.goarch }}
+          path: librarian/deskkit_*_${{ matrix.goos }}_${{ matrix.goarch }}
           if-no-files-found: error
 
   # ---- build the marketplace plugin bundle ----

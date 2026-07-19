@@ -21,7 +21,7 @@ overseen project is software; a desk can oversee a portfolio of work of any kind
 This skill is the consultable rule set. It states *what the standard requires*; the
 `desk-setup` skill applies it to a new or existing desk, and the `harvest-loop` skill evolves
 it. Mechanical enforcement (scan, flag, auto-fix, restore) is **not** this skill's job — it
-belongs to the pocket-librarian, reached through the MCP tools. This skill defines the rules
+belongs to the deskkit, reached through the MCP tools. This skill defines the rules
 those tools enforce.
 
 ## The critical rule (K1)
@@ -93,7 +93,7 @@ synopsis: "One-sentence scannable abstract."
 **Frontmatter-exemption classes.** A small allowlist is exempt from the contract: the entry
 file (`CLAUDE.md`), `_meta/HANDOFF.md`, `_meta/README.md`, a **directory-index `README.md`
 inside an entity dir** (`_structure/decisions/`, tasks, analyses, journal — the index orients
-the folder, it is not an entity record; the pocket-librarian enforces this by basename, so
+the folder, it is not an entity record; the deskkit enforces this by basename, so
 patrol's R1/R4 never fire on it), template files (the standard-free scaffold), briefing sidecar
 files (e.g. `sources.md`), and drafted GitHub issue bodies (the desk drafts these for the owner
 to file; they follow the issue tracker's shape, not the desk contract).
@@ -205,7 +205,7 @@ file is intra-desk only and is never a cross-desk delivery channel.
 This section defines **what conformance means** as testable rule statements, plus a
 **non-mutating** procedure an agent (or human) runs to report deltas. It ships **no executable
 checker and no auto-fix**: mechanical enforcement — scan, flag, `--fix`, restore, numbering-
-collision detection, retrieval — is the **pocket-librarian's** job (reached through the MCP
+collision detection, retrieval — is the **deskkit's** job (reached through the MCP
 tools), specified here so the two never drift and never own the same fact twice (K12). Running
 this checklist changes nothing; it produces a report.
 
@@ -240,7 +240,7 @@ Each is a claim a checker can decide against a desk tree:
 5. Confirm rule 6 (one keep-only `_meta/secrets/`; no tracked secret values).
 6. Spot-check plans and status docs for rules 8–9.
 7. **Report deltas only — never edit.** Present each finding as `path — rule — what is wrong`.
-   Remediation is proposed, not applied: applying fixes is the pocket-librarian's supervised,
+   Remediation is proposed, not applied: applying fixes is the deskkit's supervised,
    record-original-first job, not this checklist's.
 
 The checklist is trigger-based, never scheduled (K19): run it when a desk is being set up,

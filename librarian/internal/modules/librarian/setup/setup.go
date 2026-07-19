@@ -1,4 +1,4 @@
-// Package setup implements the zero-export desk onramp: `pocket-librarian init`
+// Package setup implements the zero-export desk onramp: `deskkit init`
 // scaffolds the minimal _knowledge/profile.yaml a folder needs to work as a desk, and
 // the first-run prompt decision that offers to run it on an interactive terminal.
 //
@@ -22,7 +22,7 @@ import (
 // profileTemplate is the least a folder needs to work as a desk with zero exports (a
 // schema-compatible profile.yaml: schema/profile.schema.yaml, additionalProperties:false,
 // schema_version required). %s is the YAML-quoted, basename-derived desk name.
-const profileTemplate = `# Minimal desk profile scaffolded by pocket-librarian init.
+const profileTemplate = `# Minimal desk profile scaffolded by deskkit init.
 # The least a folder needs to work as a desk with zero exports.
 # Full personalization options (identity, repos, board, models, preferences, ...)
 # are documented in the profile schema: schema/profile.schema.yaml

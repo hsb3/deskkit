@@ -49,7 +49,7 @@ $EDITOR _knowledge/profile.yaml
 ```
 
 Working from a plain folder instead (no plugin scaffold to copy from)? Once the
-librarian is built (step 3), `pocket-librarian init [dir]` is the fastest path to a
+librarian is built (step 3), `deskkit init [dir]` is the fastest path to a
 working profile: it writes the minimal `_knowledge/profile.yaml` a folder needs — desk
 name from the folder's basename, `root: "."` — with `--force` to overwrite and
 `--with-env` to also scaffold a `.env` naming your LLM API-key env var. It never touches
@@ -70,9 +70,9 @@ floors it):
 
 ```console
 $ cd librarian
-$ make build          # -> ./pocket-librarian
-$ ./pocket-librarian --version
-pocket-librarian version 0.5.0
+$ make build          # -> ./deskkit
+$ ./deskkit --version
+deskkit version 0.5.0
 ```
 
 A `make`-built or release binary reports its release version via `--version`; a binary that
@@ -100,19 +100,19 @@ needed — just run:
 
 ```console
 $ cd /path/to/your/desk      # the folder whose _knowledge/profile.yaml you filled
-$ pocket-librarian sweep
+$ deskkit sweep
 ```
 
 > **Env vars are the override, not the requirement.** Two cases still need them:
 > - **A bare folder with no profile** (a scratch or UAT dir) — either run
->   `pocket-librarian init` in it (writes that one-line `_knowledge/profile.yaml` for you),
+>   `deskkit init` in it (writes that one-line `_knowledge/profile.yaml` for you),
 >   drop the file in by hand (`desk:` with `name:` and `root: "."`), or set the vars for the
 >   session: `export DESK_ROOT=/path/to/desk DESK_NAME=my-desk`.
-> - **Running the dev build from `librarian/`** (`./pocket-librarian …`) — you're outside the
+> - **Running the dev build from `librarian/`** (`./deskkit …`) — you're outside the
 >   desk tree, so the profile isn't on the walk-up path; export the two vars.
 >
 > Env always wins over the profile. Either way the store lives outside the desk tree, at
-> `$XDG_DATA_HOME/pocket-librarian/<DESK_NAME>/` (see
+> `$XDG_DATA_HOME/deskkit/<DESK_NAME>/` (see
 > `decisions/0002-multi-desk-topology-store-per-desk.md`).
 >
 > On an interactive terminal, you don't even have to remember `init`: any store-touching
@@ -125,7 +125,7 @@ first run. `sweep` and `patrol` are LLM-free and **never write desk files** — 
 pure dry run:
 
 ```console
-$ pocket-librarian sweep
+$ deskkit sweep
 {
   "total": 4,
   "created": 4,
@@ -134,7 +134,7 @@ $ pocket-librarian sweep
   "soft_deleted": 0
 }
 
-$ pocket-librarian patrol
+$ deskkit patrol
 {
   "run_id": "patrol-20260717T171143Z",
   "files_swept": 4,
@@ -147,7 +147,7 @@ $ pocket-librarian patrol
 what was flagged with a read-only query:
 
 ```console
-$ pocket-librarian query findings --pretty
+$ deskkit query findings --pretty
 findings: 3
 
 R1 (1)
@@ -160,7 +160,7 @@ R3 (1)
 
 ## What's next
 
-- **Chat with it** — `pocket-librarian chat` opens an interactive session over the same tools
+- **Chat with it** — `deskkit chat` opens an interactive session over the same tools
   (a full-screen view on a terminal). Unlike `sweep`/`patrol`, `chat` needs an LLM: set
   `ANTHROPIC_API_KEY` for the default provider, or point `models` + `secrets_ref.llm_api_key`
   at your key in the profile. Details in `../librarian/README.md`.

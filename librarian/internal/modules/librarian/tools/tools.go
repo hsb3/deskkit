@@ -13,8 +13,8 @@ import (
 // The seven core functions live one-per-file (spec §2.8): sweep.go, patrol.go, propose_fix.go,
 // apply_fix.go, restore.go, query.go, record_feedback.go. Each is the SINGLE implementation both the CLI
 // subcommands and the (later) eino InvokableTool wrappers call — "sweep behaves identically
-// whether the agent calls it or an operator runs pocket-librarian sweep" (spec §2.6).
-var ErrNotImplemented = errors.New("pocket-librarian: tool not implemented (spine stub)")
+// whether the agent calls it or an operator runs deskkit sweep" (spec §2.6).
+var ErrNotImplemented = errors.New("deskkit: tool not implemented (spine stub)")
 
 func notImplemented(name string) error {
 	return fmt.Errorf("%s: %w", name, ErrNotImplemented)

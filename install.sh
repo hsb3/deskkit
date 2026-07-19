@@ -7,7 +7,7 @@
 # It consumes the artifacts published by the release workflow
 # (.github/workflows/release.yml) on every `v*` tag:
 #
-#   - pocket-librarian_<version>_<os>_<arch>   (the librarian Go binary; release.yml line 125)
+#   - deskkit_<version>_<os>_<arch>   (the librarian Go binary; release.yml line 125)
 #   - desk-standard-plugin_<version>.tar.gz    (the plugin bundle;        release.yml line 154)
 #   - checksums.txt                            (sha256sum of every asset; release.yml line 182)
 #
@@ -24,7 +24,8 @@ set -euo pipefail
 
 # ---- constants (kept in lock-step with .github/workflows/release.yml) -----------------------
 REPO="hsb3/desk-standard"          # gh release lives here; also the plugin marketplace slug
-BINARY_NAME="pocket-librarian"     # installed command name (release.yml line 126: -o pocket-librarian)
+BINARY_NAME="deskkit"     # installed command name (release.yml line 126: -o deskkit)
+LEGACY_BINARY_NAME="pocket-librarian"  # asset name on releases <= v0.6.0 (pre-D2b rename)
 CHECKSUMS_FILE="checksums.txt"     # release.yml line 182
 PLUGIN_ID="desk-standard@desk-standard"  # `claude plugin install desk-standard@desk-standard`
 
@@ -128,7 +129,7 @@ case "$ARCH" in amd64|arm64) ;; *) die "invalid INSTALL_ARCH='$ARCH' (expected a
 
 # ---- resolve the release version ------------------------------------------------------------
 # The workflow tags releases `v<version>` (release.yml lines 32/195) but names the binary
-# artifact with the BARE version (release.yml line 125: pocket-librarian_${version}_...).
+# artifact with the BARE version (release.yml line 125: deskkit_${version}_...).
 # So we track both: TAG (with the leading v, used in download URLs) and VERSION_BARE.
 resolve_version() {
   if [ "$VERSION" = "latest" ]; then
@@ -152,7 +153,7 @@ TAG="$(resolve_version)"
 VERSION_BARE="${TAG#v}"
 
 # ---- construct artifact names + URLs (must match release.yml exactly) ------------------------
-# release.yml line 125: out="pocket-librarian_${version}_${goos}_${goarch}"
+# release.yml line 125: out="deskkit_${version}_${goos}_${goarch}"
 ARTIFACT="${BINARY_NAME}_${VERSION_BARE}_${OS}_${ARCH}"
 BASE_URL="https://github.com/${REPO}/releases/download/${TAG}"
 BINARY_URL="${BASE_URL}/${ARTIFACT}"
@@ -189,8 +190,17 @@ install_binary() {
   trap "rm -rf '${tmp}'" EXIT
 
   info "  downloading ${ARTIFACT}"
-  curl -fL --retry 3 -o "${tmp}/${ARTIFACT}" "${BINARY_URL}" \
-    || die "download failed: ${BINARY_URL}"
+  if ! curl -fL --retry 3 -o "${tmp}/${ARTIFACT}" "${BINARY_URL}"; then
+    # Releases up to v0.6.0 published the binary under its pre-rename name (D2b, spec §2.10).
+    # Fall back to that asset name so this script keeps working against them; the binary still
+    # installs as ${BINARY_NAME} — same tool, renamed.
+    warn "asset ${ARTIFACT} not found; trying the pre-rename asset name (releases <= v0.6.0)"
+    ARTIFACT="${LEGACY_BINARY_NAME}_${VERSION_BARE}_${OS}_${ARCH}"
+    BINARY_URL="${BASE_URL}/${ARTIFACT}"
+    info "  downloading ${ARTIFACT}"
+    curl -fL --retry 3 -o "${tmp}/${ARTIFACT}" "${BINARY_URL}" \
+      || die "download failed: ${BINARY_URL}"
+  fi
   info "  downloading ${CHECKSUMS_FILE}"
   curl -fL --retry 3 -o "${tmp}/${CHECKSUMS_FILE}" "${CHECKSUMS_URL}" \
     || die "download failed: ${CHECKSUMS_URL}"

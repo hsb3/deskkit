@@ -9,18 +9,18 @@
 # PROVIDER_HOST here) — a provider swap updates one allow-list entry in both.
 #
 # Prerequisite (one-time, outside this script): create the egress-restricted network, e.g.
-#   docker network create pocket-librarian-egress
+#   docker network create deskkit-egress
 # and configure its firewall/egress policy to permit only $PROVIDER_HOST:443 + DNS.
 set -euo pipefail
 
 : "${DESK_ROOT:?set DESK_ROOT to the desk this run stewards}"
 : "${DESK_NAME:?set DESK_NAME}"
-IMAGE="${IMAGE:-pocket-librarian:latest}"
-NETWORK="${NETWORK:-pocket-librarian-egress}"
+IMAGE="${IMAGE:-deskkit:latest}"
+NETWORK="${NETWORK:-deskkit-egress}"
 PROVIDER_HOST="${PROVIDER_HOST:-api.anthropic.com}" # swap per LLM_PROVIDER (api.openai.com / generativelanguage.googleapis.com)
 
 if [ "$#" -eq 0 ]; then
-  echo "usage: DESK_ROOT=... DESK_NAME=... $0 <pocket-librarian subcommand + args>" >&2
+  echo "usage: DESK_ROOT=... DESK_NAME=... $0 <deskkit subcommand + args>" >&2
   echo "  e.g.: $0 apply-fix --run <run_id>" >&2
   exit 2
 fi

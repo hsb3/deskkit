@@ -5,7 +5,7 @@ Status: active
 # Development
 
 Two product lanes sit under one repo: the **plugin** (harness-pure TypeScript core + stdio MCP
-server, built/tested with `bun`) and the **librarian** (`pocket-librarian`, a single Go binary).
+server, built/tested with `bun`) and the **librarian** (`deskkit`, a single Go binary).
 The **root `Makefile` is the canonical task interface** — `make help` lists every target; CI
 (`.github/workflows/ci.yml`) runs the same checks.
 

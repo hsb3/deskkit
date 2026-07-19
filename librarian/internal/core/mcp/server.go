@@ -3,7 +3,7 @@
 // core (internal/core/toolcore) as an MCP stdio server — the librarian's "hands" — so a
 // Claude Code or OpenCode session (or the dual-format plugin's plugin/mcp boundary) can call
 // the tools directly. This is the one-binary "MCP server + CLI over a single tool core"
-// pattern; the CLI (cmd/pocket-librarian) and the eino agent loop
+// pattern; the CLI (cmd/deskkit) and the eino agent loop
 // (internal/modules/librarian/agent) remain the other two surfaces over the SAME tool core.
 //
 // Three invariants this slice enforces (all load-bearing):
@@ -49,7 +49,7 @@ import (
 // Identity-neutral: no person/org/repo/issue (0013 item 9). The module path is already
 // github.com/example/pocket-librarian; this keeps the wire identity neutral too.
 const (
-	serverName    = "pocket-librarian"
+	serverName    = "deskkit"
 	serverVersion = "v1"
 )
 

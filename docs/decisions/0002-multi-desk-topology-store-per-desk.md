@@ -1,5 +1,13 @@
 _ADR for pocket-librarian's multi-desk topology: how an estate of many desks maps to stores, where stores live on disk, and what the `desk` field is for._
-Status: Accepted — 2026-07-17
+Status: Accepted (corrected 2026-07-18) — 2026-07-17
+
+> **Correction (2026-07-18):** The D2b chassis rename (PR #62; `docs/pm-system-v1-spec.md`
+> §2.10, epic #55) renamed the binary and its store home: the canonical store now lives at
+> `$XDG_DATA_HOME/deskkit/<DESK_NAME>/` (fallback `~/.local/share/deskkit/<DESK_NAME>/`). On
+> startup the binary automatically moves a store still at the pre-rename
+> `pocket-librarian/<DESK_NAME>/` home to the new one (one logged line). The store-per-desk
+> decision itself stands unchanged; only the path literal in §2 below is corrected (struck
+> inline with a pointer here).
 
 # 0002 — Multi-desk topology: store-per-desk, XDG store home, `desk` as open-guard
 
@@ -49,8 +57,11 @@ insufficient).
 ### 2. Canonical store home: XDG data home
 
 When `--dir` is absent, the store resolves to
-**`$XDG_DATA_HOME/pocket-librarian/<DESK_NAME>/`** (falling back to
-`~/.local/share/pocket-librarian/<DESK_NAME>/` when `$XDG_DATA_HOME` is unset), replacing
+~~**`$XDG_DATA_HOME/pocket-librarian/<DESK_NAME>/`** (falling back to
+`~/.local/share/pocket-librarian/<DESK_NAME>/` when `$XDG_DATA_HOME` is unset)~~
+**`$XDG_DATA_HOME/deskkit/<DESK_NAME>/`** (falling back to
+`~/.local/share/deskkit/<DESK_NAME>/` when `$XDG_DATA_HOME` is unset; path renamed by the
+D2b correction — see the callout at the top), replacing
 the cwd-relative `pb_data/` default. `--dir` remains the explicit override.
 
 Constraints that drove it: stores must live **outside the desk tree** (the librarian must not

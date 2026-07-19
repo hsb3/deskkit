@@ -1,10 +1,10 @@
-_pocket-librarian: a single Go binary that serves a PocketBase database and stewards a
+_deskkit: a single Go binary that serves a PocketBase database and stewards a
 desk's files under a record-original-first safety boundary._
 Status: active
 
 ## What this is
 
-pocket-librarian indexes a desk's files, flags convention violations (rules R1–R6), and
+deskkit indexes a desk's files, flags convention violations (rules R1–R6), and
 can mechanically repair the fixable ones (R1/R2/R3) — always recording the file's original
 content before any write, so every change can be reversed byte-exact. It is identity-neutral:
 nothing about a person, org, repo, or desk is hardcoded. `DESK_ROOT`, `DESK_NAME`, path
@@ -29,7 +29,7 @@ supply them; it walks up from the working directory and resolves in the order en
     root: "."
   ```
 
-  `./pocket-librarian init [dir]` writes exactly this file for you (desk name from the
+  `./deskkit init [dir]` writes exactly this file for you (desk name from the
   folder's basename, `root: "."`) — the fastest way to this profile. It's idempotent
   (`--force` to overwrite), takes `--with-env` to also scaffold a `.env` naming the LLM
   API-key env var, and never creates the store. On an interactive terminal, any
@@ -49,22 +49,22 @@ supply them; it walks up from the working directory and resolves in the order en
 The `make` targets run from `librarian/`, so they take the environment form:
 
 ```bash
-make build          # go build -> ./pocket-librarian
+make build          # go build -> ./deskkit
 make sweep           # index the desk tree
 make patrol          # flag rule violations (dry-run; never writes)
 make findings        # or: summary / adoption / orphans / uncollapsed
 ```
 
 The store self-initializes on first run (ADR 0003) — no separate setup step needed.
-`./pocket-librarian migrate up` remains available as an explicit, optional step (idempotent).
+`./deskkit migrate up` remains available as an explicit, optional step (idempotent).
 
 `make help` lists every target.
 
 ## Where the store lives
 
 By default (no `--dir`), the store resolves to
-`$XDG_DATA_HOME/pocket-librarian/<DESK_NAME>/`, falling back to
-`~/.local/share/pocket-librarian/<DESK_NAME>/` when `XDG_DATA_HOME` is unset or empty — not a
+`$XDG_DATA_HOME/deskkit/<DESK_NAME>/`, falling back to
+`~/.local/share/deskkit/<DESK_NAME>/` when `XDG_DATA_HOME` is unset or empty — not a
 cwd-relative `pb_data/`. `--dir` is the explicit override. A command that can't resolve
 `DESK_NAME` and got no `--dir` errors out rather than silently defaulting to the working
 directory. Stores live outside the desk tree on purpose: the librarian must not index its own
@@ -76,11 +76,16 @@ Opening a store also runs a **desk open-guard**: if the store already has rows s
 `desk` different from the configured `DESK_NAME`, the command refuses to run, naming both
 values. An empty or brand-new store opens fine.
 
+**Upgrading from `pocket-librarian` (v0.6.0 or earlier)?** Nothing to do: on startup, if
+`$XDG_DATA_HOME/deskkit/<DESK_NAME>/` is absent and the old
+`$XDG_DATA_HOME/pocket-librarian/<DESK_NAME>/` store exists, the binary moves it to the new
+home automatically and logs one line. No desk loses its store across the rename.
+
 If you have an existing store from before this convention (scattered in a scratch or job-tmp
 dir), move it to the canonical location before first run at the new default:
 
 ```bash
-mv <old-store-dir> "${XDG_DATA_HOME:-$HOME/.local/share}/pocket-librarian/$DESK_NAME"
+mv <old-store-dir> "${XDG_DATA_HOME:-$HOME/.local/share}/deskkit/$DESK_NAME"
 ```
 
 Otherwise, a store is a rebuildable cache — a fresh `sweep` at the canonical location
@@ -109,7 +114,7 @@ falls back.
 ```bash
 export LLM_PROVIDER=anthropic     # or set models.provider in your profile
 export ANTHROPIC_API_KEY=sk-...
-./pocket-librarian agent "patrol the desk and summarize what you find"
+./deskkit agent "patrol the desk and summarize what you find"
 ```
 
 `agent` runs the librarian's reasoning loop once over the tool set and exits (one-shot,
@@ -123,7 +128,7 @@ binary, against the desk's store (see "Where the store lives" above). It needs n
 (ADR 0003):
 
 ```bash
-./pocket-librarian chat         # start the multi-turn session
+./deskkit chat         # start the multi-turn session
 ```
 
 That's the whole path from a built binary plus an API key to a live session — one
@@ -192,13 +197,13 @@ patrol `findings`, and `revisions` (recorded originals) directly:
 make gui             # builds, starts serve, opens http://127.0.0.1:8090/_/
 ```
 
-or by hand: `./pocket-librarian serve` then open `http://127.0.0.1:8090/_/`. If
+or by hand: `./deskkit serve` then open `http://127.0.0.1:8090/_/`. If
 `PB_SUPERUSER_EMAIL` and `PB_SUPERUSER_PASSWORD` are both set, `serve` auto-creates that
 superuser account on first run (idempotent — safe to leave set across restarts). Otherwise,
 use the console's first-run screen, or create one non-interactively:
 
 ```bash
-./pocket-librarian superuser create you@example.com <password>
+./deskkit superuser create you@example.com <password>
 ```
 
 The console is read/write over the database (records, collections) — it does not write
@@ -213,8 +218,8 @@ desk files; the `apply-fix` boundary below still holds.
 ```json
 {
   "mcpServers": {
-    "pocket-librarian": {
-      "command": "/path/to/pocket-librarian",
+    "deskkit": {
+      "command": "/path/to/deskkit",
       "args": ["mcp-serve"],
       "env": { "DESK_ROOT": "/path/to/your/desk", "DESK_NAME": "my-desk" }
     }
@@ -259,13 +264,13 @@ Fixing a finding is split into two steps (decision recorded in the spec §11.2):
 supervised-only, run by hand:
 
 ```bash
-./pocket-librarian apply-fix --run <run_id>
+./deskkit apply-fix --run <run_id>
 ```
 
 Any applied fix can be reversed exactly:
 
 ```bash
-./pocket-librarian restore --by-path <path>
+./deskkit restore --by-path <path>
 ```
 
 Initial and supervised writes are expected to run inside the OS-level sandbox in

@@ -1,9 +1,9 @@
-_The pocket-librarian daily loop, told as a story: index a desk, flag violations, and repair the mechanical ones under a byte-exact undo._
+_The deskkit daily loop, told as a story: index a desk, flag violations, and repair the mechanical ones under a byte-exact undo._
 Status: active
 
-# pocket-librarian — the daily loop
+# deskkit — the daily loop
 
-pocket-librarian keeps a desk conformant without you reading every file. It indexes the
+deskkit keeps a desk conformant without you reading every file. It indexes the
 tree, flags rule violations, and mechanically repairs the fixable ones — and **every write
 it makes is byte-exact reversible.** You get a self-repairing desk with an undo button you
 can trust: nothing is changed on disk until you say so, and anything changed can be put
@@ -37,8 +37,8 @@ auto-fixed.
 ## Where the store lives (and the open-guard)
 
 The librarian is a one-shot CLI; its "instance" is an on-disk SQLite store. With no
-`--dir`, the store resolves to `$XDG_DATA_HOME/pocket-librarian/<DESK_NAME>/` (falling back
-to `~/.local/share/pocket-librarian/<DESK_NAME>/`) — **outside** the desk tree on purpose,
+`--dir`, the store resolves to `$XDG_DATA_HOME/deskkit/<DESK_NAME>/` (falling back
+to `~/.local/share/deskkit/<DESK_NAME>/`) — **outside** the desk tree on purpose,
 so the librarian never indexes its own database and a cloud-synced desk folder never
 corrupts a live SQLite file. `DESK_NAME` names the store directory and must be unique
 across your desks.
@@ -81,7 +81,7 @@ f417da0c8fe543166f9d97d0d4df9b89a2288dacaa48d4311d3ab37f742f3f9e  tasks/wire-up-
 desk files.
 
 ```console
-$ ./pocket-librarian sweep
+$ ./deskkit sweep
 {
   "total": 4,
   "created": 4,
@@ -91,7 +91,7 @@ $ ./pocket-librarian sweep
 }
 ```
 
-(No first step needed — `sweep` creates the store on first run. `./pocket-librarian migrate
+(No first step needed — `sweep` creates the store on first run. `./deskkit migrate
 up` is available as an explicit, optional alternative.)
 
 ## 2. Flag violations — `patrol`
@@ -103,7 +103,7 @@ keys off it.
 ![patrol firing real R1 and R2 findings on a seeded desk](media/patrol.gif)
 
 ```console
-$ ./pocket-librarian patrol
+$ ./deskkit patrol
 {
   "run_id": "patrol-20260717T171143Z",
   "files_swept": 4,
@@ -122,7 +122,7 @@ $ ./pocket-librarian patrol
 of JSON. Both are read-only.
 
 ```console
-$ ./pocket-librarian query findings --pretty
+$ ./deskkit query findings --pretty
 findings: 3
 
 R1 (1)
@@ -139,7 +139,7 @@ R3 (1)
 `findings`, `summary`, `adoption` are the available kinds):
 
 ```console
-$ ./pocket-librarian query summary
+$ ./deskkit query summary
 {"kind":"summary","files_total":4,"files_by_dir_kind":{"analyses":1,"journal":1,"root":1,"tasks":1},"open_findings_total":3,"open_findings_by_rule":{"R1":1,"R2":1,"R3":1},"open_findings_by_severity":{"mechanical":3}}
 ```
 
@@ -150,7 +150,7 @@ each mechanical fix and records the file's original content to the `revisions` t
 undo exists *before* any change does.
 
 ```console
-$ ./pocket-librarian propose-fix --run patrol-20260717T171143Z
+$ ./deskkit propose-fix --run patrol-20260717T171143Z
 {
   "run_id": "patrol-20260717T171143Z",
   "proposed": [
@@ -173,7 +173,7 @@ autonomous writes only happen when `LIBRARIAN_AUTONOMOUS_WRITES=true`; the super
 below is the human-driven path.)
 
 ```console
-$ ./pocket-librarian apply-fix --run patrol-20260717T171143Z
+$ ./deskkit apply-fix --run patrol-20260717T171143Z
 {
   "run_id": "patrol-20260717T171143Z",
   "outcomes": [
@@ -210,7 +210,7 @@ Wire up the ingest path for the new data surface.
 Open findings are now zero, and one `adoption_log` row records the run:
 
 ```console
-$ ./pocket-librarian query adoption
+$ ./deskkit query adoption
 {"kind":"adoption","count":1,"rows":[{"date":"2026-07-17","event":"fix","detail":"run patrol-20260717T171143Z: applied=3"}]}
 ```
 
@@ -220,13 +220,13 @@ Every applied fix reverses to the exact recorded original. `restore` is **CLI-on
 exposed over MCP) — reversal is a human decision. Restore by the *original* path:
 
 ```console
-$ ./pocket-librarian restore --by-path tasks/wire-up-ingest.md
+$ ./deskkit restore --by-path tasks/wire-up-ingest.md
 { "revision_id": "…", "path": "tasks/wire-up-ingest.md", "restored": true, "reopened": true }
 
-$ ./pocket-librarian restore --by-path journal/kickoff-notes.md
+$ ./deskkit restore --by-path journal/kickoff-notes.md
 { "revision_id": "…", "path": "journal/kickoff-notes.md", "restored": true, "reopened": true }
 
-$ ./pocket-librarian restore --by-path analyses/backlog-triage.md
+$ ./deskkit restore --by-path analyses/backlog-triage.md
 { "revision_id": "…", "path": "analyses/backlog-triage.md", "restored": true, "reopened": true }
 ```
 
@@ -249,14 +249,14 @@ Every hash matches its original above. Restore also **reopens** the findings it 
 the next `patrol` sees the same violations again:
 
 ```console
-$ ./pocket-librarian query summary
+$ ./deskkit query summary
 {"kind":"summary","files_total":4,"files_by_dir_kind":{"analyses":1,"journal":1,"root":1,"tasks":1},"open_findings_total":3,"open_findings_by_rule":{"R1":1,"R2":1,"R3":1},"open_findings_by_severity":{"mechanical":3}}
 ```
 
 `restore` fails loud when there is nothing to reverse — it never guesses:
 
 ```console
-$ ./pocket-librarian restore --by-path does/not/exist.md; echo "exit=$?"
+$ ./deskkit restore --by-path does/not/exist.md; echo "exit=$?"
 Error: restore: no applied, unrestored revision for path does/not/exist.md
 exit=1
 ```
@@ -274,8 +274,8 @@ guide** because they require a live API key:
 
 ```bash
 export ANTHROPIC_API_KEY=sk-...
-./pocket-librarian agent "patrol the desk and summarize what you find"
-./pocket-librarian chat    # full-screen TUI on a terminal, line REPL when piped or --plain
+./deskkit agent "patrol the desk and summarize what you find"
+./deskkit chat    # full-screen TUI on a terminal, line REPL when piped or --plain
 ```
 
 Provider selection, key redirection via `secrets_ref.llm_api_key`, history bounds, and the

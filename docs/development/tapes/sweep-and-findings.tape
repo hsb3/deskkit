@@ -2,7 +2,7 @@
 # Regenerate: bash scripts/record-media.sh (never hand-edit the GIF).
 Output docs/media/sweep-and-findings.gif
 
-Require pocket-librarian
+Require deskkit
 
 Set Shell "bash"
 Set FontSize 14
@@ -31,19 +31,19 @@ Enter
 Sleep 500ms
 Type "export DESK_NAME=example-desk" Enter
 Sleep 700ms
-Type "pocket-librarian sweep" Enter
+Type "deskkit sweep" Enter
 Sleep 2200ms
 
 # A hidden patrol pass gives `query findings` real content to show — findings/orphans are
 # populated by patrol, not sweep — without pulling `patrol` into the command sequence this
 # tape is actually teaching (that's patrol.tape's job).
 Hide
-Type "pocket-librarian patrol > /dev/null 2>&1" Enter
+Type "deskkit patrol > /dev/null 2>&1" Enter
 Sleep 400ms
 Type "clear" Enter
 Show
 
-Type "pocket-librarian query findings --pretty" Enter
+Type "deskkit query findings --pretty" Enter
 Sleep 2200ms
-Type "pocket-librarian query orphans --pretty" Enter
+Type "deskkit query orphans --pretty" Enter
 Sleep 2200ms

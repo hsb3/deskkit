@@ -1,4 +1,4 @@
-# pocket-librarian — task interface. `make help` lists targets.
+# deskkit — task interface. `make help` lists targets.
 #
 # Single-writer rule (spec §2.7): the one-shot subcommands (sweep, patrol, propose-fix,
 # findings/summary/adoption/orphans/uncollapsed, and the supervised `apply-fix` CLI) open
@@ -7,20 +7,20 @@
 # its own throwaway XDG store home + scratch desk) and is safe to run at any time.
 #
 # Store location (ADR 0002 §2): with no --dir, every command below resolves its store to
-# $XDG_DATA_HOME/pocket-librarian/<DESK_NAME>/ (fallback ~/.local/share/...). These targets
+# $XDG_DATA_HOME/deskkit/<DESK_NAME>/ (fallback ~/.local/share/...). These targets
 # pass no --dir, so they use that canonical per-desk home and require DESK_NAME to be
 # resolvable (env / walk-up .env / the desk's _knowledge/profile.*).
 #
 # `apply-fix` is deliberately NOT a Makefile target (spec §9.5): committing a fix to the
 # REAL desk is supervised-only, run by hand as
-#   ./pocket-librarian apply-fix --run <run_id>
+#   ./deskkit apply-fix --run <run_id>
 # (optionally under sandbox-exec — see sandbox/README.md). The throwaway-copy write path
 # (propose-fix -> apply-fix) is exercised only inside `verify`.
 .DEFAULT_GOAL := help
 SHELL := /bin/bash
 
-BIN     := pocket-librarian
-PIDFILE := .pocket-librarian.pid
+BIN     := deskkit
+PIDFILE := .deskkit.pid
 LOGFILE := serve.log
 
 # Install location. Mirrors install.sh's default (~/.local/bin — no root needed); override with
@@ -29,7 +29,7 @@ PREFIX  ?= $(HOME)/.local
 BINDIR  := $(PREFIX)/bin
 
 # Version stamp: the single source of truth is the repo-root VERSION file. The build target
-# passes it to the binary via `-ldflags -X main.version=<VERSION>` so `pocket-librarian
+# passes it to the binary via `-ldflags -X main.version=<VERSION>` so `deskkit
 # --version` reports the release (a bare `go build ./...` leaves the default "dev"). The
 # release workflow stamps the same way for cross-compiled artifacts.
 VERSION  := $(shell cat ../VERSION 2>/dev/null || echo dev)
@@ -42,8 +42,8 @@ help: ## List targets
 	@grep -hE '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) \
 	  | awk -F':.*?## ' '{printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}'
 
-build: ## Build the pocket-librarian binary (./pocket-librarian), version-stamped from ../VERSION
-	@go build -ldflags "$(LDFLAGS)" -o $(BIN) ./cmd/pocket-librarian
+build: ## Build the deskkit binary (./deskkit), version-stamped from ../VERSION
+	@go build -ldflags "$(LDFLAGS)" -o $(BIN) ./cmd/deskkit
 
 install: build ## Install the version-stamped binary to $(PREFIX)/bin (default ~/.local/bin; override PREFIX=...)
 	@mkdir -p "$(BINDIR)"
@@ -103,7 +103,7 @@ clean: stop ## Stop serve + remove build artifacts (binary, pidfile, serve log)
 	@rm -rf $(BIN) $(PIDFILE) $(LOGFILE)
 	@rm -rf pb_data  # legacy cwd-relative store from pre-ADR-0002 checkouts, if any lingers
 	@echo "cleaned: binary, pidfile, serve log (+ any legacy ./pb_data)"
-	@echo "note: the canonical per-desk store lives at \$$XDG_DATA_HOME/pocket-librarian/<DESK_NAME>/"
+	@echo "note: the canonical per-desk store lives at \$$XDG_DATA_HOME/deskkit/<DESK_NAME>/"
 	@echo "      (fallback ~/.local/share/...); it is persistent and NOT removed by clean — rm it by hand."
 
 test: ## go test ./...

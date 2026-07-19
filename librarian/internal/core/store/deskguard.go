@@ -19,7 +19,7 @@ var deskCarryingCollections = []string{"files", "patrol_log", "adoption_log"}
 // opens the DB before any RunE); it refuses to PROCEED, which is the enforceable boundary.
 //
 // `migrate` deliberately does NOT call this: it is schema-only and writes no desk rows, so a
-// migrate against a store belonging to another desk is harmless (see cmd/pocket-librarian).
+// migrate against a store belonging to another desk is harmless (see cmd/deskkit).
 func CheckDeskGuard(app core.App, deskName string) error {
 	for _, coll := range deskCarryingCollections {
 		rec, err := app.FindFirstRecordByFilter(coll, "id != ''")

@@ -1,4 +1,4 @@
-_Index of Architecture Decision Records for pocket-librarian._
+_Index of Architecture Decision Records for deskkit._
 Status: active
 
 # Decision records

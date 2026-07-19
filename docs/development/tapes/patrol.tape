@@ -2,7 +2,7 @@
 # Regenerate: bash scripts/record-media.sh (never hand-edit the GIF).
 Output docs/media/patrol.gif
 
-Require pocket-librarian
+Require deskkit
 
 Set Shell "bash"
 Set FontSize 14
@@ -30,7 +30,7 @@ Enter
 Sleep 500ms
 Type "export DESK_NAME=example-desk" Enter
 Sleep 700ms
-Type "pocket-librarian patrol" Enter
+Type "deskkit patrol" Enter
 Sleep 2200ms
-Type "pocket-librarian query findings --pretty" Enter
+Type "deskkit query findings --pretty" Enter
 Sleep 2500ms

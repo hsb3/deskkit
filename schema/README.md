@@ -5,7 +5,7 @@ Status: active
 # schema/
 
 **What schema v1 is.** One shared, product-neutral schema both the desk-standard plugin
-and the pocket-librarian binary read as their single rule/structure source
+and the deskkit binary read as their single rule/structure source
 (`_meta/build-brief.md` §3.3(a); `_structure/decisions/0013` item 8). It is the seed of
 a single estate-wide schema (`0013` item 4).
 

@@ -6,7 +6,7 @@
 # self-contained: it builds the librarian, seeds a handful of throwaway scratch desks (one per
 # tape, isolated from each other so no tape's writes can bleed into another's demo), points
 # EVERY store-touching invocation at a scratch XDG_DATA_HOME + HOME so nothing can ever touch
-# the operator's real ~/.local/share/pocket-librarian, pre-runs whatever setup each tape's demo
+# the operator's real ~/.local/share/deskkit, pre-runs whatever setup each tape's demo
 # assumes already happened (migrate/sweep/patrol), then drives `vhs` over each tape (sources in
 # docs/development/tapes/), writing the GIFs to docs/media/ (each tape's `Output docs/media/*.gif`
 # path resolves from the repo root). Idempotent: every run starts from a fresh scratch tree and leaves
@@ -16,7 +16,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 LIB_DIR="$REPO_ROOT/librarian"
-BIN="$LIB_DIR/pocket-librarian"
+BIN="$LIB_DIR/deskkit"
 MEDIA_DIR="$REPO_ROOT/docs/media"
 
 log() { printf 'record-media: %s\n' "$1"; }
@@ -24,7 +24,7 @@ log() { printf 'record-media: %s\n' "$1"; }
 command -v vhs >/dev/null 2>&1 || { echo "record-media: vhs not found on PATH (brew install vhs)" >&2; exit 1; }
 command -v ttyd >/dev/null 2>&1 || { echo "record-media: ttyd not found on PATH (brew install ttyd)" >&2; exit 1; }
 
-log "building pocket-librarian..."
+log "building deskkit..."
 make -C "$LIB_DIR" build
 
 # --- scratch setup ---------------------------------------------------------------------------
@@ -32,7 +32,7 @@ make -C "$LIB_DIR" build
 # sandbox's $TMPDIR can embed session-specific path components (repo/session identifiers) that
 # would otherwise get typed into a permanent recording. /tmp is stable and identity-neutral on
 # both macOS and Linux.
-SCRATCH=$(mktemp -d "/tmp/pocket-librarian-media.XXXXXX")
+SCRATCH=$(mktemp -d "/tmp/deskkit-media.XXXXXX")
 cleanup() {
   chmod -R u+w "$SCRATCH" 2>/dev/null || true
   rm -rf "$SCRATCH"
@@ -40,15 +40,15 @@ cleanup() {
 trap cleanup EXIT INT TERM
 
 # Scratch HOME + a default scratch XDG_DATA_HOME, exported for the WHOLE script (every child
-# process, including every `vhs`/pocket-librarian invocation below, inherits these) so no
-# recording can ever resolve its store to the operator's real ~/.local/share/pocket-librarian.
+# process, including every `vhs`/deskkit invocation below, inherits these) so no
+# recording can ever resolve its store to the operator's real ~/.local/share/deskkit.
 # Each desk below still gets its OWN XDG_DATA_HOME override (one store per tape).
 export HOME="$SCRATCH/home"
 mkdir -p "$HOME"
 export XDG_DATA_HOME="$SCRATCH/xdg-default"
 mkdir -p "$XDG_DATA_HOME"
 
-# pocket-librarian on $PATH as a bare command — both for `Require pocket-librarian` (checked by
+# deskkit on $PATH as a bare command — both for `Require deskkit` (checked by
 # vhs itself before it opens a shell) and so no tape needs to know the repo's on-disk layout.
 export PATH="$LIB_DIR:$PATH"
 
@@ -145,7 +145,7 @@ mkdir -p "$DESK_GUARD" "$XDG_GUARD"
 seed_decision "$DESK_GUARD/_structure/decisions/0001-example-decision.md"
 run_lib "$DESK_GUARD" "$XDG_GUARD" example-desk migrate up > /dev/null
 run_lib "$DESK_GUARD" "$XDG_GUARD" example-desk sweep > /dev/null
-STORE_ONE="$XDG_GUARD/pocket-librarian/example-desk"
+STORE_ONE="$XDG_GUARD/deskkit/example-desk"
 
 # --- desk E: chat.tape -----------------------------------------------------------------------
 # The only demo whose live step (the model's own `sweep` tool call, mid-conversation) needs a

@@ -5,7 +5,7 @@ Status: active
 # Documentation
 
 Two products over one shared schema — the **plugin** (Claude Code plugin + MCP server) and the
-**librarian** (`pocket-librarian` Go binary). The docs are organized by what you're here to do.
+**librarian** (`deskkit` Go binary). The docs are organized by what you're here to do.
 
 ## Using it
 
