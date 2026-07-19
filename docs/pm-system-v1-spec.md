@@ -5,8 +5,8 @@ lives beside the librarian on the same single-binary PocketBase chassis, refuses
 transitions until the required documents exist and validate, and ships as a complementary
 plugin for the agent-facing surfaces._
 
-Status: draft
-Date: 2026-07-18
+Status: Delivered in v0.7.0 (epic #55, slices D1–D8) — frozen build contract, retained for provenance. The shipped code + tests are authoritative; see §12 (test traceability), CHANGELOG `[0.7.0]`, and ADRs 0002 / 0008.
+Date: 2026-07-18 (delivered 2026-07-19)
 
 ## Table of contents
 
@@ -722,8 +722,8 @@ distribution layer is separate (A2); only the data/runtime layer is unified (R5.
 - **`.mcp.json`** pointing at the binary's `pm` MCP surface (the same one-binary MCP server,
   exposing the PM tool family when `PM_ENABLED`).
 
-The plugin is registered in `.claude-plugin/marketplace.json` as a second entry (`desk-pm` or
-similar; final name at build time), following the existing `desk-standard` plugin's structure
+The plugin is registered in `.claude-plugin/marketplace.json` as a second entry (shipped as
+`desk-pm`), following the existing `desk-standard` plugin's structure
 (`plugin/` TS lane, `claude-plugin/` bundle).
 
 ### 6.2 Identity neutrality (R5.3)
@@ -954,6 +954,14 @@ sort determinism (issue #71).
 
 Where the requirements left a genuine design choice, this spec makes a concrete one. Each is
 flagged here for the foreman/owner to review; none is claimed as ruled.
+
+> **As shipped (v0.7.0, 2026-07-19):** every choice below shipped as-drafted — as the default
+> or seed, not as a ruling. Item 1 (binary rename) shipped as slice **D2b** (#62), and the
+> companion plugin (§6.1) shipped under the name **`desk-pm`**, resolving the "final name at
+> build time" note. The **seeded default `desk_config` gate rules** (item 3 / §4.2) and the
+> **default `status_label` vocabulary** (item 2) remain explicitly re-rulable by the owner from
+> the exec desk — see `docs/pm-guide.md` and CHANGELOG `[0.7.0]`. Shipping a default did not
+> convert it into a binding decision.
 
 1. **Binary/chassis rename — approved, and sequenced OUT of D2.** The owner has approved
    renaming the unified binary to `deskkit` (it now serves two modules; a librarian-named binary
