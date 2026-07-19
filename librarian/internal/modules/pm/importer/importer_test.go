@@ -158,6 +158,10 @@ func TestImport_RejectsBadManifest(t *testing.T) {
 			Deps:  []ManifestDep{{From: "a", To: "ghost", Kind: "blocks", UnblockAt: "work", Cascade: "auto"}},
 		}},
 		{"empty key", Manifest{Items: []ManifestItem{{Title: "no key"}}}},
+		{"parent cycle", Manifest{Items: []ManifestItem{
+			{Key: "a", Title: "A", Parent: "b"},
+			{Key: "b", Title: "B", Parent: "a"},
+		}}},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

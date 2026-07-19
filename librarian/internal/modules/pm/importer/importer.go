@@ -210,7 +210,10 @@ func e_createDep(ctx context.Context, eng *engine.Engine, d ManifestDep, ids map
 	existing, ferr := eng.App.FindRecordsByFilter("dependencies",
 		"from = {:f} && to = {:t} && kind = {:k}", "", 1, 0,
 		map[string]any{"f": fromID, "t": toID, "k": kind})
-	if ferr == nil && len(existing) > 0 {
+	if ferr != nil {
+		return false, fmt.Errorf("importer: check dep existence %s->%s: %w", d.From, d.To, ferr)
+	}
+	if len(existing) > 0 {
 		return true, nil
 	}
 	if _, err := eng.Link(ctx, engine.LinkInput{
@@ -305,8 +308,14 @@ func GraphSnapshot(ctx context.Context, eng *engine.Engine) (Snapshot, error) {
 	return snap, nil
 }
 
-// Canonical renders a Snapshot as stable JSON — the exact bytes two rebuilds must match.
+// Canonical renders a Snapshot as stable JSON — the exact bytes two rebuilds must match. A
+// marshal failure panics rather than returning "": two empty strings would compare equal and
+// turn the §10.8 reproducibility assertion into a silent false-pass. This is a test oracle, so
+// a panic is the right failure mode.
 func (s Snapshot) Canonical() string {
-	b, _ := json.MarshalIndent(s, "", "  ")
+	b, err := json.MarshalIndent(s, "", "  ")
+	if err != nil {
+		panic("importer: Canonical: " + err.Error())
+	}
 	return string(b)
 }

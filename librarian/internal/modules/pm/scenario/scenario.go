@@ -209,11 +209,26 @@ func (r *Runner) dispatch(ctx context.Context, step Step) error {
 	a := r.actor(step)
 	switch step.Op {
 	case Link:
-		return r.surface.Link(ctx, r.ids[step.From], r.ids[step.LinkTo], step.Kind, step.UnblockAt, step.Cascade, a)
+		from, fok := r.ids[step.From]
+		to, tok := r.ids[step.LinkTo]
+		if !fok {
+			return fmt.Errorf("scenario: unbound key %q (From)", step.From)
+		}
+		if !tok {
+			return fmt.Errorf("scenario: unbound key %q (LinkTo)", step.LinkTo)
+		}
+		return r.surface.Link(ctx, from, to, step.Kind, step.UnblockAt, step.Cascade, a)
 	case AddNote:
-		return r.surface.AddNote(ctx, r.ids[step.Item], step.NoteKey, step.NoteBody, a)
+		id, ok := r.ids[step.Item]
+		if !ok {
+			return fmt.Errorf("scenario: unbound key %q", step.Item)
+		}
+		return r.surface.AddNote(ctx, id, step.NoteKey, step.NoteBody, a)
 	}
-	id := r.ids[step.Item]
+	id, ok := r.ids[step.Item]
+	if !ok {
+		return fmt.Errorf("scenario: unbound key %q", step.Item)
+	}
 	version := r.version(id)
 	if step.StaleVersion != nil {
 		version = *step.StaleVersion
@@ -326,9 +341,11 @@ type docStub struct{ verdicts map[string]schema.Verdict }
 func newDocStub() *docStub { return &docStub{verdicts: map[string]schema.Verdict{}} }
 
 func (d *docStub) set(pointer, status string, valid bool) {
-	satisfied := valid // Satisfied is recomputed per-requirement below; store the raw signal
+	// Satisfied is intentionally left zero: Verdict recomputes it per-requirement below (it
+	// depends on the gate's RequiredStatus, which set() cannot know), so storing a value here
+	// would be dead and misleading.
 	d.verdicts[pointer] = schema.Verdict{
-		Exists: true, FrontmatterValid: valid, Status: status, Satisfied: satisfied,
+		Exists: true, FrontmatterValid: valid, Status: status,
 	}
 }
 
