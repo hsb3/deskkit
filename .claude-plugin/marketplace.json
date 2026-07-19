@@ -9,7 +9,7 @@
       "name": "desk-standard",
       "source": "./plugin/claude-plugin",
       "description": "Profile-driven repo conventions: knowledge indexing, template rendering, and schema validation over a shared MCP tool surface, plus the desk-setup / conventions-standard / harvest-loop / brownfield-adoption skills. Personalize via _knowledge/profile.yaml, never by editing shipped definitions.",
-      "version": "0.6.0",
+      "version": "0.7.0",
       "author": {
         "name": "Henry Burden"
       }
@@ -18,7 +18,7 @@
       "name": "desk-pm",
       "source": "./plugin/desk-pm",
       "description": "The desk work graph as an agent surface: a session-open cold-start briefing, gated item advancement, and triage skills plus a PM-operator agent over the deskkit binary's PM MCP tools. Complements desk-standard; feature-gated behind PM_ENABLED. Personalize via the desk profile and desk_config, never by editing shipped definitions.",
-      "version": "0.6.0",
+      "version": "0.7.0",
       "author": {
         "name": "Henry Burden"
       }
