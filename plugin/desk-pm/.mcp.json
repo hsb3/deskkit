@@ -1,0 +1,9 @@
+{
+  "desk-pm": {
+    "command": "deskkit",
+    "args": ["mcp-serve"],
+    "env": {
+      "PM_ENABLED": "true"
+    }
+  }
+}

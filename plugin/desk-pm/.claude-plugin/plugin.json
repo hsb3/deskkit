@@ -1,0 +1,5 @@
+{
+  "name": "desk-pm",
+  "version": "0.6.0",
+  "description": "The desk work graph as an agent surface: session-open briefing, gated item advancement, and triage skills plus a PM-operator agent over the deskkit binary's PM MCP tools (get_context, list_items, transition_item, ...). Feature-gated behind PM_ENABLED; personalize via the desk profile and desk_config, never by editing shipped definitions."
+}
