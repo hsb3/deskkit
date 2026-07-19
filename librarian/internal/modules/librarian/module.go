@@ -6,6 +6,10 @@ package librarian
 
 import (
 	"context"
+	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
 
 	"github.com/pocketbase/pocketbase/core"
 
@@ -14,6 +18,7 @@ import (
 	"github.com/example/pocket-librarian/internal/core/module"
 	"github.com/example/pocket-librarian/internal/core/schema"
 	"github.com/example/pocket-librarian/internal/core/toolcore"
+	"github.com/example/pocket-librarian/internal/modules/librarian/desklib"
 	"github.com/example/pocket-librarian/internal/modules/librarian/tools"
 	"github.com/example/pocket-librarian/internal/modules/librarian/trigger"
 )
@@ -21,8 +26,16 @@ import (
 // New constructs the librarian module.
 func New() module.Module { return &Mod{} }
 
-// Mod implements module.Module + schema.DocumentValidator.
-type Mod struct{}
+// Mod implements module.Module + schema.DocumentValidator + schema.FrontmatterReader (and
+// module.Configurable to receive the resolved config the validator needs).
+type Mod struct {
+	cfg *config.Config // injected by module.Register via Configure; nil until then
+}
+
+// Configure implements module.Configurable: module.Register injects the resolved config so
+// Verdict can resolve document pointers against DESK_ROOT. cfg may be nil (config.Load
+// failed); Verdict fails closed on that.
+func (m *Mod) Configure(cfg *config.Config) { m.cfg = cfg }
 
 func (*Mod) Name() string { return "librarian" }
 
@@ -74,17 +87,105 @@ func (*Mod) RegisterHooks(app core.App, cfg *config.Config) error {
 	return trigger.RegisterCron(app, cfg)
 }
 
-// Verdict implements schema.DocumentValidator. D2 defines the seam only (§2.5) — no gate
-// consumes it yet, and the schema.DocumentValidator interface takes no app/store handle (that
-// wiring is D3's gate-engine concern: it will capture the real app at registration time). A
-// real existence + frontmatter-validity check against the `files` collection requires that
-// handle, so building one now would mean inventing untested plumbing nothing exercises. Kept
-// deliberately minimal and honest per the design brief ("do NOT over-build"): it returns an
-// explicit not-yet-wired verdict so a D3 caller sees a clear, unambiguous signal rather than a
-// silently-wrong answer.
-func (*Mod) Verdict(_ context.Context, pointer string, _ schema.ArtifactRequirement) (schema.Verdict, error) {
-	return schema.Verdict{
-		Exists:  false,
-		Missing: []string{"librarian.Verdict is not yet wired to a store handle (D2 seam-only; D3 completes gate use) for pointer " + pointer},
-	}, nil
+// Verdict implements schema.DocumentValidator (spec §2.5, §4.4): a document is "filled" for a
+// gate when it EXISTS at the pointer, its FRONTMATTER VALIDATES against schema v1 for the
+// required type, and it carries the REQUIRED STATUS. The verdict is produced by the same
+// engine family the patrol rules use — a direct desk-file read (DESK_ROOT-resolved pointer) +
+// desklib.ParseFrontmatter + the core/schema doctypes vocabulary — NOT a `files`-collection
+// lookup, so a verdict never depends on sweep freshness and needs no store handle (the gate
+// engine's own store handle covers the PM collections; documents are files). Fails closed on
+// unresolved config and on non-file pointers (a URL pointer can never satisfy a document gate).
+func (m *Mod) Verdict(_ context.Context, pointer string, req schema.ArtifactRequirement) (schema.Verdict, error) {
+	v := schema.Verdict{}
+	fail := func(reason string) (schema.Verdict, error) {
+		v.Missing = append(v.Missing, reason)
+		return v, nil
+	}
+	if m.cfg == nil || m.cfg.DeskRoot == "" {
+		return fail("document validator has no resolved desk config (DESK_ROOT); cannot verify " + pointer)
+	}
+	if pointer == "" {
+		return fail(fmt.Sprintf("no document pointer set; a document (type=%s) is required", req.Type))
+	}
+	if strings.Contains(pointer, "://") {
+		return fail(fmt.Sprintf("pointer %q is not a desk file; a document gate needs a file path", pointer))
+	}
+	abs, ok := m.resolveDeskPath(pointer)
+	if !ok {
+		return fail(fmt.Sprintf("pointer %q resolves outside the desk root; a document gate reads desk files only", pointer))
+	}
+	b, err := os.ReadFile(abs)
+	if err != nil {
+		return fail(fmt.Sprintf("required document (type=%s) at %q does not exist", req.Type, pointer))
+	}
+	v.Exists = true
+
+	fm := desklib.ParseFrontmatter(string(b))
+	if len(fm) == 0 {
+		return fail(fmt.Sprintf("required document at %q has no valid frontmatter", pointer))
+	}
+	vocab, verr := schema.Vocab()
+	if verr != nil {
+		return schema.Verdict{}, verr // embedded-vocabulary parse failure is a build defect
+	}
+	docType, _ := fm["type"].(string)
+	reasons := []string{}
+	if docType != req.Type {
+		reasons = append(reasons, fmt.Sprintf(
+			"document at %q has type %q, gate requires type %q", pointer, docType, req.Type))
+	}
+	reasons = append(reasons, vocab.ValidateFrontmatter(fm, req.Type)...)
+	if len(reasons) == 0 {
+		v.FrontmatterValid = true
+	} else {
+		for _, r := range reasons {
+			v.Missing = append(v.Missing, r)
+		}
+	}
+	v.Status, _ = fm["status"].(string)
+
+	statusOK := req.RequiredStatus == "" || v.Status == req.RequiredStatus
+	if !statusOK {
+		v.Missing = append(v.Missing, fmt.Sprintf(
+			"required document (type=%s, status=%s) at %q is at status %q, needs %q",
+			req.Type, req.RequiredStatus, pointer, v.Status, req.RequiredStatus))
+	}
+	v.Satisfied = v.Exists && v.FrontmatterValid && statusOK
+	return v, nil
+}
+
+// Frontmatter implements schema.FrontmatterReader (spec §4.2 trait predicates): returns the
+// parsed frontmatter of the pointed desk file, resolved the same way Verdict resolves
+// pointers. A missing/unreadable/frontmatter-less file returns an empty map (the trait simply
+// does not match), never an error the gate engine would have to interpret.
+func (m *Mod) Frontmatter(_ context.Context, pointer string) (map[string]any, error) {
+	if m.cfg == nil || m.cfg.DeskRoot == "" || pointer == "" || strings.Contains(pointer, "://") {
+		return map[string]any{}, nil
+	}
+	abs, ok := m.resolveDeskPath(pointer)
+	if !ok {
+		return map[string]any{}, nil
+	}
+	b, err := os.ReadFile(abs)
+	if err != nil {
+		return map[string]any{}, nil
+	}
+	return desklib.ParseFrontmatter(string(b)), nil
+}
+
+// resolveDeskPath resolves a document pointer against DESK_ROOT and CONTAINS it there: a
+// relative pointer joins the root, an absolute pointer is accepted only if already inside the
+// root, and any `..` traversal escaping the root is refused (a gate whose purpose is document
+// provenance must not read arbitrary filesystem paths).
+func (m *Mod) resolveDeskPath(pointer string) (string, bool) {
+	root := filepath.Clean(m.cfg.DeskRoot)
+	abs := pointer
+	if !filepath.IsAbs(abs) {
+		abs = filepath.Join(root, pointer)
+	}
+	abs = filepath.Clean(abs)
+	if abs != root && !strings.HasPrefix(abs, root+string(filepath.Separator)) {
+		return "", false
+	}
+	return abs, true
 }

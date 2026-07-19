@@ -40,6 +40,15 @@ type Registry struct {
 	Validator schema.DocumentValidator
 }
 
+// Configurable is the optional interface a module implements to receive the resolved config at
+// registration time (D3): the librarian's DocumentValidator needs DeskRoot to resolve document
+// pointers, and modules are constructed in main before config is threaded anywhere else. cfg
+// may be nil (main registers modules even when config.Load failed); implementations must fail
+// closed on a nil config, never panic.
+type Configurable interface {
+	Configure(cfg *config.Config)
+}
+
 // Register wires the enabled subset of mods into the app: filters by Enabled(cfg), asserts no
 // owned-collection collision across the enabled set, merges each enabled module's tools into
 // toolcore, captures a schema.DocumentValidator if a module implements it, and registers each
@@ -63,6 +72,9 @@ func Register(cfg *config.Config, mods ...Module) (*Registry, error) {
 
 	reg := &Registry{Enabled: enabled}
 	for _, mod := range enabled {
+		if c, ok := mod.(Configurable); ok {
+			c.Configure(cfg)
+		}
 		toolcore.Register(mod.Tools()...)
 		if v, ok := mod.(schema.DocumentValidator); ok {
 			// The librarian module is the base module and always enabled, so the first (and in

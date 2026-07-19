@@ -1,0 +1,92 @@
+# schema v1 — the doc-type dimension (companion to profile.schema.yaml).
+#
+# WHAT THIS IS. The frontmatter data model for the SOP kits (kits/, #49): every doc `type` a
+# filled kit emits, its status family, and its required/optional type-specific fields. It is the
+# product-neutral successor of the origin vault's schema.yaml `types:` block (desk decision
+# 0013 items 4 + 8 — the seed of one estate-wide schema). The vault copy is frozen; this file is
+# now the source of truth for the kit contract (see docs/decisions/0006-kit-port-schema-reconciliation.md).
+#
+# STATUS OF CONSUMPTION. This is the CONTRACT as data. The runtime validation ENGINE that reads
+# it (schema-conforming-document gates) is the PM-system build's job (#55 D2/D3), NOT this port —
+# porting the kits requires their contract to live in the repo, but wiring enforcement does not.
+#
+# REFINEMENTS vs the vault (flagged, not silently forked — owner intent on #49). Marked inline
+# with `# REFINEMENT:`. The reconciliation dispositions table is ADR 0006.
+
+# Required on every doc (status is optional on `lightweight` types — see below).
+universal: [type, status, created, updated, tags]
+
+# Value-format checks for fields, wherever they appear.
+formats:
+  created: date          # YYYY-MM-DD
+  updated: date          # YYYY-MM-DD
+  tags: kebab-array      # array of lowercase a-z0-9- tokens
+
+# Reusable value enums.
+enums:
+  priority: [P0, P1, P2, P3]
+  workstream: [product, engineering, pm]
+  entity_type: [person, company, technology, product, service]
+
+# Which enum governs which field (scalar or array-of).
+fieldEnums:
+  priority: priority
+  affects_workstreams: workstream
+  entity_type: entity_type
+
+# Allowed `status` values per family. Each type points at one family.
+status:
+  spec:      [draft, in-review, approved, building, shipped, shelved]
+  reference: [draft, in-review, approved, archived]
+  decision:  [proposed, accepted, rejected, superseded]
+  cadence:   [draft, published]
+  project:   [active, paused, completed, archived]
+  meta:      [final]
+
+# Every known `type`: its status family + required / optional type-specific fields.
+# `lightweight: true` means universal fields only (status optional) and a freeform body.
+types:
+  # ── carried verbatim from the vault (kits port their existing contract) ──
+  project-brief:      { status: reference, required: [author, owner] }
+  one-pager:          { status: spec,      required: [author, owner, target_ship_date] }
+  product-spec:       { status: spec,      required: [author, parent_one_pager, decomposes_to] }
+  feature-spec:       { status: spec,      required: [author, parent_product_spec, priority] }
+  engineering-spec:   { status: spec,      required: [author, parent_product_spec, priority, definition_of_done, test_plan_link], optional: [parent_feature_spec] }
+  test-plan:          { status: spec,      required: [author, priority, parent_engineering_spec] }
+  sow:                { status: spec,      required: [author, owner], optional: [commissioned_by, target_ship_date] }
+  technical-design:   { status: spec,      required: [author, priority, affects_workstreams], optional: [superseded_by] }
+  decision:           { status: decision,  required: [decided_by, affects_workstreams], optional: [superseded_by] }
+  research-synthesis: { status: reference, required: [author, affects_workstreams], optional: [commissioned_by] }
+  user-journey:       { status: reference, required: [author, persona, related_product_specs] }
+  weekly-checkin:     { status: cadence,   required: [week_of] }
+  retro:              { status: cadence,   required: [period_covered] }
+  project:            { status: project, required: [owner], optional: [code_repo_local, code_repo_remote] }  # carried; no kit (uses the `project` status family) — see ADR 0006
+  journal:    { lightweight: true }   # emitted by the daily-note kit
+  task:       { lightweight: true }
+  idea:       { lightweight: true }
+  user-story: { lightweight: true }
+  mockup:     { lightweight: true }
+  entity:     { status: reference, required: [entity_type] }
+  readme:      { status: meta }
+  conventions: { status: meta }
+  model:       { status: meta }
+  home:        { status: meta }
+  sop:         { status: meta }
+  schema:      { status: meta }
+
+  # ── ADDED so every ported kit maps to a schema entry (#49 D3 gaps). Status families are a
+  #    REFINEMENT: the vault kits carried these types but the vault schema `types:` never
+  #    classified them. Families/fields below are derived from each kit's template frontmatter. ──
+  analysis:       { status: reference, required: [author], optional: [conclusion] }              # REFINEMENT: new type + family
+  meeting-notes:  { status: reference, required: [meeting_date, attendees] }                     # REFINEMENT: new type + family
+  raid:           { status: reference, required: [author, owner] }                               # REFINEMENT: new type + family
+  release-notes:  { status: cadence,   required: [version] }                                     # REFINEMENT: new type + family (composite kit)
+  roadmap:        { status: reference, required: [author, owner] }                               # REFINEMENT: new type + family
+  runbook:        { status: reference, required: [author, owner] }                               # REFINEMENT: new type + family
+  ux-spec:        { status: spec,      required: [author, parent_product_spec] }                 # REFINEMENT: new type + family
+
+# DELIBERATELY EXCLUDED (kit-only, not canonical types). The `user-defined` kit ships loose
+# project-flavored stubs (types `meeting`, `note`, plus `decision`/`task` variants) that use
+# statuses OUTSIDE the families above (`scheduled`, `backlog`) and a lowercase `priority`
+# (`p2`) that violates the P0–P3 enum. They are nonstandard by design (a consumer's escape
+# hatch), so they are NOT added to canonical `types:`. See ADR 0006 for the full disposition.

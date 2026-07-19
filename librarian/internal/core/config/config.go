@@ -41,7 +41,8 @@ type Config struct {
 	LLMAPIKeyEnv        string        // secrets_ref.llm_api_key — NAME of the env var holding the LLM API key (profile indirection; empty falls back to the per-provider default var)
 	LLMMaxTokens        int           // LLM_MAX_TOKENS
 	AgentMaxStep        int           // AGENT_MAX_STEP
-	PMEnabled           bool          // PM_ENABLED (D2 feature gate; the pm module stays disabled by default)
+	PMEnabled           bool          // PM_ENABLED / profile modules.pm.enabled (spec §2.9; default off)
+	PMClaimTTL          time.Duration // PM_CLAIM_TTL — pm claim horizon (spec §3.6; default 30m)
 }
 
 // EntityDirMap returns the frontmatter-type -> configured-directory map the sweep/patrol
@@ -107,7 +108,11 @@ func Load() (*Config, error) {
 		LLMAPIKeyEnv: pick("LLM_API_KEY_ENV", ps("secrets_ref.llm_api_key"), ""),
 	}
 	c.AutonomousWrites = envBool("LIBRARIAN_AUTONOMOUS_WRITES", false)
-	c.PMEnabled = envBool("PM_ENABLED", false)
+	// PM feature gate (spec §2.9): env PM_ENABLED > profile modules.pm.enabled > default off.
+	// envBool keeps the env var's exact prior semantics (ParseBool, invalid falls through);
+	// profileScalar renders a YAML bool as "true"/"false", supplying the fallback default.
+	c.PMEnabled = envBool("PM_ENABLED", ps("modules.pm.enabled") == "true")
+	c.PMClaimTTL = envDuration("PM_CLAIM_TTL", 30*time.Minute)
 	c.LLMMaxTokens = envInt("LLM_MAX_TOKENS", 4096)
 	c.AgentMaxStep = envInt("AGENT_MAX_STEP", 12)
 	c.ClaimerPollInterval = envDuration("CLAIMER_POLL_INTERVAL", 5*time.Second)
