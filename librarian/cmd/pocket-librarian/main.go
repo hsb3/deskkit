@@ -1,8 +1,10 @@
 // Command pocket-librarian is the single Go binary that serves PocketBase, runs the agent
-// loop under `serve` (later slice), and exposes the six tools as CLI subcommands. This
+// loop under `serve` (later slice), and exposes the seven tools as CLI subcommands. This
 // spine wires: pocketbase.New(), migratecmd (automigrate), the blank-imported migrations,
 // first-run seeding (ignore boundary + system prompt) on serve, and the Cobra subcommands
-// routed through the tools seam. Tool bodies + the eino loop + MCP are later slices.
+// routed through the tools seam. Core + module wiring (spec §2.7): main builds the enabled
+// module set (librarian, always on; pm, disabled by default) via module.Register, which
+// merges each module's tools into the shared toolcore registry before any surface builds.
 package main
 
 import (
@@ -23,19 +25,27 @@ import (
 	"github.com/pocketbase/pocketbase/tools/osutils"
 	"github.com/spf13/cobra"
 
-	"github.com/example/pocket-librarian/internal/agent"
-	"github.com/example/pocket-librarian/internal/bootstrap"
-	"github.com/example/pocket-librarian/internal/config"
-	"github.com/example/pocket-librarian/internal/desklib"
-	"github.com/example/pocket-librarian/internal/mcp"
-	"github.com/example/pocket-librarian/internal/prompt"
-	"github.com/example/pocket-librarian/internal/setup"
-	"github.com/example/pocket-librarian/internal/tools"
-	"github.com/example/pocket-librarian/internal/trigger"
-	"github.com/example/pocket-librarian/internal/tui"
+	"github.com/example/pocket-librarian/internal/core/config"
+	"github.com/example/pocket-librarian/internal/core/mcp"
+	"github.com/example/pocket-librarian/internal/core/migrate"
+	"github.com/example/pocket-librarian/internal/core/module"
+	"github.com/example/pocket-librarian/internal/core/store"
+	"github.com/example/pocket-librarian/internal/modules/librarian/agent"
+	"github.com/example/pocket-librarian/internal/modules/librarian/desklib"
+	"github.com/example/pocket-librarian/internal/modules/librarian/prompt"
+	"github.com/example/pocket-librarian/internal/modules/librarian/setup"
+	"github.com/example/pocket-librarian/internal/modules/librarian/tools"
+	"github.com/example/pocket-librarian/internal/modules/librarian/trigger"
+	"github.com/example/pocket-librarian/internal/modules/librarian/tui"
 
-	// Blank-import registers all Go migrations (spec §4.11).
-	_ "github.com/example/pocket-librarian/migrations"
+	"github.com/example/pocket-librarian/internal/modules/librarian"
+	"github.com/example/pocket-librarian/internal/modules/pm"
+
+	// Blank-import registers the librarian's Go migrations (spec §4.11). The core-owned
+	// module_schema_versions meta migration self-registers via internal/core/migrate's own
+	// init() — that package is already imported normally above (for GuardDowngrade/
+	// StampModules), which is sufficient to run its init().
+	_ "github.com/example/pocket-librarian/internal/modules/librarian/collections"
 )
 
 // version is stamped at build time via ldflags (-X main.version=<VERSION>), wired from the
@@ -43,6 +53,11 @@ import (
 // leaves the default "dev", so `pocket-librarian --version` prints the real version only for
 // make/release builds.
 var version = "dev"
+
+// moduleReg holds the enabled module set (spec §2.7), populated once in main() by
+// module.Register before the app is constructed. OnServe (stamping + per-module hooks) and
+// requireConfig (stamping) both read it.
+var moduleReg *module.Registry
 
 func main() {
 	// `init` scaffolds a desk profile with filesystem writes ONLY: it needs neither resolved
@@ -84,7 +99,7 @@ func main() {
 			locErr = fmt.Errorf(
 				"cannot resolve the store location: %w; set DESK_NAME (env or _knowledge/profile.*) or pass --dir <path>",
 				cfgErr)
-		} else if dir, derr := config.StoreDir(cfg.DeskName); derr != nil {
+		} else if dir, derr := store.StoreDir(cfg.DeskName); derr != nil {
 			locErr = fmt.Errorf("cannot resolve the store location: %w; pass --dir <path>", derr)
 		} else {
 			defaultDataDir = dir
@@ -130,7 +145,7 @@ func main() {
 				// location (0700, matching the guard above) so the requested command can continue.
 				if newCfg, nerr := config.Load(); nerr == nil {
 					cfg, cfgErr = newCfg, nil
-					if dir, serr := config.StoreDir(cfg.DeskName); serr != nil {
+					if dir, serr := store.StoreDir(cfg.DeskName); serr != nil {
 						locErr = fmt.Errorf("cannot resolve the store location: %w; pass --dir <path>", serr)
 					} else if mkErr := os.MkdirAll(dir, 0o700); mkErr != nil {
 						locErr = fmt.Errorf("cannot create the store directory %s: %w; pass --dir <path>", dir, mkErr)
@@ -150,6 +165,19 @@ func main() {
 	// falls back to PocketBase's exe-relative pb_data, reached only when --dir is passed (and
 	// overrides it) or for non-store commands. DefaultDev mirrors pocketbase.New()'s go-run
 	// detection so `go run` still defaults to dev mode.
+	// Core + module wiring (spec §2.7): build the enabled module set and merge each module's
+	// tools into the shared toolcore registry BEFORE any surface (agent/mcp) builds and before
+	// the migration runner executes (RegisterProgrammatic wires any non-self-registered module
+	// migrations into PocketBase's global list). librarian is always enabled; pm is disabled
+	// unless PM_ENABLED. Safe with a nil cfg — Enabled tolerates it (librarian ignores cfg, pm
+	// treats nil as off). A registration error is a collection-ownership collision (a build-time
+	// bug), so it is fatal.
+	reg, regErr := module.Register(cfg, librarian.New(), pm.New())
+	if regErr != nil {
+		log.Fatalf("pocket-librarian: module registration: %v", regErr)
+	}
+	moduleReg = reg
+
 	app := pocketbase.NewWithConfig(pocketbase.Config{
 		DefaultDev:     osutils.IsProbablyGoRun(),
 		DefaultDataDir: defaultDataDir,
@@ -187,9 +215,21 @@ func main() {
 			// guarded surface (requireConfig's cmdErr wrapper; the unresolved-location guard's
 			// direct os.Exit above) fails closed with a non-zero exit; mirror that here since
 			// normal RunE-error propagation is invisible for this command.
-			if err := bootstrap.CheckDeskGuard(e.App, cfg.DeskName); err != nil {
+			if err := store.CheckDeskGuard(e.App, cfg.DeskName); err != nil {
 				fmt.Fprintf(os.Stderr, "pocket-librarian: %v\n", err)
 				os.Exit(1)
+			}
+			// Module-schema versioning (spec §2.8): migrations have already run by OnServe, so
+			// GuardDowngrade refuses to serve a store a newer binary already migrated ahead, and
+			// StampModules records each enabled module's applied version by observation. In the D2
+			// zero-change envelope the librarian is the only enabled module and its version matches
+			// its highest migration, so the guard never trips; stamping is non-fatal bookkeeping.
+			if err := migrate.GuardDowngrade(e.App, moduleReg.MigrateModules()); err != nil {
+				fmt.Fprintf(os.Stderr, "pocket-librarian: %v\n", err)
+				os.Exit(1)
+			}
+			if err := migrate.StampModules(e.App, moduleReg.MigrateModules()); err != nil {
+				app.Logger().Error("stamp module schema versions", "err", err)
 			}
 			if err := desklib.EnsureIgnoreFile(cfg.IgnoreConfig, cfg.DeskRoot); err != nil {
 				app.Logger().Error("ensure .librarian-ignore", "err", err)
@@ -203,7 +243,7 @@ func main() {
 		// First-run superuser auto-create (spec §10.3): only when both PB_SUPERUSER_* env
 		// vars are set; idempotent and non-fatal — a failure logs but never blocks serve.
 		if cfgErr == nil {
-			if created, err := bootstrap.EnsureSuperuser(e.App, cfg); err != nil {
+			if created, err := store.EnsureSuperuser(e.App, cfg); err != nil {
 				app.Logger().Error("ensure superuser", "err", err)
 			} else if created {
 				app.Logger().Info("created superuser from PB_SUPERUSER_* env", "email", cfg.PBSuperuserEmail)
@@ -216,11 +256,14 @@ func main() {
 		// each task (deterministic kinds call the tool directly; agentic kinds run the loop
 		// via the injected action below). Config is required for the tools, so gate on cfgErr.
 		if cfgErr == nil {
-			if err := trigger.RegisterHooks(e.App, cfg); err != nil {
-				app.Logger().Error("register record hooks", "err", err)
-			}
-			if err := trigger.RegisterCron(e.App, cfg); err != nil {
-				app.Logger().Error("register cron", "err", err)
+			// Each enabled module wires its own serve-time record hooks + cron via RegisterHooks
+			// (the librarian module's wraps trigger.RegisterHooks + RegisterCron — identical to the
+			// pre-refactor direct calls). StartClaimer stays here in main because it needs
+			// agentAction (keeping it in the module would pull internal/agent into internal/trigger).
+			for _, mod := range moduleReg.Enabled {
+				if err := mod.RegisterHooks(e.App, cfg); err != nil {
+					app.Logger().Error("register module hooks", "module", mod.Name(), "err", err)
+				}
 			}
 			trigger.StartClaimer(context.Background(), e.App, cfg, agentAction)
 		} else {
@@ -447,10 +490,20 @@ func requireConfig(app core.App, cfg *config.Config, cfgErr error) (*config.Conf
 	if err := app.RunAppMigrations(); err != nil {
 		return nil, fmt.Errorf("initialize store schema: %w", err)
 	}
+	// Module-schema versioning (spec §2.8) at the one-shot-command entry point too: guard against
+	// a store a newer binary migrated ahead, then stamp each enabled module's applied version by
+	// observation. In the D2 zero-change envelope this never trips (librarian only); stamping is
+	// non-fatal bookkeeping.
+	if err := migrate.GuardDowngrade(app, moduleReg.MigrateModules()); err != nil {
+		return nil, err
+	}
+	if err := migrate.StampModules(app, moduleReg.MigrateModules()); err != nil {
+		app.Logger().Error("stamp module schema versions", "err", err)
+	}
 	// Desk open-guard (ADR 0002 §3): refuse if this store already belongs to another desk.
 	// Checked before any seeding/write so a mismatched desk never mutates the wrong store; the
 	// choke point every tool + agent/chat/mcp-serve/gui RunE reaches first.
-	if err := bootstrap.CheckDeskGuard(app, cfg.DeskName); err != nil {
+	if err := store.CheckDeskGuard(app, cfg.DeskName); err != nil {
 		return nil, err
 	}
 	// "First run" auto-creation (spec §10.1) applies to every entry point, not just
@@ -484,7 +537,7 @@ func annotateLockErr(err error) error {
 	return fmt.Errorf("%w; is another pocket-librarian process (e.g. `serve`) already running against this desk?", err)
 }
 
-// registerToolCommands wires the six tool subcommands + gui onto the PocketBase RootCmd.
+// registerToolCommands wires the seven tool subcommands + gui onto the PocketBase RootCmd.
 // serve, migrate, and superuser are provided by PocketBase / migratecmd. Each tool command
 // routes through the same tools.* function the agent will call (spec §2.6, §3.3). Until the
 // tool-body slice lands these return ErrNotImplemented — expected for the spine.
@@ -720,7 +773,7 @@ func registerToolCommands(app *pocketbase.PocketBase, cfg *config.Config, cfgErr
 	// stdio-transport lifecycle.
 	app.RootCmd.AddCommand(&cobra.Command{
 		Use:   "mcp-serve",
-		Short: "Expose the six-tool core as an MCP stdio server (model-facing; gated per §5.4)",
+		Short: "Expose the seven-tool core as an MCP stdio server (model-facing; gated per §5.4)",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := requireConfig(app, cfg, cfgErr)
 			if err != nil {
