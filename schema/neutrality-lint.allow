@@ -17,7 +17,7 @@ plugin/claude-plugin/skills/desk-setup/assets/template/**
 
 # Librarian extraction tests: these fixtures MUST contain sample "#N" refs and a github URL to
 # exercise the issue-ref / github-URL extractors (pocket-librarian-v1-spec.md §11.2).
-librarian/internal/tools/sweep_test.go
+librarian/internal/modules/librarian/tools/sweep_test.go
 
 # Librarian verify gate: builds synthetic R-rule fixtures inline (sample "#N" refs, neutral
 # slugs) to prove the rule engine — a test harness, not a distributed definition.
@@ -25,4 +25,4 @@ librarian/verify.sh
 
 # Doc-internal ordinal: "build-brief punch-list #1" references item 1 of a punch list, not a
 # GitHub issue. (Token-scoped so the rest of the file stays under the lint.)
-librarian/internal/desklib/desklib.go | #1
+librarian/internal/modules/librarian/desklib/desklib.go | #1
