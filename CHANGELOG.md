@@ -1,8 +1,9 @@
 # Changelog
 
 All notable changes to this repository — both the **plugin** (Claude Code plugin + MCP server)
-and the **librarian** (`pocket-librarian` Go binary) — are recorded here. The two ship under one
-repo version (the root `VERSION` file); a release tags that single version.
+and the **librarian** (`deskkit` Go binary; `pocket-librarian` through 0.6.0) — are recorded
+here. The two ship under one repo version (the root `VERSION` file); a release tags that
+single version.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html). See
@@ -11,6 +12,16 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html). See
 for why this policy exists.
 
 ## [Unreleased]
+
+### Changed
+
+- **Chassis rename: `pocket-librarian` → `deskkit`** (D2b, `docs/pm-system-v1-spec.md` §2.10,
+  epic #55). The Go binary, its build/install/release artifact names, and the canonical store
+  home (`$XDG_DATA_HOME/pocket-librarian/<DESK_NAME>/` → `$XDG_DATA_HOME/deskkit/<DESK_NAME>/`)
+  are renamed. On startup, a store still at the old home is moved to the new one automatically
+  (one logged line) — no desk loses its store across the rename. `install.sh` falls back to the
+  pre-rename asset name for releases up to v0.6.0; ADR 0002's store-path literal carries a dated
+  correction. The Go module path (`github.com/example/pocket-librarian`) is unchanged.
 
 ## [0.6.0] — 2026-07-18
 
