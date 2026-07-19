@@ -628,3 +628,79 @@ func TestDeskConfigHookRejectsBadLabels(t *testing.T) {
 		t.Fatalf("invalid stored status_labels must be a loud engine error, got %v", terr)
 	}
 }
+
+// TestDemoteGatedWhenConfigBindsOne is the other half of §10.2 (spec §3.2/§4.1): demote and
+// reopen edges are ungated BY DEFAULT (TestUngatedTypeAdvancesFreely), but are gated when —
+// and only when — the desk's config binds a rule to them. A desk_config binds a gate to the
+// demote edge review->work; the demote is then refused while the gate document is missing or
+// at the wrong status, passes once satisfied, and the reopen edge (unbound in the same
+// config) stays ungated throughout.
+func TestDemoteGatedWhenConfigBindsOne(t *testing.T) {
+	sv := &stubValidator{verdicts: map[string]schema.Verdict{}}
+	e := newEngine(t, sv)
+	col, _ := e.App.FindCollectionByNameOrId("desk_config")
+	rec := core.NewRecord(col)
+	rec.Set("desk", "test-desk")
+	rec.Set("rules", `schema_version: 1
+gates:
+  analysis:
+    "review->work":
+      documents:
+        - type: analysis
+          status: approved
+          pointer: item
+`)
+	if err := e.App.Save(rec); err != nil {
+		t.Fatal(err)
+	}
+
+	ptr := "analyses/walkback-rationale.md"
+	item := mustCreate(t, e, CreateItemInput{Title: "gated walkback", Type: "analysis", Pointer: ptr})
+	item = mustTransition(t, e, item, "work")
+	item = mustTransition(t, e, item, "review") // work->review unbound in this config: ungated
+
+	// Gate doc missing: the BOUND demote edge refuses, naming the pointer.
+	err := transitionErr(e, item, "work")
+	if !IsRefusal(err) || !strings.Contains(err.Error(), ptr) {
+		t.Fatalf("bound demote with missing doc must refuse naming the pointer, got %v", err)
+	}
+
+	// Wrong status: still refused, naming actual vs required.
+	sv.verdicts[ptr] = schema.Verdict{
+		Exists: true, FrontmatterValid: true, Status: "draft",
+		Missing: []string{`required document (type=analysis, status=approved) at "` + ptr + `" is at status "draft", needs "approved"`},
+	}
+	err = transitionErr(e, item, "work")
+	if !IsRefusal(err) || !strings.Contains(err.Error(), `needs "approved"`) {
+		t.Fatalf("bound demote with wrong-status doc must refuse, got %v", err)
+	}
+
+	// The refusals were gate refusals: recorded as gate_refused audit rows, phase unchanged.
+	rows, _ := e.App.FindRecordsByFilter("transitions",
+		"item = {:i} && event = 'gate_refused'", "", 0, 0, map[string]any{"i": item.Id})
+	if len(rows) != 2 {
+		t.Fatalf("expected 2 gate_refused rows for the bound demote, got %d", len(rows))
+	}
+	item, _ = e.loadItem(item.Id)
+	if item.GetString("phase") != "review" {
+		t.Fatalf("refused demote must leave the item in review, got %s", item.GetString("phase"))
+	}
+
+	// Satisfied: the same demote passes.
+	sv.verdicts[ptr] = schema.Verdict{Exists: true, FrontmatterValid: true, Status: "approved", Satisfied: true}
+	item = mustTransition(t, e, item, "work")
+	if item.GetString("phase") != "work" {
+		t.Fatalf("satisfied bound demote must pass, got %s", item.GetString("phase"))
+	}
+
+	// "Only when the config binds one": the reopen edge is unbound in this config, so after
+	// completing (review->terminal is also unbound here), terminal->work passes with the gate
+	// doc removed — no gate consulted.
+	delete(sv.verdicts, ptr)
+	item = mustTransition(t, e, item, "review")
+	item = mustTransition(t, e, item, "terminal")
+	item = mustTransition(t, e, item, "work") // reopen: unbound => ungated
+	if item.GetString("phase") != "work" {
+		t.Fatalf("unbound reopen must stay ungated, got %s", item.GetString("phase"))
+	}
+}
