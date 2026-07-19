@@ -19,15 +19,15 @@ import (
 	"strings"
 	"time"
 
+	"charm.land/bubbles/v2/help"
+	"charm.land/bubbles/v2/key"
+	"charm.land/bubbles/v2/spinner"
+	"charm.land/bubbles/v2/textarea"
+	"charm.land/bubbles/v2/viewport"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/glamour/v2"
+	"charm.land/lipgloss/v2"
 	"github.com/atotto/clipboard"
-	"github.com/charmbracelet/bubbles/help"
-	"github.com/charmbracelet/bubbles/key"
-	"github.com/charmbracelet/bubbles/spinner"
-	"github.com/charmbracelet/bubbles/textarea"
-	"github.com/charmbracelet/bubbles/viewport"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/glamour"
-	"github.com/charmbracelet/lipgloss"
 	"github.com/pocketbase/pocketbase/core"
 
 	"github.com/example/pocket-librarian/internal/agent"
@@ -289,6 +289,15 @@ func newModel(baseCtx context.Context, sess streamer, provider sessionProvider, 
 	// Plain enter is the send key (handled in Update); rebind the textarea's own newline to
 	// alt+enter so it never swallows the send key.
 	ta.KeyMap.InsertNewline = key.NewBinding(key.WithKeys("alt+enter"))
+	// The textarea keeps its inline virtual cursor — the only cursor the surface has ever had —
+	// rather than wiring the real terminal cursor through tea.View.Cursor (ADR 0007). Explicit,
+	// though it is also bubbles' default.
+	ta.SetVirtualCursor(true)
+	// The AdaptiveColor-based defaults that v1 resolved via the lipgloss.SetHasDarkBackground pin
+	// (tui.go) are gone with the pin itself; textarea.DefaultStyles(isDark) is v2's own per-theme
+	// default table, selected by the same resolved theme, so the chrome (cursor line, line
+	// numbers, placeholder) still varies by theme without any runtime query.
+	ta.SetStyles(textarea.DefaultStyles(theme == themeDark))
 	ta.Focus()
 
 	sp := spinner.New(spinner.WithSpinner(spinner.Dot))
@@ -309,7 +318,7 @@ func newModel(baseCtx context.Context, sess streamer, provider sessionProvider, 
 		keymap:      defaultKeymap(),
 		hlp:         hlp,
 		ta:          ta,
-		vp:          viewport.New(0, 0),
+		vp:          viewport.New(),
 		sp:          sp,
 		history:     newHistory(nil),
 		reduced:     reducedMotion(os.Getenv("NO_COLOR")),
@@ -338,7 +347,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.resize(msg.Width, msg.Height)
 		return m, nil
 
-	case tea.KeyMsg:
+	case tea.KeyPressMsg:
 		return m.handleKey(msg)
 
 	case eventMsg:
@@ -389,7 +398,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 // viewport; everything else (typing, alt+enter newline) goes to the textarea. ctrl+c quits from
 // anywhere (even with the overlay open); otherwise, when the picker overlay is open every key
 // routes to it first (handlePickerKey).
-func (m model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	// ctrl+c is honored before the overlay so the picker can never trap the user. The picker only
 	// lives while NOT streaming, so this path is only ever the immediate-quit branch when open.
 	if key.Matches(msg, m.keymap.quit) {
@@ -546,7 +555,7 @@ func (m model) openPicker() (tea.Model, tea.Cmd) {
 		m.refreshViewport()
 		return m, nil
 	}
-	m.picker = newPicker(convos, m.vp.Width, m.vp.Height)
+	m.picker = newPicker(convos, m.vp.Width(), m.vp.Height())
 	return m, nil
 }
 
@@ -586,7 +595,7 @@ func (m model) newConversation() (tea.Model, tea.Cmd) {
 // picker only lives while NOT streaming (ctrl+o/ctrl+n are no-ops mid-turn), there is never an
 // in-flight turn to drain at swap time, so closing the current session before opening the resumed
 // one is safe immediately — this is how the picker path respects the engine's drain contract.
-func (m model) handlePickerKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m model) handlePickerKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch {
 	case key.Matches(msg, m.keymap.cancel):
 		// esc closes the overlay. There is no in-flight turn to cancel here (the picker only opens
@@ -769,13 +778,13 @@ func (m *model) resize(w, h int) {
 	if vpHeight < 1 {
 		vpHeight = 1
 	}
-	m.vp.Width = w
-	m.vp.Height = vpHeight
+	m.vp.SetWidth(w)
+	m.vp.SetHeight(vpHeight)
 	// The textarea sits inside the rounded input box; reserve the two columns its left/right
 	// border consume so the box spans the full terminal width without wrapping.
 	m.ta.SetWidth(w - 2)
 	m.ta.SetHeight(inputHeight)
-	m.hlp.Width = w // the help footer truncates its short view to the terminal width
+	m.hlp.SetWidth(w) // the help footer truncates its short view to the terminal width
 	// Glamour wraps at the CAPPED measure, not the raw width — the transcript keeps a readable
 	// line length on a wide terminal even though the bars span the whole screen.
 	m.renderer = newRenderer(m.contentW, m.theme)
@@ -899,9 +908,17 @@ func fmtDuration(d time.Duration) string {
 
 // View composes the surface: header, transcript viewport, input textarea, footer. Before the
 // first WindowSizeMsg it shows a minimal placeholder (bubbletea sends the size immediately).
-func (m model) View() string {
+//
+// v2's Model.View returns a tea.View rather than a bare string; AltScreen is now a per-frame View
+// field (not a tea.WithAltScreen ProgramOption), and every return path below sets it — a path that
+// forgot it would silently drop the surface out of the alternate screen mid-run. BackgroundColor is
+// deliberately left nil in both paths: the TUI renders on the terminal's own background (ADR 0004 /
+// ADR 0007), never overriding it.
+func (m model) View() tea.View {
 	if !m.ready {
-		return "initializing…"
+		v := tea.NewView("initializing…")
+		v.AltScreen = true
+		return v
 	}
 	// When the resume overlay is open it renders in place of the transcript viewport; the header,
 	// input, and footer stay put so the surface never loses its frame.
@@ -909,12 +926,15 @@ func (m model) View() string {
 	if m.picker != nil {
 		body = m.picker.View()
 	}
-	return lipgloss.JoinVertical(lipgloss.Left,
+	content := lipgloss.JoinVertical(lipgloss.Left,
 		m.renderHeader(),
 		body,
 		m.renderInput(),
 		m.renderFooter(),
 	)
+	v := tea.NewView(content)
+	v.AltScreen = true
+	return v
 }
 
 // renderHeader renders `desk · provider/model` as a full-width bar: a subtle per-theme background
@@ -980,7 +1000,7 @@ func (m model) renderFooter() string {
 	hlp := m.hlp
 	hlp.Styles = m.styles.helpBar
 	if w := m.width - lipgloss.Width(state); w > 0 {
-		hlp.Width = w
+		hlp.SetWidth(w)
 	}
 	hints := hlp.View(m.keymap)
 	return m.styles.footerBar.Width(m.width).MaxWidth(m.width).Render(hints + state)

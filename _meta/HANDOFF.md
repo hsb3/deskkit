@@ -1,7 +1,7 @@
 _Session-to-session bridge for desk-standard. Read this before working; update it at the end
 of any substantial session. Secret-free — live URLs/credentials belong in `_meta/operations/`
 (untracked) if that dir is ever created._
-Status: active (2026-07-18)
+Status: active (2026-07-19)
 
 # HANDOFF
 
@@ -53,13 +53,40 @@ Crush-style app chrome, look approved live) **and PR #54** (`record_feedback`, #
 GIFs re-recorded with the final chrome post-merge. Deferred UX items are recorded in
 `docs/development/chat-tui-ux-survey.md`.
 
-**AWAITING HENRY — the TUI roadmap rulings.** His direction (2026-07-18): "not just one
-window — threads, resume, context %; lift and shift from Crush." The decision memo with the
-five checkboxes + recommendations is at
-`_meta/briefings/2026-07-18-tui-roadmap-rulings/README.md`: #53 Charm-v2-stack migration is
-the gate ruling (ADR-worthy; Crush itself is FSL — lift designs, original code on MIT Charm
-libs), then #51 sessions surface and #52 context/token display. Recommended sequence: rule
-#53 → migration PR + ADR → #51/#52 on v2 (#52's session-layer plumbing can start anytime).
+**RULED 2026-07-18 — all five TUI roadmap recommendations accepted verbatim** (memo, now
+marked decided: `_meta/briefings/2026-07-18-tui-roadmap-rulings/README.md`; rulings also
+commented on #51/#52/#53): #53 Charm-v2 migration GO with terminal background retained +
+no-query rule kept pre-program-only (**ADR 0007**, committed on `feat/tui-charm-v2` @
+57f1a76); #51 sessions-list-first launch + truncation titles + rename/delete v1; #52 defer
+dollar-cost, add the `models.context_window` profile override key (schema change).
+
+**DONE 2026-07-19 — the #53 v2 migration is PR #59: green, mergeable, awaiting Henry.**
+Branch `feat/tui-charm-v2`: migration verified (build/vet/full tests, no-v1-imports grep,
+make check/test), rebased onto the moved main, ci + claude-review pass, all four review
+threads fixed (c17c802) and replied. **ADR renumbered 0006 → 0007** (PR #57, landed from a
+parallel session, took 0006 for the kit-port ADR). Live parity proven in a REAL terminal
+(tmux send-keys/capture-pane, full ready→streaming→ready cycle byte-clean) — that proof, not
+re-recorded GIFs, is the PR's parity artifact.
+
+**SEQUENCING DECISION IN HENRY'S COURT — PR #59 vs PR #60.** A parallel workstream (epic
+#55) landed #56/#57 on main 2026-07-18 evening and opened **PR #60** (`refactor/core-modules`,
+92 files) which MOVES `librarian/internal/tui/` → `librarian/internal/modules/librarian/tui/`.
+Direct structural collision. Recommendation (commented on both PRs): merge **#59 first**;
+#60 absorbs the v2 import swap in its rebase (its move rewrites those import paths anyway).
+If #60 goes first instead, #59 must be re-targeted onto the moved paths and re-verified.
+
+**#58 — chat-GIF re-record blocked by an xterm.js canvas-renderer bug (investigated,
+disposition open).** Re-recording chat tapes on v2 deterministically shows a one-cell stale
+glyph ("rready") — VHS-environment-only. Full evidence on the issue: our emitted bytes are
+provably correct (raw pty capture replays clean through the exact xterm-headless version
+ttyd bundles); VHS hardcodes `-t rendererType=canvas`, whose stale-glyph bug class is
+documented upstream (xtermjs #3548/#3617); no reachable flag fixes it (dom renderer 4–9×
+slower, never completed; customGlyphs/sixel flags don't help). Committed GIFs deliberately
+stay v1-era. Disposition options ranked on #58 (accept / product-side full-line-repaint
+dodge / toolchain pinning dig).
+
+**Then:** #52's session-layer token plumbing (stack-independent) and #51 on v2 (both build
+on whichever tree layout wins the #59/#60 sequencing).
 
 **Release note:** `[Unreleased]` now holds the whole TUI pass + `record_feedback` + `make
 install` — a solid 0.6.0. Cut per `docs/development/releasing.md` when Henry wants it.

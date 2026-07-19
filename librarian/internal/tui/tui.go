@@ -14,8 +14,7 @@ import (
 	"context"
 	"time"
 
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	tea "charm.land/bubbletea/v2"
 	"github.com/pocketbase/pocketbase/core"
 
 	"github.com/example/pocket-librarian/internal/config"
@@ -27,15 +26,12 @@ import (
 // Close error when the program itself succeeded. theme is the concrete palette ("light"/"dark")
 // the caller resolved in the pre-program safe window (see ResolveTheme) — never "auto".
 func Run(ctx context.Context, app core.App, cfg *config.Config, theme string) error {
-	// Pin lipgloss's cached background answer to the resolved theme, still in the pre-program
-	// safe window. This package uses no AdaptiveColor of its own, but embedded bubbles
-	// components do (the textarea's DefaultStyles), and those resolve through lipgloss's
-	// background cache: seeding it here (a) guarantees the lazy OSC background query can never
-	// fire after the program starts — today that is only prevented by a bubbletea v1 package
-	// init workaround slated for removal in v2 — and (b) makes an explicit --theme govern the
-	// embedded components too, instead of the detected background overriding the user's choice.
-	lipgloss.SetHasDarkBackground(theme == themeDark)
-
+	// No global-renderer background pin is needed (or possible) under lipgloss v2: there is no
+	// shared renderer, and every color this surface uses is a concrete per-theme value. The
+	// embedded bubbles components that previously leaned on lipgloss's adaptive background cache
+	// (the textarea's DefaultStyles) are now handed concrete per-theme styles explicitly in
+	// newModel, keyed off the same resolved theme — so the render path stays query-free and an
+	// explicit --theme governs those components too, without any terminal query after startup.
 	provider := &agentProvider{app: app, cfg: cfg}
 
 	// Open the initial session eagerly (via the provider), so a build/config failure surfaces
@@ -45,7 +41,9 @@ func Run(ctx context.Context, app core.App, cfg *config.Config, theme string) er
 		return err
 	}
 
-	p := tea.NewProgram(newModel(ctx, sess, provider, cfg, theme), tea.WithAltScreen(), tea.WithContext(ctx))
+	// WithAltScreen is gone in v2: alt-screen is now a per-frame tea.View field (model.View sets
+	// v.AltScreen = true on every returned View, in every code path).
+	p := tea.NewProgram(newModel(ctx, sess, provider, cfg, theme), tea.WithContext(ctx))
 	final, runErr := p.Run()
 
 	// The final model may hold a DIFFERENT session than the one opened above: the user may have
