@@ -40,8 +40,9 @@ Bun `1.3.14` / Node `26.5.0` (either runs `plugin/`).
 Known, intentional gaps — not bugs:
 
 - **OpenCode adapter** — not built (see above).
-- **Hooks and agents surfaces** — the Claude plugin ships skills only; no `hooks/` or
-  `agents/` definitions yet.
+- **Hooks and agents surfaces (`desk-standard` plugin)** — the `desk-standard` plugin itself
+  ships skills only; no `hooks/` or `agents/` definitions. (The companion `desk-pm` plugin does
+  ship a `pm-operator` agent and a SessionStart briefing hook.)
 
 Marketplace packaging and schema distribution are now wired (see below); they are no longer gaps.
 
