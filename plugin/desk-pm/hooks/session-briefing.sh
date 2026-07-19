@@ -27,11 +27,7 @@ fi
 
 header="PM work graph — cold-start briefing (from \`deskkit pm context\`). The desk's active, blocked, and stalled work follows as JSON. Use the pm-session-open skill to render it and pick the next item."
 
-if command -v jq >/dev/null 2>&1; then
-  # Proper JSON envelope with the briefing escaped into additionalContext.
-  jq -n --arg h "$header" --arg c "$context" \
-    '{hookSpecificOutput: {hookEventName: "SessionStart", additionalContext: ($h + "\n\n" + $c)}}'
-else
-  # No jq: SessionStart adds a hook's stdout to the session context directly.
-  printf '%s\n\n%s\n' "$header" "$context"
-fi
+# A SessionStart hook's stdout is added to the session context directly. Emit the header +
+# the (already human-readable) briefing JSON as plain text — no dependency, identical
+# behaviour on every machine, and no risk of an unrecognised JSON envelope landing verbatim.
+printf '%s\n\n%s\n' "$header" "$context"

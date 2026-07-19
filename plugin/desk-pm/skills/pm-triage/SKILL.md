@@ -59,8 +59,8 @@ dependency edge captures the truth.
 The blocked flag is a **side-state** independent of phase — it holds an item in place without
 demoting it.
 
-- **`block_item <id> --reason "..."`** sets it (the reason is audit detail).
-- **`unblock_item <id> --reason "..."`** clears it and restores the held phase.
+- **`block_item <id> --version <version> --reason "..."`** sets it (the reason is audit detail).
+- **`unblock_item <id> --version <version> --reason "..."`** clears it and restores the held phase.
 
 Prefer a dependency edge with `cascade: auto` when the block is *caused by another item*; use a
 bare `block_item` only for an external reason with no in-graph blocker (e.g. waiting on an
