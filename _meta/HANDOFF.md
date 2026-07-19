@@ -30,16 +30,18 @@ decision records (e.g. 0013–0016) referenced from the build brief — annotate
 was refreshed to 0.6.0 via `make install`. All product rulings are in; open work is pure build.
 Cutting the next release just follows `docs/development/releasing.md` (§3, §4).
 
-**Active blocker — the public `curl|bash` install path is gated on repo visibility.** The repo is
-PRIVATE, so every unauthenticated URL `install.sh` needs (`raw…/install.sh`, `/releases/latest`,
-`/releases/download/…`) 404s by design. install.sh's URL + checksum logic are proven correct
-(authed assets verify); the only missing link is the unauthenticated fetch. Fix = make the repo
-public (a deliberate launch decision, not autonomous) or add token/`gh` auth to install.sh.
+**Public launch is deferred until ≥ v1.0.0 (Henry, 2026-07-19) — this is settled, not an open
+blocker.** The repo stays PRIVATE until then, so the public `curl|bash` path is expected to 404
+by design (every unauthenticated URL `install.sh` needs — `raw…/install.sh`, `/releases/latest`,
+`/releases/download/…`). install.sh's URL + checksum logic are already proven correct (authed
+assets verify); the only missing link is the unauthenticated fetch, which will resolve for free
+when the repo goes public at v1.0.0. **Until then, install from the private repo with `gh` auth**
+(see §4 "Installing from the private repo"). Do NOT keep surfacing the private-repo 404 as a
+blocker — it's a planned gate, not a bug.
 
-**ON HOLD (Henry, 2026-07-17): going public AND OpenCode (#12) are parked** until Henry is
-satisfied with the current build in practice — the focus is dogfooding/stabilizing shipped
-Claude-Code, not opening or extending. Don't action either without his go-ahead. Buildable
-follow-ups (#34, #35) can proceed.
+**ON HOLD (Henry, 2026-07-17): going public AND OpenCode (#12) are parked** — public until
+≥ v1.0.0 (above); the focus is dogfooding/stabilizing shipped Claude-Code, not opening or
+extending. Don't action either without his go-ahead. Buildable follow-ups (#34, #35) can proceed.
 
 **Small open follow-ons:** two accepted PR #40 review nits — the locked-store hint's substring
 match could false-positive on a path containing "locked" (harmless; the hint is phrased as a
@@ -197,6 +199,18 @@ assets verified). `[Unreleased]` is now empty; the next bump starts accumulating
   `ci.yml` checks out `fetch-depth: 0` for it. Both scripts + CHANGELOG live outside the neutrality
   surface (repo root / `scripts/`). `make install` builds + drops the binary in `~/.local/bin`
   (override `PREFIX=`); `/plugin` updates the plugin only — the binary is a separate artifact.
+- **Installing from the private repo** (until the public launch at ≥ v1.0.0): the public
+  `install.sh` / `curl|bash` path 404s by design while private — use authed `gh` instead. Two ways:
+  - **From a local clone** (version-stamped, what a dev should use): `make install` (root or
+    `librarian/`) → `~/.local/bin/pocket-librarian`.
+  - **Straight from the release** (no clone/build): download the platform asset with `gh`:
+    ```bash
+    gh release download v0.6.0 --repo hsb3/desk-standard \
+      --pattern "pocket-librarian_*_$(uname -s|tr '[:upper:]' '[:lower:]')_$(uname -m|sed 's/x86_64/amd64/;s/aarch64/arm64/')" \
+      --output ~/.local/bin/pocket-librarian --clobber && chmod +x ~/.local/bin/pocket-librarian
+    ```
+    (Assets are `pocket-librarian_<ver>_{darwin,linux}_{amd64,arm64}`; verify against the
+    release's `checksums.txt`.)
 - **Docs layout (since the dev/use split)**: `docs/` is indexed by `docs/README.md` in two
   tracks — **Using** (`getting-started`/`plugin-guide`/`librarian-guide` + `media/*.gif`) and
   **Development** (`docs/development/` = overview README + `releasing.md` + `tapes/*.tape`). The
