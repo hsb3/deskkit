@@ -289,13 +289,9 @@ func newModel(baseCtx context.Context, sess streamer, provider sessionProvider, 
 	// Plain enter is the send key (handled in Update); rebind the textarea's own newline to
 	// alt+enter so it never swallows the send key.
 	ta.KeyMap.InsertNewline = key.NewBinding(key.WithKeys("alt+enter"))
-	// Cursor choice (v2 migration): keep the VIRTUAL cursor (a highlighted cell drawn inline in
-	// the rendered string) rather than wiring the real terminal cursor through tea.View.Cursor.
-	// v1's bubbletea had no concept of a real terminal cursor at all — the textarea always drew
-	// its own inline cursor cell — so the virtual cursor is the byte-for-byte visual match and the
-	// lower-risk choice (no new cursor-position/blink-timing behavior to get wrong). bubbles v2's
-	// textarea.New() already defaults useVirtualCursor to true; SetVirtualCursor(true) here just
-	// makes the choice explicit and self-documenting.
+	// The textarea keeps its inline virtual cursor — the only cursor the surface has ever had —
+	// rather than wiring the real terminal cursor through tea.View.Cursor (ADR 0007). Explicit,
+	// though it is also bubbles' default.
 	ta.SetVirtualCursor(true)
 	// The AdaptiveColor-based defaults that v1 resolved via the lipgloss.SetHasDarkBackground pin
 	// (tui.go) are gone with the pin itself; textarea.DefaultStyles(isDark) is v2's own per-theme

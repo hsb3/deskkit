@@ -103,7 +103,9 @@ func TestAssistantStyle_HighContrast(t *testing.T) {
 // tea.WithAltScreen (a ProgramOption) in favor of a per-frame tea.View.AltScreen field, so every
 // return path of Model.View must set it explicitly — a path that forgets it silently drops the
 // surface out of the alternate screen mid-run. Both the pre-ready placeholder path (before the
-// first WindowSizeMsg) and the fully composed surface are asserted.
+// first WindowSizeMsg) and the fully composed surface are asserted. The picker-open branch needs
+// no separate case: it only swaps the body string, and every composed frame passes through the
+// same unconditional AltScreen set.
 func TestView_SetsAltScreen(t *testing.T) {
 	notReady := newModel(context.Background(), &fakeStreamer{}, &fakeProvider{}, &config.Config{}, themeDark)
 	if v := notReady.View(); !v.AltScreen {
