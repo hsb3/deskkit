@@ -15,6 +15,7 @@ import (
 	"github.com/example/pocket-librarian/internal/core/migrate"
 	"github.com/example/pocket-librarian/internal/core/schema"
 	"github.com/example/pocket-librarian/internal/core/toolcore"
+	"github.com/example/pocket-librarian/internal/core/tuiview"
 )
 
 // Module is the interface every desk module implements.
@@ -26,10 +27,11 @@ type Module interface {
 	OwnedCollections() []string
 	Tools() []toolcore.ToolSpec
 	RegisterHooks(app core.App, cfg *config.Config) error
-	// TUIViews() is DEFERRED — see D2-DESIGN.md §core/module: the current TUI (internal/tui,
-	// now modules/librarian/tui) exposes no View plug-point, so D2 does not invent one. The
-	// librarian TUI keeps working as-is (main calls tui.Run directly, unchanged); D4 adds
-	// TUIViews to this interface when PM TUI views land.
+	// TUIViews returns the module's views for the shared chat TUI (spec §5.3), built lazily
+	// against the LIVE app/config at TUI start (registration happens before the app exists).
+	// nil = the module contributes no views (the librarian: the chat transcript IS its view).
+	// This is the plug-point D2 deferred ("D4 adds TUIViews when PM TUI views land").
+	TUIViews(app core.App, cfg *config.Config) []tuiview.View
 }
 
 // Registry captures the result of Register: the enabled module set, the merged tool registry
@@ -47,6 +49,21 @@ type Registry struct {
 // closed on a nil config, never panic.
 type Configurable interface {
 	Configure(cfg *config.Config)
+}
+
+// ValidatorConsumer is the optional interface a module implements to receive the captured
+// schema.DocumentValidator after registration (spec §2.5): the pm module's tools/gate engine
+// consume verdicts through it. Injection happens in a SECOND pass (after every module's tools
+// are collected), so consumers must read the injected value lazily at invoke time.
+type ValidatorConsumer interface {
+	SetValidator(v schema.DocumentValidator)
+}
+
+// RealtimeSource is the optional capability a module implements to emit realtime events
+// (spec §5.4, R4.3): core wires it to PocketBase's realtime subsystem under `serve` only —
+// one-shot CLI commands emit no events (main.go's OnServe loop calls this).
+type RealtimeSource interface {
+	RegisterRealtime(app core.App) error
 }
 
 // Register wires the enabled subset of mods into the app: filters by Enabled(cfg), asserts no
@@ -85,9 +102,27 @@ func Register(cfg *config.Config, mods ...Module) (*Registry, error) {
 			}
 		}
 	}
+	// Second pass (spec §2.5): inject the captured validator into consumers. Runs after the
+	// tools pass because the validator-providing module may be registered in any position;
+	// consumers read the value lazily at invoke time, so late injection is safe.
+	for _, mod := range enabled {
+		if c, ok := mod.(ValidatorConsumer); ok {
+			c.SetValidator(reg.Validator)
+		}
+	}
 	migrate.RegisterProgrammatic(reg.MigrateModules())
 
 	return reg, nil
+}
+
+// TUIViews collects every enabled module's views for the shared chat TUI (spec §5.3), in
+// module registration order. Called lazily at TUI start with the live app + config.
+func (r *Registry) TUIViews(app core.App, cfg *config.Config) []tuiview.View {
+	var out []tuiview.View
+	for _, mod := range r.Enabled {
+		out = append(out, mod.TUIViews(app, cfg)...)
+	}
+	return out
 }
 
 // MigrateModules adapts the enabled set to []migrate.Module (a narrower interface than
