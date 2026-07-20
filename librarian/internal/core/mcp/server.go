@@ -174,6 +174,9 @@ func resolveModuleGate(cfg *config.Config, raw string, declared bool) (names, mo
 	}
 	names = toolcore.ToolNames(toolcore.SelectByModules(toolcore.ExposedSpecs(cfg), mods...))
 	if len(names) == 0 {
+		// mods is deliberately non-nil on this path (unlike the empty-declaration failure
+		// above): the declaration DID name modules, and a caller inspecting a !ok result can
+		// surface what was declared.
 		return nil, mods, fmt.Sprintf(
 			"MCP_MODULES=%q resolved to no exposed tools on this desk; none of those modules are registered/enabled here — "+
 				"check the module name(s) and that the owning module is enabled (e.g. set PM_ENABLED=true for \"pm\")",

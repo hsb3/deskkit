@@ -25,6 +25,12 @@ func TestBuildTools_LibrarianOnly(t *testing.T) {
 	// never called here. writesEnabled=true so all twelve PM specs get AgentDefault=true and
 	// register — this exercises the worst case (every PM tool present in the merged registry).
 	toolcore.Register(pmtools.Specs(func() coreschema.DocumentValidator { return nil }, true)...)
+	// Restore the registry so a future test in this package doesn't inherit the PM specs
+	// (same cleanup discipline as the mcp package's module-gate tests).
+	t.Cleanup(func() {
+		toolcore.Reset()
+		toolcore.Register(tools.Specs()...)
+	})
 
 	cfg := &config.Config{AutonomousWrites: true}
 

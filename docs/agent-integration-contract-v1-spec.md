@@ -63,7 +63,7 @@ naming what is unresolved), never register a silent or empty tool surface. On su
 prints a one-line stderr **mount signal** naming the exact exposed tool set, e.g.:
 
 ```
-deskkit mcp-serve: mounted "deskkit" v1; 5 tool(s) exposed: sweep, patrol, propose_fix, query, record_feedback
+deskkit mcp-serve: mounted "deskkit" v1; modules: all; 5 tool(s) exposed: sweep, patrol, propose_fix, query, record_feedback
 ```
 
 Any new mount — a future per-module surface, a librarian-specific bundle, or any other shape —

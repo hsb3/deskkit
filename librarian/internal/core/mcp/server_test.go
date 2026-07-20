@@ -411,6 +411,23 @@ func TestResolveModuleGate_PMFilter(t *testing.T) {
 	if !equalSet(libNames, wantLib) {
 		t.Errorf("MCP_MODULES=librarian names = %v, want %v", libNames, wantLib)
 	}
+
+	// The combined declaration completes the matrix: both modules named exposes exactly the
+	// union (18 = 6 librarian + 12 pm here) — pinning SelectByModules against accidental
+	// deduplication or ordering bugs across a multi-module set.
+	bothNames, bothModules, _, ok := resolveModuleGate(cfg, "librarian,pm", true)
+	if !ok {
+		t.Fatalf("MCP_MODULES=librarian,pm must resolve when both modules are registered")
+	}
+	if !equalSet(bothModules, []string{"librarian", "pm"}) {
+		t.Errorf("modules label = %v, want [librarian pm]", bothModules)
+	}
+	if !equalSet(bothNames, toolcore.ToolNames(toolcore.ExposedSpecs(cfg))) {
+		t.Errorf("MCP_MODULES=librarian,pm names = %v, want the full exposed set", bothNames)
+	}
+	if len(bothNames) != 18 {
+		t.Errorf("MCP_MODULES=librarian,pm exposed %d tool(s), want 18 (6 librarian + 12 pm)", len(bothNames))
+	}
 }
 
 // TestServe_MountSignalStderrNotStdout runs Serve end-to-end with a resolved desk and a stdin at
