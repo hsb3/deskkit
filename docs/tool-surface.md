@@ -41,7 +41,7 @@ supervised `apply-fix`/`findings dispose` actions.
 | `restore` | tool core | Reverse a change to the recorded original. **CLI-only — never exposed over MCP.** |
 | `query` | tool core | Read-only queries. `--include-disposed` widens `findings` past the live-only default. |
 | `record-feedback` | tool core | Write one feedback-log entry. |
-| `findings dispose <id> --as <disposition>` | `registerToolCommands` | Supervised disposition lifecycle (`open`/`acknowledged`/`triaged`/`wont_fix`). CLI-only, like `restore`. |
+| `findings dispose <id> --as <disposition> [--by <actor>] [--reason <text>]` | `registerToolCommands` | Supervised disposition lifecycle (`open`/`acknowledged`/`triaged`/`wont_fix`); optional `--by`/`--reason` record who/why (no baked default actor) and are cleared when re-disposed to `open`. CLI-only, like `restore`. |
 | `agent` | `registerToolCommands` | Run the eino loop once (manual trigger). |
 | `chat` | `registerToolCommands` | Interactive session (TUI or REPL). |
 | `mcp-serve` | `registerToolCommands` | Start the librarian MCP server (surface 2 below). |

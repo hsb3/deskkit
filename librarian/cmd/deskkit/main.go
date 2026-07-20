@@ -810,15 +810,18 @@ func registerToolCommands(app *pocketbase.PocketBase, cfg *config.Config, cfgErr
 	// finding's disposition (open|acknowledged|triaged|wont_fix), ORTHOGONAL to its state, so a
 	// live-only `query findings` stops surfacing an acknowledged/triaged/wont_fix item while it
 	// survives re-baseline: patrol dedupes on (file,rule,checksum) and inherits a prior non-open
-	// disposition onto a re-created finding. Disposition is an owner-supervised action, so it is a
-	// CLI subcommand — deliberately NOT an MCP tool (§5.4/§5.5, like restore). tools.DisposeFinding
-	// normalizes the value (wont-fix -> wont_fix) and validates it, returning an error (routed
-	// through the wrapRunE non-zero exit) for an empty/invalid disposition or an unknown id.
+	// disposition (and its provenance) onto a re-created finding. Disposition is an
+	// owner-supervised action, so it is a CLI subcommand — deliberately NOT an MCP tool
+	// (§5.4/§5.5, like restore). tools.DisposeFinding normalizes the value (wont-fix -> wont_fix)
+	// and validates it, returning an error (routed through the wrapRunE non-zero exit) for an
+	// empty/invalid disposition or an unknown id. Optional --by/--reason record who/why (no baked
+	// default actor — an omitted --by simply leaves the finding's provenance anonymous); moving
+	// back to `open` clears any previously-recorded provenance.
 	findingsCmd := &cobra.Command{
 		Use:   "findings",
 		Short: "Manage patrol findings (disposition lifecycle)",
 	}
-	var disposeAs string
+	var disposeAs, disposeBy, disposeReason string
 	disposeCmd := &cobra.Command{
 		Use:   "dispose <finding-id>",
 		Short: "Set a finding's disposition: open, acknowledged, triaged, or wont-fix",
@@ -828,11 +831,13 @@ func registerToolCommands(app *pocketbase.PocketBase, cfg *config.Config, cfgErr
 			if err != nil {
 				return err
 			}
-			return printJSON(tools.DisposeFinding(cmd.Context(), app, c, args[0], disposeAs))
+			return printJSON(tools.DisposeFinding(cmd.Context(), app, c, args[0], disposeAs, disposeBy, disposeReason))
 		},
 	}
 	disposeCmd.Flags().StringVar(&disposeAs, "as", "", "disposition to set: open, acknowledged, triaged, or wont-fix (required)")
 	_ = disposeCmd.MarkFlagRequired("as")
+	disposeCmd.Flags().StringVar(&disposeBy, "by", "", "who is disposing this finding (optional; recorded as provenance)")
+	disposeCmd.Flags().StringVar(&disposeReason, "reason", "", "why (optional; recommended when --as wont-fix)")
 	findingsCmd.AddCommand(disposeCmd)
 	app.RootCmd.AddCommand(findingsCmd)
 

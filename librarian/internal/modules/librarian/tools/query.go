@@ -379,7 +379,7 @@ func queryOrphans(app core.App, cfg *config.Config) (json.RawMessage, error) {
 }
 
 func queryUncollapsed(app core.App) (json.RawMessage, error) {
-	rows, err := openFindingRows(app, "rule = 'R5'")
+	rows, err := openFindingRows(app, "rule = 'R5' && disposition = 'open'")
 	if err != nil {
 		return nil, err
 	}
@@ -394,10 +394,12 @@ func queryUncollapsed(app core.App) (json.RawMessage, error) {
 // queryFindings — `findings` kind. By default it is LIVE-ONLY: it returns flagged findings whose
 // disposition is still 'open', hiding those a supervisor has acknowledged/triaged/marked wont_fix
 // (the disposition lifecycle). includeDisposed=true drops the disposition filter and
-// returns every flagged finding regardless of disposition. The disposition filter is threaded
-// through openFindingRows' existing extraFilter param; queryUncollapsed and querySummary keep
-// their prior behavior (all flagged rows, no disposition filter). See the disposition-lifecycle
-// migration (0014) for the field definition and backfill.
+// returns every flagged finding regardless of disposition. All three count surfaces built on
+// openFindingRows — queryFindings, queryUncollapsed, and querySummary — are disposition-aware by
+// default (disposition = 'open'), so a disposed finding does not inflate the summary total or
+// still show up as uncollapsed; includeDisposed=true widens queryFindings only, the other two
+// surfaces stay live-only. See the disposition-lifecycle migration (0014) for the field
+// definition and backfill.
 func queryFindings(app core.App, includeDisposed bool) (json.RawMessage, error) {
 	extraFilter := "disposition = 'open'"
 	if includeDisposed {
@@ -416,7 +418,7 @@ func querySummary(app core.App) (json.RawMessage, error) {
 	if err != nil {
 		return nil, err
 	}
-	findingRows, err := openFindingRows(app, "")
+	findingRows, err := openFindingRows(app, "disposition = 'open'")
 	if err != nil {
 		return nil, err
 	}
