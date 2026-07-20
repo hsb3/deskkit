@@ -20,9 +20,9 @@ updates:
     cooldown:
       default-days: 7
 
-  # Node — delete if the repo has no JS/TS packages.
+  # Node (TS lane) — the package.json/lockfile live under plugin/, not the root.
   - package-ecosystem: "npm"
-    directory: "/"
+    directory: "/plugin"
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 0
@@ -34,16 +34,16 @@ updates:
         patterns:
           - "*"
 
-  # Python (uv) — delete if the repo has no Python packages.
-  - package-ecosystem: "uv"
-    directory: "/"
+  # Go (librarian lane) — go.mod lives under librarian/.
+  - package-ecosystem: "gomod"
+    directory: "/librarian"
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 0
     cooldown:
       default-days: 7
     groups:
-      uv-security:
+      gomod-security:
         applies-to: security-updates
         patterns:
           - "*"
