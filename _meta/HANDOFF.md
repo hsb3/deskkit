@@ -27,9 +27,38 @@ desk's genesis record 0001.
 
 ## 1. Current standing + top priority
 
-**SESSION 2026-07-20 (late) — PRE-BUILD ADVERSARIAL REVIEW DONE; THE V1 BUILD LANES ARE
-CLEARED TO OPEN. Top priority: open lane #114.** Everything below the next divider predates
-this session. Four desk-standard PRs + one dotfiles-agents PR landed:
+**SESSION 2026-07-20 (build) — THE V1 BUILD WAVE IS LANDED; EPIC #129 IS CLOSED; THE
+`gate:1.0.0` LABEL QUERY IS EMPTY.** All ten children (#114–#123) shipped same-day as PRs
+#136–#145 plus the serial reconciliation pass #146 (main HEAD `cd22b9f`; `make verify` 48/48
+run on it; the epic-close comment on #129 carries the full issue→PR→commit table and the
+close-when walk). Highlights: the librarian store schema went 14→**20** (migrations 0015–0020,
+serialized #118→#123 with landing-time renumbering per the epic rule); `make check` now runs
+EIGHT guard families — the wave added prompt-drift (byte-exact embed↔spec), tool-surface
+(+self-test, three-axis counts), persona-drift (generated bundle files), and textfield-max
+(explicit-Max recurrence); `plugin/desk-persona/` is the composed librarian+PM bundle
+(17-tool mount `MCP_MODULES=librarian,pm`, one authored source per surface, desk-pm
+byte-untouched); `MCP_MODULES` module gating is live (unset=all; explicit-empty/unresolvable
+= exit 1); the TS→deskkit proxy has a reviewed design doc (`docs/development/
+ts-proxy-design.md`, verdict closable-as-is 26/26) with build slices 0–6 as the follow-on.
+Foreman process: every lane got a distilled scout packet or lead-driven build, adversarial
+review dispositions recorded on each PR, and layered verification (lead proof packages
+spot-checked + foreman-run bare gates before every merge).
+
+**NEXT, in order of consequence:**
+1. **Owner ruling: fold `desk-pm` into `desk-persona`, or ship both?** Deliberately additive
+   for now; facets in PR #143's body (duplicate `pm-operator` agent name if both installed;
+   the SessionStart wake hook is NOT composed into the bundle). A fold is a small follow-up PR.
+2. **Release cut (owner-gated)** — `[Unreleased]` now holds the entire wave + the 0.8.0 bug
+   floor; `make version-status` will shout. Runbook `docs/development/releasing.md`.
+3. **Epic #130 (schema-v2 track, #124–#128)** — its own arc, deliberately NO milestone; v1+v2
+   model simulations before v2 finalizes (owner's signoff note).
+4. **ts-proxy implementation** — design doc §5 slices; slice 0 (host spawn-capability probe)
+   is the go/no-go before anything else.
+5. Small ledger: PM-module Max-less fields (`notes.body`, `desk_config.rules`); guard-output
+   polish notes recorded on PRs #143/#144.
+
+The pre-build session below (planning wave, adversarial review, PR #131–#135) is now
+history — its detail lives in those PRs and the epic-close comment:
 - **#131 → `16e9259`** — the Phase-4 planning wave (epics #129/#130, children #114–#128).
 - **#132 → `103021a`** — briefings relocated to the exec desk. **Briefings now live ONLY at
   `desk-standard-desk/_meta/briefings/`, never in the product repo** (the design-session
@@ -460,6 +489,15 @@ committed GIFs depict v2 accurately — reopen only if a real redesign needs fre
 
 ## 5. Incident log
 
+- 2026-07-20 (build wave): a read-only scout REFUSED its brief because the main tree
+  contradicted it — root cause: the session had been `git fetch`ing after merges but never
+  pulled local `main`, so the working tree was three merges stale while `origin/main` was
+  current. In multi-worktree waves, `git pull` local main before any agent reads the main
+  tree (worktrees fork from commits, so they were unaffected). The scout's stop-condition
+  discipline caught a foreman error; keep briefing scouts with hard stop conditions.
+- 2026-07-20 (build wave): `gh pr merge` failed on a conflicting PR but the `;`-chained
+  cleanup (worktree remove + branch delete) ran anyway — recovery needed a re-checkout from
+  the remote branch. Chain merge→cleanup with `&&`, never `;`.
 - 2026-07-17: first real release (v0.4.0) cut successfully, but the live `install.sh` e2e
   surfaced that **the repo is private** — every unauthenticated URL the public install flow needs
   (`raw…/install.sh`, `/releases/latest`, `/releases/download/…`) returns 404. Initially looked
