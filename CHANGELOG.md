@@ -15,6 +15,17 @@ for why this policy exists.
 
 ### Added
 
+- **Typed cross-reference contract in `schema/`** (#116, ADR 0011). `schema/references.yaml`
+  adds schema v1's third dimension — a `{kind, target}` reference primitive with a closed
+  `kind` enum (seeded `issue`, `url`) and a raw `target` string. The desk-relative repo
+  qualifier is documented as read-time-resolved from `profile.repos.shorthand.issue_default`
+  and never persisted (no default qualifier ships — identity-neutral). A validation guard lands
+  in both lanes — `ReferenceVocab`/`ValidateReference` (Go, `librarian/internal/core/schema/
+  references.go`) and `validateReference` (TS, `plugin/core/references.ts`) — each drift-guarded
+  byte-for-byte against the canonical file. No field migrates onto the shape and no store
+  migration ships: `graduated_to` / `items.pointer` behavior is unchanged, and the field
+  migrations ride the schema-v2 track. Forward-pointer notes added to
+  `docs/pocket-librarian-v1-spec.md` and `docs/pm-system-v1-spec.md`.
 - **Normative `pointer` grammar spec section** (#115). `docs/pm-system-v1-spec.md` §3.1a now
   defines the `items.pointer` grammar ADR 0010 ratified — desk-relative file path with an
   advisory `§ <heading>` suffix; URL and `#`-anchored forms fail closed — and corrects the

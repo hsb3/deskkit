@@ -9,7 +9,7 @@ and the deskkit binary read as their single rule/structure source
 (`_meta/build-brief.md` §3.3(a); `_structure/decisions/0013` item 8). It is the seed of
 a single estate-wide schema (`0013` item 4).
 
-**What's in it now.** Two dimensions:
+**What's in it now.** Three dimensions:
 
 - `profile.schema.yaml` — the M-05 personalization profile block
   (`_meta/m-05-data-surfaces.md`, "Field set (schema v1 profile block)"): identity, repos,
@@ -23,6 +23,13 @@ a single estate-wide schema (`0013` item 4).
   origin vault's `types:` model (0013 items 4 + 8). The contract as data; the runtime
   validation engine that consumes it is the PM-system build's job. Port + gap dispositions:
   [`docs/decisions/0006-kit-port-schema-reconciliation.md`](../docs/decisions/0006-kit-port-schema-reconciliation.md).
+- `references.yaml` — the **reference dimension**: the typed cross-reference primitive both
+  lanes share — a `{kind, target}` shape with a closed `kind` enum (seeded `issue`, `url`) and
+  a raw `target` string. The desk-relative repo qualifier is documented as read-time-resolved
+  from the profile (`repos.shorthand.issue_default`) and is never persisted. A validation guard
+  lands in each lane (`librarian` `ReferenceVocab`/`ValidateReference`, `plugin`
+  `validateReference`); no field migrates onto the shape yet. Contract + rationale:
+  [`docs/decisions/0011-typed-reference-contract.md`](../docs/decisions/0011-typed-reference-contract.md).
 
 **How validation is consumed.** The M-05 substitution loader (build-brief D7) validates
 an agent-written profile against this schema before write — a profile that violates the
