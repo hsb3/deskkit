@@ -183,14 +183,15 @@ session decision** (scope-change note added to the D8 brief + index); no missing
 One owner-input note rides D7 (verbatim in the brief): leverage the TS-plugin seam for
 server-backed capabilities — leans extend-the-boundary over amend-spec-to-reality; input to
 weigh, not a ruling. **Phase 1 is CLOSED. Phase 2 package is DELIVERED**: 15-slide deck (PDF, boardroom, zero
-overflow) + 4:36 audio + `sources.md` at `_meta/briefings/2026-07-20-design-session-decisions/`
+overflow) + 4:36 audio + `sources.md` at the exec desk `_meta/briefings/2026-07-20-design-session-decisions/` (relocated from the repo 2026-07-20 — briefings live on the exec desk)
 — one slide per decision (two for D5), option labels quoted from the briefs, the five
 review-proven facts on their own weights slide, D7's owner note and D8's promotion carried.
 **Next: the decide phase** — Henry rules the eight (second signoff form or live); then
 Phase 3 rulings → ADRs in `docs/decisions/` + spec deltas, then Phase 4 the build plan.
 The decision book + its Verification record is the session's deep material; the deck is
 the map. NOTE: the whole design-session tree (`_meta/research/2026-07-design-session/`,
-`_meta/signoff/`, `_meta/briefings/2026-07-20-design-session-decisions/`) plus this handoff
+`_meta/signoff/`, and the decision deck now at the exec desk
+`_meta/briefings/2026-07-20-design-session-decisions/`) plus this handoff
 edit is UNCOMMITTED — commit when Henry's ready (`_meta/` is track-by-default).
 
 **Public launch is deferred until ≥ v1.0.0 (Henry, 2026-07-19) — this is settled, not an open
