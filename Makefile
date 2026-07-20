@@ -38,11 +38,13 @@ test: ## Fast tests both lanes: plugin (bun test) + librarian (go test ./...)
 	@cd plugin && bun run test
 	@$(MAKE) -C librarian test
 
-check: ## Repo gates: neutrality lint + self-test, kit-manifest drift, prompt-copy drift, scaffold frontmatter, persona drift, plugin core purity, actionlint
+check: ## Repo gates: neutrality lint + self-test, kit-manifest drift, prompt-copy drift, tool-surface drift + self-test, scaffold frontmatter, persona drift, plugin core purity, actionlint
 	@node scripts/check-neutrality.mjs
 	@node scripts/check-neutrality.mjs --self-test
 	@node scripts/check-kits.mjs
 	@node scripts/check-prompt-drift.mjs
+	@node scripts/check-tool-surface.mjs
+	@node scripts/check-tool-surface.mjs --self-test
 	@node scripts/check-scaffold-frontmatter.mjs
 	@node scripts/check-persona-drift.mjs
 	@cd plugin && bun run check:purity

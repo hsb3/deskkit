@@ -64,6 +64,16 @@ jobs:
       - name: Prompt-copy drift guard — embed vs spec quote
         run: node scripts/check-prompt-drift.mjs
 
+      # Tool-surface drift: docs/tool-surface.md's counts must match source (ADR 0016). The TS
+      # server (4) and CLI (16 base) counts are pinned here; the gate-dependent Librarian MCP
+      # counts (5/6/17/18, MCP_MODULES=pm → 12) are pinned by TestToolSurfaceDoc_MCPCounts on the
+      # go-test lane below. Self-test proves the guard still fails on a tool add/remove.
+      - name: Tool-surface drift guard — doc counts vs source
+        run: node scripts/check-tool-surface.mjs
+
+      - name: Tool-surface drift guard — self-test (seeded divergence detection)
+        run: node scripts/check-tool-surface.mjs --self-test
+
       # Advisory only (never fails the build): nudges when user-facing changes have piled up
       # under plugin/ or librarian/ since the last v* tag without a VERSION bump. The hard gate
       # (a documented CHANGELOG section for the tagged version) lives in release.yml.
