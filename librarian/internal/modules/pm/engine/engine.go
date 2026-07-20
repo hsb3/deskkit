@@ -143,6 +143,18 @@ func (e *Engine) CreateItem(ctx context.Context, in CreateItemInput) (*core.Reco
 		}
 		rec.Set("desk", txe.desk())
 		rec.Set("title", in.Title)
+		if in.Type != "" {
+			// Empty type stays legal (a scope call, ADR 0012): only a NON-EMPTY, unrecognized
+			// type is refused, so `type` remains optional across every caller-facing shape.
+			vocab, verr := schema.Vocab()
+			if verr != nil {
+				return verr
+			}
+			if !vocab.KnownType(in.Type) {
+				return refuse("unknown item type %q (known types: %s; see schema/doctypes.yaml)",
+					in.Type, strings.Join(vocab.TypeNames(), ", "))
+			}
+		}
 		rec.Set("type", in.Type)
 		rec.Set("phase", string(statemachine.Queue))
 		rec.Set("status_label", statemachine.DefaultLabelFor(statemachine.Queue))

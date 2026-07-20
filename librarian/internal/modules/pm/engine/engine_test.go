@@ -163,6 +163,77 @@ func TestUngatedTypeAdvancesFreely(t *testing.T) {
 	}
 }
 
+// TestCreateItemRejectsUnknownType: CreateItem hard-refuses an items.type outside the
+// schema-v1 vocabulary (ADR 0012), closing the one write path that previously accepted any
+// string unchecked — the identical schema.Vocab().KnownType check gates.ParseRules already
+// applies to desk_config.rules. An absent type stays legal (the deliberate empty-type-passes
+// scope call: `type` remains optional across every caller-facing shape), and every known
+// vocabulary type is still accepted.
+func TestCreateItemRejectsUnknownType(t *testing.T) {
+	t.Run("unknown type is refused and creates no row", func(t *testing.T) {
+		e := newEngine(t, nil)
+		before, err := e.deskItems()
+		if err != nil {
+			t.Fatalf("deskItems: %v", err)
+		}
+
+		_, err = e.CreateItem(context.Background(), CreateItemInput{Title: "x", Type: "no-such-type"})
+		if err == nil {
+			t.Fatal("expected a refusal for an unknown item type, got nil error")
+		}
+		if !IsRefusal(err) {
+			t.Fatalf("expected a Refusal, got %T: %v", err, err)
+		}
+		if !strings.Contains(err.Error(), "no-such-type") {
+			t.Fatalf("refusal should name the offending type, got %v", err)
+		}
+		if !strings.Contains(err.Error(), "analysis") {
+			t.Fatalf("refusal should list a real known type, got %v", err)
+		}
+		if !strings.Contains(err.Error(), "doctypes.yaml") {
+			t.Fatalf("refusal should point at the vocabulary source, got %v", err)
+		}
+
+		after, err := e.deskItems()
+		if err != nil {
+			t.Fatalf("deskItems: %v", err)
+		}
+		if len(after) != len(before) {
+			t.Fatalf("expected no items row created, had %d before and %d after", len(before), len(after))
+		}
+	})
+
+	t.Run("absent type stays legal", func(t *testing.T) {
+		e := newEngine(t, nil)
+		before, err := e.deskItems()
+		if err != nil {
+			t.Fatalf("deskItems: %v", err)
+		}
+		mustCreate(t, e, CreateItemInput{Title: "x"}) // no Type set
+		after, err := e.deskItems()
+		if err != nil {
+			t.Fatalf("deskItems: %v", err)
+		}
+		if len(after) != len(before)+1 {
+			t.Fatalf("expected exactly one item row created, had %d before and %d after", len(before), len(after))
+		}
+	})
+
+	t.Run("every known vocabulary type is still accepted", func(t *testing.T) {
+		vocab, err := schema.Vocab()
+		if err != nil {
+			t.Fatalf("schema.Vocab(): %v", err)
+		}
+		e := newEngine(t, nil)
+		for _, typ := range vocab.TypeNames() {
+			typ := typ
+			t.Run(typ, func(t *testing.T) {
+				mustCreate(t, e, CreateItemInput{Title: "x", Type: typ})
+			})
+		}
+	})
+}
+
 // TestDeskConfigOverridesDefaults: a stored desk_config rules YAML replaces the shipped
 // default (here: analysis becomes gated), and an INVALID stored config is a loud error, not a
 // silent fallback (§4.2).

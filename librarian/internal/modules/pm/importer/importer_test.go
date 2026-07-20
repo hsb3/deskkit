@@ -35,13 +35,13 @@ func newEngine(t *testing.T, desk string) *engine.Engine {
 	}
 }
 
-// sampleManifest is an identity-neutral fixture graph: an epic with two children, one of which
+// sampleManifest is an identity-neutral fixture graph: a project with two children, one of which
 // blocks the other (auto, unblock_at review), plus a standalone relates-to link. Generic names
 // only (R5.3) — no real desk/person/repo.
 func sampleManifest() Manifest {
 	return Manifest{
 		Items: []ManifestItem{
-			{Key: "epic-alpha", Title: "Ship the widget", Type: "epic", Court: "owner", Priority: 1},
+			{Key: "epic-alpha", Title: "Ship the widget", Type: "project", Court: "owner", Priority: 1},
 			{Key: "task-spec", Title: "Write the spec", Type: "task", Court: "desk", Parent: "epic-alpha", Pointer: "tasks/spec.md", Priority: 1},
 			{Key: "task-build", Title: "Build the widget", Type: "task", Court: "crew", Parent: "epic-alpha", Priority: 2},
 			{Key: "note-item", Title: "A loosely related note", Type: "analysis", Court: "desk"},
@@ -144,7 +144,10 @@ func TestImport_Idempotent(t *testing.T) {
 }
 
 // TestImport_RejectsBadManifest: unknown parent / dependency references and duplicate keys fail
-// loudly before any write (fail-loud discipline, R7).
+// loudly before any write (fail-loud discipline, R7). The "unknown item type" case is the
+// importer's inherited half of ADR 0012: e_createItem calls engine.CreateItem directly, so a
+// manifest item outside the schema-v1 vocabulary fails with the same propagated error and no
+// importer-side code was needed to make it so.
 func TestImport_RejectsBadManifest(t *testing.T) {
 	ctx := context.Background()
 	cases := []struct {
@@ -162,6 +165,7 @@ func TestImport_RejectsBadManifest(t *testing.T) {
 			{Key: "a", Title: "A", Parent: "b"},
 			{Key: "b", Title: "B", Parent: "a"},
 		}}},
+		{"unknown item type", Manifest{Items: []ManifestItem{{Key: "a", Title: "A", Type: "epic"}}}},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
