@@ -31,6 +31,7 @@ Read these to build, test, release, or change the products.
 | [development/](development/) | Contributor overview — build/test gates, media regeneration, release flow. |
 | [development/releasing.md](development/releasing.md) | How to version and cut a release (both products, one version). |
 | [development/tapes/](development/tapes/) | VHS `.tape` sources that regenerate the demo GIFs in `media/`. |
+| [development/ts-proxy-design.md](development/ts-proxy-design.md) | The TS→deskkit proxy design (ADR 0016 Option B implementation design). |
 | [pocket-librarian-v1-spec.md](pocket-librarian-v1-spec.md) | The librarian's product + technical build spec. |
 | [pm-system-v1-spec.md](pm-system-v1-spec.md) | The PM-system (document-gated work graph) product + technical build spec — the core+modules refactor, PM module, gates, surfaces, and plugin. |
 | [tool-surface.md](tool-surface.md) | The authoritative map of every tool/command across all three surfaces (librarian CLI, librarian MCP by gate, plugin TS server) with empirically-verified counts. |

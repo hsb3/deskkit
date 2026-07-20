@@ -500,6 +500,7 @@ never refiles an open finding for unchanged content.
 | `state` | select (1) | Values: `flagged`, `fixed`, `resolved`. Code always creates `flagged`. (`dismissed` retired by migration `0015` — the disposition axis replaced it; `resolved` added by `0010`.) |
 | `patrol_run` | text | `run_id`. |
 | `checksum` | text | Checksum of the flagged file at flag time; part of the dedupe key. |
+| `disposition` | select (1) | Values: `open`, `acknowledged`, `triaged`, `wont_fix`. Added by migration `0014` — a supervisor's triage decision, orthogonal to `state` (a finding can stay `flagged` while dispositioned). Defaults to `open` (backfilled on existing rows); the default `query findings` view filters `disposition='open'`. Inherited by the dedupe key `(file, rule, checksum)` on re-fire, alongside its `actor`/`reason`/`disposed_at` provenance. |
 | `actor` | text | Max 200. Disposition provenance: who dispositioned the finding. Free text, no baked default. Empty on `open` findings. |
 | `reason` | text | Max 2000. Disposition provenance: why. Optional for every disposition (a `wont_fix` MAY stay anonymous, though a reason is recommended). Empty on `open` findings. |
 | `disposed_at` | date | Disposition provenance: when the finding moved to a non-`open` disposition. Plain date (set at dispose time, NOT an autodate). Cleared when a finding returns to `open`. |

@@ -6,7 +6,7 @@ import (
 )
 
 // Extends patrol_findings with a "disposition" select — a supervisor's triage decision that is
-// ORTHOGONAL to the finding's `state` (flagged/dismissed/fixed/resolved). A finding stays
+// ORTHOGONAL to the finding's `state` (flagged/fixed/resolved) (dismissed retired in 0015). A finding stays
 // `flagged` while it is dispositioned acknowledged/triaged/wont_fix, so the two axes do not
 // collide: `state` tracks the finding's lifecycle, `disposition` tracks whether a human has
 // chosen to defer/silence it. The default `query findings` view is live-only
