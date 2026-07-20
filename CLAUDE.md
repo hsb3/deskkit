@@ -74,7 +74,7 @@ the exit code and has let a failing gate through before (incident, 2026-07-17).
 | `make help` | List all targets (default goal) |
 | `make setup` | `bun install` (plugin) + `lefthook install` (git hooks) |
 | `make build` | Build both lanes: plugin (`bun run build`) + librarian binary (version-stamped) |
-| `make test` | Fast unit tests: plugin `bun test` (59) + librarian `go test ./...` (314) |
+| `make test` | Fast unit tests: plugin `bun test` (75) + librarian `go test ./...` (594) |
 | `make check` | Repo gates: neutrality + self-test, kit-drift, prompt-drift, tool-surface drift + self-test, scaffold frontmatter, plugin core-purity, actionlint |
 | `make verify` | Librarian integration gate — `librarian/verify.sh` (48 checks, throwaway scratch desk) |
 | `make package` | Regenerate the marketplace bundle (`plugin/claude-plugin/` artifacts) |
@@ -112,6 +112,8 @@ self-contained — that's why it's committed and drift-guarded.
 | Prompt copies byte-identical (embed ↔ spec quote; ADR 0015) | `scripts/check-prompt-drift.mjs` |
 | `docs/tool-surface.md` counts match source (ADR 0016) | `scripts/check-tool-surface.mjs` (+ `--self-test`; MCP gated counts by `TestToolSurfaceDoc_MCPCounts` on `make test`) |
 | Scaffold instruments carry conformant frontmatter | `scripts/check-scaffold-frontmatter.mjs` |
+| Persona bundle stays generated from its sources (ADR 0014) | `scripts/check-persona-drift.mjs` |
+| Content TextFields carry an explicit Max (ADR 0017) | `scripts/check-textfield-max.mjs` (+ `--self-test`) |
 | A tagged release has a CHANGELOG section | `scripts/check-changelog.mjs` (release gate) |
 
 ### Order-sensitive chains

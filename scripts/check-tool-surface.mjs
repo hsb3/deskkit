@@ -202,6 +202,7 @@ function runSelfTest() {
   // and a doc snippet whose counts agree.
   const ts4 = "export const TOOLS: ToolDef<any, any>[] = [a, b, c, d];\n";
   const ts5 = "export const TOOLS: ToolDef<any, any>[] = [a, b, c, d, e];\n";
+  const ts3 = "export const TOOLS: ToolDef<any, any>[] = [a, b, c];\n"; // one fewer → derives 3
   const go16 =
     Array.from({ length: 13 }, () => "\tapp.RootCmd.AddCommand(x)\n").join("") +
     'var pbLateCommands = []string{"serve", "superuser"}\n' +
@@ -221,6 +222,12 @@ function runSelfTest() {
     {
       name: "TS tool added without a doc edit → RED (names TS)",
       args: { tsSource: ts5, goSource: go16, docMd: docMatched, goGuardPresent: true },
+      wantFail: true,
+      wantMatch: /TS surface/,
+    },
+    {
+      name: "TS tool removed without a doc edit → RED (names TS)",
+      args: { tsSource: ts3, goSource: go16, docMd: docMatched, goGuardPresent: true },
       wantFail: true,
       wantMatch: /TS surface/,
     },
