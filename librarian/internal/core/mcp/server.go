@@ -61,14 +61,24 @@ func ExposedTools(cfg *config.Config) []string {
 	return toolcore.ExposedTools(cfg)
 }
 
-// NewServer builds the MCP server with exactly the gated tool set for cfg, looping over the
-// merged toolcore registry (populated from the enabled module set at startup) instead of a
+// NewServer builds the MCP server with exactly the §5.4-gated tool set for cfg — the FULL exposed
+// set (toolcore.ExposedTools(cfg)), NOT module-gated. Module gating (MCP_MODULES) is a Serve-path
+// concern only, so NewServer stays the stable "all exposed tools" builder the module tests
+// (gatedon/gatedoff) and TestNewServer_BuildsForBothGates rely on. It loops over the merged
+// toolcore registry (populated from the enabled module set at startup) instead of a
 // hand-maintained name-keyed switch — so a second module's tools register here without editing
 // this file. app is used only inside the tool handlers (invoked per request), not during
 // registration, so it may be nil in tests that only assert the registered set.
 func NewServer(app core.App, cfg *config.Config) (*mcp.Server, error) {
+	return newServerForTools(app, cfg, toolcore.ExposedTools(cfg))
+}
+
+// newServerForTools builds an MCP server registering exactly the tools in names (which the caller
+// has already gated). Both NewServer (full exposed set) and Serve (optionally module-filtered set)
+// call it, so the registration loop lives in ONE place regardless of which gate produced names.
+func newServerForTools(app core.App, cfg *config.Config, names []string) (*mcp.Server, error) {
 	s := mcp.NewServer(&mcp.Implementation{Name: serverName, Version: serverVersion}, nil)
-	for _, name := range toolcore.ExposedTools(cfg) {
+	for _, name := range names {
 		spec, ok := toolcore.Spec(name)
 		if !ok {
 			return nil, fmt.Errorf("mcp: exposed tool %q not in registry (registrar drift)", name)
@@ -103,19 +113,73 @@ func Serve(ctx context.Context, app core.App, cfg *config.Config) error {
 		fmt.Fprintf(os.Stderr, "deskkit mcp-serve: %v\n", err)
 		os.Exit(1)
 	}
-	s, err := NewServer(app, cfg)
+
+	// Module gate (MCP_MODULES): a shared MCP mount narrows the exposed set to specific modules —
+	// the desk-pm mount declares MCP_MODULES=pm so it carries the twelve PM tools and none of the
+	// librarian ride-alongs. resolveModuleGate encodes the three cases (unset = all, set-but-empty
+	// = fail, unresolvable = fail); a failure is surfaced here as a direct os.Exit(1) — never a
+	// returned error — mirroring the requireResolvedConfig precedent above, because PocketBase's
+	// Start()/serve goroutine discards RunE errors, so a returned error would serve silently.
+	raw, declared := os.LookupEnv("MCP_MODULES")
+	names, modules, failReason, ok := resolveModuleGate(cfg, raw, declared)
+	if !ok {
+		fmt.Fprintf(os.Stderr, "deskkit mcp-serve: %s\n", failReason)
+		os.Exit(1)
+	}
+
+	s, err := newServerForTools(app, cfg, names)
 	if err != nil {
 		return err
 	}
-	// Mount signal: emit ONE concise line so a host operator can SEE the surface came up (and
-	// which tools it carries — the PM tool family only appears when PM is enabled) instead of
-	// guessing at a silent absence. It MUST go to stderr — stdout is the JSON-RPC channel and any
-	// stray byte there corrupts the protocol.
-	emitMountSignal(os.Stderr, ExposedTools(cfg))
+	// Mount signal: emit ONE concise line so a host operator can SEE the surface came up (which
+	// module set gated it and which tools it carries) instead of guessing at a silent absence. It
+	// MUST go to stderr — stdout is the JSON-RPC channel and any stray byte there corrupts the
+	// protocol.
+	emitMountSignal(os.Stderr, modules, names)
 	if rerr := s.Run(ctx, &mcp.StdioTransport{}); rerr != nil && !isShutdownEOF(rerr) {
 		return rerr
 	}
 	return nil
+}
+
+// resolveModuleGate applies the MCP_MODULES gate to cfg's exposed tool set and returns the tool
+// NAME list to register plus the module-set label for the mount signal. The three cases are kept
+// DISTINCT — collapsing them is the design trap this gate exists to avoid:
+//
+//   - raw UNSET (declared == false): no module filter — every exposed tool (today's behavior,
+//     unchanged); modules is nil (the signal renders "all"). This preserves the 5/6/17/18 counts.
+//   - raw SET but resolving to zero declared module names (e.g. "" or " , " — after splitting on
+//     comma and trimming, nothing remains): FAIL LOUD. ok == false, failReason names the empty
+//     declaration. Do NOT fall back to "all" — an explicit-but-empty declaration is an operator
+//     error, and silently exposing everything would defeat the mount's intent.
+//   - raw SET, non-empty declared set: filter ExposedSpecs by module via SelectByModules. If the
+//     FILTERED result is empty (unresolvable — a typo'd name, or a module not registered/enabled
+//     on this desk, e.g. MCP_MODULES=pm without PM_ENABLED): FAIL LOUD. A partially-matching set
+//     (e.g. "librarian,bogus" where librarian matches) yields a non-empty result and serves.
+func resolveModuleGate(cfg *config.Config, raw string, declared bool) (names, modules []string, failReason string, ok bool) {
+	if !declared {
+		return toolcore.ExposedTools(cfg), nil, "", true
+	}
+	var mods []string
+	for _, part := range strings.Split(raw, ",") {
+		if m := strings.TrimSpace(part); m != "" {
+			mods = append(mods, m)
+		}
+	}
+	if len(mods) == 0 {
+		return nil, nil, fmt.Sprintf(
+			"MCP_MODULES is set to %q but names no module after splitting on comma and trimming; "+
+				"set it to a comma-separated module list (e.g. \"pm\" or \"librarian,pm\") or unset it to expose every module",
+			raw), false
+	}
+	names = toolcore.ToolNames(toolcore.SelectByModules(toolcore.ExposedSpecs(cfg), mods...))
+	if len(names) == 0 {
+		return nil, mods, fmt.Sprintf(
+			"MCP_MODULES=%q resolved to no exposed tools on this desk; none of those modules are registered/enabled here — "+
+				"check the module name(s) and that the owning module is enabled (e.g. set PM_ENABLED=true for \"pm\")",
+			raw), false
+	}
+	return names, mods, "", true
 }
 
 // requireResolvedConfig reports whether cfg is a fully-resolved desk (a non-nil config with a
@@ -141,13 +205,19 @@ func requireResolvedConfig(cfg *config.Config) error {
 	return nil
 }
 
-// emitMountSignal writes ONE concise mount line to w: the server identity plus the exact tool set
-// it exposed. Presence of this line in the host's server log is the observable "the surface
-// mounted" signal (its absence, a diagnostic). Callers MUST pass a stderr writer — never stdout,
-// the JSON-RPC channel.
-func emitMountSignal(w io.Writer, tools []string) {
-	fmt.Fprintf(w, "deskkit mcp-serve: mounted %q %s; %d tool(s) exposed: %s\n",
-		serverName, serverVersion, len(tools), strings.Join(tools, ", "))
+// emitMountSignal writes ONE concise mount line to w: the server identity, the gated MODULE SET,
+// and the exact tool set it exposed. Presence of this line in the host's server log is the
+// observable "the surface mounted" signal (its absence, a diagnostic); naming the module set makes
+// a module-gated mount (e.g. desk-pm's MCP_MODULES=pm) legible at a glance. modules is the declared
+// set (nil when MCP_MODULES is unset → rendered "all"). Callers MUST pass a stderr writer — never
+// stdout, the JSON-RPC channel.
+func emitMountSignal(w io.Writer, modules []string, tools []string) {
+	moduleSet := "all"
+	if len(modules) > 0 {
+		moduleSet = strings.Join(modules, ",")
+	}
+	fmt.Fprintf(w, "deskkit mcp-serve: mounted %q %s; modules: %s; %d tool(s) exposed: %s\n",
+		serverName, serverVersion, moduleSet, len(tools), strings.Join(tools, ", "))
 }
 
 // isShutdownEOF reports whether err is the normal end of a stdio MCP session rather than a

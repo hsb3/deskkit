@@ -3,7 +3,8 @@
     "command": "deskkit",
     "args": ["mcp-serve"],
     "env": {
-      "PM_ENABLED": "true"
+      "PM_ENABLED": "true",
+      "MCP_MODULES": "pm"
     }
   }
 }

@@ -102,11 +102,16 @@ func newAgent(ctx context.Context, app core.App, chatModel model.ToolCallingChat
 // buildTools builds eino InvokableTools for the merged registry's gated tool set
 // (toolcore.AgentTools(cfg)): the §5.4 LIBRARIAN_AUTONOMOUS_WRITES gate is enforced by
 // EXCLUSION FROM THE SLICE (apply_fix absent unless gated on; restore never present) — not
-// re-implemented here. Each spec's NewEinoTool derives the tool's JSON schema from its input
-// struct's jsonschema tags via eino's InferTool (moved into toolcore.New).
+// re-implemented here. On top of that gate, the slice is further narrowed to the librarian
+// module only (toolcore.SelectByModules(..., "librarian")): the in-binary eino loop's system
+// prompt covers the librarian tool family exclusively, so when PM is enabled and its twelve
+// tools join the merged registry, they must NOT reach this loop (ADR 0014(c)) — the PM tools
+// are surfaced only via the MCP/CLI surfaces, which build their own module-appropriate slices.
+// Each spec's NewEinoTool derives the tool's JSON schema from its input struct's jsonschema tags
+// via eino's InferTool (moved into toolcore.New).
 func buildTools(app core.App, cfg *config.Config) ([]tool.BaseTool, error) {
 	var out []tool.BaseTool
-	for _, spec := range toolcore.AgentTools(cfg) {
+	for _, spec := range toolcore.SelectByModules(toolcore.AgentTools(cfg), "librarian") {
 		t, err := spec.NewEinoTool(app, cfg)
 		if err != nil {
 			return nil, fmt.Errorf("register tool %q: %w", spec.Name, err)

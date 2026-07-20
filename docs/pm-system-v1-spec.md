@@ -710,6 +710,10 @@ mirroring the librarian pattern) — this spec ships it defaulting **on** for PM
 expected to drive the graph) while keeping `transition_item`'s document gates as the real
 safety (§13).
 
+See [`docs/agent-integration-contract-v1-spec.md`](agent-integration-contract-v1-spec.md) for
+the full cross-product agent-integration contract: this write-gate asymmetry is one of its five
+named parameters, ratified as policy rather than drift to reconcile against the librarian.
+
 ### 5.2 `get_context` — the cold-start briefing (R4.2)
 
 One call returns the desk's working state, replacing the hand-maintained handoff §1 threads index
