@@ -33,3 +33,8 @@ librarian/internal/modules/librarian/desklib/desklib.go | #1
 # byte identity, so the copy cannot diverge; its provenance comments legitimately carry the
 # same issue ordinals the canonical file carries.
 librarian/internal/core/schema/doctypes.yaml
+
+# Agent-integration contract spec: the cross-product agent/PM parity doc under docs/ — a docs
+# authoring surface (SCAN_DIRS does not cover docs/), allow-listed explicitly since the doc
+# necessarily names internal path/tool identifiers across both lanes.
+docs/agent-integration-contract-v1-spec.md

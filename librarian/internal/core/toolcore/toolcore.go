@@ -141,18 +141,45 @@ func AgentTools(cfg *config.Config) []ToolSpec {
 	return out
 }
 
-// ExposedTools mirrors the old mcp.ExposedTools: AgentTools(cfg) with restore excluded
-// defensively (§5.5). Because AgentTools already never returns restore, the explicit skip is
-// defense-in-depth.
-func ExposedTools(cfg *config.Config) []string {
-	var names []string
+// SelectByModules returns the subset of specs whose Module is one of modules. It is a pure
+// filter over a passed-in slice — it never mutates or forks the shared registry — so a surface
+// that must narrow an already-gated slice (e.g. the eino agent loop restricting itself to the
+// librarian module while PM tools are also registered) composes this on top of AgentTools(cfg)
+// instead of forking a second copy of the gate logic.
+func SelectByModules(specs []ToolSpec, modules ...string) []ToolSpec {
+	allow := map[string]bool{}
+	for _, m := range modules {
+		allow[m] = true
+	}
+	var out []ToolSpec
+	for _, s := range specs {
+		if allow[s.Module] {
+			out = append(out, s)
+		}
+	}
+	return out
+}
+
+// ExposedSpecs returns AgentTools(cfg) with restore excluded (§5.5) — the spec-level twin of
+// ExposedTools, so a caller that must filter the exposed set by module (the module-gated mount)
+// can reuse SelectByModules instead of re-deriving the gate. This is the single source both
+// ExposedTools (name list) and the module-gated mount (filter-then-name) build from.
+func ExposedSpecs(cfg *config.Config) []ToolSpec {
+	var out []ToolSpec
 	for _, s := range AgentTools(cfg) {
 		if s.Name == "restore" {
 			continue
 		}
-		names = append(names, s.Name)
+		out = append(out, s)
 	}
-	return names
+	return out
+}
+
+// ExposedTools mirrors the old mcp.ExposedTools: AgentTools(cfg) with restore excluded
+// defensively (§5.5). Because AgentTools already never returns restore, the explicit skip is
+// defense-in-depth. It is the name projection of ExposedSpecs — one gate, two shapes.
+func ExposedTools(cfg *config.Config) []string {
+	return ToolNames(ExposedSpecs(cfg))
 }
 
 // ToolNames maps a []ToolSpec to its names (convenience for the loop/MCP slices).

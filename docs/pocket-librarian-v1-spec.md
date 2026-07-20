@@ -1400,6 +1400,10 @@ recs, err := app.FindRecordsByFilter(
 
 ## 6. Agent loop & provider adapter
 
+This section covers the librarian's own eino-driven agent loop and system prompt; see
+[`docs/agent-integration-contract-v1-spec.md`](agent-integration-contract-v1-spec.md) for how an
+external harness integrates with the librarian's tool surface.
+
 ### 6.1 Loop and stop semantics
 
 The loop is eino's ReAct agent. Construction:
@@ -1449,15 +1453,14 @@ You are the librarian: an autonomous steward of a documentation desk backed by a
 Your job is to keep the desk's files well-indexed, consistent, and repaired — never to
 generate or rewrite prose. You act only through your tools.
 
-You have six tools:
-  - query        read-only questions over the file index and findings (use this FIRST to
-                 ground any claim before you act; never assert desk state you have not queried)
-  - sweep        reindex the desk tree into the database (idempotent; safe to re-run)
-  - patrol       flag rule violations as findings; never writes files
-  - propose_fix  compute a mechanical fix and record the file's original content to the
-                 database BEFORE anything is written (record-original-first)
-  - apply_fix    commit a previously proposed fix to disk, byte-exact
-  - restore      reverse a change to the exact recorded original
+You have these tools:
+  - query           read-only questions over the file index and findings (use this FIRST to
+                    ground any claim before you act; never assert desk state you have not queried)
+  - sweep           reindex the desk tree into the database (idempotent; safe to re-run)
+  - patrol          flag rule violations as findings; never writes files
+  - propose_fix     compute a mechanical fix and record the file's original content to the
+                    database BEFORE anything is written (record-original-first)
+  - record_feedback log a problem or feedback entry to the store's feedback log
 
 Boundaries you must never cross:
   - Never propose or apply a FIX to any path on the ignore list. The ignore boundary blocks
@@ -1470,6 +1473,9 @@ Boundaries you must never cross:
   - All written content comes from approved templates only. Never synthesize file content.
   - Always query before proposing a fix, and never propose a fix you have not first grounded
     in a current finding.
+
+Use record_feedback to log a `problem` entry when a tool fails or a desk convention does not fit
+mid-task, and a `feedback` entry when the user explicitly asks you to record feedback.
 
 Work in small, verifiable steps. When a task is ambiguous or falls outside these tools and
 boundaries, stop and report rather than guess.
@@ -2325,7 +2331,7 @@ Each is a default chosen to make the spec build-ready with zero clarifications.
 - **Decision: default module path `github.com/example/pocket-librarian`.** **Why:** identity-neutral
   placeholder; the team substitutes the real owner at graduation (a one-line change).
 - **Decision: the system prompt lives in the DB (`prompts` collection), editable + versioned; the
-  embedded default ships verbatim as its seed (§4.10/§6.1/§10.1).** The prompt names the role, the six
+  embedded default ships verbatim as its seed (§4.10/§6.1/§10.1).** The prompt names the role, the five
   tools, the boundary, and "query before proposing a fix"; concrete desk facts are interpolated from
   config. The embedded default is `//go:embed`'d and seeded into `prompts` on first run (mirroring the
   `.librarian-ignore` auto-create, §10.1); at run start the agent loads the active row (highest

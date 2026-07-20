@@ -15,8 +15,10 @@ import (
 	"time"
 
 	"github.com/example/pocket-librarian/internal/core/config"
+	coreschema "github.com/example/pocket-librarian/internal/core/schema"
 	"github.com/example/pocket-librarian/internal/core/toolcore"
 	"github.com/example/pocket-librarian/internal/modules/librarian/tools"
+	pmtools "github.com/example/pocket-librarian/internal/modules/pm/tools"
 )
 
 // TestMain populates the shared toolcore registry with the librarian's specs — exactly what
@@ -250,12 +252,15 @@ func TestRequireResolvedConfig(t *testing.T) {
 }
 
 // TestEmitMountSignal is the focused unit test on the mount-signal shape: ONE line naming the
-// server identity + the exact tool count/set, terminated by a newline. This is the "the surface
-// mounted" observability signal — presence must be visible on stderr, never silently absent.
+// server identity, the gated MODULE SET, and the exact tool count/set, terminated by a newline.
+// This is the "the surface mounted" observability signal — presence must be visible on stderr,
+// never silently absent — and the module segment (DoD 2d) makes a module-gated mount legible.
 func TestEmitMountSignal(t *testing.T) {
-	var buf bytes.Buffer
 	tools := []string{"sweep", "patrol", "query"}
-	emitMountSignal(&buf, tools)
+
+	// Module-gated form: modules names the declared set on the line.
+	var buf bytes.Buffer
+	emitMountSignal(&buf, []string{"pm"}, tools)
 	got := buf.String()
 
 	if strings.Count(got, "\n") != 1 || !strings.HasSuffix(got, "\n") {
@@ -264,6 +269,9 @@ func TestEmitMountSignal(t *testing.T) {
 	if !strings.Contains(got, serverName) {
 		t.Errorf("mount signal should name the server %q; got %q", serverName, got)
 	}
+	if !strings.Contains(got, "modules: pm") {
+		t.Errorf("mount signal should name the gated module set; got %q", got)
+	}
 	if !strings.Contains(got, "3 tool") {
 		t.Errorf("mount signal should report the tool count; got %q", got)
 	}
@@ -271,6 +279,154 @@ func TestEmitMountSignal(t *testing.T) {
 		if !strings.Contains(got, name) {
 			t.Errorf("mount signal should list tool %q; got %q", name, got)
 		}
+	}
+
+	// Unset form (modules == nil): the segment renders "all".
+	var allBuf bytes.Buffer
+	emitMountSignal(&allBuf, nil, tools)
+	if !strings.Contains(allBuf.String(), "modules: all") {
+		t.Errorf("mount signal with no module filter should render \"modules: all\"; got %q", allBuf.String())
+	}
+}
+
+// TestResolveModuleGate is the load-bearing unit test for the MCP_MODULES gate's three DISTINCT
+// cases (the design trap this slice exists to get right). It runs against the librarian-only
+// registry TestMain installs, so the "pm" and "nonexistent" cases are genuinely unresolvable here
+// and prove the fail-loud branch WITHOUT re-exec. It never touches process env (raw/declared are
+// passed in), so it is fully hermetic.
+func TestResolveModuleGate(t *testing.T) {
+	cfg := &config.Config{AutonomousWrites: false} // librarian default surface: 5 exposed tools
+	librarian5 := []string{"sweep", "patrol", "propose_fix", "query", "record_feedback"}
+
+	t.Run("unset exposes all (unchanged behavior)", func(t *testing.T) {
+		names, modules, _, ok := resolveModuleGate(cfg, "", false)
+		if !ok {
+			t.Fatalf("unset MCP_MODULES must resolve, not fail loud")
+		}
+		if modules != nil {
+			t.Errorf("unset must yield a nil module label (renders \"all\"); got %v", modules)
+		}
+		if !equalSet(names, librarian5) {
+			t.Errorf("unset names = %v, want the full librarian set %v", names, librarian5)
+		}
+	})
+
+	t.Run("librarian filter yields exactly the librarian tools", func(t *testing.T) {
+		names, modules, _, ok := resolveModuleGate(cfg, "librarian", true)
+		if !ok {
+			t.Fatalf("MCP_MODULES=librarian must resolve on a librarian desk")
+		}
+		if !equalSet(modules, []string{"librarian"}) {
+			t.Errorf("modules label = %v, want [librarian]", modules)
+		}
+		if !equalSet(names, librarian5) {
+			t.Errorf("filtered names = %v, want %v", names, librarian5)
+		}
+	})
+
+	t.Run("partial match still serves (do not overengineer per-name validation)", func(t *testing.T) {
+		names, _, _, ok := resolveModuleGate(cfg, "librarian,bogus", true)
+		if !ok {
+			t.Fatalf("a partially-matching set must serve the matched subset, not fail loud")
+		}
+		if !equalSet(names, librarian5) {
+			t.Errorf("filtered names = %v, want %v", names, librarian5)
+		}
+	})
+
+	failCases := []struct {
+		name    string
+		raw     string
+		mustSay string
+	}{
+		{"explicitly empty", "", "MCP_MODULES"},
+		{"whitespace and commas only", " , ", "MCP_MODULES"},
+		{"typo'd module name", "libarian", "no exposed tools"},
+		{"module not registered on this desk", "pm", "no exposed tools"},
+	}
+	for _, fc := range failCases {
+		t.Run("fail loud: "+fc.name, func(t *testing.T) {
+			names, _, reason, ok := resolveModuleGate(cfg, fc.raw, true)
+			if ok {
+				t.Fatalf("MCP_MODULES=%q must fail loud (resolve to no tools), got names=%v", fc.raw, names)
+			}
+			if names != nil {
+				t.Errorf("fail-loud path must return no names; got %v", names)
+			}
+			if !strings.Contains(reason, fc.mustSay) {
+				t.Errorf("fail reason %q should mention %q", reason, fc.mustSay)
+			}
+		})
+	}
+}
+
+// TestResolveModuleGate_PMFilter proves the desk-pm mount's gate: with BOTH librarian and pm
+// registered (the PM_ENABLED case), MCP_MODULES=pm resolves to exactly the twelve PM tools and
+// none of the librarian ride-alongs, while MCP_MODULES=librarian keeps exactly the librarian set.
+// It registers pm specs like the agent test does and restores the librarian-only registry via
+// t.Cleanup so the rest of the package's tests keep their TestMain-installed state — hermetic.
+func TestResolveModuleGate_PMFilter(t *testing.T) {
+	toolcore.Reset()
+	toolcore.Register(tools.Specs()...)
+	// writesEnabled=true so all twelve PM specs are AgentDefault and land in ExposedSpecs.
+	toolcore.Register(pmtools.Specs(func() coreschema.DocumentValidator { return nil }, true)...)
+	t.Cleanup(func() {
+		toolcore.Reset()
+		toolcore.Register(tools.Specs()...)
+	})
+
+	cfg := &config.Config{AutonomousWrites: true} // widest gate; ExposedSpecs still excludes restore
+
+	pmNames, modules, _, ok := resolveModuleGate(cfg, "pm", true)
+	if !ok {
+		t.Fatalf("MCP_MODULES=pm must resolve when pm is registered")
+	}
+	if !equalSet(modules, []string{"pm"}) {
+		t.Errorf("modules label = %v, want [pm]", modules)
+	}
+	if !equalSet(pmNames, pmtools.ToolNames()) {
+		t.Errorf("MCP_MODULES=pm names = %v, want exactly the 12 PM tools %v", pmNames, pmtools.ToolNames())
+	}
+	if len(pmNames) != 12 {
+		t.Errorf("MCP_MODULES=pm exposed %d tools, want exactly 12", len(pmNames))
+	}
+	// None of the five librarian ride-alongs may leak into the pm mount.
+	pmSet := map[string]bool{}
+	for _, n := range pmNames {
+		pmSet[n] = true
+	}
+	for _, ride := range []string{"sweep", "patrol", "propose_fix", "query", "record_feedback", "apply_fix"} {
+		if pmSet[ride] {
+			t.Errorf("librarian tool %q leaked into the pm mount (MCP_MODULES=pm must drop the ride-alongs)", ride)
+		}
+	}
+
+	// The complementary filter: MCP_MODULES=librarian keeps exactly the librarian tools (6 with
+	// autonomous writes on: the 5 defaults + apply_fix), and no PM tool.
+	libNames, _, _, ok := resolveModuleGate(cfg, "librarian", true)
+	if !ok {
+		t.Fatalf("MCP_MODULES=librarian must resolve")
+	}
+	wantLib := []string{"sweep", "patrol", "propose_fix", "query", "record_feedback", "apply_fix"}
+	if !equalSet(libNames, wantLib) {
+		t.Errorf("MCP_MODULES=librarian names = %v, want %v", libNames, wantLib)
+	}
+
+	// The combined declaration completes the matrix: both modules named exposes exactly the
+	// union (18 = 6 librarian + 12 pm here) — pinning SelectByModules against accidental
+	// deduplication or ordering bugs across a multi-module set.
+	bothNames, bothModules, _, ok := resolveModuleGate(cfg, "librarian,pm", true)
+	if !ok {
+		t.Fatalf("MCP_MODULES=librarian,pm must resolve when both modules are registered")
+	}
+	if !equalSet(bothModules, []string{"librarian", "pm"}) {
+		t.Errorf("modules label = %v, want [librarian pm]", bothModules)
+	}
+	if !equalSet(bothNames, toolcore.ToolNames(toolcore.ExposedSpecs(cfg))) {
+		t.Errorf("MCP_MODULES=librarian,pm names = %v, want the full exposed set", bothNames)
+	}
+	if len(bothNames) != 18 {
+		t.Errorf("MCP_MODULES=librarian,pm exposed %d tool(s), want 18 (6 librarian + 12 pm)", len(bothNames))
 	}
 }
 
@@ -354,6 +510,57 @@ func TestServe_FailsLoudOnUnresolvedDesk(t *testing.T) {
 	}
 	if !strings.Contains(stderr.String(), "DESK_ROOT") || !strings.Contains(stderr.String(), "DESK_NAME") {
 		t.Errorf("stderr not actionable (should name DESK_ROOT and DESK_NAME); got %q", stderr.String())
+	}
+}
+
+// TestServe_FailsLoudOnModuleGate is the RED-able regression for the MCP_MODULES fail-loud
+// contract: a RESOLVED desk with MCP_MODULES set to an empty or unresolvable value must exit
+// NON-ZERO with an actionable stderr message — never silently serve the full set or an empty set
+// and exit 0. Serve os.Exit(1)s on that path (a returned error would be swallowed by PocketBase's
+// serve goroutine), so the assertion runs in a re-exec'd child — the same pattern as
+// TestServe_FailsLoudOnUnresolvedDesk. The child's TestMain registers librarian only, so
+// MCP_MODULES=pm and MCP_MODULES=nonexistent are genuinely unresolvable there.
+func TestServe_FailsLoudOnModuleGate(t *testing.T) {
+	if os.Getenv("DESKKIT_MCP_MODGATE_CHILD") == "1" {
+		// Child: a fully-resolved desk (so requireResolvedConfig passes and we reach the module
+		// gate), with MCP_MODULES inherited from the parent. Empty/unresolvable → Serve os.Exit(1)s;
+		// absent the gate it would build the server and fall through to a clean EOF shutdown, exit 0.
+		_ = Serve(context.Background(), nil, &config.Config{DeskRoot: os.TempDir(), DeskName: "probe"})
+		return
+	}
+	cases := []struct {
+		name    string
+		modules string
+		mustSay []string
+	}{
+		{"explicitly empty", "", []string{"MCP_MODULES", "no module"}},
+		{"whitespace and commas only", " , ", []string{"MCP_MODULES", "no module"}},
+		{"unresolvable module name", "nonexistent", []string{"MCP_MODULES", "no exposed tools"}},
+		{"pm requested but not registered on this desk", "pm", []string{"MCP_MODULES", "no exposed tools"}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			defer cancel()
+			cmd := exec.CommandContext(ctx, os.Args[0], "-test.run=TestServe_FailsLoudOnModuleGate")
+			cmd.Env = append(os.Environ(), "DESKKIT_MCP_MODGATE_CHILD=1", "MCP_MODULES="+tc.modules)
+			var stderr bytes.Buffer
+			cmd.Stderr = &stderr
+			err := cmd.Run()
+
+			var ee *exec.ExitError
+			if !errors.As(err, &ee) {
+				t.Fatalf("expected a non-zero exit (fail loud), got err=%v; stderr=%q", err, stderr.String())
+			}
+			if code := ee.ExitCode(); code != 1 {
+				t.Errorf("expected exit code 1, got %d; stderr=%q", code, stderr.String())
+			}
+			for _, want := range tc.mustSay {
+				if !strings.Contains(stderr.String(), want) {
+					t.Errorf("stderr not actionable (should mention %q); got %q", want, stderr.String())
+				}
+			}
+		})
 	}
 }
 

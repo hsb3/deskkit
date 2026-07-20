@@ -15,6 +15,22 @@ for why this policy exists.
 
 ### Added
 
+- **Tool-level MCP module gating on a shared mount** (`MCP_MODULES`; the agent integration
+  contract — [ADR 0014](docs/decisions/0014-agent-integration-contract.md),
+  `docs/agent-integration-contract-v1-spec.md`, #114 under epic #129). `deskkit mcp-serve` now filters its
+  exposed tool set to the modules named in `MCP_MODULES`, keyed on each tool's `ToolSpec.Module`
+  (`internal/core/mcp/server.go` → `toolcore.SelectByModules` over `toolcore.ExposedSpecs(cfg)`),
+  so a shared MCP mount carries only the tools it is meant to expose. The **desk-pm** plugin mount
+  (`plugin/desk-pm/.mcp.json`) declares `MCP_MODULES=pm` alongside `PM_ENABLED=true` and therefore
+  exposes **exactly the 12 PM tools, dropping the 5 librarian ride-alongs (17 → 12)**. The
+  semantics are three-way and deliberately non-collapsing: `MCP_MODULES` **unset** exposes every
+  module (the 5 / 6 / 17 / 18 counts are unchanged); **set-but-empty** (`""`, `" , "`) or
+  **unresolvable** (a typo, or a module not registered/enabled on this desk) **fails loud** with a
+  direct `os.Exit(1)` and an actionable stderr line — never a silent fallback to "all". The
+  `deskkit mcp-serve` mount signal now names the gated set (`modules: pm; 12 tool(s) exposed: …`).
+  `docs/tool-surface.md` gains the module-gating axis (§2.1) and an extended count-derivation
+  method; the eino agent loop stays librarian-only (ADR 0014(c)) and its prompt no longer names PM
+  tools it never receives.
 - **Typed cross-reference contract in `schema/`** (#116, ADR 0011). `schema/references.yaml`
   adds schema v1's third dimension — a `{kind, target}` reference primitive with a closed
   `kind` enum (seeded `issue`, `url`) and a raw `target` string. The desk-relative repo
