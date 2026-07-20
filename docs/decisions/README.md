@@ -17,3 +17,13 @@ where the decision binds; never delete a record — supersede or correct in plac
 | [0006](0006-kit-port-schema-reconciliation.md) | SOP kit port + schema-v1 doc-type reconciliation | Accepted (2026-07-18) |
 | [0007](0007-tui-charm-v2-stack.md) | Chat TUI moves to the Charm v2 stack (terminal background retained) | Accepted (2026-07-18) |
 | [0008](0008-pm-core-modules-architecture.md) | PM system architecture: core + compile-time modules (R5.5) — narrow validation seam, module-scoped migrations, per-desk feature gating | Accepted (2026-07-19) |
+| [0009](0009-platform-frame.md) | The platform frame — grow deskkit, staged truth regime (files-are-truth + named gate), schema two-track + model simulations | Accepted (2026-07-20) |
+| [0010](0010-pointer-grammar.md) | Pointer grammar — ratify shipped behavior; URL refs are not gate pointers | Accepted (2026-07-20) |
+| [0011](0011-typed-reference-contract.md) | Typed cross-reference contract — specify in `schema/` now, migrate on the v2 track | Accepted (2026-07-20) |
+| [0012](0012-item-type-validation.md) | `items.type` validated at creation — hard reject unknown types | Accepted (2026-07-20) |
+| [0013](0013-disposition-completion-adoption-log.md) | Findings lifecycle completed — provenance on the finding, adoption log shrunk to writer-backed events | Accepted (2026-07-20) |
+| [0014](0014-agent-integration-contract.md) | The agent integration contract — composed desk persona bundle, gated shared mount, librarian-only in-binary loop | Accepted (2026-07-20) |
+| [0015](0015-prompt-governance.md) | Prompt governance — git is truth, DB rows a re-seeded cache, centralized tuning requirement | Accepted (2026-07-20) |
+| [0016](0016-ts-boundary-deskkit-proxy.md) | TS plugin boundary — extend via a designed deskkit proxy; drift-guarded tool-surface truth | Accepted (2026-07-20) |
+| [0017](0017-document-identity-and-hygiene.md) | Document identity & hygiene — frontmatter id, `entity_type` column rename, text-cap sweep + guard | Accepted (2026-07-20) |
+| [0018](0018-element-model-direction.md) | Element-model direction — simple goal, optional workstream tag, research loop, trigger-gated exec outputs | Accepted (2026-07-20) |

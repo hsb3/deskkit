@@ -40,6 +40,133 @@ authored; root `tests/` ruled a declared-home index (recorded in `_meta/mise-en-
 widening comment is posted; #81 rides the 1.0.0 milestone (R20 ruling). Cutting the next
 release follows `docs/development/releasing.md`.
 
+**Session 2026-07-20 — owner ruled the sequencing: bug floor → design session → features.**
+After 0.8.0's bugs, a design session rules direction before any feature lane starts. Two
+owner concerns were assessed against source and independently verified: (1) the librarian
+and PM agent integrations are NOT mirror images — different kinds of objects on different
+layers (in-binary Go eino loop vs plugin-markdown agent), with four unruled asymmetries
+(no librarian Claude Code bundle; ride-along librarian tools on the PM MCP mount; the
+in-binary loop gets PM tools with no PM prompt; split prompt governance); (2) the store
+models documents as path-keyed frontmatter indexes only — no sub-file addressing, untyped
+repo-unqualified cross-refs, an unwired `dismissed` disposition, no rename identity —
+**#92/#93/#102 are symptoms of these gaps: fix them as modeling decisions, not spot
+patches.** Evidence + the six-decision design-session agenda: exec desk
+`analyses/desk-standard-agent-symmetry-and-document-model-2026-07-20.md` (§3). A
+plain-language status briefing (15-slide PDF + MP3, comms standard) is at exec desk
+`_meta/briefings/2026-07-20-status-and-direction/`. Owner preference (saved to project
+memory): decision packages for Henry are non-markdown decks/PDFs, never terminal markdown.
+
+**BUG FLOOR MERGED (2026-07-20) — PR #112 squash-merged to main as `51235f6`.** All nine
+0.8.0 milestone issues shipped: #67/#78/#79/#80/#91/#92/#93/#102 + #94 (stretch, done); the
+PR body's "Closes" auto-closed all nine. Each fix carries a **red-able regression test**
+(#82's bar); the three data-safety slices (transactions #91, disposition #93, graduation
+#78/#92) were each independently adversarially reviewed — 0 defects. The automated PR review
+ran three rounds (all findings addressed, fixes folded into the squash): round 1 → dispose
+lookup sorts `-patrol_run,-id`, `findings dispose --as` cobra-required, migration 0014
+backfill paged (500/id-sorted), Verdict's not-found error hints `§` when a pointer carries a
+`#` anchor (+ pinning test), `graduated to: <bare number>` confirmed spec-verbatim (§5.1/R5,
+declined tightening, + pinning test); round 2 → engine.go doc comments (failpoint wired only
+in transitionCore; SetStatusLabel's outer checkVersion guards the same-phase fast path;
+AddNote keeps its tx for phase-snapshot consistency — refactor declined). Round-3 verdict
+"clean and ready", two non-blocking notes NOT yet filed as issues: `universalFMKeys` omits
+`status` deliberately (lightweight types) but says nothing — wants a one-liner comment; and
+`cascade`/`tryAutoUnblock` use unbounded dependency queries (benign at desk scale). Full
+gates green pre-merge (`make check` · `make test` bun 59 + go · `make verify` 48/48).
+**VERSION stays 0.7.0** — the 0.8.0 release cut (bump + dated CHANGELOG + tag) is the separate,
+owner-gated step (runbook `docs/development/releasing.md`); the changes sit under `[Unreleased]`.
+**Next: #79's merge unblocks the PM default-on lane #83, and the design session rules feature
+direction** (agenda on the exec desk — see the §1 sequencing note above/below). Non-blocking
+follow-ups filed in the PR #112 body: the #79 not-on-PATH host-drop residual (unfixable in deskkit
+— mitigated by the skill note + mount signal), a #93 `query summary`/`uncollapsed` count that
+ignores disposition, `pm/engine/queries.go`'s still-non-atomic item-update (outside #91's scope),
+and the neutrality scanner walking `.claude/` scratch (gitignore hardened for nested agent-memory
+this session).
+
+**DESIGN-SESSION PREP IN FLIGHT (2026-07-20, post-merge).** Owner ruled: no 0.8.0 release cut
+(sole user); proceed straight to design-session prep. The prep doc — design lens (data model +
+workflows are the core; MCP/CLI/skills/personas/TUI/human are projections), 5-phase process
+outline (Ground → Frame → Decide → Record → Plan), known-changes table C1–C8, best-guess
+choices, tough spots, constraint walls — is at
+`_meta/research/2026-07-design-session/README.md`. **Phase 0 (Ground) is COMPLETE**: all
+five evidence dossiers landed beside it (`data-model.md`, `workflows.md`, `surface-matrix.md`,
+`agent-symmetry.md`, `document-model-gaps.md`), each cited path:line against merged main
+`51235f6` with an explicit gaps section; the prep-doc §6 table carries per-dossier headlines.
+Foreman-verified highlights: the exec-desk analysis
+(`~/Documents/EXECUTIVE_DESK/Projects/desk-standard-desk/analyses/desk-standard-agent-symmetry-and-document-model-2026-07-20.md`)
+survives PR #112 nearly intact (14/15 symmetry claims CONFIRMED; only #79's mount claim changed
+— resolved fail-loud, not self-gating); gap D (#91 transactions) fully closed; A/B/C
+symptom-closed but model-open; E/F untouched; NEW: unwired enums are broader than the analysis
+knew (5 of 6 `adoption_log.event` values have no writer — even restore logs nothing;
+independently re-derived), patrol has SIX rules (R1–R6), and unclaimed tools exist on BOTH
+agent surfaces (stale librarian system prompt independent of PM; 3 of 4 TS tools skill-less;
+PM `import` + admin console persona-less). **Phase 1 (Frame) is COMPLETE (2026-07-20, later session): the decision book is written and
+reviewed.** Eight briefs + index at `_meta/research/2026-07-design-session/decision-book/`
+(D1 pointer grammar · D2 typed cross-refs · D3 `items.type` · D4 disposition+adoption-log ·
+D5 agent contract & parity · D6 prompt governance · D7 spec↔reality · D8 pull-only backlog),
+dependency-ordered model → workflow → surface. Foreman-led: 8 parallel builders (one file
+each), then two report-only reviews — (1) conformance/coverage: every evidence bullet
+resolves to a real dossier heading, sampled cites lifted not invented, seed matrix complete
+(agenda §3 + C1–C8 + Phase-0 findings), cross-brief boundaries coherent; sole defect was
+D4's leaked tool-envelope tags + an extra section (both fixed in place); (2) adversarial
+re-derivation of the five beyond-dossier claims — ALL survived, two sharpened (full verdicts
+in the book README's "Verification record"; headline sharpenings: `adoption_log` has live
+CLI+MCP+TUI readers plus deskguard membership, so "kill it" has real blast radius; the
+pm-spec:744 GitHub-URL-pointer promise is rejected by the SHIPPED DEFAULT decision/task
+gates, not just an edge; runtime prompt edits are ephemeral across a store rebuild).
+**REBOOT (2026-07-20, owner directive): the desk-platform stream merged in; combined decide
+phase is LIVE.** The parallel stream on dev-tooling-desk (rounds R1–R3: "grow deskkit", the
+persona bundle as v1 proof surface, files+held-diffs KB model with a PB-becomes-truth
+direction, the three-plane element model + two adversarial reviews) was reviewed against the
+decision book — five interaction points found (truth regime undercuts four briefs' criteria;
+R3 redesigns D3's vocabulary; D5.a pre-answered; D7 three-sided; two pending owner gates).
+Reconciliation applied: platform docs migrated to
+`_meta/research/2026-07-design-session/platform/` (originals frozen with pointers — work no
+longer happens on that desk); **`D0-platform-frame.md`** added to the book (ratify R1 · truth
+regime staged-with-gate · element model as the schema-v2 two-track · imports platform
+Q1–Q4); D2–D8 annotated; deck regenerated (17 slides + 4:04 audio, same folder). **THE SESSION IS RULED
+(2026-07-20 13:54Z):** the owner accepted every recommendation on the combined form
+(`_meta/signoff/2026-07-20-design-session-rulings/answers.json`) with three notes — v1+v2
+**model simulations** before v2 finalizes; **centralized prompt tuning**; exec outputs
+**trigger-gated** (candidates: meeting, milestone/marker). **Phase 3 RECORDED: ADRs
+0009–0018** landed in `docs/decisions/` (platform frame w/ staged truth regime · pointer
+grammar · typed-reference contract · item-type validation · disposition completion ·
+agent contract · prompt governance · TS-boundary-via-deskkit-proxy · identity & hygiene ·
+element-model direction), indexed in the README; the two contradicted spec passages
+corrected in place (pm-spec R6.1; librarian-spec §7.2). **The session record is on
+PR #113** (branch `docs/design-session-rulings`, commit `5d3046c`: ADRs + decision book +
+five dossiers + migrated platform docs + both signoff trails with `answers.json` + the
+briefing package + the two spec corrections + `.claude/settings.json` plugin enablement;
+`make check` green pre-commit). **CI is GREEN** (verified pre-clear: `ci: pass`,
+`claude-review: pass`, `claude: skipping`) — the PR is merge-ready; merging is the owner's
+call. Note (2026-07-20, post-record): the old dev-tooling exec desk was **renamed
+`dotfiles-agents-desk`** — the frozen platform originals + migration pointers traveled with
+it; stale `dev-tooling-desk` paths in earlier session docs resolve there.
+**Next: merge PR #113, then Phase 4 — the build plan from main** (planning desk: epics/
+issues with acceptance criteria + gate labels derived from ADRs 0009–0018's Affects/
+Consequences; named deliverables: the **v1+v2 model simulations** (0009), the **TS-proxy
+design item** (0016), the **trigger design item** (0018), the **schema-v2 element-track
+revision** (0009/0018), plus the mechanism slices 0012/0013/0017 and the contract/bundle
+work 0014/0015). Decision batches for Henry ALWAYS go through the owner-signoff HTML form;
+decision packages as deck/PDF (project memory). Everything below this paragraph predates
+the reboot.
+
+**Owner SIGNED OFF on the decision list (2026-07-20 12:11Z**, recorded at
+`_meta/signoff/2026-07-20-decision-book-scope/answers.json` — the batch dir with the form is
+the sign-off trail): D1–D7 included as-is; **D8 PROMOTED from pull-only backlog to a full
+session decision** (scope-change note added to the D8 brief + index); no missing decisions.
+One owner-input note rides D7 (verbatim in the brief): leverage the TS-plugin seam for
+server-backed capabilities — leans extend-the-boundary over amend-spec-to-reality; input to
+weigh, not a ruling. **Phase 1 is CLOSED. Phase 2 package is DELIVERED**: 15-slide deck (PDF, boardroom, zero
+overflow) + 4:36 audio + `sources.md` at `_meta/briefings/2026-07-20-design-session-decisions/`
+— one slide per decision (two for D5), option labels quoted from the briefs, the five
+review-proven facts on their own weights slide, D7's owner note and D8's promotion carried.
+**Next: the decide phase** — Henry rules the eight (second signoff form or live); then
+Phase 3 rulings → ADRs in `docs/decisions/` + spec deltas, then Phase 4 the build plan.
+The decision book + its Verification record is the session's deep material; the deck is
+the map. NOTE: the whole design-session tree (`_meta/research/2026-07-design-session/`,
+`_meta/signoff/`, `_meta/briefings/2026-07-20-design-session-decisions/`) plus this handoff
+edit is UNCOMMITTED — commit when Henry's ready (`_meta/` is track-by-default).
+
 **Public launch is deferred until ≥ v1.0.0 (Henry, 2026-07-19) — this is settled, not an open
 blocker.** The repo stays PRIVATE until then, so the public `curl|bash` path is expected to 404
 by design (every unauthenticated URL `install.sh` needs — `raw…/install.sh`, `/releases/latest`,
@@ -61,50 +188,14 @@ interrupted turn's partial text (judged correct — it's real answer text). The 
 CHANGELOG now holds `make install` + the docs split + the whole chat-TUI pass; `make
 version-status` advises a bump — cut the next release when Henry's ready.
 
-**MERGED 2026-07-18: PR #48** (chat-TUI pass — #44 theming + #45 UX + #43 init/onramp +
-Crush-style app chrome, look approved live) **and PR #54** (`record_feedback`, #50). Chat
-GIFs re-recorded with the final chrome post-merge. Deferred UX items are recorded in
-`docs/development/chat-tui-ux-survey.md`.
-
-**RULED 2026-07-18 — all five TUI roadmap recommendations accepted verbatim** (memo, now
-marked decided: `_meta/briefings/2026-07-18-tui-roadmap-rulings/README.md`; rulings also
-commented on #51/#52/#53): #53 Charm-v2 migration GO with terminal background retained +
-no-query rule kept pre-program-only (**ADR 0007**, committed on `feat/tui-charm-v2` @
-57f1a76); #51 sessions-list-first launch + truncation titles + rename/delete v1; #52 defer
-dollar-cost, add the `models.context_window` profile override key (schema change).
-
-**MERGED 2026-07-19 — #59 (v2 migration) then #60 (core+modules refactor), in that order.**
-The #59-first sequencing was executed as recommended: #59 squash-merged clean (ci +
-claude-review green), then #60 rebased onto the new main. The rebase's rename detection paired
-#59's v2-modified tui files with #60's move correctly — v2 code landed at the new module path
-`librarian/internal/modules/librarian/tui/`, zero v1 imports, old `internal/tui/` gone. **One
-drift caught by `go vet`:** #59's new regression-guard test `defects_test.go` still imported the
-pre-move `internal/config`; git took #59's copy so #60's path rewrite missed it. Fixed to
-`internal/core/config` (config moved under `internal/core/` in #60), amended into the rebased
-commit. Full gates green post-fix (check/test/verify-47/package/version-sync) and on merged
-`main` (build+vet). **ADR renumbered 0006 → 0007** (PR #57 took 0006 for the kit-port ADR).
-Live v2 parity was proven in a REAL terminal (tmux capture, byte-clean) — the PR's parity
-artifact, not re-recorded GIFs (see #58). Current tree layout is the modules/ layout: any
-new TUI work (#51/#52) targets `librarian/internal/modules/librarian/tui/`.
-
-**#58 — CLOSED 2026-07-19 as won't-fix (upstream, cosmetic, docs unaffected).** One-more-pass
-determination: re-recording was never actually necessary — ADR 0007 mandates the v2 migration
-ship *zero visual change*, so the committed v1-era GIFs depict the v2 product accurately;
-nothing in the docs is stale. The glitch (one-cell stale footer glyph "rready") is
-VHS-environment-only — our emitted bytes replay clean through ttyd's exact xterm-headless
-version; VHS hardcodes `-t rendererType=canvas`, whose stale-glyph bug (xtermjs #3548/#3617,
-fixes in #4189/#4101) is newer than ttyd 1.7.7 bundles, with no newer ttyd stable to pin.
-Product-side footer-repaint dodge rejected (global perf workaround defeating v2's cell-diff
-renderer to satisfy a broken recording tool; real terminals clean). Auto-resolves for free on
-a future VHS/ttyd xterm.js bump — reopen only if a real visual redesign needs fresh captures
-before the toolchain catches up. Full rationale in the #58 close comment.
-
-**Then:** #52's session-layer token plumbing (stack-independent) and #51 on v2 — both build on
-the modules/ layout at `librarian/internal/modules/librarian/tui/`.
-
-**Release note:** the TUI pass + `record_feedback` + `make install` + the SOP kit library +
-the Charm v2 migration + the core+modules refactor all shipped in **v0.6.0** (tagged, released,
-assets verified). `[Unreleased]` is now empty; the next bump starts accumulating from here.
+**v0.6.0 era (2026-07-18/19), collapsed:** chat-TUI UX pass + `record_feedback` merged
+(PRs #48/#54); all five TUI roadmap rulings accepted (**ADR 0007** — Charm v2 GO with zero
+visual change; #51/#52 ride post-1.0 per the roadmap); v2 migration then core+modules
+refactor merged in order (#59→#60) — TUI code lives at
+`librarian/internal/modules/librarian/tui/`; #58 closed won't-fix (VHS-toolchain cosmetic;
+committed GIFs depict v2 accurately — reopen only if a real redesign needs fresh captures);
+**v0.6.0** tagged, assets verified. Detail: the cited PRs/ADRs,
+`_meta/briefings/2026-07-18-tui-roadmap-rulings/`, and this file's git history.
 
 **Open backlog, ranked** (no ruling gates the buildable ones):
 - **#12** — dual-format Claude+OpenCode fan-out (consumes `bun run package` as the seed).
@@ -123,6 +214,33 @@ assets verified). `[Unreleased]` is now empty; the next bump starts accumulating
 
 ## 2. Recent deliveries (newest first — full detail in the cited PRs / ADRs / git)
 
+- **2026-07-20 (bug-floor session) — 0.8.0 bug floor shipped as PR #112 (CI green, awaiting
+  merge).** Foreman-led crew: 3 scouts → 6 builders + 1 lead (disjoint file scopes on the
+  shared tree) → 3 adversarial reviewers, then foreman reconciliation + gates. Closed #67
+  (unknown-cmd non-zero exit via a known-command guard before `app.Start()`), #78 (R5 gated on
+  an explicit graduation marker), #79 (`mcp-serve` fail-loud + stderr mount signal + brownfield
+  skill prereq; `.mcp.json` left as-is — shape frozen by its test, not-on-PATH is host-level),
+  #80 (both scaffold `improvement-log.md` copies carry frontmatter + `check-scaffold-frontmatter.mjs`
+  guard wired into `make check`), #91 (every mutating PM `Engine` method in `RunInTransaction`,
+  version guard inside), #92 (`graduated_to` extraction gated on the explicit marker), #93
+  (findings disposition lifecycle — migration `0014` w/ backfill-to-`open`, `findings dispose`
+  CLI, live-default `query findings` + `--include-disposed`, `(file,rule,checksum)` inheritance +
+  checksum re-open), #94 (killed the false "seven-tool core" string; `docs/tool-surface.md` with
+  empirically-verified counts — MCP 5/6/17/18, plugin TS 4), #102 (transition gate resolves
+  `file § heading` by its file part; already-seeded desks repaired with no migration). Commit
+  `1a3ef75` (+1979/−274); spec §5.1/§5.2 + CHANGELOG `[Unreleased]` updated. Foreman caught +
+  fixed cross-slice drift the owners correctly refused to cross into: the `module.go` `0014`
+  migration-manifest declaration + `SchemaVersion 13→14` twin (`gatedon_test.go` + `migrate.go`
+  comment), S6's initial patch of the wrong scaffold file (redirected to the `desk-setup`
+  template), neutrality `#N` literals across two lanes, and untracked agent-memory cruft under
+  `librarian/.claude/` (removed; gitignore hardened to `**/.claude/agent-memory/`). Detail: PR #112.
+- **2026-07-20 (later session) — owner concerns assessed + briefing package (no repo
+  commits; handoff/memory edits only).** Two verified assessments (agent-integration
+  asymmetry; document data-model gaps) recorded in the exec desk analysis cited in §1;
+  sequencing directive + non-markdown-briefing preference recorded in both handoffs +
+  project memory; 15-slide status-and-direction deck (PDF + 4.5-min MP3, comms standard)
+  delivered at exec desk `_meta/briefings/2026-07-20-status-and-direction/` (two accepted
+  cosmetic nits: footer link spacing, stat sub-label order — only matter on regeneration).
 - **2026-07-20 — Lane 6 conformance + exec-desk split + deep-dive triage.** PR #105 (squash
   `217b5e6`, closes #86): mise-en-place scaffold (`.claude/` skeleton, `.mcp.json`, dependabot
   npm@`/plugin` + gomod@`/librarian`, ADR 0000-template) + the three authored entry docs +
@@ -137,62 +255,31 @@ assets verified). `[Unreleased]` is now empty; the next bump starts accumulating
   core+modules refactor). PR CI + claude-review green, squash-merged; `make release-prep` green
   from clean main; release.yml published all four platform binaries + plugin bundle + checksums;
   darwin/arm64 asset verified (runs, sha256 matches). On-PATH binary refreshed via `make install`.
-- **2026-07-18 — record_feedback** (PR #54, open; issue #50): `feedback` collection
-  (migration 0013), tool on all surfaces + CLI subcommand, `query feedback` kind,
-  system-prompt nudge. Built in a worktree off main, independent of the TUI branch.
-- **2026-07-18 — chat-TUI UX pass** (PR #48, open): #44 per-theme palettes resolved once
-  pre-program (`--theme`/`LIBRARIAN_THEME`/auto-probe) + #45 survey
-  (`docs/development/chat-tui-ux-survey.md`) and apply (gutters, per-turn `model · latency`
-  footer, bubbles/help + ctrl+g, ctrl+y copy-raw-markdown, edge-row prompt history with draft
-  stash, scroll-anchored streaming, NO_COLOR reduced motion) + #43 `pocket-librarian init` +
-  interactive first-run onramp (`--no-input` keeps fail-closed) + Crush-style app chrome
-  (full-width header/status bars, rounded input box that dims while streaming, user turns as
-  `▌`-bordered tinted blocks, 120-col measure — `themeSurfaces` in styles.go). New
-  `chat-light.tape`/GIF (light proof) + `init-onramp.tape`/GIF (offline onramp proof).
-  Review hardening: lipgloss background cache pinned to the resolved theme in `tui.Run` (§4).
-- **2026-07-18 — profile-first docs onramp** (PR #46). Fixed a getting-started
-  self-inconsistency: §4 told non-devs to `export DESK_ROOT`/`DESK_NAME` even though step 2
-  already fills `_knowledge/profile.yaml`, which the librarian auto-discovers by walk-up
-  (`internal/config/config.go` `Load`→`DiscoverProfile`; a profile with `desk.name` +
-  `root: "."` needs zero exports from inside the desk). Reframed env as the *override* (bare
-  folder / dev build from `librarian/`), added a `chat` pointer. Mirrored in `librarian/README`
-  + root README. Docs-only. Grew out of a UAT dogfooding session that also filed #43/#44/#45.
-- **2026-07-18 — make install + docs dev/use split** (PR #42). `make install` (root →
-  `librarian/Makefile`) builds the version-stamped binary into `~/.local/bin` (override `PREFIX=`);
-  prompted by a stale on-PATH binary — `/plugin` updates the plugin, NOT the standalone binary
-  (separate artifacts). Docs split Using vs Development: new `docs/README.md` index + `docs/development/`
-  (overview, `releasing.md`, VHS `tapes/`); spec + ADRs kept at `docs/` top level for citation
-  stability (§4 "Docs layout").
-- **2026-07-18 — v0.5.0 release + versioning/changelog guard** (PR #41, **ADR 0005**). Bumped
-  0.4.0→0.5.0, added `CHANGELOG.md`, and a two-tier missing-bump guard: `check-changelog.mjs`
-  (hard release gate) + `check-version-status.mjs` (non-blocking drift advisory) — §4
-  "Versioning/release". Tagged + released; assets verified.
-- **2026-07-18 — chat full-screen TUI, all 5 phases** (PRs #37–#40, **ADR 0004**). Bubble Tea TUI
-  with streaming, tool steps, markdown, cancel, resume (ctrl+o); REPL fallback when piped/`--plain`.
-  Streaming substrate (`Session.StreamTurn`, JSON-taggable `Event`) is reusable for the deferred
-  webapp SSE route. eino/bubbletea streaming gotchas → §4.
-- **2026-07-17 — #31 store self-init** (PR #32, **ADR 0003**) + **docs/CI release-prep sweep**
-  (PR #33): tool commands auto-run migrations at `requireConfig`; `verify.sh` wired into CI + the
-  release gate (§4 "Store self-initializes").
-- **2026-07-17 — distribution + hardening** #7/#25/#27 (PRs #29/#30/#28): curl-able `install.sh`,
-  SHA-pinned Actions, actionable uninitialized-store message. **First release v0.4.0 cut** (§5).
-- **2026-07-17 — NOTE.md punch list** (PR #26): root `Makefile`, unified `VERSION`, `lefthook.yml`,
-  `release.yml`, three user guides + VHS media.
-- **2026-07-17 — #23 XDG store home + desk open-guard** (PR #24, **ADR 0002**, from the #20 design
-  session): store defaults to `$XDG_DATA_HOME/pocket-librarian/<DESK_NAME>/`; a mismatched-desk
-  store refuses. PocketBase bootstrap/serve-RunE gotchas → §4.
-- **2026-07-17 — #18 field-UX batch** (PR #22): `infra` dir_kind, R4→judgment, mcp-serve clean EOF,
-  `query --pretty`. **#16/#17** (PR #21): content-field widen (migration 0011) + prompt seed moved
-  into `requireConfig`.
-- **2026-07-16 — #13/#14/#15** (**ADR 0001**): chat REPL + trigger wake layer, `secrets_ref`
-  indirection, serve superuser auto-create, patrol stale-finding resolution (migration 0010).
-  **#8–#11**: brownfield-adoption skill, in-repo marketplace + `bun run package` bundle, operator docs.
+- **2026-07-18 — v0.5.0→v0.6.0 build-up, collapsed:** v0.5.0 + versioning/changelog guard
+  (PR #41, ADR 0005) · chat full-screen TUI, 5 phases (PRs #37–#40, ADR 0004 — `StreamTurn`
+  substrate reusable for the #19 webapp SSE route) · `make install` + docs dev/use split
+  (PR #42) · profile-first docs onramp (PR #46) · chat-TUI UX pass (PR #48) ·
+  `record_feedback` (PR #54, migration 0013). Durable rules live in §4 (versioning/release,
+  docs layout, eino/TUI gotchas); detail in the PRs.
+- **2026-07-16/17 — v0.4.0 build-out, collapsed:** ADR 0001 (chat REPL + trigger layer,
+  `secrets_ref`) · ADR 0002 (XDG store home + desk open-guard) · ADR 0003 (store self-init)
+  · distribution + hardening (`install.sh`, SHA-pinned Actions) · root Makefile/VERSION/
+  guides + first release **v0.4.0** · field-UX + content-widen batches (PRs #21–#33).
+  Durable rules in §4; incidents in §5.
 
 ## 3. Where to start next
 
-- **Work the 0.8.0 milestone** (bug floor + Tier-1 deep-dive items; plan: exec desk
-  `_meta/plans/release-0.8.0.md`). #79 gates the PM default-on lane (#83). Deferred TUI UX
-  items remain in `docs/development/chat-tui-ux-survey.md`.
+- **The 0.8.0 bug floor is DONE (merged, unreleased)** — changes sit under `[Unreleased]`;
+  the release cut stays owner-gated. Current gate: the decision-list sign-off (§1), then
+  Phase 2 of the design session. #79's merge unblocks the PM default-on lane (#83) but that
+  is a feature lane — it waits on the design session per the sequencing directive. Deferred
+  TUI UX items remain in `docs/development/chat-tui-ux-survey.md`.
+- **The design session is RULED (2026-07-20) — ADRs 0009–0018 bind** (see the §1 reboot
+  paragraph). Feature lanes are unblocked under those rulings; start with Phase 4 (the
+  build plan) once PR #113 merges. The decision book, dossiers, and migrated platform docs
+  under `_meta/research/2026-07-design-session/` are the historical record — the ADRs are
+  what binds. Decision packages for Henry stay non-markdown (deck/PDF); his answers are
+  collected via the owner-signoff HTML form, never chat questions.
 - **Cut the next release** when `[Unreleased]` warrants — follow `docs/development/releasing.md`
   (bump VERSION + 3 manifests → roll `[Unreleased]` into a dated CHANGELOG section →
   `make release-prep` → tag). `check-changelog` gates the tag; `make version-status` flags drift.
@@ -270,13 +357,8 @@ assets verified). `[Unreleased]` is now empty; the next bump starts accumulating
   <DESK_NAME>/` (dir renamed with the binary in 0.7.0); unresolvable DESK_NAME + no `--dir` →
   exit 1 (serve/migrate included).
   verify.sh exports a scratch XDG_DATA_HOME — keep it hermetic when adding checks.
-- **Store self-initializes** (ADR 0003, since PR #32): tool commands run `RunAppMigrations()`
-  at the `requireConfig` choke point, so a fresh store needs no manual `migrate up`. When adding
-  a new store-touching command routed through `requireConfig`, it inherits this automatically.
-- **PocketBase bare `TextField` silently caps at 5000 chars** (`Max==0` → default 5000, per
-  `core.TextField`). Any field holding full file bodies / transcripts / editable prompts MUST
-  set an explicit large `Max` or it truncates at 5 KB — the content fields are widened in
-  migration `0011`. Set `Max` explicitly when adding a new content-bearing text field.
+- Store self-init (ADR 0003) and the bare-`TextField` 5000-char cap: both covered in
+  CLAUDE.md (hot-loaded) — not repeated here.
 - **Altering a shipped collection: add a forward migration, don't edit the applied one**
   (precedent: `0010`, `0011`, `0012`). Editing `000N`'s field decl only reaches fresh stores; a
   new migration that mutates the field via `FindCollectionByNameOrId` + `Save(c)` fixes existing
@@ -285,14 +367,14 @@ assets verified). `[Unreleased]` is now empty; the next bump starts accumulating
   Values** enum-extension (`0012` adds `infra` to `dir_kind`). An enum-extension's DOWN migration
   must remap rows off the new value FIRST (`0012`: `infra`→`other`) before dropping it from the
   enum, or a rollback leaves a row outside its reverted enum (same data-first pattern as `0010`).
-- Go 1.25 floor (PocketBase's go.mod); Bun 1.3.14 pinned in CI.
 - **eino streaming gotchas** (bind any new streaming caller to these — origin: PRs #37–#38 / ADR 0004):
   agent output stream is bursty under the anthropic tool-call checker (use model-callback
   stream copies for live tokens); ctx-cancel doesn't abort a stuck provider stream; failed
   tools fire OnError only; zero-arg tool calls need the `argNormalizingTool` adapter (in
   place at buildTools — keep new tools behind it). **No terminal queries after bubbletea
   starts** (no glamour WithAutoStyle / lazy lipgloss adaptive colors) — responses leak into
-  the textarea; regression-guarded in `internal/tui/defects_test.go`. Since PR #48 the chat
+  the textarea; regression-guarded in `internal/modules/librarian/tui/defects_test.go`
+  (path since the #60 modules refactor). Since PR #48 the chat
   theme resolves ONCE pre-program (`tui.ResolveTheme`) and `tui.Run` pins
   `lipgloss.SetHasDarkBackground` to it — load-bearing for embedded bubbles components whose
   DEFAULT styles use AdaptiveColor (the textarea): without the pin they're only safe via a

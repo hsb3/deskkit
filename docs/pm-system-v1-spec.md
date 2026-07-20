@@ -741,10 +741,13 @@ build (the D8 gate that already exists).
 ## 7. Boundaries (R6)
 
 - **R6.1 — the GitHub board stays the single work-state truth for code-repo work.** The PM system
-  never forks a copy of board items. An item MAY carry a `pointer` to a GitHub issue URL; any
-  GitHub integration is a **read-only mirror/linkage** (display the issue's state beside the
-  item), never a write-back or a parallel backlog. v1 ships no GitHub connector at all — the
-  pointer is a plain string; a read-only enrichment is LATER.
+  never forks a copy of board items. An item MAY reference a GitHub issue — but per ADR 0010
+  an issue URL is **not** a gate `pointer` (the pointer grammar is a desk-relative file path;
+  gates fail `://` closed): it is a cross-reference, typed per ADR 0011. Any GitHub
+  integration is a **read-only mirror/linkage** (display the issue's state beside the item),
+  never a write-back or a parallel backlog. v1 ships no GitHub connector at all — the
+  reference is a plain string until ADR 0011's contract migration lands; a read-only
+  enrichment is LATER.
 - **R6.2 — the librarian write boundary carries over.** The PM system writes only its own store
   collections; it never writes desk files. When a gate needs a document produced, that document is
   authored through the normal (human or librarian-supervised) path, under the librarian's binding-doc
