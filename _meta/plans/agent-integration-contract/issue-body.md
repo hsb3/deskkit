@@ -37,6 +37,10 @@ Two more surfaces are claimed by no persona at all: the PM manifest `import` sea
 TUI, or console surface (`librarian/internal/modules/pm/importer/importer.go:1-20`; its only caller
 is the test harness), and the PocketBase admin console at `/_/` is reachable by any superuser,
 named by no skill or persona (`_meta/research/2026-07-design-session/surface-matrix.md` finding 6).
+And on the TS plugin MCP server, three of the four tools — `profile_get`, `profile_validate`,
+`knowledge_index` — are claimed by no shipped skill (only `template_render` is, via the `desk-setup`
+and `brownfield-adoption` skills), so the ADR 0014 audit's "TS plugin tools" surface has an
+unclaimed hole too.
 
 ## Deliverables
 
@@ -59,16 +63,25 @@ named by no skill or persona (`_meta/research/2026-07-design-session/surface-mat
 - **C - Fix the stale librarian prompt.** Make `librarian/templates/librarian-system-prompt.txt`
   reflect the actually-gated slice (config-aware wording, or drop the two phantom `apply_fix` /
   `restore` lines). Per ADR 0015 the embed is the git-truth source; existing stores hold a stale
-  `prompts` row until cleared (documented-ephemeral, not a migration).
+  `prompts` row until cleared (documented-ephemeral, not a migration). **In the SAME edit**, move
+  the fenced prompt block this mirrors in `docs/pocket-librarian-v1-spec.md` (the `:1435-1464`
+  block + the `:2316` Decisions bullet) so the two stay byte-identical — `prompt-governance` (#120)
+  adds `scripts/check-prompt-drift.mjs` to pin them, and per the epic coordination rule **#114
+  lands before #120** so that guard is built against the corrected pair.
 - **D - Keep the eino `buildTools` slice librarian-only.** Filter the eino slice to
   `ToolSpec.Module == "librarian"` (PM `Name()` returns "pm", `pm/module.go:56`) so the in-binary
   loop never receives PM tools it has no prompt for (ADR 0014(c), decision-book option C1). The
   shared `toolcore` registry stays the single registry — filter it, never fork it.
-- **E - Name owners for `import` and the admin console.** Document PM `import` as a supervised /
-  D8-reserved maintenance path with no agent surface (matching `restore` / `findings dispose`),
-  and the admin console as an acknowledged human maintenance surface, not an agent surface. Both
-  are recorded in the contract spec section (docs-only; see Open questions on an interim
-  `import` CLI subcommand).
+- **E - Name owners for the remaining unclaimed surfaces: `import`, the admin console, and the
+  three unclaimed TS plugin tools.** Document PM `import` as a supervised / D8-reserved maintenance
+  path with no agent surface (matching `restore` / `findings dispose`), and the admin console as an
+  acknowledged human maintenance surface, not an agent surface. Also account for the TS plugin MCP
+  tools no skill claims — `profile_get`, `profile_validate`, `knowledge_index` (only
+  `template_render` is claimed, via `desk-setup` + `brownfield-adoption`): document each as either
+  claimed by a skill/persona or no-persona-by-design (a setup/validation seam the skills call, not
+  an agent-reachable tool), so the audit finds zero unclaimed tools on the TS surface too. All
+  recorded in the contract spec section (docs-only; see Open questions on an interim `import` CLI
+  subcommand).
 
 ## Acceptance criteria
 
@@ -88,11 +101,14 @@ named by no skill or persona (`_meta/research/2026-07-design-session/surface-mat
       current two-axis four-combination framing predates gating).
 - [ ] `librarian/templates/librarian-system-prompt.txt` no longer claims a tool the default-desk
       agent lacks: on a default desk the prompt's tool list is a subset of `ExposedTools(cfg)`; a
-      red-able regression test pins this.
+      red-able regression test pins this. The mirrored spec block
+      (`docs/pocket-librarian-v1-spec.md:1435-1464`) is updated in the same PR so #120's drift
+      guard will pass.
 - [ ] Under `PM_ENABLED=true`, `buildTools` returns zero tools whose `Module != "librarian"`; a
       test asserts the eino slice is librarian-only regardless of PM state.
-- [ ] The contract spec section names an owner for `import` and the admin console; `docs/tool-surface.md`
-      is updated so its counts match the gated mount surface.
+- [ ] The contract spec section names an owner for `import`, the admin console, and the three
+      unclaimed TS plugin tools (`profile_get` / `profile_validate` / `knowledge_index`);
+      `docs/tool-surface.md` is updated so its counts match the gated mount surface.
 
 ## Dependencies & gates
 
@@ -108,6 +124,10 @@ named by no skill or persona (`_meta/research/2026-07-design-session/surface-mat
   are `docs/` — exempt from neutrality, no code gate.
 - **Depends on.** ADR 0015 (`docs/decisions/0015-prompt-governance.md`) governs the instruction-source
   mechanism deliverable A names and the re-seed rule C relies on.
+- **Lands before #120.** Slice C edits the prompt embed + its mirrored spec block
+  (`docs/pocket-librarian-v1-spec.md:1435-1464` / `:2316`) that `prompt-governance` (#120) will
+  pin with `scripts/check-prompt-drift.mjs`; #114 must merge first (epic coordination rule 2) or
+  #120's guard fails against a stale pair.
 
 ## Out of scope
 

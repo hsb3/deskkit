@@ -115,7 +115,7 @@ struct change, no second registry, honoring the "filter the one registry, never 
 
 - **Parallel wave (independent file scopes):**
   - A - contract spec doc (docs-only; no code dependency)
-  - C - prompt fix (`librarian-system-prompt.txt` + its test)
+  - C - prompt fix (`librarian-system-prompt.txt` + the mirrored spec block + its test)
   - D - eino librarian-only slice (`agent.go` + its test)
   These three touch disjoint files and can land in any order.
 - **Serialized after the contract is defined:**
@@ -126,6 +126,11 @@ struct change, no second registry, honoring the "filter the one registry, never 
 - **Landing order:** A (+ C, D in parallel) -> B -> update `docs/tool-surface.md` counts + CHANGELOG.
 - **Shared-file caution:** `toolcore.go` is touched by both B and D if a filter helper is shared —
   serialize those two edits (one owner for the toolcore helper), do not fan them out in parallel.
+- **Cross-issue (#120):** slice C also moves the mirrored prompt block in
+  `docs/pocket-librarian-v1-spec.md` (`:1435-1464` + the `:2316` Decisions bullet) in lockstep with
+  `librarian-system-prompt.txt`, because `prompt-governance` (#120) adds
+  `scripts/check-prompt-drift.mjs` pinning the two byte-identical. #114 lands before #120 (epic
+  coordination rule 2), so C's file scope includes that spec block, not just the `.txt` + test.
 
 ## Open questions (recommended defaults)
 

@@ -75,7 +75,11 @@ and `findings-lifecycle-completion` both add three librarian migrations on one s
 real sequence (basenames + the `module.go` `SchemaVersion()`/manifest twin) is assigned at landing
 time from true current HEAD — whichever lands first takes the next free numbers, the second
 continues from the true next free number; the two issues' migration commits must serialize (rule
-recorded in the `epic-design-session-v1` body).
+recorded in the `epic-design-session-v1` body). Beyond the migrations, slice B also edits
+`tools/query.go` and `tools/patrol.go` (and `docs/pocket-librarian-v1-spec.md`), all touched by
+`findings-lifecycle-completion` (#118) too; the migration rule already serializes the two, so
+whoever lands second rebases those hunks onto the first (disjoint regions today; epic coordination
+rule 3).
 
 Two landing shapes both work; pick one before starting:
 
