@@ -15,6 +15,20 @@ for why this policy exists.
 
 ### Added
 
+- **Tool-surface drift guard** (#121, ADR 0016). `docs/tool-surface.md` — the authoritative,
+  empirically-derived map of every tool-bearing surface (#94) — is now pinned to source by a
+  mechanical guard, closing the manual "remember to re-run the probe" gap that let the old
+  "seven-tool core" shorthand rot. A dependency-free `scripts/check-tool-surface.mjs` (wired into
+  `make check` + CI next to `check-prompt-drift.mjs`) cross-checks the **Plugin TS MCP server** count
+  (4, the `TOOLS` array in `plugin/core/tools.ts`) and the **Librarian CLI** base count (16, the
+  `AddCommand` registrations in `librarian/cmd/deskkit/main.go` plus the framework system commands)
+  against the numbers the doc states, with a `--self-test` proving it fails RED on a tool
+  added/removed without a matching doc edit. The gate-dependent **Librarian MCP** counts
+  (5 / 6 / 17 / 18 by `LIBRARIAN_AUTONOMOUS_WRITES` × `PM_ENABLED`, and the `MCP_MODULES=pm` desk-pm
+  mount → 12) are pinned by a Go test (`TestToolSurfaceDoc_MCPCounts`) that reads the same doc counts
+  and re-derives them from the real `toolcore` gate on the `go test ./...` lane — no reimplemented
+  gate arithmetic to drift. The guard pins **counts**, not the doc's bytes, so an unrelated prose/row
+  edit never trips it. A new gate only; no runtime behavior changes.
 - **`desk-persona` — the composed librarian + PM Claude Code bundle** (#119, ADR 0014(a), ADR
   0015; the platform's v1 proof surface per ADR 0009). A new `plugin/desk-persona/` marketplace
   entry mounts one `deskkit mcp-serve` server with `MCP_MODULES=librarian,pm`, exposing all 17

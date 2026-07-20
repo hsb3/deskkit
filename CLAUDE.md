@@ -75,7 +75,7 @@ the exit code and has let a failing gate through before (incident, 2026-07-17).
 | `make setup` | `bun install` (plugin) + `lefthook install` (git hooks) |
 | `make build` | Build both lanes: plugin (`bun run build`) + librarian binary (version-stamped) |
 | `make test` | Fast unit tests: plugin `bun test` (59) + librarian `go test ./...` (314) |
-| `make check` | Repo gates: neutrality + self-test, kit-drift, scaffold frontmatter, plugin core-purity, actionlint |
+| `make check` | Repo gates: neutrality + self-test, kit-drift, prompt-drift, tool-surface drift + self-test, scaffold frontmatter, plugin core-purity, actionlint |
 | `make verify` | Librarian integration gate — `librarian/verify.sh` (48 checks, throwaway scratch desk) |
 | `make package` | Regenerate the marketplace bundle (`plugin/claude-plugin/` artifacts) |
 | `make install` | Build + install the `deskkit` binary to `~/.local/bin` (override `PREFIX=`) |
@@ -110,6 +110,7 @@ self-contained — that's why it's committed and drift-guarded.
 | `VERSION` == shipped manifests | `scripts/check-version-sync.mjs` |
 | `kits.yaml` == `kits/` tree | `scripts/check-kits.mjs` |
 | Prompt copies byte-identical (embed ↔ spec quote; ADR 0015) | `scripts/check-prompt-drift.mjs` |
+| `docs/tool-surface.md` counts match source (ADR 0016) | `scripts/check-tool-surface.mjs` (+ `--self-test`; MCP gated counts by `TestToolSurfaceDoc_MCPCounts` on `make test`) |
 | Scaffold instruments carry conformant frontmatter | `scripts/check-scaffold-frontmatter.mjs` |
 | A tagged release has a CHANGELOG section | `scripts/check-changelog.mjs` (release gate) |
 
