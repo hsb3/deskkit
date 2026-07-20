@@ -109,6 +109,7 @@ self-contained — that's why it's committed and drift-guarded.
 | `plugin/core` stays harness-pure (no harness imports) | `plugin` `bun run check:purity` → `scripts/check-core-purity.mjs` |
 | `VERSION` == shipped manifests | `scripts/check-version-sync.mjs` |
 | `kits.yaml` == `kits/` tree | `scripts/check-kits.mjs` |
+| Prompt copies byte-identical (embed ↔ spec quote; ADR 0015) | `scripts/check-prompt-drift.mjs` |
 | Scaffold instruments carry conformant frontmatter | `scripts/check-scaffold-frontmatter.mjs` |
 | A tagged release has a CHANGELOG section | `scripts/check-changelog.mjs` (release gate) |
 

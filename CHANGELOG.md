@@ -15,6 +15,18 @@ for why this policy exists.
 
 ### Added
 
+- **Prompt-copy drift guard + git-is-truth prompt governance** (#120, ADR 0015). A new
+  dependency-free `scripts/check-prompt-drift.mjs` (wired into `make check` + CI next to
+  `check-kits.mjs`) asserts the librarian system-prompt embed
+  (`librarian/templates/librarian-system-prompt.txt`) and its "kept verbatim" quote in
+  `docs/pocket-librarian-v1-spec.md` §6.1 stay **byte-identical**, closing the drift class that
+  shipped a stale six-tool spec quote against the five-tool embed with nothing to catch it.
+  `prompt.Seed`'s doc comments, spec §4.10/§6.1, and `librarian/README.md` now state ADR 0015
+  in its own terms: the DB `prompts` row is a **re-seeded cache** (not canonical), GUI/REST
+  edits are **ephemeral by rule**, and `_knowledge/` is the only durable customization path —
+  with a documented **"reset to shipped"** affordance (delete the row via the admin console; the
+  next command or a `serve` restart re-seeds it from the embed). Documentation + a new gate only;
+  no runtime behavior changes (`Seed`'s seed-if-absent logic and the resolver are unchanged).
 - **Tool-level MCP module gating on a shared mount** (`MCP_MODULES`; the agent integration
   contract — [ADR 0014](docs/decisions/0014-agent-integration-contract.md),
   `docs/agent-integration-contract-v1-spec.md`, #114 under epic #129). `deskkit mcp-serve` now filters its

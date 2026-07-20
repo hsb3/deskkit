@@ -59,6 +59,11 @@ jobs:
       - name: Kit-manifest drift guard — kits.yaml vs kits/ tree
         run: node scripts/check-kits.mjs
 
+      # Prompt-copy drift: the librarian system-prompt embed and its "kept verbatim" quote in the
+      # v1 spec must stay byte-identical (ADR 0015 — git is truth). Fails naming where they diverge.
+      - name: Prompt-copy drift guard — embed vs spec quote
+        run: node scripts/check-prompt-drift.mjs
+
       # Advisory only (never fails the build): nudges when user-facing changes have piled up
       # under plugin/ or librarian/ since the last v* tag without a VERSION bump. The hard gate
       # (a documented CHANGELOG section for the tagged version) lives in release.yml.
