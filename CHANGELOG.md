@@ -15,6 +15,22 @@ for why this policy exists.
 
 ### Added
 
+- **Findings disposition lifecycle** (#93). Patrol findings now carry a `disposition`
+  (`open`/`acknowledged`/`triaged`/`wont_fix`), orthogonal to `state`. `deskkit findings dispose
+  <id> --as <disposition>` marks a finding; `query findings` defaults to live (undisposed) items
+  with `--include-disposed` to show history. Dispositions survive re-patrol by inheriting on
+  (file, rule, checksum); a finding whose evidence (checksum) changes re-opens automatically.
+  Migration `0014_patrol_findings_disposition` backfills existing rows to `open`.
+- **Authoritative tool-surface document** (#94) — `docs/tool-surface.md` (linked from
+  `docs/README.md`) enumerates every surface with empirically-verified counts: the librarian MCP
+  tools by gate (5 default / 6 with `LIBRARIAN_AUTONOMOUS_WRITES` / 17 with `PM_ENABLED` / 18 both),
+  the CLI subcommands, and the plugin's separate 4-tool TS MCP server. Replaces the false
+  "seven-tool core" help string, which matched no real surface.
+- **`deskkit mcp-serve` mount signal** (#79) — a one-line readiness line on stderr (server identity
+  + tool count) so an absent PM tool surface is diagnosable instead of silent.
+- **Scaffold-frontmatter drift guard** (#80) — `scripts/check-scaffold-frontmatter.mjs` (wired into
+  `make check`) asserts scaffold-shipped instruments carry conformant frontmatter.
+
 - **Repo-conformance pass to the code-desk standard** (Lane 6, #86). The repo now passes its own
   `repo-compliance-audit` with zero gaps:
   - **Root entry-doc set** — a `CLAUDE.md` agent-navigation guide (command surface, the one

@@ -94,8 +94,9 @@ type RestoreResult struct {
 // --- §5.6 query ---
 
 type QueryInput struct {
-	Kind string `json:"kind" jsonschema:"description=One of: live_files recent orphans uncollapsed findings summary adoption feedback;required"`
-	Days int    `json:"days,omitempty" jsonschema:"description=Window for 'recent'; default 7"`
+	Kind            string `json:"kind" jsonschema:"description=One of: live_files recent orphans uncollapsed findings summary adoption feedback;required"`
+	Days            int    `json:"days,omitempty" jsonschema:"description=Window for 'recent'; default 7"`
+	IncludeDisposed bool   `json:"include_disposed,omitempty" jsonschema:"description=Include disposed (acknowledged triaged wont_fix) findings; default false shows only open"`
 }
 
 // --- record_feedback ---

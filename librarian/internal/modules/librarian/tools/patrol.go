@@ -93,6 +93,15 @@ func Patrol(ctx context.Context, app core.App, cfg *config.Config, in *PatrolInp
 			fr.Set("state", "flagged")
 			fr.Set("patrol_run", runID)
 			fr.Set("checksum", row.Checksum)
+			// Disposition lifecycle: a supervisor's acknowledged/triaged/wont_fix decision must
+			// survive a resolve→re-fire cycle. On the dedupe path the existing flagged row keeps
+			// its disposition for free (we never reach here). On the RE-FIRE path a prior finding
+			// with the same (file, rule, checksum) was resolved (so it is not in openKeys) and a
+			// FRESH row is filed here — inherit that prior non-open disposition so the decision is
+			// not silently lost. No prior disposed finding ⇒ 'open'. Set explicitly so a finding is
+			// never left with an empty disposition (the default `query findings` filter is
+			// disposition='open', which would otherwise hide an empty-disposition row).
+			fr.Set("disposition", inheritedDisposition(txApp, row.ID, rule, row.Checksum))
 			if err := txApp.Save(fr); err != nil {
 				return err
 			}
@@ -242,6 +251,26 @@ func isDuplicateFinding(open map[findingKey]bool, path, rule, checksum string) b
 	return open[findingDedupeKey(path, rule, checksum)]
 }
 
+// inheritedDisposition returns the disposition a newly filed finding should carry so a
+// supervisor's earlier decision survives a resolve→re-fire cycle. It looks up the most recent
+// PRIOR finding sharing the same (file, rule, checksum) whose disposition is non-'open' (i.e.
+// acknowledged/triaged/wont_fix). Recency is ordered by patrol_run: run ids are
+// "patrol-<UTC-timestamp>" (patrol_findings has no `created` column — a base collection carries
+// only `id`), so a descending patrol_run sort is timestamp-monotonic. Returns "open" when there
+// is no prior disposed finding, or on any lookup error (fail open — never block filing).
+func inheritedDisposition(app core.App, fileID, rule, checksum string) string {
+	recs, err := app.FindRecordsByFilter(
+		"patrol_findings",
+		"file = {:file} && rule = {:rule} && checksum = {:checksum} && disposition != 'open' && disposition != ''",
+		"-patrol_run", 1, 0,
+		dbx.Params{"file": fileID, "rule": rule, "checksum": checksum},
+	)
+	if err != nil || len(recs) == 0 {
+		return "open"
+	}
+	return recs[0].GetString("disposition")
+}
+
 // --- rule detection (spec §5.2 table, PoC-verbatim text) ---
 
 var entityDirKinds = map[string]bool{"decisions": true, "tasks": true, "analyses": true, "journal": true}
@@ -351,7 +380,10 @@ func r4Check(dirKind, relPath, status string) (string, string, bool) {
 func checkR4(row fileRow) (string, string, bool) { return r4Check(row.DirKind, row.Path, row.Status) }
 
 // r5Check is the pure core of R5 (judgment, flag-only), given already-read text. Decisions
-// are excluded (append-only records, never collapse targets).
+// are excluded (append-only records, never collapse targets). R5 gates on an EXPLICIT
+// graduation marker (graduationMarker: the frontmatter `graduated_to:` key or a canonical
+// `graduated to: <ref>` line), NOT a bare issue number quoted in prose — so a >40-line entity
+// doc that merely cites an issue as evidence no longer false-fires the collapse rule.
 func r5Check(dirKind string, text string) (string, string, bool) {
 	if dirKind == "decisions" {
 		return "", "", false
@@ -360,7 +392,7 @@ func r5Check(dirKind string, text string) (string, string, bool) {
 	if lines <= 40 {
 		return "", "", false
 	}
-	ref := issueRefFind(text)
+	ref := graduationMarker(text)
 	if ref == "" {
 		return "", "", false
 	}

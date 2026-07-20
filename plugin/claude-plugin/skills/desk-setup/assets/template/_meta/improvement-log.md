@@ -1,9 +1,21 @@
+---
+type: journal
+status: active
+created: <YYYY-MM-DD>
+updated: <YYYY-MM-DD>
+tags: [self-maintenance, friction-ledger]
+synopsis: "Desk self-maintenance ledger — the maintenance backlog, pass log, and instruction-friction ledger the harvest loop reads (K21)."
+---
+
 # Improvement log — {{profile.desk.name}}
 
 <!--
   The desk's single self-maintenance file (K21). Three ledgers in one file. The harvest loop
   folds the friction-ledger entries into versioned revisions of the conventions standard.
-  Seed stub — replace the placeholders as real entries arrive.
+  Seed stub — replace the placeholders as real entries arrive, including the frontmatter's
+  <YYYY-MM-DD> (created = the day this scaffold was materialized; updated stays static unless
+  the ledger's structure itself changes — appending M-nn/INS-nn entries never touches
+  frontmatter, so this file is conformant with the frontmatter contract (K3) as instantiated).
 -->
 
 ## Maintenance backlog (M-nn)

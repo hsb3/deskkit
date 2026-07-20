@@ -40,13 +40,13 @@ func (m *Mod) Configure(cfg *config.Config) { m.cfg = cfg }
 
 func (*Mod) Name() string { return "librarian" }
 
-// SchemaVersion is the highest migration sequence the librarian module declares (0013).
-func (*Mod) SchemaVersion() int { return 13 }
+// SchemaVersion is the highest migration sequence the librarian module declares (0014).
+func (*Mod) SchemaVersion() int { return 14 }
 
 // Enabled is always true: librarian is the base module (spec §2.7).
 func (*Mod) Enabled(*config.Config) bool { return true }
 
-// OwnedCollections lists every collection created by the librarian's 0001..0013 migrations
+// OwnedCollections lists every collection created by the librarian's 0001..0014 migrations
 // (enumerated from the migration bodies; see module_test.go's drift guard for the migrations
 // side).
 func (*Mod) OwnedCollections() []string {
@@ -63,7 +63,7 @@ func (*Mod) Tools() []toolcore.ToolSpec { return tools.Specs() }
 // contributes no extra mounted views (spec §5.3 — the plug-point exists for other modules).
 func (*Mod) TUIViews(core.App, *config.Config) []tuiview.View { return nil }
 
-// Migrations lists the librarian's 0001..0013 migrations. All are SelfRegistered: their
+// Migrations lists the librarian's 0001..0014 migrations. All are SelfRegistered: their
 // bodies still call PocketBase's m.Register via their own init() (blank-imported by main via
 // internal/modules/librarian/collections), so Up/Down are nil here — this manifest exists for
 // stamp-by-observation (core/migrate.StampModules) and the drift test below, not to re-wire
@@ -74,6 +74,7 @@ func (*Mod) Migrations() []migrate.Migration {
 		"0005_adoption_log", "0006_agent_runs", "0007_messages", "0008_tasks",
 		"0009_prompts", "0010_patrol_findings_resolved", "0011_widen_content_fields",
 		"0012_dir_kind_add_infra", "0013_feedback",
+		"0014_patrol_findings_disposition",
 	}
 	out := make([]migrate.Migration, len(basenames))
 	for i, b := range basenames {
@@ -112,10 +113,17 @@ func (m *Mod) Verdict(_ context.Context, pointer string, req schema.ArtifactRequ
 	if pointer == "" {
 		return fail(fmt.Sprintf("no document pointer set; a document (type=%s) is required", req.Type))
 	}
-	if strings.Contains(pointer, "://") {
+	// A pointer may carry an advisory "§ heading" section anchor naming a heading INSIDE the
+	// document (e.g. "notes.md § Decisions"). The heading is a human wayfinding hint, not part of
+	// the file's identity: resolve and require only the FILE part to exist, and never check the
+	// heading. This keeps a pointer resolving even after the document's headings are renamed, and
+	// lets pointers that already carry such a suffix pass their first gated transition with no data
+	// migration.
+	file := sectionFilePart(pointer)
+	if strings.Contains(file, "://") {
 		return fail(fmt.Sprintf("pointer %q is not a desk file; a document gate needs a file path", pointer))
 	}
-	abs, ok := m.resolveDeskPath(pointer)
+	abs, ok := m.resolveDeskPath(file)
 	if !ok {
 		return fail(fmt.Sprintf("pointer %q resolves outside the desk root; a document gate reads desk files only", pointer))
 	}
@@ -164,10 +172,17 @@ func (m *Mod) Verdict(_ context.Context, pointer string, req schema.ArtifactRequ
 // pointers. A missing/unreadable/frontmatter-less file returns an empty map (the trait simply
 // does not match), never an error the gate engine would have to interpret.
 func (m *Mod) Frontmatter(_ context.Context, pointer string) (map[string]any, error) {
-	if m.cfg == nil || m.cfg.DeskRoot == "" || pointer == "" || strings.Contains(pointer, "://") {
+	if m.cfg == nil || m.cfg.DeskRoot == "" || pointer == "" {
 		return map[string]any{}, nil
 	}
-	abs, ok := m.resolveDeskPath(pointer)
+	// Tolerate the same advisory "§ heading" section anchor Verdict does: resolve only the file
+	// part, so a trait predicate over a section-anchored pointer reads the same document the gate
+	// does (never a URL, never a heading).
+	file := sectionFilePart(pointer)
+	if strings.Contains(file, "://") {
+		return map[string]any{}, nil
+	}
+	abs, ok := m.resolveDeskPath(file)
 	if !ok {
 		return map[string]any{}, nil
 	}
@@ -176,6 +191,19 @@ func (m *Mod) Frontmatter(_ context.Context, pointer string) (map[string]any, er
 		return map[string]any{}, nil
 	}
 	return desklib.ParseFrontmatter(string(b)), nil
+}
+
+// sectionFilePart returns the FILE portion of a document pointer, dropping an advisory
+// "§ heading" section anchor when one is present: "notes.md § Decisions" yields "notes.md",
+// while a plain "notes.md" is returned unchanged. The text after "§" names a location inside the
+// document for a human reader and is never part of the file's identity, so the gate resolves and
+// requires only the file. Only "§" delimits a section anchor here; "#" is deliberately left
+// untouched.
+func sectionFilePart(pointer string) string {
+	if i := strings.IndexRune(pointer, '§'); i >= 0 {
+		return strings.TrimSpace(pointer[:i])
+	}
+	return pointer
 }
 
 // resolveDeskPath resolves a document pointer against DESK_ROOT and CONTAINS it there: a

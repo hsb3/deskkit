@@ -250,13 +250,15 @@ func scanFile(root, rel string, dirMap map[string]string, secretsDir, deskName s
 		row.Synopsis = fmStr(fm, "synopsis")
 		row.FMCreated = fmStr(fm, "created")
 		row.FMUpdated = fmStr(fm, "updated")
-		if lineCount(text) <= 40 {
-			if ref := issueRefFind(text); ref != "" {
-				row.GraduatedTo = ref
-			} else if url := ghURLRe.FindString(text); url != "" {
-				row.GraduatedTo = url
-			}
-		}
+		// graduated_to is populated ONLY from an EXPLICIT graduation marker (a frontmatter
+		// `graduated_to:` key, or a canonical inline `graduated to: <ref>` line) — never
+		// inferred from a bare #N merely quoted in prose. The old heuristic (lines <= 40 AND
+		// leftmost ISSUE_REF_RE/GH_URL_RE match) mis-populated this column for any short doc
+		// that only cited an issue as evidence, and coupled to R5 (§5.2) it false-fired the
+		// graduated-doc rule. Gating both on a deliberate marker fixes both symptoms at the
+		// root; the marker is authoritative at ANY length (a graduated-but-uncollapsed doc is
+		// exactly the >40-line case R5 flags).
+		row.GraduatedTo = graduationMarker(text)
 	}
 	return row, nil
 }
@@ -342,6 +344,32 @@ func isMetaPath(rel, secretsDir string) bool {
 		return true
 	}
 	return strings.HasPrefix(rel, "_meta/")
+}
+
+// --- graduation marker (explicit-only; gates graduated_to §5.1 and R5 §5.2) ---
+
+// inlineGraduationRe matches a CANONICAL graduation line — one that STARTS with "graduated
+// to" (case-insensitive, optional colon) followed by a pointer target (`wb#N`, `#N`, a bare
+// number, or a URL). Anchored at line start (multiline) so a bare #N merely mentioned inside a
+// prose sentence ("...which graduated to #N last week") is NOT a marker; only a deliberate
+// canonical line is. `wb#\d+` precedes `#?\d+` in the alternation so the wb-prefixed form wins.
+var inlineGraduationRe = regexp.MustCompile(`(?im)^\s*graduated to:?\s+(wb#\d+|#?\d+|https?://\S+)`)
+
+// graduationMarker returns the doc's EXPLICIT graduation pointer, or "" when the doc declares
+// none. A graduation is DECLARED, never inferred from a bare #N quoted in prose: the primary
+// marker is the frontmatter `graduated_to:` key; a canonical inline `graduated to: <ref>` line
+// is accepted as a secondary marker. This single gate backs both graduated_to population
+// (sweep, §5.1) and R5 (patrol, §5.2), so a doc that only CITES an issue as evidence is never
+// treated as graduated. Self-contained (parses its own frontmatter) so the R5 call site can
+// swap `issueRefFind(text)` for `graduationMarker(text)` with no signature change.
+func graduationMarker(text string) string {
+	if v := strings.TrimSpace(fmStr(desklib.ParseFrontmatter(text), "graduated_to")); v != "" {
+		return v
+	}
+	if m := inlineGraduationRe.FindStringSubmatch(text); m != nil {
+		return m[1]
+	}
+	return ""
 }
 
 // --- ISSUE_REF_RE / GH_URL_RE (spec §5.1 graduated_to precedence, §5.2 R5) ---

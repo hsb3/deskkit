@@ -1,6 +1,24 @@
 package main
 
-import "testing"
+import (
+	"bytes"
+	"os"
+	"testing"
+)
+
+// TestNoStaleSevenToolClaim guards against the return of the false "seven-tool core" help string:
+// the librarian MCP default surface exposes 5 tools (6 with LIBRARIAN_AUTONOMOUS_WRITES, +12 under
+// PM_ENABLED) and the CLI carries far more than seven subcommands — the authoritative map is
+// docs/tool-surface.md. RED before the fix (the mcp-serve Short said "seven-tool core"), green after.
+func TestNoStaleSevenToolClaim(t *testing.T) {
+	src, err := os.ReadFile("main.go")
+	if err != nil {
+		t.Fatalf("read main.go: %v", err)
+	}
+	if bytes.Contains(src, []byte("seven-tool core")) {
+		t.Error(`main.go still contains the false "seven-tool core" claim; describe the surface accurately (see docs/tool-surface.md)`)
+	}
+}
 
 func TestHasDirFlag(t *testing.T) {
 	cases := []struct {
@@ -158,6 +176,64 @@ func TestStripNoInput(t *testing.T) {
 				if got[i] != c.want[i] {
 					t.Fatalf("stripNoInput(%v) = %v, want %v", c.args, got, c.want)
 				}
+			}
+		})
+	}
+}
+
+func TestUnknownSubcommand(t *testing.T) {
+	// A representative registered set: leaf commands, groups (pm/findings/completion/migrate) with
+	// their children, and the pbLateCommands (serve/superuser) the guard seeds explicitly.
+	known := knownCommandSet{
+		top: map[string]bool{
+			"serve": true, "superuser": true, "migrate": true, "sweep": true,
+			"query": true, "pm": true, "findings": true, "completion": true, "help": true,
+		},
+		groups: map[string]map[string]bool{
+			"pm":         {"create": true, "show": true},
+			"findings":   {"dispose": true},
+			"completion": {"bash": true, "zsh": true},
+			"migrate":    {"up": true, "down": true},
+		},
+	}
+	cases := []struct {
+		name     string
+		args     []string
+		wantName string
+		wantBad  bool
+	}{
+		// The core regression: a bare unknown subcommand must be reported (was exit 0 before).
+		{"unknown top-level command", []string{"frobnicate"}, "frobnicate", true},
+		{"unknown nested pm command", []string{"pm", "frobnicate"}, "pm frobnicate", true},
+		{"unknown nested findings command", []string{"findings", "frobnicate"}, "findings frobnicate", true},
+		{"unknown nested completion command", []string{"completion", "frobnicate"}, "completion frobnicate", true},
+		{"unknown nested migrate command", []string{"migrate", "frobnicate"}, "migrate frobnicate", true},
+		{"unknown after leading global value flag", []string{"--dir", "/x", "frobnicate"}, "frobnicate", true},
+		// Valid invocations must never be flagged.
+		{"known leaf command", []string{"sweep"}, "", false},
+		{"pocketbase-late serve", []string{"serve"}, "", false},
+		{"pocketbase-late superuser", []string{"superuser"}, "", false},
+		{"known leaf with an arg is not a nested lookup", []string{"query", "findings"}, "", false},
+		{"known nested pm command", []string{"pm", "create"}, "", false},
+		{"known findings dispose with id and flags", []string{"findings", "dispose", "abc123", "--as", "wont-fix"}, "", false},
+		{"known migrate subcommand", []string{"migrate", "up"}, "", false},
+		{"known completion subcommand", []string{"completion", "bash"}, "", false},
+		{"group invoked bare prints its usage", []string{"pm"}, "", false},
+		{"findings group invoked bare", []string{"findings"}, "", false},
+		{"leading global value flag then known command", []string{"--dir", "/x", "sweep"}, "", false},
+		// Help/version fast paths short-circuit before dispatch — never flagged.
+		{"help long flag", []string{"--help"}, "", false},
+		{"help short flag", []string{"-h"}, "", false},
+		{"version long flag", []string{"--version"}, "", false},
+		{"help flag alongside an unknown token", []string{"frobnicate", "--help"}, "", false},
+		{"bare invocation", []string{}, "", false},
+		{"only flags no subcommand", []string{"--dev"}, "", false},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			gotName, gotBad := unknownSubcommand(c.args, known)
+			if gotBad != c.wantBad || gotName != c.wantName {
+				t.Errorf("unknownSubcommand(%v) = (%q, %v), want (%q, %v)", c.args, gotName, gotBad, c.wantName, c.wantBad)
 			}
 		})
 	}

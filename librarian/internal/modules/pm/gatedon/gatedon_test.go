@@ -86,7 +86,7 @@ func TestGatedOnDeskCreatesPMCollectionsAndStamps(t *testing.T) {
 		}
 	}
 	assertVersion("pm", 5)
-	assertVersion("librarian", 13)
+	assertVersion("librarian", 14)
 
 	// GuardDowngrade passes when store == binary...
 	if err := migrate.GuardDowngrade(app, reg.MigrateModules()); err != nil {

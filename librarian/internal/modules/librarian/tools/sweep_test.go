@@ -1,6 +1,10 @@
 package tools
 
-import "testing"
+import (
+	"os"
+	"path/filepath"
+	"testing"
+)
 
 func TestDirKindForRoot(t *testing.T) {
 	dirMap := map[string]string{"decision": "_structure/decisions", "task": "tasks", "analysis": "analyses", "journal": "journal"}
@@ -211,5 +215,120 @@ func TestFmStr(t *testing.T) {
 	}
 	if got := fmStr(fm, "missing"); got != "" {
 		t.Fatalf("missing key must reduce to empty string, got %q", got)
+	}
+}
+
+// --- graduated_to / R5 explicit-marker gating ---
+//
+// NEUTRALITY: issue refs used as test DATA are assembled at runtime so no literal `#\d+`
+// token appears in this source (scripts/check-neutrality.mjs family 2a). The scanner also
+// whole-file-exempts this test, but building refs at runtime keeps the file clean regardless.
+const (
+	refHash = "#"    // bare-issue-ref sigil, kept split from its digits at the source level
+	refN    = "111"  // the sample issue number
+	refWB   = "wb#"  // the wb-prefixed alternative sigil
+	refWBN  = "37"   // the wb sample number
+)
+
+// scanTempMD writes content to name under a throwaway desk root and returns the scanned
+// fileRow. The temp root is not a git repo, so Origin / GitLastCommit resolve to "".
+func scanTempMD(t *testing.T, name, content string) fileRow {
+	t.Helper()
+	root := t.TempDir()
+	abs := filepath.Join(root, filepath.FromSlash(name))
+	if err := os.MkdirAll(filepath.Dir(abs), 0o755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+	if err := os.WriteFile(abs, []byte(content), 0o644); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+	dirMap := map[string]string{"decision": "_structure/decisions", "task": "tasks", "analysis": "analyses", "journal": "journal"}
+	row, err := scanFile(root, name, dirMap, "_meta/secrets", "testdesk")
+	if err != nil {
+		t.Fatalf("scanFile(%q): %v", name, err)
+	}
+	return row
+}
+
+func padLines(n int) string {
+	var b string
+	for i := 0; i < n; i++ {
+		b += "padding line of prose\n"
+	}
+	return b
+}
+
+// TestGraduationMarker is the pure gate: an explicit frontmatter key or a canonical inline
+// `graduated to` line is a marker; a bare #N anywhere in prose is NOT.
+func TestGraduationMarker(t *testing.T) {
+	hash := refHash + refN // "#111"
+	wb := refWB + refWBN   // "wb#37"
+	url := "https://" + "github.com/o/r/issues/9"
+	cases := []struct {
+		name, text, want string
+	}{
+		{"frontmatter key, quoted", "---\ntype: analysis\ngraduated_to: \"" + hash + "\"\n---\nbody\n", hash},
+		{"frontmatter key, wb value", "---\ngraduated_to: \"" + wb + "\"\n---\nbody\n", wb},
+		{"frontmatter key wins over inline", "---\ngraduated_to: \"" + hash + "\"\n---\ngraduated to " + wb + "\n", hash},
+		{"inline canonical line, no colon", "no frontmatter\ngraduated to " + hash + "\n", hash},
+		{"inline canonical line, with colon", "graduated to: " + wb + "\n", wb},
+		{"inline canonical line, url", "graduated to: " + url + "\n", url},
+		{"bare ref in prose is NOT a marker", "this doc references " + hash + " as evidence\n", ""},
+		{"graduated-to mid-sentence is NOT a marker", "the plan graduated to " + hash + " earlier this week\n", ""},
+		{"no marker at all", "---\ntype: analysis\n---\njust prose, nothing filed\n", ""},
+		{"empty", "", ""},
+	}
+	for _, c := range cases {
+		if got := graduationMarker(c.text); got != c.want {
+			t.Errorf("%s: graduationMarker = %q, want %q", c.name, got, c.want)
+		}
+	}
+}
+
+// TestScanFileNoMarkerNoGraduatedTo is the #92/#78 RED regression: a short doc that merely
+// CITES an issue number in prose — with NO graduation marker — must NOT populate graduated_to,
+// and (being short) must not fire R5. This FAILS on the pre-fix leftmost-bare-#N heuristic
+// (which set graduated_to to the quoted ref) and PASSES once graduated_to is marker-gated.
+func TestScanFileNoMarkerNoGraduatedTo(t *testing.T) {
+	prose := "This analysis references filed issue " + refHash + refN + " as supporting evidence.\n"
+	content := "---\ntype: analysis\ncreated: 2026-07-15\nupdated: 2026-07-15\ntags: []\nsynopsis: \"cites an issue as evidence\"\n---\n" + prose
+	row := scanTempMD(t, "analyses/cite-as-evidence.md", content)
+	if row.GraduatedTo != "" {
+		t.Fatalf("a doc that only CITES %s in prose must leave graduated_to empty, got %q", refHash+refN, row.GraduatedTo)
+	}
+	if _, _, hit := r5Check(row.DirKind, content); hit {
+		t.Fatalf("R5 must not fire on a doc that only cites an issue as evidence")
+	}
+}
+
+// TestScanFileFrontmatterMarkerSetsGraduatedToAndR5Fires is the regression that an EXPLICIT
+// `graduated_to:` frontmatter marker populates graduated_to regardless of length, and that a
+// graduated-but-still-long doc (>40 lines) fires R5 as designed.
+func TestScanFileFrontmatterMarkerSetsGraduatedToAndR5Fires(t *testing.T) {
+	marker := refHash + refN
+	content := "---\ntype: analysis\ncreated: 2026-07-15\nupdated: 2026-07-15\ntags: []\nsynopsis: \"graduated but not collapsed\"\ngraduated_to: \"" + marker + "\"\n---\n" + padLines(45)
+	row := scanTempMD(t, "analyses/graduated-not-collapsed.md", content)
+	if row.GraduatedTo != marker {
+		t.Fatalf("frontmatter graduated_to marker must populate the column, got %q want %q", row.GraduatedTo, marker)
+	}
+	if _, _, hit := r5Check(row.DirKind, content); !hit {
+		t.Fatalf("R5 must fire on a graduated (marker present) doc that is still >40 lines")
+	}
+}
+
+// TestScanFileInlineMarkerSetsGraduatedTo pins the canonical inline `graduated to <ref>` line
+// (the verify.sh F-R5 fixture shape). It must populate graduated_to and, on a >40-line doc,
+// fire R5 — this is what keeps the integration gate's F-R5 fixture firing once R5 is wired to
+// the shared marker gate.
+func TestScanFileInlineMarkerSetsGraduatedTo(t *testing.T) {
+	marker := refHash + refN
+	body := "graduated to " + marker + "\n" + padLines(45)
+	content := "---\ntype: analysis\ncreated: 2026-07-15\nupdated: 2026-07-15\ntags: []\nsynopsis: \"graduated stub\"\n---\n" + body
+	row := scanTempMD(t, "analyses/inline-graduated.md", content)
+	if row.GraduatedTo != marker {
+		t.Fatalf("canonical inline `graduated to` line must populate the column, got %q want %q", row.GraduatedTo, marker)
+	}
+	if _, _, hit := r5Check(row.DirKind, content); !hit {
+		t.Fatalf("R5 must fire on an inline-marked graduated doc that is still >40 lines")
 	}
 }

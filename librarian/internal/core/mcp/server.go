@@ -36,6 +36,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"strings"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -89,14 +90,64 @@ func NewServer(app core.App, cfg *config.Config) (*mcp.Server, error) {
 // "Error: server is closing: EOF" + a usage dump and exit non-zero — so we swallow them and
 // exit 0/silent instead (field-eval finding).
 func Serve(ctx context.Context, app core.App, cfg *config.Config) error {
+	// Fail LOUD, never "silently absent". An MCP host (e.g. a plugin .mcp.json entry) launches
+	// mcp-serve as a subprocess and surfaces its stderr in the server's own logs. If the desk did
+	// not resolve, registering a degenerate/empty tool surface would look like a mysterious absence
+	// rather than a fixable error — so name the missing identity and exit non-zero right here. A
+	// direct os.Exit (not a returned error) keeps this to ONE clean line: PocketBase's RootCmd
+	// silences neither errors nor usage, so a returned RunE error would print "Error: …" plus a
+	// full usage dump. In normal operation the CLI's requireConfig gate already fails first, so
+	// this is a defensive belt-and-suspenders for any caller (or refactor) that reaches Serve with
+	// an unresolved cfg — the surface refuses to serve the wrong desk ON ITS OWN.
+	if err := requireResolvedConfig(cfg); err != nil {
+		fmt.Fprintf(os.Stderr, "deskkit mcp-serve: %v\n", err)
+		os.Exit(1)
+	}
 	s, err := NewServer(app, cfg)
 	if err != nil {
 		return err
 	}
+	// Mount signal: emit ONE concise line so a host operator can SEE the surface came up (and
+	// which tools it carries — the PM tool family only appears when PM is enabled) instead of
+	// guessing at a silent absence. It MUST go to stderr — stdout is the JSON-RPC channel and any
+	// stray byte there corrupts the protocol.
+	emitMountSignal(os.Stderr, ExposedTools(cfg))
 	if rerr := s.Run(ctx, &mcp.StdioTransport{}); rerr != nil && !isShutdownEOF(rerr) {
 		return rerr
 	}
 	return nil
+}
+
+// requireResolvedConfig reports whether cfg is a fully-resolved desk (a non-nil config with a
+// DeskRoot and DeskName). An empty desk would otherwise register tools against a nil desk and
+// answer requests wrongly, all while looking like a working-but-empty surface. The returned
+// message names the missing identity and how to set it, so the failure is actionable straight
+// from the host's server log.
+func requireResolvedConfig(cfg *config.Config) error {
+	if cfg == nil {
+		return errors.New("desk not resolved: DESK_ROOT and DESK_NAME unset; set them via env or a discoverable _knowledge/profile.*")
+	}
+	var missing []string
+	if strings.TrimSpace(cfg.DeskRoot) == "" {
+		missing = append(missing, "DESK_ROOT")
+	}
+	if strings.TrimSpace(cfg.DeskName) == "" {
+		missing = append(missing, "DESK_NAME")
+	}
+	if len(missing) > 0 {
+		return fmt.Errorf("desk not resolved: %s unset; set via env or a discoverable _knowledge/profile.* (run deskkit inside the desk), then restart the MCP host session",
+			strings.Join(missing, ", "))
+	}
+	return nil
+}
+
+// emitMountSignal writes ONE concise mount line to w: the server identity plus the exact tool set
+// it exposed. Presence of this line in the host's server log is the observable "the surface
+// mounted" signal (its absence, a diagnostic). Callers MUST pass a stderr writer — never stdout,
+// the JSON-RPC channel.
+func emitMountSignal(w io.Writer, tools []string) {
+	fmt.Fprintf(w, "deskkit mcp-serve: mounted %q %s; %d tool(s) exposed: %s\n",
+		serverName, serverVersion, len(tools), strings.Join(tools, ", "))
 }
 
 // isShutdownEOF reports whether err is the normal end of a stdio MCP session rather than a

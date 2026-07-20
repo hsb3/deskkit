@@ -2,6 +2,7 @@ package engine
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"testing"
 	"time"
@@ -424,7 +425,57 @@ func TestLinkIsBlockedByCanonicalizes(t *testing.T) {
 	}
 }
 
-// --- §10.4 concurrency ---
+// --- §10.4 concurrency / atomicity ---
+
+// TestTransitionRollsBackOnLaterFailure is the atomicity regression guard for the
+// optimistic-concurrency TOCTOU fix: a mutating method's load->version-check->mutate->save->
+// audit->cascade sequence must commit or roll back as ONE unit. It forces a failure AFTER the
+// phase write (via the txFailpoint seam, standing in for a failing audit/cascade write) and
+// asserts the item's phase AND version are fully restored — no half-applied mutation. Without
+// the enclosing transaction the phase Save persists while the later step fails, leaving the item
+// half-mutated (this test fails); with it, the phase and version roll back (this test passes).
+func TestTransitionRollsBackOnLaterFailure(t *testing.T) {
+	e := newEngine(t, nil)
+	item := mustCreate(t, e, CreateItemInput{Title: "atomic", Type: "analysis"})
+	beforePhase := item.GetString("phase")
+	beforeVersion := item.GetInt("version")
+
+	txFailpoint = func() error { return errors.New("forced failure after the phase write") }
+	t.Cleanup(func() { txFailpoint = nil })
+
+	_, err := e.Transition(context.Background(), TransitionInput{
+		ItemID: item.Id, TargetPhase: "work", Version: beforeVersion, Actor: human,
+	})
+	if err == nil {
+		t.Fatal("expected the forced mid-sequence failure to surface as an error")
+	}
+
+	reloaded, lerr := e.loadItem(item.Id)
+	if lerr != nil {
+		t.Fatal(lerr)
+	}
+	if got := reloaded.GetString("phase"); got != beforePhase {
+		t.Fatalf("phase must roll back to %q on a mid-sequence failure, got %q (half-applied write)", beforePhase, got)
+	}
+	if got := reloaded.GetInt("version"); got != beforeVersion {
+		t.Fatalf("version must roll back to %d on a mid-sequence failure, got %d", beforeVersion, got)
+	}
+	// The advance audit row must not have committed either (whole sequence rolled back).
+	rows, _ := e.App.FindRecordsByFilter("transitions",
+		"item = {:i} && event = 'advance'", "", 0, 0, map[string]any{"i": item.Id})
+	if len(rows) != 0 {
+		t.Fatalf("no advance audit row may commit when the transition rolls back, got %d", len(rows))
+	}
+
+	// With the failpoint cleared, the same transition succeeds and bumps the version — proving
+	// the seam only affects the forced-failure path, not the happy path.
+	txFailpoint = nil
+	moved := mustTransition(t, e, reloaded, "work")
+	if moved.GetString("phase") != "work" || moved.GetInt("version") != beforeVersion+1 {
+		t.Fatalf("post-rollback retry must advance and bump once, got %s/%d",
+			moved.GetString("phase"), moved.GetInt("version"))
+	}
+}
 
 func TestVersionMismatchRefused(t *testing.T) {
 	e := newEngine(t, nil)

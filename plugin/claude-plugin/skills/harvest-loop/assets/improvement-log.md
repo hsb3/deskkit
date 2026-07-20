@@ -1,7 +1,20 @@
+---
+type: journal
+status: active
+created: <YYYY-MM-DD>
+updated: <YYYY-MM-DD>
+tags: [self-maintenance, friction-ledger]
+synopsis: "Desk self-maintenance ledger — the maintenance backlog, pass log, and instruction-friction ledger the harvest loop reads (K21)."
+---
+
 # Improvement log — <desk name>
 
 <!--
-  Per-desk friction-ledger template (K21). Copy into a desk as _meta/improvement-log.md.
+  Per-desk friction-ledger template (K21). Copy into a desk as _meta/improvement-log.md, then
+  fill in the placeholders — <desk name> above and <YYYY-MM-DD> in the frontmatter (created =
+  the copy date; updated stays static unless the ledger's structure itself changes — appending
+  M-nn/INS-nn entries never requires touching frontmatter, so the instantiated file is
+  conformant with the frontmatter contract (K3) from the moment it's copied in).
   One file, three ledgers. The harvest loop (harvest-loop skill) folds the INS-nn entries into
   versioned revisions of the conventions standard; absorbed entries are marked resolved with a
   pointer to the revision that absorbed them.

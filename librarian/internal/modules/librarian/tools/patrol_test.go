@@ -219,6 +219,37 @@ func TestR5CheckLongDocNoIssueRefNoFinding(t *testing.T) {
 	}
 }
 
+// TestR5CheckLongDocProseIssueQuoteDoesNotFire is the R5 graduation-marker regression: a
+// >40-line entity doc whose body only QUOTES an issue number in prose (not a graduation marker)
+// must NOT flag R5. Before r5Check swapped issueRefFind for graduationMarker this false-fired
+// because the bare hash ref matched; a mere citation is not an explicit graduation declaration.
+// The issue token is assembled at runtime so the neutrality lint never sees a literal bare #N.
+func TestR5CheckLongDocProseIssueQuoteDoesNotFire(t *testing.T) {
+	var longText string
+	for i := 0; i < 45; i++ {
+		longText += "content line\n"
+	}
+	longText += "see issue " + "#" + "111" + " for context\n"
+	if _, _, hit := r5Check("tasks", longText); hit {
+		t.Fatalf("a long doc that only quotes an issue number in prose must not flag R5")
+	}
+}
+
+// TestR5CheckLongDocWithGraduatedToFrontmatterFlags is the compat direction: a >40-line doc that
+// carries an EXPLICIT graduated_to frontmatter marker still flags R5 (graduationMarker's primary
+// marker). The existing TestR5CheckLongDocWithIssueRefFlags covers the inline `graduated to`
+// marker; this covers the frontmatter key. wb#37 is preceded by a word char, so it is not a bare
+// issue ref under the neutrality lint.
+func TestR5CheckLongDocWithGraduatedToFrontmatterFlags(t *testing.T) {
+	longText := "---\ngraduated_to: \"wb#37\"\n---\n"
+	for i := 0; i < 45; i++ {
+		longText += "content line\n"
+	}
+	if _, _, hit := r5Check("tasks", longText); !hit {
+		t.Fatalf("a >40-line doc with a graduated_to frontmatter marker must flag R5")
+	}
+}
+
 func TestR6CheckStaleHandoff(t *testing.T) {
 	text := "---\nupdated: 2026-07-10\n---\nHANDOFF body\n"
 	detail, fix, hit := r6Check(text, "2026-07-15")
@@ -455,6 +486,191 @@ func TestPatrol_ResolvesFindingOnDeletedFile(t *testing.T) {
 	}
 	if got.GetString("resolved_run") != res.RunID {
 		t.Fatalf("resolved_run = %q, want the resolving run id %q", got.GetString("resolved_run"), res.RunID)
+	}
+}
+
+// --- disposition lifecycle across re-patrol (DoD 93b / 93c + inheritance) ---
+
+// TestPatrol_DisposedFindingPersistsAcrossRepatrol is DoD case 93b: a wont_fix finding stays out
+// of the default view after a re-patrol with the SAME (file, rule, checksum). Disposing sets only
+// disposition (state stays flagged), so the next patrol dedupes the existing row and its
+// disposition survives untouched — no re-creation, no re-open.
+func TestPatrol_DisposedFindingPersistsAcrossRepatrol(t *testing.T) {
+	app, cfg := newTestEnv(t)
+
+	mustWriteFile(t, cfg.DeskRoot, "tasks/broken.md", missingFM)
+	checksum := desklib.Checksum([]byte(missingFM))
+	mustCreateFileRecord(t, app, "tasks/broken.md", "tasks", "task", checksum)
+
+	// Patrol 1 files an open R1 finding.
+	if _, err := Patrol(context.Background(), app, cfg, &PatrolInput{}); err != nil {
+		t.Fatalf("patrol 1: %v", err)
+	}
+	flagged, err := app.FindRecordsByFilter("patrol_findings", "rule = 'R1' && state = 'flagged'", "", 0, 0)
+	if err != nil || len(flagged) != 1 {
+		t.Fatalf("expected 1 flagged R1 finding after patrol 1, got %d (err=%v)", len(flagged), err)
+	}
+	findingID := flagged[0].Id
+	if flagged[0].GetString("disposition") != "open" {
+		t.Fatalf("freshly filed finding disposition = %q, want open", flagged[0].GetString("disposition"))
+	}
+	if n := defaultFindingsCount(t, app, cfg); n != 1 {
+		t.Fatalf("open finding: default findings = %d, want 1", n)
+	}
+
+	// Dispose wont_fix -> gone from the default view.
+	if _, err := DisposeFinding(context.Background(), app, cfg, findingID, "wont_fix"); err != nil {
+		t.Fatalf("DisposeFinding: %v", err)
+	}
+	if n := defaultFindingsCount(t, app, cfg); n != 0 {
+		t.Fatalf("after wont_fix dispose, default findings = %d, want 0", n)
+	}
+
+	// Patrol 2 with the SAME (file, rule, checksum): the row dedupes and keeps wont_fix.
+	if _, err := Patrol(context.Background(), app, cfg, &PatrolInput{}); err != nil {
+		t.Fatalf("patrol 2: %v", err)
+	}
+	got := reloadRecord(t, app, "patrol_findings", findingID)
+	if got.GetString("state") != "flagged" {
+		t.Fatalf("deduped finding state = %q, want flagged", got.GetString("state"))
+	}
+	if got.GetString("disposition") != "wont_fix" {
+		t.Fatalf("deduped finding disposition = %q, want wont_fix (survived re-patrol)", got.GetString("disposition"))
+	}
+	if n := defaultFindingsCount(t, app, cfg); n != 0 {
+		t.Fatalf("after re-patrol, default findings = %d, want 0 (disposition persisted)", n)
+	}
+	// Exactly one R1 row total — no duplicate was filed.
+	all, err := app.FindRecordsByFilter("patrol_findings", "rule = 'R1'", "", 0, 0)
+	if err != nil || len(all) != 1 {
+		t.Fatalf("expected exactly 1 R1 row after dedupe, got %d (err=%v)", len(all), err)
+	}
+}
+
+// TestPatrol_ChangedChecksumReopensDisposedFinding is DoD case 93c: because finding identity
+// includes the checksum, changed evidence (a different checksum) yields a FRESH finding that
+// defaults to open and resurfaces in the default view, while the prior wont_fix finding stays
+// disposed. Re-open needs no extra code — it falls out of the (path, rule, checksum) identity.
+func TestPatrol_ChangedChecksumReopensDisposedFinding(t *testing.T) {
+	app, cfg := newTestEnv(t)
+
+	mustWriteFile(t, cfg.DeskRoot, "tasks/broken.md", missingFM)
+	checksum1 := desklib.Checksum([]byte(missingFM))
+	fileRec := mustCreateFileRecord(t, app, "tasks/broken.md", "tasks", "task", checksum1)
+
+	// Patrol 1 -> open R1 finding; dispose it wont_fix.
+	if _, err := Patrol(context.Background(), app, cfg, &PatrolInput{}); err != nil {
+		t.Fatalf("patrol 1: %v", err)
+	}
+	first, err := app.FindRecordsByFilter("patrol_findings", "rule = 'R1'", "", 0, 0)
+	if err != nil || len(first) != 1 {
+		t.Fatalf("expected 1 R1 finding after patrol 1, got %d (err=%v)", len(first), err)
+	}
+	if _, err := DisposeFinding(context.Background(), app, cfg, first[0].Id, "wont_fix"); err != nil {
+		t.Fatalf("DisposeFinding: %v", err)
+	}
+	if n := defaultFindingsCount(t, app, cfg); n != 0 {
+		t.Fatalf("after dispose, default findings = %d, want 0", n)
+	}
+
+	// Evidence changes: still R1-broken, but different content -> different checksum -> different
+	// finding identity.
+	missingFM2 := "---\ntype: task\n---\na different broken body line\n"
+	mustWriteFile(t, cfg.DeskRoot, "tasks/broken.md", missingFM2)
+	checksum2 := desklib.Checksum([]byte(missingFM2))
+	if checksum2 == checksum1 {
+		t.Fatalf("test setup: the two broken variants must have different checksums")
+	}
+	fileRec.Set("checksum", checksum2)
+	if err := app.Save(fileRec); err != nil {
+		t.Fatalf("update file checksum: %v", err)
+	}
+
+	// Patrol 2 files a FRESH, open finding for the new checksum.
+	if _, err := Patrol(context.Background(), app, cfg, &PatrolInput{}); err != nil {
+		t.Fatalf("patrol 2: %v", err)
+	}
+	if n := defaultFindingsCount(t, app, cfg); n != 1 {
+		t.Fatalf("after checksum change, default findings = %d, want 1 (a fresh open finding resurfaced)", n)
+	}
+	openRows, err := app.FindRecordsByFilter("patrol_findings", "rule = 'R1' && disposition = 'open'", "", 0, 0)
+	if err != nil || len(openRows) != 1 {
+		t.Fatalf("expected exactly 1 open R1 finding after re-open, got %d (err=%v)", len(openRows), err)
+	}
+	if openRows[0].GetString("checksum") != checksum2 {
+		t.Fatalf("fresh finding checksum = %q, want the new %q", openRows[0].GetString("checksum"), checksum2)
+	}
+	// The prior finding is still around and still disposed.
+	priorRows, err := app.FindRecordsByFilter("patrol_findings", "rule = 'R1' && disposition = 'wont_fix'", "", 0, 0)
+	if err != nil || len(priorRows) != 1 || priorRows[0].GetString("checksum") != checksum1 {
+		t.Fatalf("expected the prior wont_fix finding (checksum %q) to persist, got %d rows (err=%v)", checksum1, len(priorRows), err)
+	}
+}
+
+// TestPatrol_ResolvedDisposedFindingRefiredInheritsDisposition proves the inheritance path the
+// dedupe path cannot cover: a finding disposed wont_fix, then RESOLVED (its rule stopped firing),
+// then RE-FIRED with the same checksum. The resolved row is not in the open dedupe set, so patrol
+// files a FRESH row — which must INHERIT the prior non-open disposition so a supervisor's decision
+// is not silently lost across the resolve→re-fire cycle.
+func TestPatrol_ResolvedDisposedFindingRefiredInheritsDisposition(t *testing.T) {
+	app, cfg := newTestEnv(t)
+
+	rel := "tasks/broken.md"
+	brokenC := desklib.Checksum([]byte(missingFM))
+	fileRec := mustCreateFileRecord(t, app, rel, "tasks", "task", brokenC)
+
+	// Patrol 1: R1 fires -> open finding; dispose it wont_fix.
+	mustWriteFile(t, cfg.DeskRoot, rel, missingFM)
+	if _, err := Patrol(context.Background(), app, cfg, &PatrolInput{}); err != nil {
+		t.Fatalf("patrol 1: %v", err)
+	}
+	f1, err := app.FindRecordsByFilter("patrol_findings", "rule = 'R1'", "", 0, 0)
+	if err != nil || len(f1) != 1 {
+		t.Fatalf("expected 1 R1 finding after patrol 1, got %d (err=%v)", len(f1), err)
+	}
+	origID := f1[0].Id
+	if _, err := DisposeFinding(context.Background(), app, cfg, origID, "wont_fix"); err != nil {
+		t.Fatalf("dispose: %v", err)
+	}
+
+	// Patrol 2: the file now has complete frontmatter -> R1 stops firing -> the finding resolves,
+	// keeping its wont_fix disposition and its ORIGINAL (broken) checksum.
+	mustWriteFile(t, cfg.DeskRoot, rel, fullFM)
+	fileRec.Set("checksum", desklib.Checksum([]byte(fullFM)))
+	if err := app.Save(fileRec); err != nil {
+		t.Fatalf("update file record to fixed: %v", err)
+	}
+	if _, err := Patrol(context.Background(), app, cfg, &PatrolInput{}); err != nil {
+		t.Fatalf("patrol 2: %v", err)
+	}
+	if got := reloadRecord(t, app, "patrol_findings", origID); got.GetString("state") != "resolved" {
+		t.Fatalf("finding state after fix = %q, want resolved", got.GetString("state"))
+	}
+
+	// Patrol 3: the file reverts to the SAME broken content (same checksum) -> R1 re-fires. The
+	// resolved row is not in the open dedupe set, so a FRESH row is filed; it must inherit the
+	// prior wont_fix disposition and therefore stay out of the default view.
+	mustWriteFile(t, cfg.DeskRoot, rel, missingFM)
+	fileRec.Set("checksum", brokenC)
+	if err := app.Save(fileRec); err != nil {
+		t.Fatalf("revert file record to broken: %v", err)
+	}
+	if _, err := Patrol(context.Background(), app, cfg, &PatrolInput{}); err != nil {
+		t.Fatalf("patrol 3: %v", err)
+	}
+
+	fresh, err := app.FindRecordsByFilter("patrol_findings", "rule = 'R1' && state = 'flagged'", "", 0, 0)
+	if err != nil || len(fresh) != 1 {
+		t.Fatalf("expected 1 flagged R1 finding after re-fire, got %d (err=%v)", len(fresh), err)
+	}
+	if fresh[0].Id == origID {
+		t.Fatalf("re-fire must file a FRESH row, not reuse the resolved one")
+	}
+	if fresh[0].GetString("disposition") != "wont_fix" {
+		t.Fatalf("re-fired finding disposition = %q, want inherited wont_fix", fresh[0].GetString("disposition"))
+	}
+	if n := defaultFindingsCount(t, app, cfg); n != 0 {
+		t.Fatalf("re-fired inherited-wont_fix finding must not appear in default findings; got %d", n)
 	}
 }
 

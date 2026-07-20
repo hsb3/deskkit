@@ -61,7 +61,10 @@ PM system.** To satisfy a refusal:
    its supervised binding-doc discipline (flag-only, record-original-first). The PM system writes
    only its own store; it never writes desk files.
 2. If the document lives somewhere the item does not yet point at, set the item's `pointer` with
-   **`update_item`** (version-checked) so the gate can find and validate it.
+   **`update_item`** (version-checked) so the gate can find and validate it. Write a **resolvable
+   document pointer** — a desk-relative file path. A trailing `§ heading` section anchor is
+   tolerated (the gate resolves the file part and ignores the heading), but prefer clean
+   file-only pointers; the heading is advisory and never checked.
 3. **Re-run `transition_item`.** With the document present, validating, and at the required
    status, the same edge now succeeds.
 

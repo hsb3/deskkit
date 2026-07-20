@@ -195,6 +195,68 @@ func TestVerdict_FailsClosed(t *testing.T) {
 	}
 }
 
+// TestVerdict_ToleratesSectionAnchorSuffix: a pointer carrying an advisory "§ heading" section
+// anchor resolves by its FILE part — the file must exist and validate, but the heading itself is
+// never required to exist. This is the seeded-pointer robustness case: an item whose pointer was
+// seeded with a "§ Some Heading" suffix must not fail its first gated transition with "document
+// not found".
+func TestVerdict_ToleratesSectionAnchorSuffix(t *testing.T) {
+	m := verdictEnv(t)
+	ctx := context.Background()
+	req := schema.ArtifactRequirement{Type: "decision", RequiredStatus: "accepted"}
+
+	writeDeskFile(t, m, "somedoc.md", `---
+type: decision
+status: accepted
+created: 2026-07-18
+updated: 2026-07-18
+tags: [pm]
+decided_by: owner
+affects_workstreams: [pm]
+---
+## Some Heading
+body
+`)
+
+	// The file exists and validates; the "§ Some Heading" suffix must be tolerated and ignored
+	// for existence, so the gate is satisfied.
+	v, err := m.Verdict(ctx, "somedoc.md § Some Heading", req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !v.Exists {
+		t.Fatalf("section-anchor pointer must resolve to its file part and exist: %+v", v)
+	}
+	if !v.Satisfied || len(v.Missing) != 0 {
+		t.Fatalf("section-anchor pointer over a valid+accepted doc must satisfy the gate: %+v", v)
+	}
+
+	// The heading need not exist for the gate: a suffix naming an absent heading still resolves,
+	// because the heading is advisory and never checked.
+	v, _ = m.Verdict(ctx, "somedoc.md § A Heading That Is Not In The File", req)
+	if !v.Satisfied {
+		t.Fatalf("an absent heading must not fail the gate (heading is advisory): %+v", v)
+	}
+
+	// A section anchor over a genuinely MISSING file still fails closed.
+	v, _ = m.Verdict(ctx, "nope.md § Some Heading", req)
+	if v.Exists || v.Satisfied || len(v.Missing) == 0 {
+		t.Fatalf("section anchor over a missing file must still fail: %+v", v)
+	}
+
+	// A URL pointer carrying a section anchor is still rejected (the URL guard runs on the file
+	// part, so a "://"-bearing file part can never satisfy a document gate).
+	v, _ = m.Verdict(ctx, "https://example.com/doc § Some Heading", req)
+	if v.Exists || v.Satisfied || len(v.Missing) == 0 {
+		t.Fatalf("URL pointer with a section anchor must still fail a document gate: %+v", v)
+	}
+
+	// Regression: a plain pointer (no anchor) still resolves and satisfies.
+	if v, _ = m.Verdict(ctx, "somedoc.md", req); !v.Satisfied {
+		t.Fatalf("plain pointer must still satisfy: %+v", v)
+	}
+}
+
 // TestFrontmatter_Reader: the trait-predicate companion seam returns the pointed doc's
 // frontmatter, and an empty map (never an error) for anything unreadable.
 func TestFrontmatter_Reader(t *testing.T) {

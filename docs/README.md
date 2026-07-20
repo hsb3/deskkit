@@ -33,6 +33,7 @@ Read these to build, test, release, or change the products.
 | [development/tapes/](development/tapes/) | VHS `.tape` sources that regenerate the demo GIFs in `media/`. |
 | [pocket-librarian-v1-spec.md](pocket-librarian-v1-spec.md) | The librarian's product + technical build spec. |
 | [pm-system-v1-spec.md](pm-system-v1-spec.md) | The PM-system (document-gated work graph) product + technical build spec — the core+modules refactor, PM module, gates, surfaces, and plugin. |
+| [tool-surface.md](tool-surface.md) | The authoritative map of every tool/command across all three surfaces (librarian CLI, librarian MCP by gate, plugin TS server) with empirically-verified counts. |
 | [decisions/](decisions/) | Architecture Decision Records (append-only; cited from code and docs). |
 | [../CHANGELOG.md](../CHANGELOG.md) | What changed in each release. |
 
