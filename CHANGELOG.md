@@ -13,6 +13,21 @@ for why this policy exists.
 
 ## [Unreleased]
 
+### Added
+
+- **Repo-conformance pass to the code-desk standard** (Lane 6, #86). The repo now passes its own
+  `repo-compliance-audit` with zero gaps:
+  - **Root entry-doc set** — a `CLAUDE.md` agent-navigation guide (command surface, the one
+    identity-neutrality rule, order-sensitive chains, config resolution), `AGENTS.md` (a symlink to
+    `CLAUDE.md` — one source, no drift), and `docs/CHARTER.md`, the canonical page with an explicit
+    precedence rule and the settled 1.0.0 direction.
+  - **Scaffolded meta-structure** (`mise-en-place-scaffold`, additive-only) — `.claude/{agents,hooks,
+    rules,memory}` with a tracked `settings.json` + `memory/MEMORY.md` index, root `.mcp.json`,
+    `.github/dependabot.yml`, and `docs/decisions/0000-template.md`.
+  - **`tests/` declared home** — `tests/README.md` documents that suites live with their products
+    (`plugin/` bun, `librarian/` go, `librarian/verify.sh`), keeping `make test` / `make verify` as
+    the canonical entries rather than hoisting suites to a root tree.
+
 ## [0.7.0] — 2026-07-19
 
 ### Added
