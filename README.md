@@ -154,7 +154,10 @@ docs/               product specs, ADRs, and the getting-started / plugin / libr
 
 ## Documentation
 
-Docs split into two tracks — see **[docs/README.md](docs/README.md)** for the full index.
+The canonical page is **[docs/CHARTER.md](docs/CHARTER.md)** — what the project is and what's
+settled for 1.0.0; if anything here disagrees with it, the charter wins. Agents working in the repo
+start at **[CLAUDE.md](CLAUDE.md)**. Docs split into two tracks — see **[docs/README.md](docs/README.md)**
+for the full index.
 
 **Using it** — install and run:
 

@@ -11,8 +11,13 @@ gh_issue_labels: []  # [{name, color, description}] — consumed by github-proje
 gh_milestones: []    # [{title, description}] — consumed by github-project-board
 board_title: ""
 required_folders: [] # repo-specific additions beyond the standard
-# No root tests/ by design: Go tests live in librarian/, TS tests in plugin/. Do NOT declare
-# tests/ here — required_folders entries are auto-created (empty) by the scaffold, which would
-# manufacture the very dir this repo omits. Broader code-repo conformance (CLAUDE.md, AGENTS.md,
-# docs/CHARTER.md, tests/) is deferred to the desk-standard design review, tracked off this repo.
+# Root tests/ ruling (2026-07-19, Lane 6 / issue #86 — decided, not deferred): this two-product
+# repo co-locates tests with their source — Go suites in librarian/ (`go test ./...`), TS suites
+# in plugin/ (`bun test`), plus the librarian/verify.sh integration gate; `make test` / `make
+# verify` are the canonical entries. ROOT-10 is satisfied by a declared-home index at
+# tests/README.md (directory existence is that row's pass condition), NOT by moving suites to the
+# root. Do NOT add tests/ to required_folders: ROOT-10 already covers it, and a required_folders
+# entry is auto-created as an empty .gitkeep dir by the scaffold, which would fight the authored
+# README home. Broader 1.0.0 conformance (CLAUDE.md, AGENTS.md, docs/CHARTER.md) landed in the
+# same Lane-6 pass; see docs/CHARTER.md and the design review off-repo.
 required_files: []
