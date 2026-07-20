@@ -15,6 +15,19 @@ for why this policy exists.
 
 ### Added
 
+- **Findings lifecycle completed** (#118, ADR 0013). Finishes the disposition sub-machine #93
+  opened. (1) The dead `state.dismissed` enum value is retired — migration `0015` remaps any
+  residual row to `flagged` (data-first) then shrinks `patrol_findings.state` to
+  `flagged`/`fixed`/`resolved`. (2) "Open findings" now means one thing everywhere: `query
+  summary` and `query uncollapsed` became disposition-aware (`disposition = 'open'`), matching
+  `query findings`' live default, so a disposed finding no longer inflates counts on some surfaces
+  and not others. (3) Dispositions carry provenance — migration `0016` adds `actor` (max 200),
+  `reason` (max 2000), and `disposed_at` (a plain date set at dispose time) to `patrol_findings`;
+  `deskkit findings dispose <id> --as <disposition> [--by <actor>] [--reason <text>]` persists
+  them (both flags optional, no baked default actor), and a re-fired finding inherits disposition
+  AND provenance on `(file, rule, checksum)`. (4) `adoption_log.event` shrinks to writer-backed
+  reality — migration `0017` retires the five writerless values, keeping only `fix` (its readers
+  and deskguard role unchanged). Store schema version 14 → 17.
 - **Prompt-copy drift guard + git-is-truth prompt governance** (#120, ADR 0015). A new
   dependency-free `scripts/check-prompt-drift.mjs` (wired into `make check` + CI next to
   `check-kits.mjs`) asserts the librarian system-prompt embed

@@ -519,7 +519,7 @@ func TestPatrol_DisposedFindingPersistsAcrossRepatrol(t *testing.T) {
 	}
 
 	// Dispose wont_fix -> gone from the default view.
-	if _, err := DisposeFinding(context.Background(), app, cfg, findingID, "wont_fix"); err != nil {
+	if _, err := DisposeFinding(context.Background(), app, cfg, findingID, "wont_fix", "", ""); err != nil {
 		t.Fatalf("DisposeFinding: %v", err)
 	}
 	if n := defaultFindingsCount(t, app, cfg); n != 0 {
@@ -566,7 +566,7 @@ func TestPatrol_ChangedChecksumReopensDisposedFinding(t *testing.T) {
 	if err != nil || len(first) != 1 {
 		t.Fatalf("expected 1 R1 finding after patrol 1, got %d (err=%v)", len(first), err)
 	}
-	if _, err := DisposeFinding(context.Background(), app, cfg, first[0].Id, "wont_fix"); err != nil {
+	if _, err := DisposeFinding(context.Background(), app, cfg, first[0].Id, "wont_fix", "", ""); err != nil {
 		t.Fatalf("DisposeFinding: %v", err)
 	}
 	if n := defaultFindingsCount(t, app, cfg); n != 0 {
@@ -608,10 +608,11 @@ func TestPatrol_ChangedChecksumReopensDisposedFinding(t *testing.T) {
 }
 
 // TestPatrol_ResolvedDisposedFindingRefiredInheritsDisposition proves the inheritance path the
-// dedupe path cannot cover: a finding disposed wont_fix, then RESOLVED (its rule stopped firing),
-// then RE-FIRED with the same checksum. The resolved row is not in the open dedupe set, so patrol
-// files a FRESH row — which must INHERIT the prior non-open disposition so a supervisor's decision
-// is not silently lost across the resolve→re-fire cycle.
+// dedupe path cannot cover: a finding disposed wont_fix (with provenance: actor + reason), then
+// RESOLVED (its rule stopped firing), then RE-FIRED with the same checksum. The resolved row is
+// not in the open dedupe set, so patrol files a FRESH row — which must INHERIT the prior non-open
+// disposition AND its provenance (actor/reason/disposed_at) so a supervisor's decision — who made
+// it, why, and when — is not silently lost across the resolve→re-fire cycle.
 func TestPatrol_ResolvedDisposedFindingRefiredInheritsDisposition(t *testing.T) {
 	app, cfg := newTestEnv(t)
 
@@ -619,7 +620,7 @@ func TestPatrol_ResolvedDisposedFindingRefiredInheritsDisposition(t *testing.T) 
 	brokenC := desklib.Checksum([]byte(missingFM))
 	fileRec := mustCreateFileRecord(t, app, rel, "tasks", "task", brokenC)
 
-	// Patrol 1: R1 fires -> open finding; dispose it wont_fix.
+	// Patrol 1: R1 fires -> open finding; dispose it wont_fix with provenance.
 	mustWriteFile(t, cfg.DeskRoot, rel, missingFM)
 	if _, err := Patrol(context.Background(), app, cfg, &PatrolInput{}); err != nil {
 		t.Fatalf("patrol 1: %v", err)
@@ -629,8 +630,12 @@ func TestPatrol_ResolvedDisposedFindingRefiredInheritsDisposition(t *testing.T) 
 		t.Fatalf("expected 1 R1 finding after patrol 1, got %d (err=%v)", len(f1), err)
 	}
 	origID := f1[0].Id
-	if _, err := DisposeFinding(context.Background(), app, cfg, origID, "wont_fix"); err != nil {
+	if _, err := DisposeFinding(context.Background(), app, cfg, origID, "wont_fix", "somebody", "not worth fixing"); err != nil {
 		t.Fatalf("dispose: %v", err)
+	}
+	origDisposedAt := reloadRecord(t, app, "patrol_findings", origID).GetString("disposed_at")
+	if origDisposedAt == "" {
+		t.Fatalf("original finding disposed_at is empty after dispose")
 	}
 
 	// Patrol 2: the file now has complete frontmatter -> R1 stops firing -> the finding resolves,
@@ -649,7 +654,7 @@ func TestPatrol_ResolvedDisposedFindingRefiredInheritsDisposition(t *testing.T) 
 
 	// Patrol 3: the file reverts to the SAME broken content (same checksum) -> R1 re-fires. The
 	// resolved row is not in the open dedupe set, so a FRESH row is filed; it must inherit the
-	// prior wont_fix disposition and therefore stay out of the default view.
+	// prior wont_fix disposition AND its provenance and therefore stay out of the default view.
 	mustWriteFile(t, cfg.DeskRoot, rel, missingFM)
 	fileRec.Set("checksum", brokenC)
 	if err := app.Save(fileRec); err != nil {
@@ -671,6 +676,17 @@ func TestPatrol_ResolvedDisposedFindingRefiredInheritsDisposition(t *testing.T) 
 	}
 	if n := defaultFindingsCount(t, app, cfg); n != 0 {
 		t.Fatalf("re-fired inherited-wont_fix finding must not appear in default findings; got %d", n)
+	}
+	// Provenance inheritance: the fresh row carries the ORIGINAL disposal's actor/reason/
+	// disposed_at, not a fresh stamp — a re-fire must not fabricate new provenance.
+	if got := fresh[0].GetString("actor"); got != "somebody" {
+		t.Fatalf("re-fired finding actor = %q, want inherited somebody", got)
+	}
+	if got := fresh[0].GetString("reason"); got != "not worth fixing" {
+		t.Fatalf("re-fired finding reason = %q, want inherited %q", got, "not worth fixing")
+	}
+	if got := fresh[0].GetString("disposed_at"); got != origDisposedAt {
+		t.Fatalf("re-fired finding disposed_at = %q, want inherited original %q", got, origDisposedAt)
 	}
 }
 

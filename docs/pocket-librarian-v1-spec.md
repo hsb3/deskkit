@@ -496,9 +496,12 @@ never refiles an open finding for unchanged content.
 | `severity` | select (1) | Values: `mechanical`, `judgment`. |
 | `detail` | text | Human-readable finding. |
 | `proposed_fix` | text | Suggested remedy. |
-| `state` | select (1) | Values: `flagged`, `dismissed`, `fixed`. Code always creates `flagged`. |
+| `state` | select (1) | Values: `flagged`, `fixed`, `resolved`. Code always creates `flagged`. (`dismissed` retired by migration `0015` — the disposition axis replaced it; `resolved` added by `0010`.) |
 | `patrol_run` | text | `run_id`. |
 | `checksum` | text | Checksum of the flagged file at flag time; part of the dedupe key. |
+| `actor` | text | Max 200. Disposition provenance: who dispositioned the finding. Free text, no baked default. Empty on `open` findings. |
+| `reason` | text | Max 2000. Disposition provenance: why. Optional for every disposition (a `wont_fix` MAY stay anonymous, though a reason is recommended). Empty on `open` findings. |
+| `disposed_at` | date | Disposition provenance: when the finding moved to a non-`open` disposition. Plain date (set at dispose time, NOT an autodate). Cleared when a finding returns to `open`. |
 
 ### 4.4 `patrol_log`
 
@@ -534,7 +537,7 @@ never refiles an open finding for unchanged content.
 |---|---|---|
 | `date` | date | |
 | `desk` | text | `DESK_NAME`. |
-| `event` | select (1) | Values: `patrol`, `fix`, `revert`, `false_positive`, `friction`, `note`. Code only writes `fix`. |
+| `event` | select (1) | Values: `fix`. Shrunk to writer-backed reality by migration `0017` — the original six (`patrol`, `revert`, `false_positive`, `friction`, `note`) had no writer; a new event is wired only when a concrete consumer pulls it. |
 | `detail` | text | |
 
 ### 4.7 NEW: `messages` — conversation history per agent run
@@ -998,6 +1001,13 @@ type PatrolResult struct {
    checksum: rec.checksum}`.
 5. Create one `patrol_log` row `{run_id, desk, started, finished, files_swept, findings_new,
    summary}`.
+
+**Disposition provenance on re-patrol.** A finding carries a `disposition` (§4.3) plus its
+provenance — `actor` / `reason` / `disposed_at`, set by `findings dispose`. When a resolved
+finding re-fires (same `(file, rule, checksum)` as a prior non-`open` disposition), the fresh row
+INHERITS that disposition AND all three provenance fields, so a resolve→re-fire cycle preserves
+who deferred the finding, why, and when. A finding with no prior disposed ancestor is filed
+`open` with empty provenance. No default `actor` is ever baked in (identity-neutral).
 
 **`Path` parameter semantics (concrete).** When `Path` is **empty**, patrol runs over the whole
 desk (all non-deleted `files`). When `Path` is **set**, it **filters the swept file set** to that

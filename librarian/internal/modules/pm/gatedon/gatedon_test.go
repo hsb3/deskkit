@@ -86,7 +86,11 @@ func TestGatedOnDeskCreatesPMCollectionsAndStamps(t *testing.T) {
 		}
 	}
 	assertVersion("pm", 5)
-	assertVersion("librarian", 14)
+	// The invariant is that the store is stamped with each module's DECLARED SchemaVersion, not a
+	// literal number. Derive the librarian expectation from the module itself so a sibling lane that
+	// extends the librarian migration chain — whose numbers are assigned at landing — does not break
+	// this test on the version bump alone.
+	assertVersion("librarian", librarian.New().SchemaVersion())
 
 	// GuardDowngrade passes when store == binary...
 	if err := migrate.GuardDowngrade(app, reg.MigrateModules()); err != nil {

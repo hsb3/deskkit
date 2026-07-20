@@ -55,7 +55,7 @@ func TestDisposeFinding_WontFixHiddenByDefaultShownWithIncludeDisposed(t *testin
 		t.Fatalf("open finding: default findings = %d, want 1", n)
 	}
 
-	res, err := DisposeFinding(context.Background(), app, cfg, finding.Id, "wont_fix")
+	res, err := DisposeFinding(context.Background(), app, cfg, finding.Id, "wont_fix", "", "")
 	if err != nil {
 		t.Fatalf("DisposeFinding: %v", err)
 	}
@@ -89,7 +89,7 @@ func TestDisposeFinding_NormalizesHyphenatedWontFix(t *testing.T) {
 	fileRec := mustCreateFileRecord(t, app, "tasks/x.md", "tasks", "task", "csum")
 	finding := mustCreateFinding(t, app, fileRec, "R1", "csum", "run-1")
 
-	res, err := DisposeFinding(context.Background(), app, cfg, finding.Id, "wont-fix")
+	res, err := DisposeFinding(context.Background(), app, cfg, finding.Id, "wont-fix", "", "")
 	if err != nil {
 		t.Fatalf("DisposeFinding(wont-fix): %v", err)
 	}
@@ -107,7 +107,7 @@ func TestDisposeFinding_AcceptsEveryValidDisposition(t *testing.T) {
 	for _, d := range []string{"open", "acknowledged", "triaged", "wont_fix"} {
 		fileRec := mustCreateFileRecord(t, app, "tasks/"+d+".md", "tasks", "task", "csum-"+d)
 		finding := mustCreateFinding(t, app, fileRec, "R1", "csum-"+d, "run-1")
-		res, err := DisposeFinding(context.Background(), app, cfg, finding.Id, d)
+		res, err := DisposeFinding(context.Background(), app, cfg, finding.Id, d, "", "")
 		if err != nil {
 			t.Fatalf("DisposeFinding(%q): %v", d, err)
 		}
@@ -124,7 +124,7 @@ func TestDisposeFinding_InvalidDispositionErrors(t *testing.T) {
 	fileRec := mustCreateFileRecord(t, app, "tasks/x.md", "tasks", "task", "csum")
 	finding := mustCreateFinding(t, app, fileRec, "R1", "csum", "run-1")
 
-	if _, err := DisposeFinding(context.Background(), app, cfg, finding.Id, "bogus"); err == nil {
+	if _, err := DisposeFinding(context.Background(), app, cfg, finding.Id, "bogus", "", ""); err == nil {
 		t.Fatalf("expected an error for an invalid disposition")
 	}
 	if got := reloadRecord(t, app, "patrol_findings", finding.Id); got.GetString("disposition") != "" {
@@ -135,7 +135,57 @@ func TestDisposeFinding_InvalidDispositionErrors(t *testing.T) {
 // TestDisposeFinding_UnknownIDErrors: a non-existent finding id is an error.
 func TestDisposeFinding_UnknownIDErrors(t *testing.T) {
 	app, cfg := newTestEnv(t)
-	if _, err := DisposeFinding(context.Background(), app, cfg, "nonexistentid00", "wont_fix"); err == nil {
+	if _, err := DisposeFinding(context.Background(), app, cfg, "nonexistentid00", "wont_fix", "", ""); err == nil {
 		t.Fatalf("expected an error for an unknown finding id")
+	}
+}
+
+// TestDisposeFinding_PersistsProvenance is the DoD provenance round-trip: disposing a finding
+// non-open with an actor and a reason persists both, plus a non-empty disposed_at timestamp.
+func TestDisposeFinding_PersistsProvenance(t *testing.T) {
+	app, cfg := newTestEnv(t)
+	fileRec := mustCreateFileRecord(t, app, "tasks/x.md", "tasks", "task", "csum")
+	finding := mustCreateFinding(t, app, fileRec, "R1", "csum", "run-1")
+
+	if _, err := DisposeFinding(context.Background(), app, cfg, finding.Id, "wont_fix", "somebody", "some reason"); err != nil {
+		t.Fatalf("DisposeFinding: %v", err)
+	}
+
+	got := reloadRecord(t, app, "patrol_findings", finding.Id)
+	if got.GetString("actor") != "somebody" {
+		t.Fatalf("actor = %q, want somebody", got.GetString("actor"))
+	}
+	if got.GetString("reason") != "some reason" {
+		t.Fatalf("reason = %q, want %q", got.GetString("reason"), "some reason")
+	}
+	if got.GetString("disposed_at") == "" {
+		t.Fatalf("disposed_at is empty, want a stamped timestamp")
+	}
+}
+
+// TestDisposeFinding_ReopenClearsProvenance: re-disposing a finding back to 'open' clears any
+// previously-recorded actor/reason/disposed_at — an open finding carries no disposition
+// provenance.
+func TestDisposeFinding_ReopenClearsProvenance(t *testing.T) {
+	app, cfg := newTestEnv(t)
+	fileRec := mustCreateFileRecord(t, app, "tasks/x.md", "tasks", "task", "csum")
+	finding := mustCreateFinding(t, app, fileRec, "R1", "csum", "run-1")
+
+	if _, err := DisposeFinding(context.Background(), app, cfg, finding.Id, "wont_fix", "somebody", "some reason"); err != nil {
+		t.Fatalf("DisposeFinding(wont_fix): %v", err)
+	}
+	if _, err := DisposeFinding(context.Background(), app, cfg, finding.Id, "open", "", ""); err != nil {
+		t.Fatalf("DisposeFinding(open): %v", err)
+	}
+
+	got := reloadRecord(t, app, "patrol_findings", finding.Id)
+	if got.GetString("actor") != "" {
+		t.Fatalf("actor after re-open = %q, want empty", got.GetString("actor"))
+	}
+	if got.GetString("reason") != "" {
+		t.Fatalf("reason after re-open = %q, want empty", got.GetString("reason"))
+	}
+	if got.GetString("disposed_at") != "" {
+		t.Fatalf("disposed_at after re-open = %q, want empty", got.GetString("disposed_at"))
 	}
 }

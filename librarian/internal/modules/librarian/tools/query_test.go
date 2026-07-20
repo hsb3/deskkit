@@ -2,11 +2,14 @@ package tools
 
 import (
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"reflect"
 	"testing"
 	"time"
+
+	"github.com/pocketbase/pocketbase/core"
 )
 
 func TestSplitCommitDate(t *testing.T) {
@@ -212,5 +215,95 @@ func TestTranslateUninitializedStoreError(t *testing.T) {
 	other := errors.New("disk I/O error")
 	if err := translateUninitializedStoreError(other); !errors.Is(err, other) {
 		t.Fatalf("translateUninitializedStoreError(other) = %v, want unchanged %v", err, other)
+	}
+}
+
+// TestQueryCountSurfacesAgreeOnMixedDisposition seeds one flagged R5/judgment finding with
+// disposition 'open' and a second, otherwise identical, finding with disposition 'wont_fix' on
+// the same file, then proves the three count surfaces built on openFindingRows —
+// queryUncollapsed, querySummary, and the default (live-only) queryFindings — all agree: each
+// counts only the open finding, none is inflated by the disposed one. queryFindings with
+// includeDisposed=true then widens to both, showing --include-disposed is exactly what the
+// default view excludes.
+func TestQueryCountSurfacesAgreeOnMixedDisposition(t *testing.T) {
+	app, _ := newTestEnv(t)
+
+	fileRec := mustCreateFileRecord(t, app, "tasks/x.md", "tasks", "task", "csum-file")
+
+	openFinding := core.NewRecord(mustCollection(t, app, "patrol_findings"))
+	openFinding.Set("file", fileRec.Id)
+	openFinding.Set("rule", "R5")
+	openFinding.Set("severity", "judgment")
+	openFinding.Set("detail", "open finding")
+	openFinding.Set("state", "flagged")
+	openFinding.Set("disposition", "open")
+	openFinding.Set("checksum", "csum-open")
+	if err := app.Save(openFinding); err != nil {
+		t.Fatalf("save open finding: %v", err)
+	}
+
+	wontFixFinding := core.NewRecord(mustCollection(t, app, "patrol_findings"))
+	wontFixFinding.Set("file", fileRec.Id)
+	wontFixFinding.Set("rule", "R5")
+	wontFixFinding.Set("severity", "judgment")
+	wontFixFinding.Set("detail", "disposed finding")
+	wontFixFinding.Set("state", "flagged")
+	wontFixFinding.Set("disposition", "wont_fix")
+	wontFixFinding.Set("checksum", "csum-wontfix")
+	if err := app.Save(wontFixFinding); err != nil {
+		t.Fatalf("save wont_fix finding: %v", err)
+	}
+
+	uncollapsedRaw, err := queryUncollapsed(app)
+	if err != nil {
+		t.Fatalf("queryUncollapsed: %v", err)
+	}
+	var uncollapsed uncollapsedResult
+	if err := json.Unmarshal(uncollapsedRaw, &uncollapsed); err != nil {
+		t.Fatalf("unmarshal uncollapsed result: %v", err)
+	}
+
+	summaryRaw, err := querySummary(app)
+	if err != nil {
+		t.Fatalf("querySummary: %v", err)
+	}
+	var summary summaryResult
+	if err := json.Unmarshal(summaryRaw, &summary); err != nil {
+		t.Fatalf("unmarshal summary result: %v", err)
+	}
+
+	findingsRaw, err := queryFindings(app, false)
+	if err != nil {
+		t.Fatalf("queryFindings(false): %v", err)
+	}
+	var findings findingsResult
+	if err := json.Unmarshal(findingsRaw, &findings); err != nil {
+		t.Fatalf("unmarshal findings result: %v", err)
+	}
+
+	if uncollapsed.Count != 1 {
+		t.Fatalf("queryUncollapsed count = %d, want 1", uncollapsed.Count)
+	}
+	if summary.OpenFindingsTotal != 1 {
+		t.Fatalf("querySummary OpenFindingsTotal = %d, want 1", summary.OpenFindingsTotal)
+	}
+	if findings.Count != 1 {
+		t.Fatalf("queryFindings(false) count = %d, want 1", findings.Count)
+	}
+	if uncollapsed.Count != summary.OpenFindingsTotal || summary.OpenFindingsTotal != findings.Count {
+		t.Fatalf("count surfaces disagree: uncollapsed=%d summary=%d findings=%d",
+			uncollapsed.Count, summary.OpenFindingsTotal, findings.Count)
+	}
+
+	includeDisposedRaw, err := queryFindings(app, true)
+	if err != nil {
+		t.Fatalf("queryFindings(true): %v", err)
+	}
+	var includeDisposed findingsResult
+	if err := json.Unmarshal(includeDisposedRaw, &includeDisposed); err != nil {
+		t.Fatalf("unmarshal include-disposed findings result: %v", err)
+	}
+	if includeDisposed.Count != 2 {
+		t.Fatalf("queryFindings(true) count = %d, want 2 (--include-disposed widens to both findings)", includeDisposed.Count)
 	}
 }
