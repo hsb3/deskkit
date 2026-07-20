@@ -95,6 +95,7 @@ reversible with `deskkit restore --by-path <path>`.
 |---|---|---|
 | `plugin/claude-plugin/mcp/server.js` | `cd plugin && bun run package` (`make package`) | CI `git diff --exit-code` |
 | `plugin/claude-plugin/schema/profile.schema.yaml` | same (copied from `schema/`) | CI `git diff --exit-code` |
+| `plugin/claude-plugin/schema/references.yaml` | same (copied from `schema/`) | CI `git diff --exit-code` |
 | `kits/` tree | authored, but `kits.yaml` must match it | `node scripts/check-kits.mjs` |
 
 The marketplace install copies **only** `plugin/claude-plugin/`, so the bundled `server.js` must be

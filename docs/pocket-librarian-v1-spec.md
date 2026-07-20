@@ -917,6 +917,18 @@ exactly the "graduated but not collapsed" case R5 flags). The old heuristic (`li
 leftmost `ISSUE_REF_RE`/`GH_URL_RE` match anywhere in the text, first match string stored) is
 REMOVED — it mis-populated this column for any short doc that merely cited an issue as evidence.
 
+**Typed reference contract (ADR 0011) — forward pointer, no behavior change here.** The
+issue-shaped and URL forms this marker accepts (`wb#N` / `#N` / a bare number, or an
+`http(s)://` URL) are the two seeds of the typed cross-reference `kind` enum (`issue`, `url`)
+that `schema/references.yaml` specifies per **ADR 0011**
+(`docs/decisions/0011-typed-reference-contract.md`): a shared `{kind, target}` reference
+primitive with a validation guard in both lanes. That contract changes nothing here — the
+marker grammar above, `graduated_to`'s population, and its (deliberately absent) repo
+qualification are all unchanged, and the desk-relative qualifier
+(`profile.repos.shorthand.issue_default`) still resolves at read time and is never persisted.
+`graduated_to` becomes an instance of the primitive later, on the schema-v2 track — no field
+migrates onto the shape in this cycle.
+
 **Line counting (deterministic).** "lines" means `len(text.split("\n"))` — a raw newline count over
 the **whole file including frontmatter**, not a logical-line or trimmed count. Used by R5's
 `lines > 40` gate (§5.2); the `graduated_to` marker check above has no length gate.

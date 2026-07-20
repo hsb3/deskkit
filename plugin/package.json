@@ -14,7 +14,7 @@
     "check:purity": "node scripts/check-core-purity.mjs",
     "check:neutrality": "node ../scripts/check-neutrality.mjs",
     "mcp": "bun mcp/server.ts",
-    "package": "mkdir -p claude-plugin/mcp claude-plugin/schema && bun build mcp/server.ts --target=node --outfile claude-plugin/mcp/server.js && cp ../schema/profile.schema.yaml claude-plugin/schema/profile.schema.yaml"
+    "package": "mkdir -p claude-plugin/mcp claude-plugin/schema && bun build mcp/server.ts --target=node --outfile claude-plugin/mcp/server.js && cp ../schema/profile.schema.yaml claude-plugin/schema/profile.schema.yaml && cp ../schema/references.yaml claude-plugin/schema/references.yaml"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.0",

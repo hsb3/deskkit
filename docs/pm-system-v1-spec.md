@@ -447,7 +447,11 @@ existing, test-pinned behavior as-is.
 
 Issue and URL references are **not** gate pointers under this grammar — they are a
 cross-reference, typed per ADR 0011 (§7 R6.1; `docs/decisions/0011-typed-reference-contract.md`).
-This section states only that boundary; it does not define the typed-reference contract.
+This section states only that boundary; the typed-reference contract itself lives in
+`schema/references.yaml` — a `{kind, target}` primitive with a closed `kind` enum (`issue`,
+`url`) and a validation guard in both lanes — where the qualifier is documented as read-time
+resolved from `profile.repos.shorthand.issue_default` and never persisted. No `items.pointer`
+field migrates onto that shape in this cycle; today's pointer resolution is unchanged.
 
 ### 3.2 The rigid state machine (R2.2)
 
