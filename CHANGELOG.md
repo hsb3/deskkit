@@ -26,6 +26,11 @@ for why this policy exists.
   with `--include-disposed` to show history. Dispositions survive re-patrol by inheriting on
   (file, rule, checksum); a finding whose evidence (checksum) changes re-opens automatically.
   Migration `0014_patrol_findings_disposition` backfills existing rows to `open`.
+- **`items.type` validated at creation** (#117). `create_item` hard-refuses a non-empty `type`
+  outside the schema-v1 vocabulary (ADR 0012), naming the offending value, the known types, and
+  `schema/doctypes.yaml`; an absent type stays legal. The importer inherits the check with no
+  importer-side code (regression-tested both places). Engine-level only — no DB migration;
+  `items.type` stays a bare TextField.
 - **Authoritative tool-surface document** (#94) — `docs/tool-surface.md` (linked from
   `docs/README.md`) enumerates every surface with empirically-verified counts: the librarian MCP
   tools by gate (5 default / 6 with `LIBRARIAN_AUTONOMOUS_WRITES` / 17 with `PM_ENABLED` / 18 both),

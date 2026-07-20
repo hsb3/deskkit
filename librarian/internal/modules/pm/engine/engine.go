@@ -130,6 +130,19 @@ func (e *Engine) CreateItem(ctx context.Context, in CreateItemInput) (*core.Reco
 	if strings.TrimSpace(in.Title) == "" {
 		return nil, refuse("cannot create an item without a title")
 	}
+	if in.Type != "" {
+		// Empty type stays legal (a scope call, ADR 0012): only a NON-EMPTY, unrecognized
+		// type is refused, so `type` remains optional across every caller-facing shape.
+		// A pure vocabulary read, so it fails before any transaction is opened.
+		vocab, verr := schema.Vocab()
+		if verr != nil {
+			return nil, verr
+		}
+		if !vocab.KnownType(in.Type) {
+			return nil, refuse("unknown item type %q (known types: %s; see schema/doctypes.yaml)",
+				in.Type, strings.Join(vocab.TypeNames(), ", "))
+		}
+	}
 	var out *core.Record
 	txErr := e.App.RunInTransaction(func(txApp core.App) error {
 		txe := e.withApp(txApp)

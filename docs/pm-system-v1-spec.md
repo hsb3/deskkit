@@ -388,7 +388,7 @@ table-per-level design.
 | `title` | text, required | |
 | `parent` | relation → items (single) | the graph edge; null = a root |
 | `root` | relation → items (single) | denormalized root for fast subtree/ancestor queries |
-| `type` | text | schema-v1 / kit type (R2.3, R3.4): decision, task, analysis, … |
+| `type` | text | schema-v1 / kit type (R2.3, R3.4): decision, task, analysis, … — `create_item` validates it against the schema-v1 vocabulary and hard-refuses an unknown type (ADR 0012); an absent type stays legal |
 | `phase` | select, required | the rigid machine: `queue`,`work`,`review`,`terminal` (§3.2) |
 | `blocked` | bool | the side-state flag; independent of `phase` (§3.2) |
 | `status_label` | text | friendly vocabulary over the phase (R2.2; §3.3) |
@@ -663,6 +663,10 @@ validates, at `desk_config` write time, that every `type`/`status` referenced by
 known kit/schema type, and refuses unknown ids (so a gate can never reference a non-existent
 document type). D1 therefore precedes D3 in the build order (§11); if D1 slips, the gate engine
 still functions but the desk's `desk_config` can only reference the base schema-v1 types.
+
+Since ADR 0012, `create_item` enforces the identical `KnownType` check at item birth, closing
+the create-vs-gate-config asymmetry this section documents on the config side: a gate rule could
+never reference an unknown type, but an item could still be born with one until that change.
 
 ### 4.4 What a document verdict means (R3.2)
 
