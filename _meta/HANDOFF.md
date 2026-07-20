@@ -27,6 +27,46 @@ desk's genesis record 0001.
 
 ## 1. Current standing + top priority
 
+**SESSION 2026-07-20 (late) — PRE-BUILD ADVERSARIAL REVIEW DONE; THE V1 BUILD LANES ARE
+CLEARED TO OPEN. Top priority: open lane #114.** Everything below the next divider predates
+this session. Four desk-standard PRs + one dotfiles-agents PR landed:
+- **#131 → `16e9259`** — the Phase-4 planning wave (epics #129/#130, children #114–#128).
+- **#132 → `103021a`** — briefings relocated to the exec desk. **Briefings now live ONLY at
+  `desk-standard-desk/_meta/briefings/`, never in the product repo** (the design-session
+  decision deck + this session's EOD/status deck moved there; the repo copy was removed and the
+  HANDOFF pointers repointed). The authoritative design records stay in-repo (ADRs,
+  `_meta/research/`, `_meta/signoff/`).
+- **#133 → `9c4b514`** — the design/planning corpus was **packaged**
+  (`_meta/research/2026-07-design-session/design-planning-package.md`) and put through a
+  **17-agent adversarial review** (6 dimension reviewers → per-finding source re-derivation →
+  opus-xhigh synthesis): **GO-WITH-FIXES, 0 blockers** — 10 findings raised, all 10 confirmed
+  against source, 0 refuted, 4 de-escalated. Report:
+  `_meta/research/2026-07-design-session/adversarial-review-2026-07-20.md`.
+- **#134 → `4f2a018`** — the two MAJORs + the ADR 0013 erratum applied: (1) #114 deliverable E
+  now claims the three unclaimed TS plugin tools (`profile_get`/`profile_validate`/`knowledge_index`)
+  so epic #129's close-when is satisfiable; (2) the **epic #129 coordination rule now names THREE
+  shared surfaces** — the migration chain, the #114-C/#120 prompt-embed drift guard (**#114 lands
+  before #120**; slice C also moves the mirrored spec block `pocket-librarian-v1-spec.md:1435-1464`
+  + `:2316`), and `query.go`/`patrol.go` between #118/#123 — mirrored in the three plans; (3) ADR
+  0013's "down-remap" corrected (a retirement remaps in the FORWARD migration). Live #129/#114
+  bodies were updated to match. The **eight MINOR/NIT** review findings stay scoped to their owning
+  slices (see the report).
+- **Sibling tooling:** the planning-desk `_utils/` toolkit was hardened against its automated
+  review (GraphQL variables, arg guards, saturation warnings, import robustness, `run()` rename)
+  and the SAME fixes ported upstream to the skill source (**dotfiles-agents PR #150 → `dc00999`**
+  on `dev`); **dotfiles-agents issue #151** filed (add CONTRIBUTING + a primitive-authoring skill).
+
+**NEXT — open the build lanes.** #114 (agent-integration-contract) first: it blocks #119/#122.
+Then the independent slices (#115/#116/#117/#118/#120/#121/#123). Honor the epic #129
+coordination rules: #118+#123 migration commits serialize; **#114 lands before #120**;
+#118/#123 rebase their shared `query.go`/`patrol.go` hunks. Epic #130 (schema-v2: #124–#128)
+is its own arc, no milestone. Desk governance: staged bodies live in `_meta/plans/*/`, pushed
+to live issues (epics have no `plan.md`, so `sync-bodies.py` skips them — push epics with
+`gh issue edit`); gates are `conformance.py` / `reconcile.py` / `sync-bodies.py` under
+`_meta/plans/_utils/`.
+
+---
+
 **v0.7.0 is released** (the PM system, ship-dark; adoption dry-run; PM spec/README reconcile)
 and the CLI binary is **renamed `pocket-librarian` → `deskkit`** — release assets are
 `deskkit_0.7.0_*`; `make install` drops `deskkit` into `~/.local/bin`. The stale
