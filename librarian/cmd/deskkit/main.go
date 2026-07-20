@@ -1,5 +1,5 @@
 // Command deskkit is the single Go binary that serves PocketBase, runs the agent
-// loop under `serve` (later slice), and exposes the seven tools as CLI subcommands. This
+// loop under `serve` (later slice), and exposes the librarian tool core as CLI subcommands. This
 // spine wires: pocketbase.New(), migratecmd (automigrate), the blank-imported migrations,
 // first-run seeding (ignore boundary + system prompt) on serve, and the Cobra subcommands
 // routed through the tools seam. Core + module wiring (spec §2.7): main builds the enabled
@@ -318,6 +318,19 @@ func main() {
 	}
 	wrapRunE(app.RootCmd.Commands())
 
+	// Unknown-subcommand guard. PocketBase's app.Start() runs RootCmd.Execute() in a
+	// goroutine and DISCARDS its error, so cobra's own "unknown command" error would otherwise
+	// exit 0 — an unknown subcommand printed a message but silently succeeded. Detect an
+	// unrecognized (nested) subcommand HERE — after every command is registered (migratecmd +
+	// registerToolCommands have populated RootCmd; serve/superuser are seeded explicitly because
+	// PocketBase only adds them inside Start()) and BEFORE app.Start() dispatches — and fail
+	// closed with a non-zero exit. Mirrors the OnServe os.Exit(1) fail-closed pattern above: a
+	// returned RunE error is invisible for the goroutine-run Execute, so exit directly.
+	if name, unknown := unknownSubcommand(os.Args[1:], buildKnownCommandSet(app.RootCmd)); unknown {
+		fmt.Fprintf(os.Stderr, "deskkit: unknown command %q\nRun 'deskkit --help' for usage.\n", name)
+		os.Exit(1)
+	}
+
 	if err := app.Start(); err != nil {
 		log.Fatal(annotateLockErr(err))
 	}
@@ -334,7 +347,7 @@ var storeTouchingCommands = map[string]bool{
 	"serve": true, "migrate": true, "superuser": true,
 	"sweep": true, "patrol": true, "propose-fix": true, "apply-fix": true,
 	"restore": true, "query": true, "record-feedback": true, "agent": true, "chat": true,
-	"mcp-serve": true, "gui": true,
+	"mcp-serve": true, "gui": true, "findings": true,
 }
 
 // hasDirFlag reports whether an explicit --dir override is present (both `--dir <path>` and
@@ -360,6 +373,102 @@ func isStoreTouchingInvocation(args []string) bool {
 		}
 	}
 	return storeTouchingCommands[firstSubcommand(args)]
+}
+
+// knownCommandSet is the recognized-command lookup the unknown-subcommand guard consults.
+// top is every top-level command + alias name; groups maps a command that HAS subcommands (pm,
+// findings, completion, migrate …) to the set of its child (+alias) names, so a nested unknown
+// like `pm frobnicate` or `findings frobnicate` is caught as well as a bare `frobnicate`.
+type knownCommandSet struct {
+	top    map[string]bool
+	groups map[string]map[string]bool
+}
+
+// pbLateCommands are the subcommands PocketBase registers INSIDE app.Start() (after the guard
+// runs), so app.RootCmd.Commands() does not list them at guard time and they must be seeded
+// explicitly — otherwise the guard would flag a legitimate `serve`/`superuser` as unknown. This
+// mirrors the same hardcoding already carried in storeTouchingCommands. migrate is NOT here: it
+// is registered by migratecmd.MustRegister BEFORE the guard, so it self-populates (with its own
+// up/down/… children) via app.RootCmd.Commands().
+var pbLateCommands = []string{"serve", "superuser"}
+
+// buildKnownCommandSet snapshots app.RootCmd (fully populated except for pbLateCommands) into the
+// lookup the guard needs. Called once in main() after all registration and before app.Start().
+func buildKnownCommandSet(root *cobra.Command) knownCommandSet {
+	ks := knownCommandSet{top: map[string]bool{}, groups: map[string]map[string]bool{}}
+	for _, name := range pbLateCommands {
+		ks.top[name] = true
+	}
+	for _, c := range root.Commands() {
+		names := append([]string{c.Name()}, c.Aliases...)
+		for _, n := range names {
+			ks.top[n] = true
+		}
+		if c.HasSubCommands() {
+			children := map[string]bool{}
+			for _, sub := range c.Commands() {
+				children[sub.Name()] = true
+				for _, a := range sub.Aliases {
+					children[a] = true
+				}
+			}
+			for _, n := range names {
+				ks.groups[n] = children
+			}
+		}
+	}
+	return ks
+}
+
+// nextNonFlagToken returns the first non-flag token in args at/after start (a group's nested
+// subcommand name), or ("", false) when only flags/nothing remain. A group's own subcommand
+// flags follow the subcommand token, so the first bare token after the group name is the
+// subcommand. (Shares the residual value-flag-shadowing gap noted on globalValueFlags, but that
+// only affects a group invoked with an unrecognized value flag BEFORE its subcommand — rare, and
+// no worse than mis-selecting an already-flagged path.)
+func nextNonFlagToken(args []string, start int) (string, bool) {
+	for i := start; i < len(args); i++ {
+		if !strings.HasPrefix(args[i], "-") {
+			return args[i], true
+		}
+	}
+	return "", false
+}
+
+// unknownSubcommand reports the offending token and true when args name a command (or, under a
+// known command GROUP, a nested subcommand) that is not registered — the case the process must
+// exit non-zero on, since PocketBase discards cobra's own unknown-command error. It returns
+// ("", false) for: the bare invocation (cobra prints usage), any -h/--help/-v/--version request
+// (cobra short-circuits before dispatch), a known leaf command, a known group invoked bare, and a
+// known group + known child — so valid commands, flags, and the help/version fast paths are never
+// flagged. Pure and table-tested; the live set is built by buildKnownCommandSet.
+func unknownSubcommand(args []string, known knownCommandSet) (string, bool) {
+	for _, a := range args {
+		switch a {
+		case "-h", "--help", "-v", "--version":
+			return "", false
+		}
+	}
+	idx := subcommandIndex(args)
+	if idx < 0 {
+		return "", false // bare invocation -> cobra prints root usage (exit 0)
+	}
+	top := args[idx]
+	if !known.top[top] {
+		return top, true
+	}
+	children, isGroup := known.groups[top]
+	if !isGroup {
+		return "", false // known leaf command; its own args/flags are cobra's business
+	}
+	sub, ok := nextNonFlagToken(args, idx+1)
+	if !ok {
+		return "", false // group invoked bare -> cobra prints the group usage (exit 0)
+	}
+	if !children[sub] {
+		return top + " " + sub, true
+	}
+	return "", false
 }
 
 // globalValueFlags are every value-taking flag this manual pre-parse must recognize so its
@@ -561,7 +670,7 @@ func annotateLockErr(err error) error {
 	return fmt.Errorf("%w; is another deskkit process (e.g. `serve`) already running against this desk?", err)
 }
 
-// registerToolCommands wires the seven tool subcommands + gui onto the PocketBase RootCmd.
+// registerToolCommands wires the librarian tool subcommands + gui onto the PocketBase RootCmd.
 // serve, migrate, and superuser are provided by PocketBase / migratecmd. Each tool command
 // routes through the same tools.* function the agent will call (spec §2.6, §3.3). Until the
 // tool-body slice lands these return ErrNotImplemented — expected for the spine.
@@ -663,6 +772,7 @@ func registerToolCommands(app *pocketbase.PocketBase, cfg *config.Config, cfgErr
 	// query <kind>
 	var queryDays int
 	var queryPretty bool
+	var queryIncludeDisposed bool
 	queryCmd := &cobra.Command{
 		Use:   "query <kind>",
 		Short: "Read-only queries: live_files recent orphans uncollapsed findings summary adoption feedback",
@@ -672,7 +782,7 @@ func registerToolCommands(app *pocketbase.PocketBase, cfg *config.Config, cfgErr
 			if err != nil {
 				return err
 			}
-			raw, qerr := tools.Query(cmd.Context(), app, c, &tools.QueryInput{Kind: args[0], Days: queryDays})
+			raw, qerr := tools.Query(cmd.Context(), app, c, &tools.QueryInput{Kind: args[0], Days: queryDays, IncludeDisposed: queryIncludeDisposed})
 			if qerr != nil {
 				return qerr
 			}
@@ -691,7 +801,40 @@ func registerToolCommands(app *pocketbase.PocketBase, cfg *config.Config, cfgErr
 	}
 	queryCmd.Flags().IntVar(&queryDays, "days", 7, "window for 'recent'")
 	queryCmd.Flags().BoolVar(&queryPretty, "pretty", false, "render an aligned table instead of raw JSON (human-supervised workflow)")
+	// --include-disposed widens the `findings` query from the live-only default (open findings)
+	// to include acknowledged/triaged/wont_fix history; no effect on other query kinds.
+	queryCmd.Flags().BoolVar(&queryIncludeDisposed, "include-disposed", false, "for `query findings`: also show disposed (acknowledged/triaged/wont-fix) findings, not just open ones")
 	app.RootCmd.AddCommand(queryCmd)
+
+	// findings — supervised disposition lifecycle for patrol findings. `dispose` sets a
+	// finding's disposition (open|acknowledged|triaged|wont_fix), ORTHOGONAL to its state, so a
+	// live-only `query findings` stops surfacing an acknowledged/triaged/wont_fix item while it
+	// survives re-baseline: patrol dedupes on (file,rule,checksum) and inherits a prior non-open
+	// disposition onto a re-created finding. Disposition is an owner-supervised action, so it is a
+	// CLI subcommand — deliberately NOT an MCP tool (§5.4/§5.5, like restore). tools.DisposeFinding
+	// normalizes the value (wont-fix -> wont_fix) and validates it, returning an error (routed
+	// through the wrapRunE non-zero exit) for an empty/invalid disposition or an unknown id.
+	findingsCmd := &cobra.Command{
+		Use:   "findings",
+		Short: "Manage patrol findings (disposition lifecycle)",
+	}
+	var disposeAs string
+	disposeCmd := &cobra.Command{
+		Use:   "dispose <finding-id>",
+		Short: "Set a finding's disposition: open, acknowledged, triaged, or wont-fix",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			c, err := requireConfig(app, cfg, cfgErr)
+			if err != nil {
+				return err
+			}
+			return printJSON(tools.DisposeFinding(cmd.Context(), app, c, args[0], disposeAs))
+		},
+	}
+	disposeCmd.Flags().StringVar(&disposeAs, "as", "", "disposition to set: open, acknowledged, triaged, or wont-fix (required)")
+	_ = disposeCmd.MarkFlagRequired("as")
+	findingsCmd.AddCommand(disposeCmd)
+	app.RootCmd.AddCommand(findingsCmd)
 
 	// record-feedback — write one entry to the store-native feedback log. Routes through the
 	// same tools.RecordFeedback the agent/chat/MCP surfaces call (spec §2.6). DB-only write:
@@ -806,7 +949,7 @@ func registerToolCommands(app *pocketbase.PocketBase, cfg *config.Config, cfgErr
 	// stdio-transport lifecycle.
 	app.RootCmd.AddCommand(&cobra.Command{
 		Use:   "mcp-serve",
-		Short: "Expose the seven-tool core as an MCP stdio server (model-facing; gated per §5.4)",
+		Short: "Expose the librarian tool core as an MCP stdio server (model-facing; the exposed tool set is gated per §5.4, distinct from the fuller CLI subcommand set)",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := requireConfig(app, cfg, cfgErr)
 			if err != nil {

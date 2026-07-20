@@ -474,7 +474,7 @@ including field order and stable collection ids; the four new collections (`mess
 | 5 | `status` | text | Frontmatter `status`, or `""`. |
 | 6 | `synopsis` | text | Frontmatter `synopsis`. |
 | 7 | `origin` | text | Git first-add `"<hash>|<yyyy-mm-dd>"`. |
-| 8 | `graduated_to` | text | Extracted `#N` / `wb#N` / GH-URL pointer if the doc is a stub. |
+| 8 | `graduated_to` | text | The doc's explicit graduation marker target (`wb#N` / `#N` / URL), or `""` if none is declared (§5.1). |
 | 9 | `checksum` | text | sha256 hex of raw file bytes. |
 | 10 | `git_last_commit` | text | Git last-commit `"<hash>|<yyyy-mm-dd>"`. |
 | 11 | `fm_created` | text | Frontmatter `created`. |
@@ -849,9 +849,9 @@ type SweepResult struct {
    name starts `pb_`; skip files whose name starts `pb_`; yield relative paths, sorted.
 2. **scan_file.** Read raw bytes → `checksum = sha256hex(bytes)`. For `.md`: parse frontmatter
    (see *Frontmatter parse* below); derive `dir_kind` (see *dir_kind derivation*); apply the
-   pointer-stub heuristic — if `lines <= 40` and (`ISSUE_REF_RE` or `GH_URL_RE` matches) then
-   `graduated_to` = the first match string (see *graduated_to precedence*). Build a record
-   populating all `files` fields.
+   graduation-marker check — if the doc declares an EXPLICIT graduation marker (see *graduated_to
+   precedence*), `graduated_to` = the marker's target. Build a record populating all `files`
+   fields.
 3. **git_meta.** `git -C DESK_ROOT log --format=%H|%cs -1 <args> -- <rel>` → `"<hash>|<date>"`
    or `""`. `origin` uses `--diff-filter=A` (first add); `git_last_commit` is the plain last
    commit.
@@ -901,14 +901,25 @@ would fail — pocket-librarian deliberately uses this tolerant parse. An UNTERM
 fence returns an **empty map**, treated as no frontmatter (→ `entity_type = ""`); the parser never
 crashes the sweep.
 
-**graduated_to precedence.** With the pointer-stub heuristic (`lines <= 40` AND a match),
-`graduated_to` is set to the first match string: `ISSUE_REF_RE` is checked first, then `GH_URL_RE`;
-the stored value is the whole matched substring (`m.group(0)` in the PoC). `GH_URL_RE =`
-`https://github\.com/\S+`.
+> **Updated 2026-07-20 (0.8.0):** graduation is now gated on an explicit marker (frontmatter
+> `graduated_to:` or a canonical `graduated to:` line), not an inferred bare `#N` — see #78 / #92.
 
-**Line counting (deterministic).** "lines" everywhere (the pointer-stub heuristic here and R5 in
-§5.2) means `len(text.split("\n"))` — a raw newline count over the **whole file including
-frontmatter**, not a logical-line or trimmed count.
+**graduated_to precedence (explicit marker, not inferred).** `graduated_to` is populated ONLY when
+the doc declares an EXPLICIT graduation marker — never inferred from a bare `#N` / `wb#N` / GH-URL
+merely quoted in prose. Two marker forms, checked in this precedence order: (1) a frontmatter
+`graduated_to: <ref>` key (trimmed, non-empty) — checked first; (2) a canonical inline line
+matching `(?im)^\s*graduated to:?\s+(wb#\d+|#?\d+|https?://\S+)` (anchored at line start,
+case-insensitive, optional colon) — checked only when (1) is absent. The stored value is the
+matched `<ref>` (the frontmatter value, or the inline regex's captured group). There is no length
+gate on this population — a marker sets `graduated_to` at ANY doc length (R5, §5.2, is what still
+gates on `lines > 40`: a doc that DECLARES graduation via a marker but hasn't been collapsed is
+exactly the "graduated but not collapsed" case R5 flags). The old heuristic (`lines <= 40` AND a
+leftmost `ISSUE_REF_RE`/`GH_URL_RE` match anywhere in the text, first match string stored) is
+REMOVED — it mis-populated this column for any short doc that merely cited an issue as evidence.
+
+**Line counting (deterministic).** "lines" means `len(text.split("\n"))` — a raw newline count over
+the **whole file including frontmatter**, not a logical-line or trimmed count. Used by R5's
+`lines > 40` gate (§5.2); the `graduated_to` marker check above has no length gate.
 
 **Date string format.** All dates are `yyyy-mm-dd` (git `--format=%cs`); the fallback when git
 yields nothing is **today** in the same format. This applies to `origin`/`git_last_commit` dates
@@ -985,7 +996,7 @@ single-file patrol inspects just that file and only evaluates R6 if that file *i
 | R2 | mechanical | `dir_kind == journal` AND basename fails `JOURNAL_NAME_RE = ^\d{4}-\d{2}-\d{2}-.+\.md$`. |
 | R3 | mechanical | `expected_dir = TYPE_DIR_MAP[entity_type]` — the configured entity-dir PATH for that type; if `expected_dir` is set AND `rel` is NOT under it (same prefix test as `dir_kind_for`, §5.1: `rel == expected_dir` or `rel` starts with `expected_dir + "/"`) → finding (keyed off frontmatter `type`). `TYPE_DIR_MAP = {decision:DECISIONS_DIR, task:TASKS_DIR, analysis:ANALYSES_DIR, journal:JOURNAL_DIR}` (paths, not `dir_kind` labels — a correctly-placed `_structure/decisions/…` decision doc is under `DECISIONS_DIR` and never flags). |
 | R4 | judgment (FLAG-ONLY) | `dir_kind == decisions` and `.md` (**excluding a basename `README.md`** — the decisions-dir index is not a decision record); `status ∉ DECISION_STATUSES = {proposed, accepted, rejected, superseded}`. Detection is mechanical but the fix — choosing WHICH valid status an invalid/empty one becomes — is a semantic call, so R4 is **judgment**, not mechanical, and has no fixer (reclassified 2026-07-17 from the dev-tooling-desk field evaluation, issue #18). |
-| R5 | judgment | entity docs **excluding** decisions (append-only); `lines > 40` AND `ISSUE_REF_RE` matches. Flag only. `ISSUE_REF_RE = (?:\bwb#\d+|(?<![\w&])#\d+)`. |
+| R5 | judgment | entity docs **excluding** decisions (append-only); `lines > 40` AND the doc declares an EXPLICIT graduation marker (§5.1 *graduated_to precedence*: a frontmatter `graduated_to:` key, or a canonical inline `graduated to: <ref>` line matching `(?im)^\s*graduated to:?\s+(wb#\d+|#?\d+|https?://\S+)`). Flag only. A bare `#N` / `wb#N` / GH-URL merely quoted in prose does NOT fire R5 — only a deliberate marker does. |
 | R6 | judgment (handled separately) | Operates on the handoff record only (`HANDOFF_PATH`, default `_meta/HANDOFF.md` — configurable for identity-neutrality). `doc_date` = `fm.updated` (string) else regex `Last updated:\s*(\d{4}-\d{2}-\d{2})`; `newest` = `git -C root log -1 --format=%cs`; if `newest` empty → no finding; if `doc_date` empty OR `doc_date < newest` → finding. |
 
 `FIXABLE_RULES = {R1, R2, R3}` (R4 detects mechanically but is flag-only judgment — its fix is a
@@ -1999,7 +2010,7 @@ neutralizes it, which is exactly the bug this gate must avoid.)
 |---|---|---|---|---|
 | **F-R1** | `tasks/r1-fixture-missing-fm.md` | `---`↵`type: task`↵`---` then one body line. Missing `created`, `updated`, `tags`, `synopsis`. | R1 only (dir_kind `tasks`, correctly placed → no R3; not journal → no R2). | no |
 | **F-R3** | `analyses/r3-fixture-type-task.md` | Full universal frontmatter — `type: task`, `created: 2026-07-15`, `updated: 2026-07-15`, `tags: []`, `synopsis: "type mismatch fixture"` — plus a short body (< 40 lines). | R3 only: `type: task` ⇒ `TYPE_DIR_MAP[task] = TASKS_DIR (tasks)`, but the file lives under `analyses/` (dir_kind `analyses`, §5.1) ⇒ move to `tasks/r3-fixture-type-task.md`, stub left at old path (§5.3 `plan_r3`). Full frontmatter ⇒ no R1; short ⇒ no R5. | no |
-| **F-R5** | `analyses/r5-fixture-graduated.md` | Full universal frontmatter (`type: analysis`, correctly placed ⇒ no R3); body padded **beyond 40 total lines** (raw newline count, §5.1) and containing the issue reference `#111`. | R5 (judgment): entity doc, not a decision, `lines > 40` AND `ISSUE_REF_RE` matches `#111`. | no |
+| **F-R5** | `analyses/r5-fixture-graduated.md` | Full universal frontmatter (`type: analysis`, correctly placed ⇒ no R3); body padded **beyond 40 total lines** (raw newline count, §5.1) and containing the canonical graduation-marker line `graduated to #111`. | R5 (judgment): entity doc, not a decision, `lines > 40` AND the doc declares an explicit graduation marker (§5.1) — the `graduated to #111` line. | no |
 | **F-IGN** | `_structure/decisions/9999-ignore-fixture.md` | `---`↵`type: decision`↵`status: accepted`↵`---` then a body line. Missing `created`/`updated`/`tags`/`synopsis` ⇒ a genuine R1 finding (its basename is **not** `README.md`, so the index-README exemption does not apply); `status: accepted` is valid ⇒ no R4; `type: decision` under `_structure/decisions` ⇒ correctly placed, no R3. | R1 (but on an ignored path). | **yes** — matched by the `_structure/decisions/` prefix entry. |
 
 8. Seed the four fixtures above (F-R1, F-R3, F-R5, F-IGN).

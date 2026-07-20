@@ -130,40 +130,51 @@ func (e *Engine) CreateItem(ctx context.Context, in CreateItemInput) (*core.Reco
 	if strings.TrimSpace(in.Title) == "" {
 		return nil, refuse("cannot create an item without a title")
 	}
-	col, err := e.App.FindCollectionByNameOrId("items")
-	if err != nil {
-		return nil, err
-	}
-	rec := core.NewRecord(col)
-	if in.ID != "" {
-		rec.Id = in.ID // deterministic import id (§8.2); "" leaves PocketBase to auto-generate
-	}
-	rec.Set("desk", e.desk())
-	rec.Set("title", in.Title)
-	rec.Set("type", in.Type)
-	rec.Set("phase", string(statemachine.Queue))
-	rec.Set("status_label", statemachine.DefaultLabelFor(statemachine.Queue))
-	rec.Set("court", in.Court)
-	rec.Set("pointer", in.Pointer)
-	rec.Set("severity", in.Severity)
-	rec.Set("priority", in.Priority)
-	rec.Set("version", 1)
-	if in.Parent != "" {
-		parent, perr := e.loadItem(in.Parent)
-		if perr != nil {
-			return nil, perr
+	var out *core.Record
+	txErr := e.App.RunInTransaction(func(txApp core.App) error {
+		txe := e.withApp(txApp)
+		col, err := txe.App.FindCollectionByNameOrId("items")
+		if err != nil {
+			return err
 		}
-		rec.Set("parent", parent.Id)
-		root := parent.GetString("root")
-		if root == "" {
-			root = parent.Id
+		rec := core.NewRecord(col)
+		if in.ID != "" {
+			rec.Id = in.ID // deterministic import id (§8.2); "" leaves PocketBase to auto-generate
 		}
-		rec.Set("root", root)
+		rec.Set("desk", txe.desk())
+		rec.Set("title", in.Title)
+		rec.Set("type", in.Type)
+		rec.Set("phase", string(statemachine.Queue))
+		rec.Set("status_label", statemachine.DefaultLabelFor(statemachine.Queue))
+		rec.Set("court", in.Court)
+		rec.Set("pointer", in.Pointer)
+		rec.Set("severity", in.Severity)
+		rec.Set("priority", in.Priority)
+		rec.Set("version", 1)
+		if in.Parent != "" {
+			// The parent read + the child write share this transaction: a concurrent delete of the
+			// parent can't slip between them.
+			parent, perr := txe.loadItem(in.Parent)
+			if perr != nil {
+				return perr
+			}
+			rec.Set("parent", parent.Id)
+			root := parent.GetString("root")
+			if root == "" {
+				root = parent.Id
+			}
+			rec.Set("root", root)
+		}
+		if err := txe.App.Save(rec); err != nil {
+			return err
+		}
+		out = rec
+		return nil
+	})
+	if txErr != nil {
+		return nil, txErr
 	}
-	if err := e.App.Save(rec); err != nil {
-		return nil, err
-	}
-	return rec, nil
+	return out, nil
 }
 
 // loadItem fetches an item by id, desk-scoped (§3.1 desk field; ADR 0002 discipline).
@@ -206,6 +217,42 @@ func liveForeignClaim(rec *core.Record, actor Actor, now time.Time) string {
 // bump increments the version token on a mutation.
 func bump(rec *core.Record) { rec.Set("version", rec.GetInt("version")+1) }
 
+// txFailpoint, when non-nil, is invoked inside a mutating transaction immediately after the
+// primary record write and before the audit/cascade writes. It exists ONLY so tests can force a
+// mid-sequence failure and prove the load->version-check->mutate->save->audit->cascade sequence
+// commits or rolls back as one unit (§3.6). It is nil on every shipped path; production never
+// sets it. It is a plain package-level var with no synchronization: tests that set it must run
+// serially (the engine tests do) — a future t.Parallel() case must not touch it. The seam is
+// wired ONLY in transitionCore (the longest write sequence); the other RunInTransaction methods
+// share the same commit-or-rollback mechanics but have no forced-failure test — add a
+// runFailpoint() call there for parity if one is ever wanted.
+var txFailpoint func() error
+
+func runFailpoint() error {
+	if txFailpoint != nil {
+		return txFailpoint()
+	}
+	return nil
+}
+
+// withApp returns a tx-scoped copy of the engine bound to app (the RunInTransaction callback's
+// txApp). Every inner read AND write of a mutating method runs through this copy, so the
+// version-guard read and the write it authorizes share one transaction — closing the §3.6
+// check-then-act TOCTOU. Cfg/Validator are immutable and safely shared.
+func (e *Engine) withApp(app core.App) *Engine {
+	return &Engine{App: app, Cfg: e.Cfg, Validator: e.Validator}
+}
+
+// pendingAudit is a gate_refused transitions row (§4.1) captured inside a transaction but written
+// AFTER it settles. A gate refusal mutates nothing, so its transaction rolls back; the row must
+// still persist (observable, not silent), which means writing it outside the rolled-back tx —
+// exactly the pre-transaction behavior (a single, non-atomic audit write; the refusal stands even
+// if that write fails).
+type pendingAudit struct {
+	itemID, fromPhase, toPhase, event, detail string
+	actor                                     Actor
+}
+
 // audit appends one transitions row (§3.6 append-only; nothing in this engine ever updates
 // or deletes one).
 func (e *Engine) audit(itemID, fromPhase, toPhase, event string, actor Actor, detail string) error {
@@ -239,39 +286,67 @@ type TransitionInput struct {
 // refusal: a gate_refused transitions row is appended (observable, not silent) and the
 // *Refusal returned names exactly what is missing (R3.1).
 func (e *Engine) Transition(ctx context.Context, in TransitionInput) (*core.Record, error) {
+	var out *core.Record
+	var pending *pendingAudit
+	txErr := e.App.RunInTransaction(func(txApp core.App) error {
+		rec, p, err := e.withApp(txApp).transitionCore(ctx, in)
+		pending = p
+		if err != nil {
+			return err
+		}
+		out = rec
+		return nil
+	})
+	// The gate_refused row is written after the tx settles (§4.1): a refusal rolls the tx back,
+	// but the row must persist regardless.
+	if pending != nil {
+		_ = e.audit(pending.itemID, pending.fromPhase, pending.toPhase, pending.event, pending.actor, pending.detail)
+	}
+	if txErr != nil {
+		return nil, txErr
+	}
+	return out, nil
+}
+
+// transitionCore runs THE §4.1 sequence and MUST be called on a tx-scoped engine (withApp) that
+// is already inside a transaction — it opens none of its own, so a caller can compose it with
+// further writes (SetStatusLabel's label pin) in the same atomic unit. On a gate refusal it
+// returns (nil, pendingAudit, *Refusal): the pendingAudit is the gate_refused row the caller must
+// write after the transaction settles; no mutation has occurred, so the tx safely rolls back.
+func (e *Engine) transitionCore(ctx context.Context, in TransitionInput) (*core.Record, *pendingAudit, error) {
 	item, err := e.loadItem(in.ItemID)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	if err := checkVersion(item, in.Version); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	from := statemachine.Phase(item.GetString("phase"))
 	to, perr := statemachine.ParsePhase(in.TargetPhase)
 	if perr != nil {
-		return nil, refuse("%v", perr)
+		return nil, nil, refuse("%v", perr)
 	}
 
 	// 1. The machine admits the edge, else refuse before gates are even consulted (§3.2).
 	event, legal := statemachine.Edge(from, to)
 	if !legal {
-		return nil, refuse("no legal transition %s->%s", from, to)
+		return nil, nil, refuse("no legal transition %s->%s", from, to)
 	}
 	// 2. Blocked refuses forward edges (§3.2: advance is refused while blocked).
 	if item.GetBool("blocked") && event == statemachine.Advance {
-		return nil, refuse("item %q is blocked; unblock it (or resolve its blockers) before advancing", item.Id)
+		return nil, nil, refuse("item %q is blocked; unblock it (or resolve its blockers) before advancing", item.Id)
 	}
 	// 3. A live foreign claim refuses advance/demote (§3.6/R2.6). Reopen too: it is a
 	// mutation of a claimed item all the same.
 	if holder := liveForeignClaim(item, in.Actor, time.Now()); holder != "" {
-		return nil, refuse("item %q is claimed by %q until %s", item.Id, holder,
+		return nil, nil, refuse("item %q is claimed by %q until %s", item.Id, holder,
 			item.GetDateTime("claim_expires").Time().Format(time.RFC3339))
 	}
 	// 4. The gate engine evaluates whatever the desk's config binds to (type, edge) — forward
 	// edges by default, demote/reopen only when the config names them (§4.1 step 4).
 	dc, derr := e.loadDeskConfig()
 	if derr != nil {
-		return nil, derr
+		return nil, nil, derr
 	}
 	edgeKey := statemachine.EdgeKey(from, to)
 	reqs := dc.rules.Effective(item.GetString("type"), edgeKey, e.fieldLookup(ctx, item))
@@ -281,29 +356,37 @@ func (e *Engine) Transition(ctx context.Context, in TransitionInput) (*core.Reco
 			msg := fmt.Sprintf("cannot %s %s item to %s: %s",
 				event, item.GetString("type"), to, strings.Join(r.Reasons, "; "))
 			// A refusal is recorded as a gate_refused transitions row (§4.1) — observable audit,
-			// non-fatal if the audit write itself fails (the refusal still stands).
-			_ = e.audit(item.Id, string(from), string(to), "gate_refused", in.Actor, msg)
-			return nil, &Refusal{Reasons: append([]string{}, r.Reasons...)}
+			// deferred to the caller (written after the tx settles; the refusal still stands even
+			// if that write later fails).
+			return nil, &pendingAudit{
+				itemID: item.Id, fromPhase: string(from), toPhase: string(to),
+				event: "gate_refused", actor: in.Actor, detail: msg,
+			}, &Refusal{Reasons: append([]string{}, r.Reasons...)}
 		}
-		return nil, gerr
+		return nil, nil, gerr
 	}
 
-	// 5. Success: write the new phase, keep the label mapped (§3.3), audit, cascade (§3.5).
+	// 5. Success: write the new phase, keep the label mapped (§3.3), audit, cascade (§3.5). All
+	// through this tx-scoped engine, so the phase write, the audit row, and the cascade's
+	// side-writes commit or roll back together.
 	item.Set("phase", string(to))
 	if dc.labels[item.GetString("status_label")] != to {
 		item.Set("status_label", statemachine.DefaultLabelFor(to))
 	}
 	bump(item)
 	if err := e.App.Save(item); err != nil {
-		return nil, err
+		return nil, nil, err
+	}
+	if err := runFailpoint(); err != nil {
+		return nil, nil, err
 	}
 	if err := e.audit(item.Id, string(from), string(to), string(event), in.Actor, ""); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	if err := e.cascade(ctx, item, from, to, in.Actor); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	return item, nil
+	return item, nil, nil
 }
 
 // fieldLookup resolves a trait predicate field (§4.2): a first-class item field, then the
@@ -363,53 +446,73 @@ func (e *Engine) pointerResolver(item *core.Record) func(spec string) (string, e
 
 // Block sets the blocked flag, preserving the phase and recording restore_phase.
 func (e *Engine) Block(ctx context.Context, itemID string, version int, actor Actor, reason string) (*core.Record, error) {
-	item, err := e.loadItem(itemID)
-	if err != nil {
-		return nil, err
+	var out *core.Record
+	txErr := e.App.RunInTransaction(func(txApp core.App) error {
+		txe := e.withApp(txApp)
+		item, err := txe.loadItem(itemID)
+		if err != nil {
+			return err
+		}
+		if err := checkVersion(item, version); err != nil {
+			return err
+		}
+		if statemachine.Phase(item.GetString("phase")) == statemachine.Terminal {
+			return refuse("item %q is terminal; a terminal item cannot be blocked", item.Id)
+		}
+		if item.GetBool("blocked") {
+			out = item // already blocked: idempotent
+			return nil
+		}
+		txe.setBlocked(item, true)
+		bump(item)
+		if err := txe.App.Save(item); err != nil {
+			return err
+		}
+		phase := item.GetString("phase")
+		if err := txe.audit(item.Id, phase, phase, "block", actor, reason); err != nil {
+			return err
+		}
+		out = item
+		return nil
+	})
+	if txErr != nil {
+		return nil, txErr
 	}
-	if err := checkVersion(item, version); err != nil {
-		return nil, err
-	}
-	if statemachine.Phase(item.GetString("phase")) == statemachine.Terminal {
-		return nil, refuse("item %q is terminal; a terminal item cannot be blocked", item.Id)
-	}
-	if item.GetBool("blocked") {
-		return item, nil // already blocked: idempotent
-	}
-	e.setBlocked(item, true)
-	bump(item)
-	if err := e.App.Save(item); err != nil {
-		return nil, err
-	}
-	phase := item.GetString("phase")
-	if err := e.audit(item.Id, phase, phase, "block", actor, reason); err != nil {
-		return nil, err
-	}
-	return item, nil
+	return out, nil
 }
 
 // Unblock clears the flag and restores the item to its recorded restore_phase.
 func (e *Engine) Unblock(ctx context.Context, itemID string, version int, actor Actor, reason string) (*core.Record, error) {
-	item, err := e.loadItem(itemID)
-	if err != nil {
-		return nil, err
+	var out *core.Record
+	txErr := e.App.RunInTransaction(func(txApp core.App) error {
+		txe := e.withApp(txApp)
+		item, err := txe.loadItem(itemID)
+		if err != nil {
+			return err
+		}
+		if err := checkVersion(item, version); err != nil {
+			return err
+		}
+		if !item.GetBool("blocked") {
+			out = item // not blocked: idempotent
+			return nil
+		}
+		txe.setBlocked(item, false)
+		bump(item)
+		if err := txe.App.Save(item); err != nil {
+			return err
+		}
+		phase := item.GetString("phase")
+		if err := txe.audit(item.Id, phase, phase, "unblock", actor, reason); err != nil {
+			return err
+		}
+		out = item
+		return nil
+	})
+	if txErr != nil {
+		return nil, txErr
 	}
-	if err := checkVersion(item, version); err != nil {
-		return nil, err
-	}
-	if !item.GetBool("blocked") {
-		return item, nil // not blocked: idempotent
-	}
-	e.setBlocked(item, false)
-	bump(item)
-	if err := e.App.Save(item); err != nil {
-		return nil, err
-	}
-	phase := item.GetString("phase")
-	if err := e.audit(item.Id, phase, phase, "unblock", actor, reason); err != nil {
-		return nil, err
-	}
-	return item, nil
+	return out, nil
 }
 
 // setBlocked flips the side-state in place (shared by Block/Unblock and the cascade, which
@@ -432,57 +535,75 @@ func (e *Engine) setBlocked(item *core.Record, blocked bool) {
 // Claim sets claimed_by + claim_expires (TTL from desk_config / PM_CLAIM_TTL / 30m default).
 // A live foreign claim refuses; an expired one is free; re-claiming your own claim renews it.
 func (e *Engine) Claim(ctx context.Context, itemID string, version int, actor Actor) (*core.Record, error) {
-	item, err := e.loadItem(itemID)
-	if err != nil {
-		return nil, err
+	var out *core.Record
+	txErr := e.App.RunInTransaction(func(txApp core.App) error {
+		txe := e.withApp(txApp)
+		item, err := txe.loadItem(itemID)
+		if err != nil {
+			return err
+		}
+		if err := checkVersion(item, version); err != nil {
+			return err
+		}
+		if holder := liveForeignClaim(item, actor, time.Now()); holder != "" {
+			return refuse("item %q is already claimed by %q", item.Id, holder)
+		}
+		dc, derr := txe.loadDeskConfig()
+		if derr != nil {
+			return derr
+		}
+		item.Set("claimed_by", actor.Name)
+		item.Set("claim_expires", time.Now().Add(dc.claimTTL))
+		bump(item)
+		if err := txe.App.Save(item); err != nil {
+			return err
+		}
+		phase := item.GetString("phase")
+		if err := txe.audit(item.Id, phase, phase, "claim", actor, ""); err != nil {
+			return err
+		}
+		out = item
+		return nil
+	})
+	if txErr != nil {
+		return nil, txErr
 	}
-	if err := checkVersion(item, version); err != nil {
-		return nil, err
-	}
-	if holder := liveForeignClaim(item, actor, time.Now()); holder != "" {
-		return nil, refuse("item %q is already claimed by %q", item.Id, holder)
-	}
-	dc, derr := e.loadDeskConfig()
-	if derr != nil {
-		return nil, derr
-	}
-	item.Set("claimed_by", actor.Name)
-	item.Set("claim_expires", time.Now().Add(dc.claimTTL))
-	bump(item)
-	if err := e.App.Save(item); err != nil {
-		return nil, err
-	}
-	phase := item.GetString("phase")
-	if err := e.audit(item.Id, phase, phase, "claim", actor, ""); err != nil {
-		return nil, err
-	}
-	return item, nil
+	return out, nil
 }
 
 // Release clears a claim. Only the holder may release a live claim; anyone may clear an
 // expired one.
 func (e *Engine) Release(ctx context.Context, itemID string, version int, actor Actor) (*core.Record, error) {
-	item, err := e.loadItem(itemID)
-	if err != nil {
-		return nil, err
+	var out *core.Record
+	txErr := e.App.RunInTransaction(func(txApp core.App) error {
+		txe := e.withApp(txApp)
+		item, err := txe.loadItem(itemID)
+		if err != nil {
+			return err
+		}
+		if err := checkVersion(item, version); err != nil {
+			return err
+		}
+		if holder := liveForeignClaim(item, actor, time.Now()); holder != "" {
+			return refuse("item %q is claimed by %q; only the holder can release a live claim", item.Id, holder)
+		}
+		item.Set("claimed_by", "")
+		item.Set("claim_expires", "")
+		bump(item)
+		if err := txe.App.Save(item); err != nil {
+			return err
+		}
+		phase := item.GetString("phase")
+		if err := txe.audit(item.Id, phase, phase, "release", actor, ""); err != nil {
+			return err
+		}
+		out = item
+		return nil
+	})
+	if txErr != nil {
+		return nil, txErr
 	}
-	if err := checkVersion(item, version); err != nil {
-		return nil, err
-	}
-	if holder := liveForeignClaim(item, actor, time.Now()); holder != "" {
-		return nil, refuse("item %q is claimed by %q; only the holder can release a live claim", item.Id, holder)
-	}
-	item.Set("claimed_by", "")
-	item.Set("claim_expires", "")
-	bump(item)
-	if err := e.App.Save(item); err != nil {
-		return nil, err
-	}
-	phase := item.GetString("phase")
-	if err := e.audit(item.Id, phase, phase, "release", actor, ""); err != nil {
-		return nil, err
-	}
-	return item, nil
+	return out, nil
 }
 
 // --- dependency edges + cascade (§3.4, §3.5) ---
@@ -525,50 +646,63 @@ func (e *Engine) Link(ctx context.Context, in LinkInput) (*core.Record, error) {
 	if fromID == toID {
 		return nil, refuse("an item cannot depend on itself")
 	}
-	blocker, err := e.loadItem(fromID)
-	if err != nil {
-		return nil, err
-	}
-	target, err := e.loadItem(toID)
-	if err != nil {
-		return nil, err
-	}
 
-	col, cerr := e.App.FindCollectionByNameOrId("dependencies")
-	if cerr != nil {
-		return nil, cerr
-	}
-	edge := core.NewRecord(col)
-	edge.Set("from", blocker.Id)
-	edge.Set("to", target.Id)
-	edge.Set("kind", kind)
-	edge.Set("desk", e.desk())
-	if kind == "blocks" {
-		edge.Set("unblock_at", in.UnblockAt)
-		edge.Set("cascade", in.Cascade)
-	}
-	if err := e.App.Save(edge); err != nil {
-		return nil, err
-	}
+	// The endpoint reads, the edge write, and the target's initial-block write are one atomic
+	// unit: the edge never lands referencing an item that a concurrent delete removed between the
+	// read and the write, and a target is never left half-blocked (edge saved, block not).
+	var out *core.Record
+	txErr := e.App.RunInTransaction(func(txApp core.App) error {
+		txe := e.withApp(txApp)
+		blocker, err := txe.loadItem(fromID)
+		if err != nil {
+			return err
+		}
+		target, err := txe.loadItem(toID)
+		if err != nil {
+			return err
+		}
 
-	if kind == "blocks" && !target.GetBool("blocked") &&
-		statemachine.Phase(target.GetString("phase")) != statemachine.Terminal {
-		unsatisfied := statemachine.Rank(statemachine.Phase(blocker.GetString("phase"))) <
-			statemachine.Rank(statemachine.Phase(in.UnblockAt))
-		if unsatisfied || in.Cascade == "permanent" {
-			e.setBlocked(target, true)
-			bump(target)
-			if err := e.App.Save(target); err != nil {
-				return nil, err
-			}
-			phase := target.GetString("phase")
-			detail := fmt.Sprintf("blocked by %q (unblock at %s, cascade %s)", blocker.Id, in.UnblockAt, in.Cascade)
-			if err := e.audit(target.Id, phase, phase, "block", in.Actor, detail); err != nil {
-				return nil, err
+		col, cerr := txe.App.FindCollectionByNameOrId("dependencies")
+		if cerr != nil {
+			return cerr
+		}
+		edge := core.NewRecord(col)
+		edge.Set("from", blocker.Id)
+		edge.Set("to", target.Id)
+		edge.Set("kind", kind)
+		edge.Set("desk", txe.desk())
+		if kind == "blocks" {
+			edge.Set("unblock_at", in.UnblockAt)
+			edge.Set("cascade", in.Cascade)
+		}
+		if err := txe.App.Save(edge); err != nil {
+			return err
+		}
+
+		if kind == "blocks" && !target.GetBool("blocked") &&
+			statemachine.Phase(target.GetString("phase")) != statemachine.Terminal {
+			unsatisfied := statemachine.Rank(statemachine.Phase(blocker.GetString("phase"))) <
+				statemachine.Rank(statemachine.Phase(in.UnblockAt))
+			if unsatisfied || in.Cascade == "permanent" {
+				txe.setBlocked(target, true)
+				bump(target)
+				if err := txe.App.Save(target); err != nil {
+					return err
+				}
+				phase := target.GetString("phase")
+				detail := fmt.Sprintf("blocked by %q (unblock at %s, cascade %s)", blocker.Id, in.UnblockAt, in.Cascade)
+				if err := txe.audit(target.Id, phase, phase, "block", in.Actor, detail); err != nil {
+					return err
+				}
 			}
 		}
+		out = edge
+		return nil
+	})
+	if txErr != nil {
+		return nil, txErr
 	}
-	return edge, nil
+	return out, nil
 }
 
 // cascade is the §3.5 scan a phase change on A drives: every outgoing gating edge applies its
@@ -679,43 +813,65 @@ func (e *Engine) reblock(ctx context.Context, targetID string, actor Actor, caus
 // request routed through the machine + gates (the label and the machine cannot drift); an
 // unknown label is refused.
 func (e *Engine) SetStatusLabel(ctx context.Context, itemID, label string, version int, actor Actor) (*core.Record, error) {
-	item, err := e.loadItem(itemID)
-	if err != nil {
-		return nil, err
-	}
-	if err := checkVersion(item, version); err != nil {
-		return nil, err
-	}
-	dc, derr := e.loadDeskConfig()
-	if derr != nil {
-		return nil, derr
-	}
-	phase, known := dc.labels[label]
-	if !known {
-		return nil, refuse("unknown status label %q for this desk", label)
-	}
-	if statemachine.Phase(item.GetString("phase")) == phase {
-		item.Set("status_label", label)
-		bump(item)
-		if err := e.App.Save(item); err != nil {
-			return nil, err
+	var out *core.Record
+	var pending *pendingAudit
+	txErr := e.App.RunInTransaction(func(txApp core.App) error {
+		txe := e.withApp(txApp)
+		item, err := txe.loadItem(itemID)
+		if err != nil {
+			return err
 		}
-		return item, nil
-	}
-	moved, terr := e.Transition(ctx, TransitionInput{
-		ItemID: itemID, TargetPhase: string(phase), Version: version, Actor: actor,
+		// This check serves the SAME-PHASE fast path below (plain label write, transitionCore
+		// never runs) and fails fast before the desk-config load. On the cross-phase path
+		// transitionCore re-checks the same tx-snapshot value — always agreeing, harmlessly.
+		if err := checkVersion(item, version); err != nil {
+			return err
+		}
+		dc, derr := txe.loadDeskConfig()
+		if derr != nil {
+			return derr
+		}
+		phase, known := dc.labels[label]
+		if !known {
+			return refuse("unknown status label %q for this desk", label)
+		}
+		if statemachine.Phase(item.GetString("phase")) == phase {
+			item.Set("status_label", label)
+			bump(item)
+			if err := txe.App.Save(item); err != nil {
+				return err
+			}
+			out = item
+			return nil
+		}
+		// Cross-phase: route through the machine + gates via transitionCore in THIS transaction,
+		// so the phase change and the label pin below commit or roll back as one unit.
+		moved, p, terr := txe.transitionCore(ctx, TransitionInput{
+			ItemID: itemID, TargetPhase: string(phase), Version: version, Actor: actor,
+		})
+		pending = p
+		if terr != nil {
+			return terr
+		}
+		// transitionCore already bumped the version and wrote the audit row; this save only pins
+		// the exact requested label (transitionCore set the phase's default) — no second bump, so
+		// the caller's version+1 expectation and the audit trail stay aligned.
+		moved.Set("status_label", label)
+		if err := txe.App.Save(moved); err != nil {
+			return err
+		}
+		out = moved
+		return nil
 	})
-	if terr != nil {
-		return nil, terr
+	// A gate refusal from the cross-phase transition records its gate_refused row after the tx
+	// settles (§4.1), same as the direct Transition path.
+	if pending != nil {
+		_ = e.audit(pending.itemID, pending.fromPhase, pending.toPhase, pending.event, pending.actor, pending.detail)
 	}
-	// Transition already bumped the version and wrote the audit row; this save only pins the
-	// exact requested label (Transition set the phase's default) — no second bump, so the
-	// caller's version+1 expectation and the audit trail stay aligned.
-	moved.Set("status_label", label)
-	if err := e.App.Save(moved); err != nil {
-		return nil, err
+	if txErr != nil {
+		return nil, txErr
 	}
-	return moved, nil
+	return out, nil
 }
 
 // jsonStringField extracts a flat string field from a JSON object string ("" , false when the
@@ -729,25 +885,37 @@ func jsonStringField(raw, field string) (string, bool) {
 	return s, ok
 }
 
-// AddNote attaches a phase-scoped keyed note (§3.7).
+// AddNote attaches a phase-scoped keyed note (§3.7). A single insert would not strictly need a
+// transaction, but the tx keeps the note's `phase` snapshot consistent with the item read (a
+// non-tx read could record a stale phase if a transition lands in between) and keeps every
+// mutating method on the same withApp(txApp) discipline (§3.6).
 func (e *Engine) AddNote(ctx context.Context, itemID, key, body string, actor Actor) (*core.Record, error) {
-	item, err := e.loadItem(itemID)
-	if err != nil {
-		return nil, err
+	var out *core.Record
+	txErr := e.App.RunInTransaction(func(txApp core.App) error {
+		txe := e.withApp(txApp)
+		item, err := txe.loadItem(itemID)
+		if err != nil {
+			return err
+		}
+		col, cerr := txe.App.FindCollectionByNameOrId("notes")
+		if cerr != nil {
+			return cerr
+		}
+		rec := core.NewRecord(col)
+		rec.Set("item", item.Id)
+		rec.Set("phase", item.GetString("phase"))
+		rec.Set("key", key)
+		rec.Set("body", body)
+		rec.Set("actor", actor.Name)
+		rec.Set("actor_kind", actor.Kind)
+		if err := txe.App.Save(rec); err != nil {
+			return err
+		}
+		out = rec
+		return nil
+	})
+	if txErr != nil {
+		return nil, txErr
 	}
-	col, cerr := e.App.FindCollectionByNameOrId("notes")
-	if cerr != nil {
-		return nil, cerr
-	}
-	rec := core.NewRecord(col)
-	rec.Set("item", item.Id)
-	rec.Set("phase", item.GetString("phase"))
-	rec.Set("key", key)
-	rec.Set("body", body)
-	rec.Set("actor", actor.Name)
-	rec.Set("actor_kind", actor.Kind)
-	if err := e.App.Save(rec); err != nil {
-		return nil, err
-	}
-	return rec, nil
+	return out, nil
 }

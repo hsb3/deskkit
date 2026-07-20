@@ -48,7 +48,7 @@ func Query(ctx context.Context, app core.App, cfg *config.Config, in *QueryInput
 	case "uncollapsed":
 		raw, err = queryUncollapsed(app)
 	case "findings":
-		raw, err = queryFindings(app)
+		raw, err = queryFindings(app, in.IncludeDisposed)
 	case "summary":
 		raw, err = querySummary(app)
 	case "adoption":
@@ -391,8 +391,19 @@ func queryUncollapsed(app core.App) (json.RawMessage, error) {
 	return json.Marshal(uncollapsedResult{Kind: "uncollapsed", Count: len(findings), Findings: findings})
 }
 
-func queryFindings(app core.App) (json.RawMessage, error) {
-	rows, err := openFindingRows(app, "")
+// queryFindings — `findings` kind. By default it is LIVE-ONLY: it returns flagged findings whose
+// disposition is still 'open', hiding those a supervisor has acknowledged/triaged/marked wont_fix
+// (the disposition lifecycle). includeDisposed=true drops the disposition filter and
+// returns every flagged finding regardless of disposition. The disposition filter is threaded
+// through openFindingRows' existing extraFilter param; queryUncollapsed and querySummary keep
+// their prior behavior (all flagged rows, no disposition filter). See the disposition-lifecycle
+// migration (0014) for the field definition and backfill.
+func queryFindings(app core.App, includeDisposed bool) (json.RawMessage, error) {
+	extraFilter := "disposition = 'open'"
+	if includeDisposed {
+		extraFilter = ""
+	}
+	rows, err := openFindingRows(app, extraFilter)
 	if err != nil {
 		return nil, err
 	}

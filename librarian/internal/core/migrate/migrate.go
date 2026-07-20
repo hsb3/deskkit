@@ -116,7 +116,7 @@ func StampModules(app core.App, mods []Module) error {
 
 // GuardDowngrade refuses to proceed if a module's STORED schema version (from a prior, newer
 // binary) exceeds the version this binary's module declares — an old binary opening a store a
-// newer one already migrated further. D2: librarian's SchemaVersion()==13 matches its highest
+// newer one already migrated further. D2: librarian's SchemaVersion()==14 matches its highest
 // migration, so this never trips in the zero-change envelope; the guard exists for future
 // migrations.
 func GuardDowngrade(app core.App, mods []Module) error {

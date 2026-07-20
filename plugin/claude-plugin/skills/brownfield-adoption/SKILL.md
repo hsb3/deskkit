@@ -39,6 +39,17 @@ Settle these before Phase 1; they bind every phase.
   the published release artifact and verifying its checksum** before first use. Release-built binaries
   report their release version via `--version`; a binary that prints `dev` was built from
   source without the version stamp — pin such a build from its source commit, not `--version`.
+- **The desk-pm MCP tool surface needs `deskkit` ON PATH and a fresh session.** The PM tools are
+  served by `deskkit mcp-serve` (launched by the desk-pm plugin's `.mcp.json`), so they exist
+  **only** once `deskkit` is **installed AND resolvable on the session's PATH** — a GUI-launched
+  host may not see `~/.local/bin`, in which case the plain `deskkit` command is **silently dropped**
+  — **and the Claude Code session has been restarted**. MCP servers wire at session start: a
+  mid-session install does **not** mount the surface, so the PM tools stay absent until the next
+  session. If they are missing, confirm `command -v deskkit` resolves, then **start a fresh
+  session** (or wire `deskkit mcp-serve` as a stdio MCP server by its absolute path in your own
+  settings) rather than assuming the module is broken. When the surface does mount, `mcp-serve`
+  now prints a one-line signal to stderr (visible in the host's MCP server log) naming the tools it
+  exposed — its **absence** is the diagnostic.
 
 ## Phase runbook
 

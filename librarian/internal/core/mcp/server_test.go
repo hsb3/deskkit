@@ -1,14 +1,18 @@
 package mcp
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"sort"
 	"strings"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/example/pocket-librarian/internal/core/config"
 	"github.com/example/pocket-librarian/internal/core/toolcore"
@@ -126,7 +130,7 @@ func TestInputSchemaMap_MatchesStructs(t *testing.T) {
 		"patrol":          {"path"},
 		"propose_fix":     {"run_id", "rules"},
 		"apply_fix":       {"run_id", "revision_ids"},
-		"query":           {"kind", "days"},
+		"query":           {"kind", "days", "include_disposed"},
 		"record_feedback": {"kind", "summary", "detail", "context", "source"},
 	}
 	wantRequired := map[string][]string{
@@ -207,6 +211,149 @@ func TestBuildInputSchema_RoundTrips(t *testing.T) {
 		if _, err := toolcore.BuildInputSchema(spec.InputType); err != nil {
 			t.Errorf("%s: buildInputSchema error: %v", name, err)
 		}
+	}
+}
+
+// TestRequireResolvedConfig pins the fail-loud precondition: mcp-serve must refuse to serve an
+// unresolved desk rather than register tools against a nil/empty desk and answer wrongly. A nil
+// cfg and an empty DeskRoot/DeskName each yield an actionable error naming the missing identity;
+// a fully-resolved cfg passes.
+func TestRequireResolvedConfig(t *testing.T) {
+	cases := []struct {
+		name    string
+		cfg     *config.Config
+		wantErr bool
+		mustSay []string
+	}{
+		{"nil config", nil, true, []string{"DESK_ROOT", "DESK_NAME"}},
+		{"empty desk", &config.Config{}, true, []string{"DESK_ROOT", "DESK_NAME"}},
+		{"missing DeskName", &config.Config{DeskRoot: "/tmp/desk"}, true, []string{"DESK_NAME"}},
+		{"missing DeskRoot", &config.Config{DeskName: "example-desk"}, true, []string{"DESK_ROOT"}},
+		{"resolved", &config.Config{DeskRoot: "/tmp/desk", DeskName: "example-desk"}, false, nil},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			err := requireResolvedConfig(tc.cfg)
+			if tc.wantErr && err == nil {
+				t.Fatalf("expected an error for %s, got nil", tc.name)
+			}
+			if !tc.wantErr && err != nil {
+				t.Fatalf("expected no error for %s, got %v", tc.name, err)
+			}
+			for _, want := range tc.mustSay {
+				if !strings.Contains(err.Error(), want) {
+					t.Errorf("%s: error %q should name %q", tc.name, err.Error(), want)
+				}
+			}
+		})
+	}
+}
+
+// TestEmitMountSignal is the focused unit test on the mount-signal shape: ONE line naming the
+// server identity + the exact tool count/set, terminated by a newline. This is the "the surface
+// mounted" observability signal — presence must be visible on stderr, never silently absent.
+func TestEmitMountSignal(t *testing.T) {
+	var buf bytes.Buffer
+	tools := []string{"sweep", "patrol", "query"}
+	emitMountSignal(&buf, tools)
+	got := buf.String()
+
+	if strings.Count(got, "\n") != 1 || !strings.HasSuffix(got, "\n") {
+		t.Errorf("mount signal must be exactly ONE newline-terminated line; got %q", got)
+	}
+	if !strings.Contains(got, serverName) {
+		t.Errorf("mount signal should name the server %q; got %q", serverName, got)
+	}
+	if !strings.Contains(got, "3 tool") {
+		t.Errorf("mount signal should report the tool count; got %q", got)
+	}
+	for _, name := range tools {
+		if !strings.Contains(got, name) {
+			t.Errorf("mount signal should list tool %q; got %q", name, got)
+		}
+	}
+}
+
+// TestServe_MountSignalStderrNotStdout runs Serve end-to-end with a resolved desk and a stdin at
+// immediate EOF (clean stdio shutdown). It asserts the mount signal lands on STDERR and NEVER on
+// stdout — stdout is the JSON-RPC channel, so a stray diagnostic byte there corrupts the protocol.
+// StdioTransport binds os.Stdin/os.Stdout at Connect time, so the globals are redirected for the
+// duration and restored after.
+func TestServe_MountSignalStderrNotStdout(t *testing.T) {
+	cfg := &config.Config{DeskName: "example-desk", DeskRoot: t.TempDir()}
+
+	origIn, origOut, origErr := os.Stdin, os.Stdout, os.Stderr
+	restore := func() { os.Stdin, os.Stdout, os.Stderr = origIn, origOut, origErr }
+	defer restore()
+
+	inR, inW, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = inW.Close() // immediate EOF on stdin → clean stdio shutdown
+	outR, outW, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	errR, errW, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	os.Stdin, os.Stdout, os.Stderr = inR, outW, errW
+
+	// Drain concurrently so a write by the SDK can never block Serve on a full pipe.
+	var outBuf, errBuf bytes.Buffer
+	var wg sync.WaitGroup
+	wg.Add(2)
+	go func() { defer wg.Done(); _, _ = io.Copy(&outBuf, outR) }()
+	go func() { defer wg.Done(); _, _ = io.Copy(&errBuf, errR) }()
+
+	serr := Serve(context.Background(), nil, cfg)
+
+	_ = outW.Close()
+	_ = errW.Close()
+	wg.Wait()
+	restore()
+
+	if serr != nil {
+		t.Fatalf("Serve returned an error on a clean EOF shutdown: %v", serr)
+	}
+	if !strings.Contains(errBuf.String(), serverName) || !strings.Contains(errBuf.String(), "mounted") {
+		t.Errorf("mount signal missing from stderr; got %q", errBuf.String())
+	}
+	if strings.Contains(outBuf.String(), "mounted") {
+		t.Errorf("mount signal leaked to stdout (JSON-RPC channel): %q", outBuf.String())
+	}
+}
+
+// TestServe_FailsLoudOnUnresolvedDesk is the RED-able regression for the fail-loud contract:
+// Serve on an unresolved desk must exit NON-ZERO with an actionable stderr message — never serve
+// silently and exit 0. Serve calls os.Exit on that path, so the assertion runs in a re-exec'd
+// child. RED (before the guard): the child registers tools, hits EOF stdin, and exits 0.
+func TestServe_FailsLoudOnUnresolvedDesk(t *testing.T) {
+	if os.Getenv("DESKKIT_MCP_FAILLOUD_CHILD") == "1" {
+		// Child: an empty (unresolved) desk config must fail loud, not serve. Serve os.Exit(1)s;
+		// if the guard were absent it would fall through to a clean EOF shutdown and exit 0.
+		_ = Serve(context.Background(), nil, &config.Config{})
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, os.Args[0], "-test.run=TestServe_FailsLoudOnUnresolvedDesk")
+	cmd.Env = append(os.Environ(), "DESKKIT_MCP_FAILLOUD_CHILD=1")
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+	err := cmd.Run()
+
+	var ee *exec.ExitError
+	if !errors.As(err, &ee) {
+		t.Fatalf("expected a non-zero exit (fail loud), got err=%v; stderr=%q", err, stderr.String())
+	}
+	if code := ee.ExitCode(); code != 1 {
+		t.Errorf("expected exit code 1, got %d; stderr=%q", code, stderr.String())
+	}
+	if !strings.Contains(stderr.String(), "DESK_ROOT") || !strings.Contains(stderr.String(), "DESK_NAME") {
+		t.Errorf("stderr not actionable (should name DESK_ROOT and DESK_NAME); got %q", stderr.String())
 	}
 }
 
