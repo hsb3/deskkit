@@ -135,7 +135,7 @@ def disk_folders() -> set[str]:
     }
 
 
-def reconcile() -> dict:
+def run() -> dict:
     active, archived = parse_readme_rows()
     states = fetch_issue_states()
     folders = disk_folders()
@@ -248,7 +248,7 @@ def reconcile() -> dict:
 
 
 def main() -> int:
-    result = reconcile()
+    result = run()
     if "--json" in sys.argv[1:]:
         print(json.dumps(result, indent=2))
         return 1 if result["drift"] else 0
