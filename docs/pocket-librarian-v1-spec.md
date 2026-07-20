@@ -631,6 +631,16 @@ never user-required**. At run start the agent loads the active, highest-`version
 interpolates desk facts; a missing/empty collection falls back to the embedded default so the agent
 always has a prompt. GUI/REST edits take effect on the **next** run.
 
+**Governance ([ADR 0015](decisions/0015-prompt-governance.md) — git is truth).** "Editable,
+versioned" is an operator convenience, **not** a durability promise. The version-controlled
+embedded default (§6.1) is **canonical**; the `prompts` row it seeds is a **re-seeded cache**. A
+GUI/REST edit to that row is **ephemeral by rule** — it applies on the next run but does not
+survive a store rebuild/re-seed, and clearing the row is the intended **"reset to shipped"** path
+(the embed re-seeds, §6.1), not data loss. The only durable customization path is `_knowledge/`
+personalization (the profile) — never a DB prompt edit, never an edit to a shipped artifact. The
+DB row therefore does not compete with the embed for truth: the embed↔spec-quote copies stay
+byte-identical under a drift guard, and the row is a cache the resolver prefers when present.
+
 ### 4.11 Migrations, automigrate, and rebuild reproducibility
 
 Collections are defined in Go migrations under `migrations/` and blank-imported from `main`:
@@ -1485,7 +1495,12 @@ boundaries, stop and report rather than guess.
 preamble line above whichever text it resolved (the DB-active row or the embedded fallback); nothing
 person-specific is compiled in (§11 identity-neutrality). GUI/REST edits to the active `prompts` row
 take effect on the **next** run; editing promotes a new `version` row and moves the `active` flag,
-retaining history (§4.10).
+retaining history (§4.10). Those edits are a re-seeded **cache**, not canonical, and are ephemeral
+by rule ([ADR 0015](decisions/0015-prompt-governance.md) — git is truth): clear the row and the
+embed above re-seeds it ("reset to shipped"); the only durable customization path is `_knowledge/`,
+never a DB prompt edit. The embed and this quoted block are held byte-identical by a drift guard
+(`scripts/check-prompt-drift.mjs`) so the "kept verbatim" copy cannot silently drift from the
+`//go:embed`'d source.
 
 ```go
 //go:embed templates/librarian-system-prompt.txt
