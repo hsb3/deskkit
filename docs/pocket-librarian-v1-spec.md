@@ -1783,8 +1783,11 @@ as deferred/out-of-scope in §7.4 and §11.1.
 **Outbound MCP server — the librarian's "hands" (Added 2026-07-16 per the outbound-MCP ruling,
 build-brief §5, punch-list 4).** The paragraph above is the *inbound* vector (eino consuming an
 external MCP server's tools). The librarian ALSO exposes its own tool core *outbound* as an MCP
-**stdio server** (`pocket-librarian mcp-serve`, §3.3), so a Claude Code or OpenCode session — or the
-dual-format plugin's `plugin/mcp` boundary — can call the librarian's tools directly. This is the
+**stdio server** (`pocket-librarian mcp-serve`, §3.3), so a Claude Code or OpenCode session can
+call the librarian's tools directly by mounting it. *(Correction 2026-07-20, ADR 0016: the
+dual-format plugin's `plugin/mcp` boundary does NOT carry librarian tools today — it ships
+exactly the four profile/template/knowledge tools, per `docs/tool-surface.md`; a designed proxy
+from that boundary to this server is the planned extension.)* This is the
 one-binary "MCP server **and** CLI over a single tool core" pattern (the `hsb3/outlook-mcp`
 architecture): the CLI, the eino agent loop, and this MCP server are three surfaces over the **same**
 `tools.*` functions, with **zero logic duplication** (each MCP tool calls the same function the CLI

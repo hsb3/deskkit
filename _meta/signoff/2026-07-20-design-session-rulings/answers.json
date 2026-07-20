@@ -1,0 +1,69 @@
+{
+  "submitted_at": "2026-07-20T13:54:42.550Z",
+  "items": {
+    "D0a": {
+      "choice": "ratify",
+      "notes": ""
+    },
+    "D0b": {
+      "choice": "staged",
+      "notes": ""
+    },
+    "D0c": {
+      "choice": "two_track",
+      "notes": "this makes sense.  more design work needs to be done to ensure the new model holds together.  for both v1 and v2 ,  i propose that we run some simulations to identify any deficiencies in the data model or related components."
+    },
+    "D1": {
+      "choice": "A",
+      "notes": ""
+    },
+    "D2": {
+      "choice": "4",
+      "notes": ""
+    },
+    "D3": {
+      "choice": "A",
+      "notes": ""
+    },
+    "D4": {
+      "choice": "2",
+      "notes": ""
+    },
+    "D5": {
+      "choice": "package",
+      "notes": ""
+    },
+    "D6": {
+      "choice": "A",
+      "notes": "in future, we need some way to tune these. probably best if we do in a centralized fashion rather than having multiple versions of prompts running per each project/db instance."
+    },
+    "D7": {
+      "choice": "B_proxy",
+      "notes": ""
+    },
+    "D8": {
+      "choice": "package",
+      "notes": ""
+    },
+    "Q1": {
+      "choice": "simple_goal",
+      "notes": ""
+    },
+    "Q2": {
+      "choice": "optional_tag",
+      "notes": ""
+    },
+    "Q3": {
+      "choice": "loop",
+      "notes": ""
+    },
+    "Q4": {
+      "choice": "summary_update",
+      "notes": "these need to be driven by triggers.  we have to define those triggers.  for now, they're just on demand.  i'm open to defining triggers but don't want to produce documents that aren't needed.  i'll say that candidate triggers are a) a meeting b) reaching some milestone/marker in task completion."
+    },
+    "Z": {
+      "choice": null,
+      "notes": ""
+    }
+  }
+}

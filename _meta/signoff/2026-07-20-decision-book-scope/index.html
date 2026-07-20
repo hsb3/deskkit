@@ -1,0 +1,272 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Design session — decision list sign-off</title>
+<style>
+  :root {
+    --bg: #f7f6f3; --card: #ffffff; --ink: #1a1a1a; --muted: #6b6b6b;
+    --line: #e2e0da; --accent: #0f62fe; --ok: #1a7f37; --warn: #9a6700;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #161616; --card: #1f1f1f; --ink: #eaeaea; --muted: #9a9a9a;
+            --line: #333; --accent: #78a9ff; --ok: #56d364; --warn: #d4a72c; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 16px/1.55 -apple-system, "Segoe UI", sans-serif;
+         background: var(--bg); color: var(--ink); }
+  main { max-width: 860px; margin: 0 auto; padding: 2.5rem 1.25rem 5rem; }
+  h1 { font-size: 1.5rem; margin: 0 0 .25rem; }
+  .sub { color: var(--muted); margin-bottom: 1.5rem; }
+  section { background: var(--card); border: 1px solid var(--line);
+            border-radius: 10px; padding: 1.25rem 1.5rem; margin-bottom: 1.25rem; }
+  section h2 { font-size: 1.05rem; margin: 0 0 .35rem; }
+  .summary h2 { font-size: 1.15rem; }
+  .summary ul { margin: .4rem 0 .9rem 1.1rem; padding: 0; }
+  .summary li { margin: .25rem 0; font-size: .95rem; }
+  .summary .done::marker { content: "✓ "; color: var(--ok); }
+  .summary .wait::marker { content: "→ "; color: var(--warn); }
+  .rec { margin: .5rem 0 .75rem; padding: .6rem .8rem; border-left: 3px solid var(--accent);
+         background: color-mix(in srgb, var(--accent) 7%, transparent);
+         border-radius: 0 6px 6px 0; font-size: .95rem; }
+  .rec b { color: var(--accent); }
+  .ctx { color: var(--muted); font-size: .92rem; margin: 0 0 .5rem; }
+  .choices { display: flex; gap: 1.1rem; flex-wrap: wrap; margin: .5rem 0; }
+  .choices label { display: flex; gap: .4rem; align-items: center; cursor: pointer; }
+  textarea, input[type=text] { width: 100%; border: 1px solid var(--line); border-radius: 6px;
+    background: var(--bg); color: var(--ink); padding: .5rem .65rem; font: inherit;
+    font-size: .92rem; margin-top: .4rem; }
+  textarea { min-height: 2.6rem; resize: vertical; }
+  .actions { position: sticky; bottom: 0; background: var(--bg); padding: 1rem 0;
+             border-top: 1px solid var(--line); display: flex; gap: 1rem; align-items: center; }
+  button { font: inherit; font-weight: 600; padding: .6rem 1.4rem; border-radius: 8px;
+           border: 1px solid var(--accent); background: var(--accent); color: #fff; cursor: pointer; }
+  button:hover { filter: brightness(1.08); }
+  #status { font-size: .95rem; }
+  #status.ok { color: var(--ok); font-weight: 600; }
+  #status.warn { color: var(--warn); }
+  .pill { display: inline-block; font-size: .75rem; font-weight: 700; letter-spacing: .04em;
+          text-transform: uppercase; color: var(--muted); }
+  code { font-size: .88em; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Design session — sign off on the decision list</h1>
+  <p class="sub">2026-07-20 · desk-standard · This approves the <b>scope</b> of the design
+  session (which decisions get made), not any answers. Pick a choice per item; add notes
+  anywhere. <b>Submit once at the bottom</b> — answers land in a file and the session is notified.
+  If you agree with everything, Submit with no other clicks is a complete answer.</p>
+
+  <section class="summary">
+    <h2>Where things stand</h2>
+    <ul>
+      <li class="done"><b>Bug floor merged</b> — PR #112 closed all nine 0.8.0 issues; no release cut (your call, sole user).</li>
+      <li class="done"><b>Evidence gathered</b> — five dossiers map the data model, workflows, and every access surface, cited line-by-line against merged main.</li>
+      <li class="done"><b>Decision book written</b> — eight briefs at <code>_meta/research/2026-07-design-session/decision-book/</code>, each with the question, options, evidence, and what a ruling would touch. Two independent reviews passed: every citation checks out, and five load-bearing claims were re-proven from source.</li>
+      <li class="wait"><b>Waiting on you</b> — approve the LIST below so the session itself (deck + rulings) can be prepared. Each item = one decision the session would rule.</li>
+    </ul>
+  </section>
+
+  <section data-id="D1">
+    <span class="pill">Model · brief D1</span>
+    <h2>D1 — Pointer grammar: what is a pointer allowed to be?</h2>
+    <p class="ctx">Work items point at documents ("pointer: plan.md § Goals"). The code today
+    accepts a file path with an optional section suffix that gates deliberately ignore, and
+    rejects URLs and #anchors — but no document states any of these rules. Review also found the
+    PM spec promises GitHub-URL pointers that the shipped default gates reject today, so the
+    contradiction is live, not theoretical.</p>
+    <div class="rec"><b>Recommendation:</b> Include — it is the foundation the other model
+    decisions (especially D2) build on.</div>
+    <div class="choices">
+      <label><input type="radio" name="D1" value="include" checked> Include in session</label>
+      <label><input type="radio" name="D1" value="defer"> Defer</label>
+      <label><input type="radio" name="D1" value="drop"> Drop</label>
+      <label><input type="radio" name="D1" value="reshape"> Needs reshaping (note below)</label>
+    </div>
+    <textarea name="D1_notes" placeholder="Inline notes…"></textarea>
+  </section>
+
+  <section data-id="D2">
+    <span class="pill">Model · brief D2</span>
+    <h2>D2 — Typed cross-references: does "graduated to: 42" become a real reference?</h2>
+    <p class="ctx">Today a graduation marker is a plain string — a bare "42" is valid, and
+    nothing records which repo that issue lives in. The brief lays out whether both products
+    share one typed reference (kind + target + which-repo qualifier), and where the qualifier
+    can live without baking anyone's identity into shipped code.</p>
+    <div class="rec"><b>Recommendation:</b> Include — issue #92's fix treated a symptom; this is
+    the modeling decision underneath it.</div>
+    <div class="choices">
+      <label><input type="radio" name="D2" value="include" checked> Include in session</label>
+      <label><input type="radio" name="D2" value="defer"> Defer</label>
+      <label><input type="radio" name="D2" value="drop"> Drop</label>
+      <label><input type="radio" name="D2" value="reshape"> Needs reshaping (note below)</label>
+    </div>
+    <textarea name="D2_notes" placeholder="Inline notes…"></textarea>
+  </section>
+
+  <section data-id="D3">
+    <span class="pill">Model · brief D3</span>
+    <h2>D3 — Item types: should a typo'd type silently skip every gate?</h2>
+    <p class="ctx">Creating a work item does not check its type against the known vocabulary.
+    An unknown type matches no gate rules, so the item advances through every phase ungated —
+    re-proven from source during review. The decision: check at creation (hard or warn), or
+    rule the ungated advance deliberate and document it.</p>
+    <div class="rec"><b>Recommendation:</b> Include — small decision, closes a real hole, and
+    the checking machinery already exists for gate config.</div>
+    <div class="choices">
+      <label><input type="radio" name="D3" value="include" checked> Include in session</label>
+      <label><input type="radio" name="D3" value="defer"> Defer</label>
+      <label><input type="radio" name="D3" value="drop"> Drop</label>
+      <label><input type="radio" name="D3" value="reshape"> Needs reshaping (note below)</label>
+    </div>
+    <textarea name="D3_notes" placeholder="Inline notes…"></textarea>
+  </section>
+
+  <section data-id="D4">
+    <span class="pill">Model + workflow · brief D4</span>
+    <h2>D4 — Findings lifecycle: finish the disposition machine and decide what the adoption log is for</h2>
+    <p class="ctx">The bug floor shipped dispositions (open / acknowledged / triaged / won't-fix),
+    but residue remains: a "dismissed" state no code can set, summary counts that disagree with
+    the findings list, no record of who dispositioned or why — and an adoption log where five of
+    six event kinds are never written. Review confirmed the log does have live readers, so
+    "just delete it" has real blast radius.</p>
+    <div class="rec"><b>Recommendation:</b> Include — #93 fixed the symptom; this rules the
+    complete machine so it stays coherent across every surface.</div>
+    <div class="choices">
+      <label><input type="radio" name="D4" value="include" checked> Include in session</label>
+      <label><input type="radio" name="D4" value="defer"> Defer</label>
+      <label><input type="radio" name="D4" value="drop"> Drop</label>
+      <label><input type="radio" name="D4" value="reshape"> Needs reshaping (note below)</label>
+    </div>
+    <textarea name="D4_notes" placeholder="Inline notes…"></textarea>
+  </section>
+
+  <section data-id="D5">
+    <span class="pill">Surface · brief D5</span>
+    <h2>D5 — Agent contract &amp; parity: one integration contract, two agents (your headline concern)</h2>
+    <p class="ctx">The librarian and PM agents are built differently on different layers. The
+    brief frames one shared contract (instructions + tool mount + wake layer + write-gate
+    policy) that each agent instantiates, then rules each difference policy or debt: a librarian
+    Claude Code bundle or not; per-module vs shared tool mounts; whether the in-binary loop
+    keeps PM tools it has no instructions for; and the unclaimed tools found on every surface.</p>
+    <div class="rec"><b>Recommendation:</b> Include — this is the decision the session exists
+    for; the model rulings (D1–D4) feed it.</div>
+    <div class="choices">
+      <label><input type="radio" name="D5" value="include" checked> Include in session</label>
+      <label><input type="radio" name="D5" value="defer"> Defer</label>
+      <label><input type="radio" name="D5" value="drop"> Drop</label>
+      <label><input type="radio" name="D5" value="reshape"> Needs reshaping (note below)</label>
+    </div>
+    <textarea name="D5_notes" placeholder="Inline notes…"></textarea>
+  </section>
+
+  <section data-id="D6">
+    <span class="pill">Surface · brief D6</span>
+    <h2>D6 — Prompt governance: which copy of the agent's instructions wins?</h2>
+    <p class="ctx">Agent instructions exist in three places: compiled into the binary, editable
+    rows in the database, and markdown in the plugin — with no rule about which is the source of
+    truth. Review proved a database edit silently disappears if the store is ever rebuilt. The
+    options: git wins, database wins, or a documented split by prompt class — each with a
+    concrete "reset to shipped" story.</p>
+    <div class="rec"><b>Recommendation:</b> Include — the stale librarian prompt found in
+    Phase 0 is the live proof this is ungoverned.</div>
+    <div class="choices">
+      <label><input type="radio" name="D6" value="include" checked> Include in session</label>
+      <label><input type="radio" name="D6" value="defer"> Defer</label>
+      <label><input type="radio" name="D6" value="drop"> Drop</label>
+      <label><input type="radio" name="D6" value="reshape"> Needs reshaping (note below)</label>
+    </div>
+    <textarea name="D6_notes" placeholder="Inline notes…"></textarea>
+  </section>
+
+  <section data-id="D7">
+    <span class="pill">Surface · brief D7</span>
+    <h2>D7 — Spec vs reality: what does the TypeScript plugin boundary actually promise?</h2>
+    <p class="ctx">The librarian spec reads as if the plugin's TypeScript server carries
+    librarian tools; it ships exactly four profile tools. Review judged the spec sentence
+    ambiguous rather than flatly broken, which favors amending the spec to match reality. The
+    session also decides where the tool list's source of truth lives (spec, the tool-surface
+    doc, or generated from code with a drift guard).</p>
+    <div class="rec"><b>Recommendation:</b> Include — cheap to rule, and it closes the last
+    spec/reality residue from #94.</div>
+    <div class="choices">
+      <label><input type="radio" name="D7" value="include" checked> Include in session</label>
+      <label><input type="radio" name="D7" value="defer"> Defer</label>
+      <label><input type="radio" name="D7" value="drop"> Drop</label>
+      <label><input type="radio" name="D7" value="reshape"> Needs reshaping (note below)</label>
+    </div>
+    <textarea name="D7_notes" placeholder="Inline notes…"></textarea>
+  </section>
+
+  <section data-id="D8">
+    <span class="pill">Model backlog · brief D8</span>
+    <h2>D8 — Backlog bundle: rename history, a misnamed column, text-size caps</h2>
+    <p class="ctx">Three smaller items deliberately kept out of the main session unless a use
+    case pulls them in: document identity across renames (today a rename discards history), the
+    confusingly-named entity_type column, and a sweep for silent 5000-character text caps. The
+    brief exists so you can see what deferring costs.</p>
+    <div class="rec"><b>Recommendation:</b> Keep as pull-only backlog — in the book, ruled only
+    if the session's other decisions need one of them.</div>
+    <div class="choices">
+      <label><input type="radio" name="D8" value="pull_only" checked> Keep as pull-only backlog</label>
+      <label><input type="radio" name="D8" value="promote"> Promote to a full session decision</label>
+      <label><input type="radio" name="D8" value="drop"> Drop</label>
+    </div>
+    <textarea name="D8_notes" placeholder="Inline notes…"></textarea>
+  </section>
+
+  <section data-id="Z">
+    <span class="pill">Anything else</span>
+    <h2>General notes — is any decision missing?</h2>
+    <p class="ctx">The list was seeded from your two concerns (agent symmetry, document model),
+    the exec-desk agenda, and everything Phase 0 surfaced. If something you care about isn't on
+    it, name it here and it gets a brief before the session.</p>
+    <textarea name="Z_notes" placeholder="Anything missed or to reprioritize…" style="min-height:5rem"></textarea>
+  </section>
+
+  <div class="actions">
+    <button id="submit">Submit answers</button>
+    <span id="status"></span>
+  </div>
+</main>
+<script>
+const $ = s => document.querySelector(s);
+function collect() {
+  const out = { submitted_at: new Date().toISOString(), items: {} };
+  document.querySelectorAll('section[data-id]').forEach(sec => {
+    const id = sec.dataset.id;
+    const choice = sec.querySelector('input[type=radio]:checked');
+    const notes = sec.querySelector('textarea');
+    const text = sec.querySelector('input[type=text]');
+    out.items[id] = { choice: choice ? choice.value : null,
+                      text: text ? text.value.trim() : undefined,
+                      notes: notes ? notes.value.trim() : "" };
+  });
+  return out;
+}
+$('#submit').addEventListener('click', async () => {
+  const data = collect();
+  const status = $('#status');
+  status.className = ''; status.textContent = 'Saving…';
+  try {
+    const r = await fetch('/save', { method: 'POST',
+      headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+    if (!r.ok) throw new Error('server ' + r.status);
+    status.className = 'ok';
+    status.textContent = '✓ Saved — the session has been notified. You can close this tab.';
+    $('#submit').disabled = true;
+  } catch (e) {
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'signoff-answers-' + new Date().toISOString().slice(0,10) + '.json';
+    a.click();
+    status.className = 'warn';
+    status.textContent = 'Local server was gone — answers downloaded to ~/Downloads; tell the session to pick them up there.';
+  }
+});
+</script>
+</body>
+</html>
