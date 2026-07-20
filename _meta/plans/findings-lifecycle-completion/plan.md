@@ -209,7 +209,11 @@ and `document-identity-hygiene` both add three librarian migrations on one share
 sequence (basenames + the `module.go` `SchemaVersion()`/manifest twin) is assigned at landing time
 from true current HEAD - whichever lands first takes the next free numbers, the second continues
 from the true next free number; the two issues' migration commits must serialize (rule recorded in
-the `epic-design-session-v1` body).
+the `epic-design-session-v1` body). Beyond the migrations, this issue also edits `tools/query.go`
+and `tools/patrol.go` (and `docs/pocket-librarian-v1-spec.md`), all of which
+`document-identity-hygiene` (#123) touches too; the migration rule already forces the two to land
+sequentially, so whoever lands second rebases their `query.go` / `patrol.go` hunks onto the first
+(disjoint regions today — a rebase, not a redesign; epic coordination rule 3).
 
 ## Open questions (with recommended defaults)
 

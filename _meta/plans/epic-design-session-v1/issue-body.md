@@ -14,13 +14,30 @@ by a new ADR, and the shipped system matches what the session ruled.
 Sequencing context: the 0.8.0 bug floor merged first (PR #112), then the session ruled
 (PR #113). These slices are the feature work the sequencing directive was holding.
 
-Coordination rule — the librarian migration chain: `findings-lifecycle-completion` and
-`document-identity-hygiene` each add three forward migrations to the same
-`librarian/internal/modules/librarian/collections/` chain. Migration numbers in their plans
-are PROVISIONAL: the merging agent assigns the real sequence (basenames + the `module.go`
-`SchemaVersion()` / manifest twin) from true current HEAD at landing time — whichever issue
-lands first takes the next free numbers; the second continues from the true next free number.
-Never dispatch both concurrently without serializing the migration commits.
+Coordination rules — three shared surfaces the parallel wave must not collide on:
+
+1. **The librarian migration chain.** `findings-lifecycle-completion` (#118) and
+   `document-identity-hygiene` (#123) each add three forward migrations to the same
+   `librarian/internal/modules/librarian/collections/` chain. Migration numbers in their plans
+   are PROVISIONAL: the merging agent assigns the real sequence (basenames + the `module.go`
+   `SchemaVersion()` / manifest twin) from true current HEAD at landing time — whichever issue
+   lands first takes the next free numbers; the second continues from the true next free number.
+   Never dispatch both concurrently without serializing the migration commits.
+
+2. **The librarian prompt embed + its drift guard.** `agent-integration-contract` (#114, slice C)
+   edits `librarian/templates/librarian-system-prompt.txt` AND must move the fenced prompt block
+   it mirrors in `docs/pocket-librarian-v1-spec.md` (the `:1435-1464` block + the `:2316` Decisions
+   bullet) in lockstep — because `prompt-governance` (#120) adds `scripts/check-prompt-drift.mjs`
+   pinning the two byte-identical. **#114 lands before #120** so the guard is built against the
+   already-corrected pair; if #120 landed first, #114's PR would fail the guard with no in-scope
+   docs fix.
+
+3. **The shared findings/query Go files.** #118 (slices B/C) and #123 (slice B) both edit
+   `librarian/internal/modules/librarian/tools/query.go` and `tools/patrol.go` (and both touch
+   `docs/pocket-librarian-v1-spec.md`). Today's edit regions are disjoint hunks git auto-merges,
+   and rule 1 already forces the two to land sequentially — but do not dispatch them assuming only
+   the migration numbers need coordinating; whoever lands second rebases their `query.go` /
+   `patrol.go` edits onto the first.
 
 ## Children
 
