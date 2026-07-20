@@ -222,7 +222,10 @@ func bump(rec *core.Record) { rec.Set("version", rec.GetInt("version")+1) }
 // mid-sequence failure and prove the load->version-check->mutate->save->audit->cascade sequence
 // commits or rolls back as one unit (§3.6). It is nil on every shipped path; production never
 // sets it. It is a plain package-level var with no synchronization: tests that set it must run
-// serially (the engine tests do) — a future t.Parallel() case must not touch it.
+// serially (the engine tests do) — a future t.Parallel() case must not touch it. The seam is
+// wired ONLY in transitionCore (the longest write sequence); the other RunInTransaction methods
+// share the same commit-or-rollback mechanics but have no forced-failure test — add a
+// runFailpoint() call there for parity if one is ever wanted.
 var txFailpoint func() error
 
 func runFailpoint() error {
@@ -818,6 +821,9 @@ func (e *Engine) SetStatusLabel(ctx context.Context, itemID, label string, versi
 		if err != nil {
 			return err
 		}
+		// This check serves the SAME-PHASE fast path below (plain label write, transitionCore
+		// never runs) and fails fast before the desk-config load. On the cross-phase path
+		// transitionCore re-checks the same tx-snapshot value — always agreeing, harmlessly.
 		if err := checkVersion(item, version); err != nil {
 			return err
 		}
@@ -879,7 +885,10 @@ func jsonStringField(raw, field string) (string, bool) {
 	return s, ok
 }
 
-// AddNote attaches a phase-scoped keyed note (§3.7).
+// AddNote attaches a phase-scoped keyed note (§3.7). A single insert would not strictly need a
+// transaction, but the tx keeps the note's `phase` snapshot consistent with the item read (a
+// non-tx read could record a stale phase if a transition lands in between) and keeps every
+// mutating method on the same withApp(txApp) discipline (§3.6).
 func (e *Engine) AddNote(ctx context.Context, itemID, key, body string, actor Actor) (*core.Record, error) {
 	var out *core.Record
 	txErr := e.App.RunInTransaction(func(txApp core.App) error {
