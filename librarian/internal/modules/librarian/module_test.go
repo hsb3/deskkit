@@ -53,6 +53,33 @@ func TestMigrations_MatchesCollectionsDir(t *testing.T) {
 	}
 }
 
+// TestSchemaVersion_MatchesHighestMigration guards the GuardDowngrade lockout that a
+// three-migration change makes newly likely: SchemaVersion() must equal the highest migration
+// sequence the module declares. A migration whose author bumps the basenames manifest but forgets
+// SchemaVersion() leaves a migrated store stamped AHEAD of what the binary claims, and
+// GuardDowngrade (core/migrate) then refuses to start on the next run — even for the very binary
+// that just applied the migration. TestMigrations_MatchesCollectionsDir above checks the manifest
+// against disk but never SchemaVersion() itself; this closes that gap, mirroring the PM module's
+// TestMigrations_MatchOwnedCollections SchemaVersion assertion (whose comment already claimed to
+// mirror "the librarian module's" check — a claim this test finally makes true).
+func TestSchemaVersion_MatchesHighestMigration(t *testing.T) {
+	highest := 0
+	for _, mig := range (&Mod{}).Migrations() {
+		// basenames are "NNNN_slug"; the leading zero-padded integer is the sequence number.
+		seq := 0
+		for i := 0; i < len(mig.Basename) && mig.Basename[i] >= '0' && mig.Basename[i] <= '9'; i++ {
+			seq = seq*10 + int(mig.Basename[i]-'0')
+		}
+		if seq > highest {
+			highest = seq
+		}
+	}
+	if got := (&Mod{}).SchemaVersion(); got != highest {
+		t.Errorf("SchemaVersion() = %d but the highest declared migration sequence is %d — bump "+
+			"SchemaVersion() to match, or GuardDowngrade refuses the store on the next start", got, highest)
+	}
+}
+
 // --- D3: the DocumentValidator wiring (spec §2.5/§4.4; test lane §10.1's verdict half) ---
 
 func verdictEnv(t *testing.T) *Mod {

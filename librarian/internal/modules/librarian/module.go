@@ -40,13 +40,13 @@ func (m *Mod) Configure(cfg *config.Config) { m.cfg = cfg }
 
 func (*Mod) Name() string { return "librarian" }
 
-// SchemaVersion is the highest migration sequence the librarian module declares (0017).
-func (*Mod) SchemaVersion() int { return 17 }
+// SchemaVersion is the highest migration sequence the librarian module declares (0020).
+func (*Mod) SchemaVersion() int { return 20 }
 
 // Enabled is always true: librarian is the base module (spec §2.7).
 func (*Mod) Enabled(*config.Config) bool { return true }
 
-// OwnedCollections lists every collection created by the librarian's 0001..0017 migrations
+// OwnedCollections lists every collection created by the librarian's 0001..0020 migrations
 // (enumerated from the migration bodies; see module_test.go's drift guard for the migrations
 // side).
 func (*Mod) OwnedCollections() []string {
@@ -63,7 +63,7 @@ func (*Mod) Tools() []toolcore.ToolSpec { return tools.Specs() }
 // contributes no extra mounted views (spec §5.3 — the plug-point exists for other modules).
 func (*Mod) TUIViews(core.App, *config.Config) []tuiview.View { return nil }
 
-// Migrations lists the librarian's 0001..0017 migrations. All are SelfRegistered: their
+// Migrations lists the librarian's 0001..0020 migrations. All are SelfRegistered: their
 // bodies still call PocketBase's m.Register via their own init() (blank-imported by main via
 // internal/modules/librarian/collections), so Up/Down are nil here — this manifest exists for
 // stamp-by-observation (core/migrate.StampModules) and the drift test below, not to re-wire
@@ -76,6 +76,7 @@ func (*Mod) Migrations() []migrate.Migration {
 		"0012_dir_kind_add_infra", "0013_feedback",
 		"0014_patrol_findings_disposition", "0015_patrol_findings_drop_dismissed",
 		"0016_patrol_findings_provenance", "0017_adoption_log_shrink_event",
+		"0018_files_doc_id", "0019_files_doctype_rename", "0020_content_field_caps",
 	}
 	out := make([]migrate.Migration, len(basenames))
 	for i, b := range basenames {

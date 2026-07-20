@@ -42,7 +42,7 @@ var arrayKey = map[string]string{
 }
 
 // colOrder is the stable left-to-right column order; only columns present in the rows print.
-var colOrder = []string{"date", "event", "path", "dir_kind", "entity_type", "status", "graduated_to", "git_last_commit", "detail"}
+var colOrder = []string{"date", "event", "path", "dir_kind", "doctype", "status", "graduated_to", "git_last_commit", "detail"}
 
 func prettyList(kind string, doc map[string]any) string {
 	rows, _ := doc[arrayKey[kind]].([]any)

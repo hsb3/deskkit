@@ -468,19 +468,20 @@ including field order and stable collection ids; the four new collections (`mess
 | # | Field | Type | Constraints / notes |
 |---|---|---|---|
 | 1 | `path` | text | Required. Relative to `DESK_ROOT`. Unique index `idx_files_path`. |
-| 2 | `desk` | text | Stamped with `DESK_NAME`. |
-| 3 | `entity_type` | text | Frontmatter `type`, or `""`. |
-| 4 | `dir_kind` | select (maxSelect 1) | Values: `decisions`, `tasks`, `analyses`, `journal`, `meta`, `memory`, `root`, `other`, `infra` (`infra` added in migration 0012 — dotted infra dirs; §5.1/§5.6). |
-| 5 | `status` | text | Frontmatter `status`, or `""`. |
-| 6 | `synopsis` | text | Frontmatter `synopsis`. |
-| 7 | `origin` | text | Git first-add `"<hash>|<yyyy-mm-dd>"`. |
-| 8 | `graduated_to` | text | The doc's explicit graduation marker target (`wb#N` / `#N` / URL), or `""` if none is declared (§5.1). |
-| 9 | `checksum` | text | sha256 hex of raw file bytes. |
-| 10 | `git_last_commit` | text | Git last-commit `"<hash>|<yyyy-mm-dd>"`. |
-| 11 | `fm_created` | text | Frontmatter `created`. |
-| 12 | `fm_updated` | text | Frontmatter `updated`. |
-| 13 | `last_seen` | date | Set on create/update during sweep. |
-| 14 | `deleted` | bool | Soft-delete flag. |
+| 2 | `doc_id` | text | Optional frontmatter `id` — the document-identity primitive (migration 0018, ADR 0017). Sweep matches on it FIRST (falling back to `path`) so a renamed doc keeps its row; `""` when the doc carries no `id`. Named `doc_id`, not `id`, because PocketBase reserves `id` for the record's own primary key. |
+| 3 | `desk` | text | Stamped with `DESK_NAME`. |
+| 4 | `doctype` | text | Frontmatter `type`, or `""` (migration 0019 renamed this column, ADR 0017 — the prior name collided with an unrelated schema enum of the same name; only the column name changed, not the value). |
+| 5 | `dir_kind` | select (maxSelect 1) | Values: `decisions`, `tasks`, `analyses`, `journal`, `meta`, `memory`, `root`, `other`, `infra` (`infra` added in migration 0012 — dotted infra dirs; §5.1/§5.6). |
+| 6 | `status` | text | Frontmatter `status`, or `""`. |
+| 7 | `synopsis` | text | Frontmatter `synopsis`. |
+| 8 | `origin` | text | Git first-add `"<hash>|<yyyy-mm-dd>"`. |
+| 9 | `graduated_to` | text | The doc's explicit graduation marker target (`wb#N` / `#N` / URL), or `""` if none is declared (§5.1). |
+| 10 | `checksum` | text | sha256 hex of raw file bytes. |
+| 11 | `git_last_commit` | text | Git last-commit `"<hash>|<yyyy-mm-dd>"`. |
+| 12 | `fm_created` | text | Frontmatter `created`. |
+| 13 | `fm_updated` | text | Frontmatter `updated`. |
+| 14 | `last_seen` | date | Set on create/update during sweep. |
+| 15 | `deleted` | bool | Soft-delete flag. |
 
 Index: `idx_files_path` UNIQUE on `path`.
 
@@ -683,7 +684,7 @@ func init() {
         files.Id = "pbc_3446931122" // preserve stable id for reproducibility
         files.Fields.Add(&core.TextField{Name: "path", Required: true})
         files.Fields.Add(&core.TextField{Name: "desk"})
-        files.Fields.Add(&core.TextField{Name: "entity_type"})
+        files.Fields.Add(&core.TextField{Name: "doctype"})
         files.Fields.Add(&core.SelectField{Name: "dir_kind", MaxSelect: 1,
             // "infra" added in migration 0012 (fresh stores carry it here; 0012 alters existing).
             Values: []string{"decisions", "tasks", "analyses", "journal", "meta", "memory", "root", "other", "infra"}})
@@ -868,15 +869,32 @@ type SweepResult struct {
 3. **git_meta.** `git -C DESK_ROOT log --format=%H|%cs -1 <args> -- <rel>` → `"<hash>|<date>"`
    or `""`. `origin` uses `--diff-filter=A` (first add); `git_last_commit` is the plain last
    commit.
-4. **Upsert.** Load existing `files` row by `path`. New → create with `last_seen = now`. Existing
-   → compare `COMPARE_FIELDS = [desk, entity_type, dir_kind, status, synopsis, origin,
-   graduated_to, checksum, git_last_commit, fm_created, fm_updated, deleted]`; if any differ →
-   patch (+ `last_seen = now`); else unchanged (no write). `path` and `last_seen` are excluded
-   from comparison.
+4. **Upsert.** Load existing `files` row by identity — `doc_id` first (when the doc carries a
+   frontmatter `id`), falling back to `path` (see *Document identity* below). New → create with
+   `last_seen = now`. Existing → compare `COMPARE_FIELDS = [doc_id, desk, doctype, dir_kind,
+   status, synopsis, origin, graduated_to, checksum, git_last_commit, fm_created, fm_updated,
+   deleted]`; if any differ → patch (+ `last_seen = now`); else unchanged (no write). `path` and
+   `last_seen` are excluded from comparison; `doc_id` IS compared so a doc that gains or changes
+   its `id` re-persists.
 5. **Deletions.** Any existing non-deleted path not seen this sweep → patch `deleted = true`
    (soft delete).
 6. **Output.** `SweepResult`; the CLI prints `sweep: <total> files indexed (created=X updated=Y
    unchanged=Z soft_deleted=W)`.
+
+**Document identity (frontmatter `id` / `files.doc_id`, ADR 0017).** `id` is an OPTIONAL
+frontmatter key — the document-identity primitive. When a doc carries one, sweep stores it in
+a NEW `files.doc_id` column (migration 0018). The DB column is named `doc_id`, never `id` —
+PocketBase reserves the field name `id` for the record's own primary key, so the frontmatter
+value and the record id are deliberately distinct columns. Sweep matches an existing row by
+`doc_id` FIRST, falling back to `path`. A renamed document that carries the same `id` therefore
+updates the SAME record at its new path — identity survives the rename — instead of
+soft-deleting the old path and inserting a fresh row; rename stops discarding history. Nothing
+about this is store-side state that could go stale: the `id` is re-derivable by a fresh sweep
+from disk alone (files-are-truth, ADR 0009), so it survives a store rebuild. A document with NO
+`id` keeps today's behavior unchanged (rename = soft-delete old path + insert new). Two
+documents that share one `id` within a single sweep are NEVER merged — the duplicate falls back
+to path-matching for that sweep and is surfaced as a patrol-visible finding (rule
+`duplicate-doc-id`) rather than silently colliding.
 
 **dir_kind derivation (`dir_kind_for(rel)`, exact).** Match `rel` against the CONFIGURED
 entity-dir PATHS as **prefixes**, not bare first path segments. The entity-dir map is
@@ -911,7 +929,7 @@ inline arrays and empty-value-opens-a-block-array (`- item` lines); strip surrou
 values. The parser **splits each line on the first colon only**, so an unquoted
 `synopsis: text: more` is tolerated (the desk's YAML-colon gotcha) where a strict YAML parser
 would fail — pocket-librarian deliberately uses this tolerant parse. An UNTERMINATED or malformed
-fence returns an **empty map**, treated as no frontmatter (→ `entity_type = ""`); the parser never
+fence returns an **empty map**, treated as no frontmatter (→ `doctype = ""`); the parser never
 crashes the sweep.
 
 > **Updated 2026-07-20 (0.8.0):** graduation is now gated on an explicit marker (frontmatter
@@ -1026,7 +1044,7 @@ single-file patrol inspects just that file and only evaluates R6 if that file *i
 |---|---|---|
 | R1 | mechanical | `is_entity_doc` (dir_kind ∈ {decisions,tasks,analyses,journal} and path ends `.md`, **excluding a basename `README.md`** — a directory index inside an entity dir is not an entity record) AND a key in `UNIVERSAL_FM_KEYS = [type, created, updated, tags, synopsis]` is missing from parsed frontmatter. |
 | R2 | mechanical | `dir_kind == journal` AND basename fails `JOURNAL_NAME_RE = ^\d{4}-\d{2}-\d{2}-.+\.md$`. |
-| R3 | mechanical | `expected_dir = TYPE_DIR_MAP[entity_type]` — the configured entity-dir PATH for that type; if `expected_dir` is set AND `rel` is NOT under it (same prefix test as `dir_kind_for`, §5.1: `rel == expected_dir` or `rel` starts with `expected_dir + "/"`) → finding (keyed off frontmatter `type`). `TYPE_DIR_MAP = {decision:DECISIONS_DIR, task:TASKS_DIR, analysis:ANALYSES_DIR, journal:JOURNAL_DIR}` (paths, not `dir_kind` labels — a correctly-placed `_structure/decisions/…` decision doc is under `DECISIONS_DIR` and never flags). |
+| R3 | mechanical | `expected_dir = TYPE_DIR_MAP[doctype]` — the configured entity-dir PATH for that type; if `expected_dir` is set AND `rel` is NOT under it (same prefix test as `dir_kind_for`, §5.1: `rel == expected_dir` or `rel` starts with `expected_dir + "/"`) → finding (keyed off frontmatter `type`). `TYPE_DIR_MAP = {decision:DECISIONS_DIR, task:TASKS_DIR, analysis:ANALYSES_DIR, journal:JOURNAL_DIR}` (paths, not `dir_kind` labels — a correctly-placed `_structure/decisions/…` decision doc is under `DECISIONS_DIR` and never flags). |
 | R4 | judgment (FLAG-ONLY) | `dir_kind == decisions` and `.md` (**excluding a basename `README.md`** — the decisions-dir index is not a decision record); `status ∉ DECISION_STATUSES = {proposed, accepted, rejected, superseded}`. Detection is mechanical but the fix — choosing WHICH valid status an invalid/empty one becomes — is a semantic call, so R4 is **judgment**, not mechanical, and has no fixer (reclassified 2026-07-17 from the dev-tooling-desk field evaluation, issue #18). |
 | R5 | judgment | entity docs **excluding** decisions (append-only); `lines > 40` AND the doc declares an EXPLICIT graduation marker (§5.1 *graduated_to precedence*: a frontmatter `graduated_to:` key, or a canonical inline `graduated to: <ref>` line matching `(?im)^\s*graduated to:?\s+(wb#\d+|#?\d+|https?://\S+)`). Flag only. A bare `#N` / `wb#N` / GH-URL merely quoted in prose does NOT fire R5 — only a deliberate marker does. |
 | R6 | judgment (handled separately) | Operates on the handoff record only (`HANDOFF_PATH`, default `_meta/HANDOFF.md` — configurable for identity-neutrality). `doc_date` = `fm.updated` (string) else regex `Last updated:\s*(\d{4}-\d{2}-\d{2})`; `newest` = `git -C root log -1 --format=%cs`; if `newest` empty → no finding; if `doc_date` empty OR `doc_date < newest` → finding. |
@@ -1358,7 +1376,7 @@ type QueryInput struct {
 |---|---|
 | `live_files` | Non-deleted `files` rows. |
 | `recent` | Files touched within `--days` (default 7), by `git_last_commit` date. |
-| `orphans` | `.md` files with empty `entity_type` that could be misfiled desk content — i.e. `dir_kind ∉ {meta, memory, infra}` (non-entity infrastructure is excluded, not just the meta/secrets prefix set: the memory store and dotted infra dirs like `.claude`/`.agents` are legitimately outside the taxonomy). The `_meta/` / `SECRETS_DIR` prefix check remains as a belt-and-suspenders guard (configurable, not hardcoded). Excluding `infra`/`memory` added 2026-07-17 per issue #18. |
+| `orphans` | `.md` files with empty `doctype` that could be misfiled desk content — i.e. `dir_kind ∉ {meta, memory, infra}` (non-entity infrastructure is excluded, not just the meta/secrets prefix set: the memory store and dotted infra dirs like `.claude`/`.agents` are legitimately outside the taxonomy). The `_meta/` / `SECRETS_DIR` prefix check remains as a belt-and-suspenders guard (configurable, not hardcoded). Excluding `infra`/`memory` added 2026-07-17 per issue #18. |
 | `uncollapsed` | Open R5 findings (graduated-but-not-collapsed). |
 | `findings` | Open findings grouped by rule. |
 | `summary` | The aggregate the `/api/desk/summary` route returns: `{files_total, files_by_dir_kind, open_findings_total, open_findings_by_rule, open_findings_by_severity}`. |
@@ -1373,14 +1391,14 @@ a `count`, plus a kind-specific body. Examples:
 ```jsonc
 // live_files → array of file rows (trimmed to useful fields)
 {"kind":"live_files","count":79,"files":[
-  {"path":"docs/pocket-librarian-spec.md","dir_kind":"root","entity_type":"","status":"",
+  {"path":"docs/pocket-librarian-spec.md","dir_kind":"root","doctype":"","status":"",
    "graduated_to":"","git_last_commit":"b94499b|2026-07-15"}]}
 
 // recent → same file shape, filtered to the window
 {"kind":"recent","days":7,"count":12,"files":[
   {"path":"_structure/decisions/0014-librarian-enforcement-boundary.md","git_last_commit":"b94499b|2026-07-15"}]}
 
-// orphans → .md files with empty entity_type not under _meta/
+// orphans → .md files with empty doctype not under _meta/
 {"kind":"orphans","count":3,"files":[{"path":"docs/pocket-librarian-spec.md","dir_kind":"root"}]}
 
 // uncollapsed → open R5 findings (path + detail)

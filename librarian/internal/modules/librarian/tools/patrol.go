@@ -362,22 +362,22 @@ func r2Check(dirKind, relPath string) (string, string, bool) {
 
 func checkR2(row fileRow) (string, string, bool) { return r2Check(row.DirKind, row.Path) }
 
-// r3Check is the pure core of R3. dirMap is TYPE_DIR_MAP (entity_type -> configured PATH,
+// r3Check is the pure core of R3. dirMap is TYPE_DIR_MAP (doctype -> configured PATH,
 // spec §5.2 — NOT dir_kind labels).
-func r3Check(entityType, dirKind, relPath string, dirMap map[string]string) (string, string, bool) {
-	expected, ok := dirMap[entityType]
+func r3Check(doctype, dirKind, relPath string, dirMap map[string]string) (string, string, bool) {
+	expected, ok := dirMap[doctype]
 	if !ok || expected == "" {
 		return "", "", false
 	}
 	if pathOrSubtree(relPath, expected) {
 		return "", "", false
 	}
-	return fmt.Sprintf("type '%s' but file lives under '%s' (expected %s/)", entityType, dirKind, expected),
+	return fmt.Sprintf("type '%s' but file lives under '%s' (expected %s/)", doctype, dirKind, expected),
 		fmt.Sprintf("move the doc to %s/ or fix its type", expected), true
 }
 
 func checkR3(row fileRow, dirMap map[string]string) (string, string, bool) {
-	return r3Check(row.EntityType, row.DirKind, row.Path, dirMap)
+	return r3Check(row.Doctype, row.DirKind, row.Path, dirMap)
 }
 
 var decisionStatuses = map[string]bool{"proposed": true, "accepted": true, "rejected": true, "superseded": true}

@@ -355,8 +355,8 @@ func planR2(cfg *config.Config, fileRec *core.Record) *fixPlan {
 // NOT a dir_kind-label equality check (dir_kind is a fixed label; TYPE_DIR_MAP values are
 // configurable paths that need not match it syntactically even when correctly placed).
 func planR3(cfg *config.Config, fileRec *core.Record) *fixPlan {
-	entityType := fileRec.GetString("entity_type")
-	expected := cfg.EntityDirMap()[entityType]
+	doctype := fileRec.GetString("doctype")
+	expected := cfg.EntityDirMap()[doctype]
 	path := fileRec.GetString("path")
 	if expected == "" || isUnderDir(path, expected) {
 		return nil

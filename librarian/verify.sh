@@ -16,7 +16,7 @@
 #   - `serve` is never started here: none of the checks in this gate's brief require a live
 #     HTTP server, and starting/stopping one only adds process-management risk. `make serve`
 #     / `make gui` remain the way to exercise `serve` manually.
-#   - `query live_files` does not expose a per-file checksum (only path/dir_kind/entity_type/
+#   - `query live_files` does not expose a per-file checksum (only path/dir_kind/doctype/
 #     status/graduated_to/git_last_commit — see internal/tools/query.go fileBrief). The
 #     "per-path checksum set" reproducibility check (§9.4 check 7) is therefore proven by an
 #     independent shasum snapshot of the scratch desk tree (mirroring sweep's own file-walk

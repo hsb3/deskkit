@@ -74,6 +74,14 @@ jobs:
       - name: Tool-surface drift guard — self-test (seeded divergence detection)
         run: node scripts/check-tool-surface.mjs --self-test
 
+      # TextField explicit-Max recurrence guard (ADR 0017 slice C): fails on any content TextField
+      # under librarian collections that carries neither an inline Max, a migration cap, nor a
+      # documented exemption — the drift class 0011/0013 opened. Self-test proves seeded detection.
+      - name: TextField explicit-Max guard (+ self-test)
+        run: |
+          node scripts/check-textfield-max.mjs
+          node scripts/check-textfield-max.mjs --self-test
+
       # Advisory only (never fails the build): nudges when user-facing changes have piled up
       # under plugin/ or librarian/ since the last v* tag without a VERSION bump. The hard gate
       # (a documented CHANGELOG section for the tagged version) lives in release.yml.

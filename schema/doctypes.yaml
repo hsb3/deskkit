@@ -16,6 +16,13 @@
 # Required on every doc (status is optional on `lightweight` types — see below).
 universal: [type, status, created, updated, tags]
 
+# OPTIONAL document-identity key (ADR 0017): frontmatter `id` is not in `universal:` above
+# because it is optional, not required — but when a doc carries one, it is a stable,
+# human-copyable identifier the librarian's sweep reads into the `files.doc_id` column
+# (migration 0018) and matches FIRST on rename (falling back to `path`), so a renamed
+# document updates its existing row instead of being soft-deleted and re-inserted as a new
+# one. Absent `id` = today's rename-as-soft-delete-plus-insert behavior, unchanged.
+
 # Value-format checks for fields, wherever they appear.
 formats:
   created: date          # YYYY-MM-DD

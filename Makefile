@@ -47,6 +47,7 @@ check: ## Repo gates: neutrality lint + self-test, kit-manifest drift, prompt-co
 	@node scripts/check-tool-surface.mjs --self-test
 	@node scripts/check-scaffold-frontmatter.mjs
 	@node scripts/check-persona-drift.mjs
+	@node scripts/check-textfield-max.mjs
 	@cd plugin && bun run check:purity
 	@actionlint
 

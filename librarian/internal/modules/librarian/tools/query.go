@@ -80,7 +80,7 @@ func translateUninitializedStoreError(err error) error {
 type fileBrief struct {
 	Path          string `json:"path"`
 	DirKind       string `json:"dir_kind"`
-	EntityType    string `json:"entity_type"`
+	Doctype       string `json:"doctype"`
 	Status        string `json:"status"`
 	GraduatedTo   string `json:"graduated_to"`
 	GitLastCommit string `json:"git_last_commit"`
@@ -181,7 +181,7 @@ func toFileBrief(row fileRow) fileBrief {
 	return fileBrief{
 		Path:          row.Path,
 		DirKind:       row.DirKind,
-		EntityType:    row.EntityType,
+		Doctype:       row.Doctype,
 		Status:        row.Status,
 		GraduatedTo:   row.GraduatedTo,
 		GitLastCommit: row.GitLastCommit,
@@ -218,12 +218,12 @@ func sortFileBriefsByCommitDateDesc(files []fileBrief) {
 }
 
 // isOrphan is the pure core of the `orphans` query (spec §5.6): a .md file with empty
-// entity_type that could be misfiled desk content — i.e. NOT non-entity infrastructure. Files
+// doctype that could be misfiled desk content — i.e. NOT non-entity infrastructure. Files
 // whose dir_kind is meta, memory, or infra (dotted infra dirs like .claude/.agents) are
 // legitimately outside the entity taxonomy and never count as orphans (spec §5.6); the
 // isMetaPath check also guards meta/secrets belt-and-suspenders.
 func isOrphan(row fileRow, secretsDir string) bool {
-	if !strings.HasSuffix(row.Path, ".md") || row.EntityType != "" {
+	if !strings.HasSuffix(row.Path, ".md") || row.Doctype != "" {
 		return false
 	}
 	switch row.DirKind {
