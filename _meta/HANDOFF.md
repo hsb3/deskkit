@@ -1,7 +1,7 @@
 _Session-to-session bridge for desk-standard. Read this before working; update it at the end
 of any substantial session. Secret-free — live URLs/credentials belong in `_meta/operations/`
 (untracked) if that dir is ever created._
-Status: active (2026-07-19)
+Status: active (2026-07-20)
 
 # HANDOFF
 
@@ -12,23 +12,33 @@ person/org/repo/issue): **`plugin/`** (harness-pure TS core + stdio MCP server, 
 Claude Code plugin with four skills) and **`librarian/`** (pocket-librarian: single Go
 binary, embedded PocketBase, eino agent loop, record-original-first write boundary), with
 **`schema/`** as the contract both read. Personalization is only via `_knowledge/profile.yaml`.
-Root `README.md` is the front door; `docs/README.md` indexes the docs (Using ┃ Development);
-`_meta/build-brief.md` is the build brief this repo was built from; `docs/pocket-librarian-v1-spec.md`
-is the librarian's spec (build spec, not operator docs — operator docs are `librarian/README.md`).
+Root `README.md` is the front door; `CLAUDE.md` is the agent digest and `docs/CHARTER.md` the
+canonical page (precedence rule — both since PR #105); `docs/README.md` indexes the docs (Using ┃
+Development); `docs/pocket-librarian-v1-spec.md` is the librarian's spec (build spec, not operator
+docs — operator docs are `librarian/README.md`). The build brief moved to the exec desk in PR #77.
 
-Siblings: `hsb3/dotfiles-agents` (the pattern source for workflows/templates); Henry's
-executive desk at `~/Documents/EXECUTIVE_DESK/Projects/dev-tooling-desk` holds off-repo
-decision records (e.g. 0013–0016) referenced from the build brief — annotated, not vendored.
+Siblings: `hsb3/dotfiles-agents` (the pattern source for workflows/templates). The **paired
+executive desk** is `~/Documents/EXECUTIVE_DESK/Projects/desk-standard-desk` (dedicated to this
+product since the 2026-07-19 split): the 1.0.0 roadmap/design-review analyses, plans, briefings,
+staged issue bodies, and the greenfield friction ledger live there. The off-repo decision
+records the build brief cites (0013/0014/0015 — not 0016, which is dotfiles-agents — plus 0021,
+the 1.0.0 direction) remain in `dev-tooling-desk`'s append-only spine, indexed from the new
+desk's genesis record 0001.
 
 ## 1. Current standing + top priority
 
-**v0.6.0 is released and CI-green on `main`.** Both products ship at 0.6.0 off the single root
-`VERSION`: the plugin (live marketplace — `claude plugin marketplace add hsb3/desk-standard` →
-`claude plugin install desk-standard@desk-standard`, proven) and the `pocket-librarian` binary
-(release assets verified — darwin/arm64 downloads, runs `--version` → 0.6.0, sha256 matches
-`checksums.txt`). All four platform binaries + the plugin bundle published. The on-PATH binary
-was refreshed to 0.6.0 via `make install`. All product rulings are in; open work is pure build.
-Cutting the next release just follows `docs/development/releasing.md` (§3, §4).
+**v0.7.0 is released** (the PM system, ship-dark; adoption dry-run; PM spec/README reconcile)
+and the CLI binary is **renamed `pocket-librarian` → `deskkit`** — release assets are
+`deskkit_0.7.0_*`; `make install` drops `deskkit` into `~/.local/bin`. The stale
+`pocket-librarian` 0.6.0 on PATH was removed 2026-07-19 (the 07-18 incident class — don't
+resurrect it). **Lane 6 shipped** (PR #105 → `217b5e6`, epic #86 closed): repo-compliance-audit
+**70 pass / 0 gap** (was 55/14); `CLAUDE.md` + `AGENTS.md` (symlink) + `docs/CHARTER.md`
+authored; root `tests/` ruled a declared-home index (recorded in `_meta/mise-en-place.yml`).
+**The deep-dive backlog is filed and triaged**: #91–#104 with milestones set (0.8.0 = bug floor
+#67/#78/#79/#80 + #91/#92/#93/#102, #94 stretch — plan at the exec desk's
+`_meta/plans/release-0.8.0.md`; the rest 1.0.0; onboarding epic #104 post-1.0); the #79
+widening comment is posted; #81 rides the 1.0.0 milestone (R20 ruling). Cutting the next
+release follows `docs/development/releasing.md`.
 
 **Public launch is deferred until ≥ v1.0.0 (Henry, 2026-07-19) — this is settled, not an open
 blocker.** The repo stays PRIVATE until then, so the public `curl|bash` path is expected to 404
@@ -113,6 +123,14 @@ assets verified). `[Unreleased]` is now empty; the next bump starts accumulating
 
 ## 2. Recent deliveries (newest first — full detail in the cited PRs / ADRs / git)
 
+- **2026-07-20 — Lane 6 conformance + exec-desk split + deep-dive triage.** PR #105 (squash
+  `217b5e6`, closes #86): mise-en-place scaffold (`.claude/` skeleton, `.mcp.json`, dependabot
+  npm@`/plugin` + gomod@`/librarian`, ADR 0000-template) + the three authored entry docs +
+  the tests/ ruling; audit 70/0; docs adversarially reviewed 10/10; the dependabot directory
+  bug was caught in PR review and fixed pre-merge. Off-repo, same session: the dedicated exec
+  desk `desk-standard-desk` bootstrapped greenfield (friction ledger INS-01..10 — including the
+  0.5.0-plugin vs 0.7.0-binary version skew and the `template_render` cwd walk-up gap), the
+  content lift out of dev-tooling-desk completed, issues #91–#104 filed, 0.8.0 milestone created.
 - **2026-07-19 — v0.6.0 release** (PR #61, tag `v0.6.0`). Minor bump 0.5.0→0.6.0: VERSION +
   3 manifests + `[Unreleased]` CHANGELOG rolled into a dated `[0.6.0]` section (SOP kit library,
   `make install`, `record_feedback`, chat-TUI UX pass, `init` onramp, Charm v2 migration,
@@ -172,8 +190,9 @@ assets verified). `[Unreleased]` is now empty; the next bump starts accumulating
 
 ## 3. Where to start next
 
-- **PR #48 is in Henry's court** (chat-TUI UX pass). After merge, the branch's deferred UX
-  items live in `docs/development/chat-tui-ux-survey.md` if he wants a follow-up pass.
+- **Work the 0.8.0 milestone** (bug floor + Tier-1 deep-dive items; plan: exec desk
+  `_meta/plans/release-0.8.0.md`). #79 gates the PM default-on lane (#83). Deferred TUI UX
+  items remain in `docs/development/chat-tui-ux-survey.md`.
 - **Cut the next release** when `[Unreleased]` warrants — follow `docs/development/releasing.md`
   (bump VERSION + 3 manifests → roll `[Unreleased]` into a dated CHANGELOG section →
   `make release-prep` → tag). `check-changelog` gates the tag; `make version-status` flags drift.
@@ -186,8 +205,8 @@ assets verified). `[Unreleased]` is now empty; the next bump starts accumulating
 ## 4. Conventions & gotchas
 
 - **Gates** (run all before claiming done — via the root Makefile since PR #26):
-  `make check` (neutrality + self-test + purity + actionlint) · `make test` (bun 45 + go) ·
-  `make verify` (verify.sh, 47 checks — **now also runs in CI + the release gate**, PR #33) ·
+  `make check` (neutrality + self-test + purity + actionlint) · `make test` (bun 59 + go 314) ·
+  `make verify` (`librarian/verify.sh`, 48 checks — **now also runs in CI + the release gate**, PR #33) ·
   `make package` (drift guard) · `node scripts/check-version-sync.mjs`. CI (`ci.yml`) is the
   aggregate required check. Note: shellcheck + actionlint are NOT yet CI-enforced (→ #34).
 - **Versioning/release (ADR 0005, since PR #41 — runbook `docs/development/releasing.md`)**: SemVer on the
@@ -197,19 +216,20 @@ assets verified). `[Unreleased]` is now empty; the next bump starts accumulating
   `check-version-status.mjs` is a **non-blocking advisory** (`make version-status` + a CI step,
   always exit 0) that warns when `plugin/`/`librarian/` drifted past the last tag without a bump.
   `ci.yml` checks out `fetch-depth: 0` for it. Both scripts + CHANGELOG live outside the neutrality
-  surface (repo root / `scripts/`). `make install` builds + drops the binary in `~/.local/bin`
-  (override `PREFIX=`); `/plugin` updates the plugin only — the binary is a separate artifact.
+  surface (repo root / `scripts/`). `make install` builds + drops the **`deskkit`** binary in `~/.local/bin`
+  (override `PREFIX=`; renamed from `pocket-librarian` in 0.7.0); `/plugin` updates the plugin
+  only — the binary is a separate artifact.
 - **Installing from the private repo** (until the public launch at ≥ v1.0.0): the public
   `install.sh` / `curl|bash` path 404s by design while private — use authed `gh` instead. Two ways:
   - **From a local clone** (version-stamped, what a dev should use): `make install` (root or
-    `librarian/`) → `~/.local/bin/pocket-librarian`.
+    `librarian/`) → `~/.local/bin/deskkit`.
   - **Straight from the release** (no clone/build): download the platform asset with `gh`:
     ```bash
-    gh release download v0.6.0 --repo hsb3/desk-standard \
-      --pattern "pocket-librarian_*_$(uname -s|tr '[:upper:]' '[:lower:]')_$(uname -m|sed 's/x86_64/amd64/;s/aarch64/arm64/')" \
-      --output ~/.local/bin/pocket-librarian --clobber && chmod +x ~/.local/bin/pocket-librarian
+    gh release download v0.7.0 --repo hsb3/desk-standard \
+      --pattern "deskkit_*_$(uname -s|tr '[:upper:]' '[:lower:]')_$(uname -m|sed 's/x86_64/amd64/;s/aarch64/arm64/')" \
+      --output ~/.local/bin/deskkit --clobber && chmod +x ~/.local/bin/deskkit
     ```
-    (Assets are `pocket-librarian_<ver>_{darwin,linux}_{amd64,arm64}`; verify against the
+    (Assets are `deskkit_<ver>_{darwin,linux}_{amd64,arm64}` since 0.7.0; verify against the
     release's `checksums.txt`.)
 - **Docs layout (since the dev/use split)**: `docs/` is indexed by `docs/README.md` in two
   tracks — **Using** (`getting-started`/`plugin-guide`/`librarian-guide` + `media/*.gif`) and
@@ -246,8 +266,9 @@ assets verified). `[Unreleased]` is now empty; the next bump starts accumulating
   `os.Exit(1)` (see the OnServe desk-guard), not a returned error. Worked example since
   PR #48: `init` executes standalone in `main()` BEFORE the app exists (and stays out of
   `storeTouchingCommands`) precisely so Bootstrap can't create a stray store dir.
-- **Store location** (since PR #24): no `--dir` → `$XDG_DATA_HOME/pocket-librarian/
-  <DESK_NAME>/`; unresolvable DESK_NAME + no `--dir` → exit 1 (serve/migrate included).
+- **Store location** (since PR #24): no `--dir` → `$XDG_DATA_HOME/deskkit/
+  <DESK_NAME>/` (dir renamed with the binary in 0.7.0); unresolvable DESK_NAME + no `--dir` →
+  exit 1 (serve/migrate included).
   verify.sh exports a scratch XDG_DATA_HOME — keep it hermetic when adding checks.
 - **Store self-initializes** (ADR 0003, since PR #32): tool commands run `RunAppMigrations()`
   at the `requireConfig` choke point, so a fresh store needs no manual `migrate up`. When adding
