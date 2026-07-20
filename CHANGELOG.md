@@ -15,6 +15,21 @@ for why this policy exists.
 
 ### Added
 
+- **`desk-persona` — the composed librarian + PM Claude Code bundle** (#119, ADR 0014(a), ADR
+  0015; the platform's v1 proof surface per ADR 0009). A new `plugin/desk-persona/` marketplace
+  entry mounts one `deskkit mcp-serve` server with `MCP_MODULES=librarian,pm`, exposing all 17
+  tools (the 5 librarian tools `sweep`/`patrol`/`propose_fix`/`query`/`record_feedback` plus the
+  12 PM tools) behind two agents (`librarian-operator`, `pm-operator`) and the three PM skills
+  (`pm-session-open`, `pm-advance-item`, `pm-triage`). The PM-sourced artifacts are copies of the
+  existing `desk-pm` content with the MCP namespace rewritten `mcp__desk-pm__` →
+  `mcp__desk-persona__` (one authored PM source; `desk-pm` coexists, unchanged); the
+  librarian-operator body is generated from the canonical librarian instruction
+  (`librarian/templates/librarian-system-prompt.txt`). A new drift guard
+  (`scripts/check-persona-drift.mjs`, wired into `make check`) fails non-zero if either generated
+  surface is hand-edited out of sync with its source. `plugin/desk-persona.test.ts` (`bun test`,
+  `plugin/package.json`'s test glob extended) asserts the composed tool set by name, guards
+  against phantom/invented tool identifiers across the bundle, and pins the marketplace/version
+  wiring. `docs/README.md` gains a pointer to the bundle's `README.md`.
 - **Findings lifecycle completed** (#118, ADR 0013). Finishes the disposition sub-machine #93
   opened. (1) The dead `state.dismissed` enum value is retired — migration `0015` remaps any
   residual row to `flagged` (data-first) then shrinks `patrol_findings.state` to

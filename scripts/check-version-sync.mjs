@@ -4,6 +4,7 @@
 //   - plugin/claude-plugin/.claude-plugin/plugin.json   (the installed desk-standard plugin)
 //   - plugin/package.json                               (the plugin build package)
 //   - plugin/desk-pm/.claude-plugin/plugin.json         (the installed desk-pm plugin, D5)
+//   - plugin/desk-persona/.claude-plugin/plugin.json    (the installed desk-persona plugin)
 //   - .claude-plugin/marketplace.json                   (each plugins[].version in the marketplace)
 // Exits 1 (listing every disagreement) if any manifest differs from VERSION; exits 0 when all
 // match. Runs under plain Node (no deps), like the other scripts/ guards.
@@ -42,6 +43,16 @@ const SOURCES = [
     label: ".claude-plugin/marketplace.json (desk-pm plugins[].version)",
     file: ".claude-plugin/marketplace.json",
     pick: (j) => marketplaceVersion(j, "desk-pm"),
+  },
+  {
+    label: "plugin/desk-persona/.claude-plugin/plugin.json",
+    file: "plugin/desk-persona/.claude-plugin/plugin.json",
+    pick: (j) => j.version,
+  },
+  {
+    label: ".claude-plugin/marketplace.json (desk-persona plugins[].version)",
+    file: ".claude-plugin/marketplace.json",
+    pick: (j) => marketplaceVersion(j, "desk-persona"),
   },
 ];
 
