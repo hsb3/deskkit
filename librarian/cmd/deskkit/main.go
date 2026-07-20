@@ -832,6 +832,7 @@ func registerToolCommands(app *pocketbase.PocketBase, cfg *config.Config, cfgErr
 		},
 	}
 	disposeCmd.Flags().StringVar(&disposeAs, "as", "", "disposition to set: open, acknowledged, triaged, or wont-fix (required)")
+	_ = disposeCmd.MarkFlagRequired("as")
 	findingsCmd.AddCommand(disposeCmd)
 	app.RootCmd.AddCommand(findingsCmd)
 

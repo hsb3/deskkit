@@ -221,7 +221,8 @@ func bump(rec *core.Record) { rec.Set("version", rec.GetInt("version")+1) }
 // primary record write and before the audit/cascade writes. It exists ONLY so tests can force a
 // mid-sequence failure and prove the load->version-check->mutate->save->audit->cascade sequence
 // commits or rolls back as one unit (§3.6). It is nil on every shipped path; production never
-// sets it.
+// sets it. It is a plain package-level var with no synchronization: tests that set it must run
+// serially (the engine tests do) — a future t.Parallel() case must not touch it.
 var txFailpoint func() error
 
 func runFailpoint() error {

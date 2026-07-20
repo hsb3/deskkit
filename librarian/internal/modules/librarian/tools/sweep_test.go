@@ -273,6 +273,7 @@ func TestGraduationMarker(t *testing.T) {
 		{"inline canonical line, no colon", "no frontmatter\ngraduated to " + hash + "\n", hash},
 		{"inline canonical line, with colon", "graduated to: " + wb + "\n", wb},
 		{"inline canonical line, url", "graduated to: " + url + "\n", url},
+		{"inline canonical line, bare number is opaque pointer text (spec-verbatim)", "graduated to: 42\n", "42"},
 		{"bare ref in prose is NOT a marker", "this doc references " + hash + " as evidence\n", ""},
 		{"graduated-to mid-sentence is NOT a marker", "the plan graduated to " + hash + " earlier this week\n", ""},
 		{"no marker at all", "---\ntype: analysis\n---\njust prose, nothing filed\n", ""},

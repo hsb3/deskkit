@@ -256,13 +256,14 @@ func isDuplicateFinding(open map[findingKey]bool, path, rule, checksum string) b
 // PRIOR finding sharing the same (file, rule, checksum) whose disposition is non-'open' (i.e.
 // acknowledged/triaged/wont_fix). Recency is ordered by patrol_run: run ids are
 // "patrol-<UTC-timestamp>" (patrol_findings has no `created` column — a base collection carries
-// only `id`), so a descending patrol_run sort is timestamp-monotonic. Returns "open" when there
-// is no prior disposed finding, or on any lookup error (fail open — never block filing).
+// only `id`), so a descending patrol_run sort is timestamp-monotonic; `-id` breaks the tie
+// deterministically if two runs ever share a UTC second. Returns "open" when there is no prior
+// disposed finding, or on any lookup error (fail open — never block filing).
 func inheritedDisposition(app core.App, fileID, rule, checksum string) string {
 	recs, err := app.FindRecordsByFilter(
 		"patrol_findings",
 		"file = {:file} && rule = {:rule} && checksum = {:checksum} && disposition != 'open' && disposition != ''",
-		"-patrol_run", 1, 0,
+		"-patrol_run,-id", 1, 0,
 		dbx.Params{"file": fileID, "rule": rule, "checksum": checksum},
 	)
 	if err != nil || len(recs) == 0 {

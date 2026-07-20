@@ -42,20 +42,28 @@ func init() {
 
 		// Backfill existing rows: a new select column is left empty on pre-existing rows, but the
 		// default findings filter is disposition='open', so an un-backfilled finding would silently
-		// disappear. Set only the empty ones (idempotent — a re-run finds none).
-		recs, err := app.FindRecordsByFilter("patrol_findings", "", "", 0, 0)
-		if err != nil {
-			return err
-		}
-		for _, r := range recs {
-			if r.GetString("disposition") == "" {
-				r.Set("disposition", "open")
-				if err := app.Save(r); err != nil {
-					return err
+		// disappear. Set only the empty ones (idempotent — a re-run finds none). Fetch in id-sorted
+		// pages rather than loading the whole collection at once; setting `disposition` changes
+		// neither membership nor order of the unfiltered id-sorted set, so the offsets stay stable
+		// while rows are mutated between pages.
+		const pageSize = 500
+		for offset := 0; ; offset += pageSize {
+			recs, err := app.FindRecordsByFilter("patrol_findings", "", "id", pageSize, offset)
+			if err != nil {
+				return err
+			}
+			for _, r := range recs {
+				if r.GetString("disposition") == "" {
+					r.Set("disposition", "open")
+					if err := app.Save(r); err != nil {
+						return err
+					}
 				}
 			}
+			if len(recs) < pageSize {
+				return nil
+			}
 		}
-		return nil
 	}, func(app core.App) error {
 		c, err := app.FindCollectionByNameOrId("patrol_findings")
 		if err != nil {

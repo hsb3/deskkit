@@ -257,6 +257,40 @@ body
 	}
 }
 
+// TestVerdict_HashAnchorNotStripped pins the deliberate non-handling of "#"-style anchors:
+// only "§" delimits a section anchor (sectionFilePart), so a markdown-convention
+// "file.md#heading" pointer does NOT resolve to its file part — it fails closed, and the
+// failure names the supported "§ heading" form so the fix is actionable.
+func TestVerdict_HashAnchorNotStripped(t *testing.T) {
+	m := verdictEnv(t)
+	ctx := context.Background()
+	req := schema.ArtifactRequirement{Type: "decision", RequiredStatus: "accepted"}
+
+	writeDeskFile(t, m, "somedoc.md", `---
+type: decision
+status: accepted
+created: 2026-07-18
+updated: 2026-07-18
+tags: [pm]
+decided_by: owner
+affects_workstreams: [pm]
+---
+## Some Heading
+body
+`)
+
+	v, err := m.Verdict(ctx, "somedoc.md#some-heading", req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if v.Exists || v.Satisfied {
+		t.Fatalf("a #-anchored pointer must not resolve to its file part (only § is stripped): %+v", v)
+	}
+	if len(v.Missing) != 1 || !strings.Contains(v.Missing[0], "§") {
+		t.Fatalf("the failure must hint at the supported § anchor form, got %+v", v.Missing)
+	}
+}
+
 // TestFrontmatter_Reader: the trait-predicate companion seam returns the pointed doc's
 // frontmatter, and an empty map (never an error) for anything unreadable.
 func TestFrontmatter_Reader(t *testing.T) {

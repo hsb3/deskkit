@@ -353,6 +353,9 @@ func isMetaPath(rel, secretsDir string) bool {
 // number, or a URL). Anchored at line start (multiline) so a bare #N merely mentioned inside a
 // prose sentence ("...which graduated to #N last week") is NOT a marker; only a deliberate
 // canonical line is. `wb#\d+` precedes `#?\d+` in the alternation so the wb-prefixed form wins.
+// The pattern is pinned VERBATIM by the spec (§5.1 graduated_to precedence, §5.2 R5): `#?\d+`
+// deliberately accepts a bare number ("graduated to: 42") as opaque pointer text — the line
+// anchor plus the explicit "graduated to" prefix is what makes it a marker, not the ref format.
 var inlineGraduationRe = regexp.MustCompile(`(?im)^\s*graduated to:?\s+(wb#\d+|#?\d+|https?://\S+)`)
 
 // graduationMarker returns the doc's EXPLICIT graduation pointer, or "" when the doc declares

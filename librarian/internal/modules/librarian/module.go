@@ -129,7 +129,14 @@ func (m *Mod) Verdict(_ context.Context, pointer string, req schema.ArtifactRequ
 	}
 	b, err := os.ReadFile(abs)
 	if err != nil {
-		return fail(fmt.Sprintf("required document (type=%s) at %q does not exist", req.Type, pointer))
+		msg := fmt.Sprintf("required document (type=%s) at %q does not exist", req.Type, pointer)
+		// Only "§" delimits a section anchor (sectionFilePart), so a markdown-convention
+		// "file.md#heading" pointer fails resolution looking for a file literally named that.
+		// Name the likely cause instead of leaving a bare not-found for a file that may exist.
+		if strings.ContainsRune(file, '#') {
+			msg += `; note: "#heading" anchors are not stripped from pointers — write "file.md § Heading" instead`
+		}
+		return fail(msg)
 	}
 	v.Exists = true
 
