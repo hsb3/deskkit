@@ -40,7 +40,7 @@ jobs:
         id: claude_oauth
         if: ${{ env.HAS_OAUTH == 'true' }}
         continue-on-error: true
-        uses: anthropics/claude-code-action@521136812280ae7ef256e06045655b9da02793f0 # v1.0.158
+        uses: anthropics/claude-code-action@e90deca47693f9457b72f2b53c17d7c445a87342 # v1.0.171
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           additional_permissions: |
@@ -48,7 +48,7 @@ jobs:
 
       - name: Run Claude Code (API key fallback)
         if: ${{ env.HAS_OAUTH != 'true' || steps.claude_oauth.outcome == 'failure' }}
-        uses: anthropics/claude-code-action@521136812280ae7ef256e06045655b9da02793f0 # v1.0.158
+        uses: anthropics/claude-code-action@e90deca47693f9457b72f2b53c17d7c445a87342 # v1.0.171
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           additional_permissions: |
