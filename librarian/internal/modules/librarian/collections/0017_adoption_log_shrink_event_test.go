@@ -79,11 +79,10 @@ func TestMigration0017_ShrinksEventAndDeletesAnomalous(t *testing.T) {
 	if _, err := app.FindRecordById("adoption_log", fixID); err != nil {
 		t.Fatalf("the fix row must survive the shrink: %v", err)
 	}
-	remaining, err := app.FindRecordsByFilter("adoption_log", "", "", 0, 0)
-	if err != nil {
-		t.Fatalf("list adoption_log: %v", err)
-	}
-	if len(remaining) != 1 || remaining[0].GetString("event") != "fix" {
-		t.Fatalf("after shrink, adoption_log = %d rows (want 1 fix row); events=%v", len(remaining), remaining)
+	// The anomalous (writerless) row is deleted: looking it up by id must now error. This is
+	// scoped to the seeded ids rather than a global row count, so an unrelated seed can never
+	// mask the deletion (the fix row's survival is already checked by id just above).
+	if _, err := app.FindRecordById("adoption_log", noteRec.Id); err == nil {
+		t.Fatalf("anomalous note row %s must be deleted by the shrink, but it still exists", noteRec.Id)
 	}
 }

@@ -275,7 +275,10 @@ type inheritedDispositionResult struct {
 // only `id`), so a descending patrol_run sort is timestamp-monotonic; `-id` breaks the tie
 // deterministically if two runs ever share a UTC second. Returns disposition "open" with empty
 // provenance when there is no prior disposed finding, or on any lookup error (fail open — never
-// block filing).
+// block filing). Recorded trade-off of that fail-open: a transient DB error during a re-fire files
+// the fresh finding as disposition=open, resurfacing a supervised decision with no visible signal
+// — accepted because filing must never block, and single-process SQLite makes such an error
+// unlikely.
 func inheritedDisposition(app core.App, fileID, rule, checksum string) inheritedDispositionResult {
 	recs, err := app.FindRecordsByFilter(
 		"patrol_findings",

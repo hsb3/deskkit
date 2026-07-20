@@ -62,7 +62,7 @@ func DisposeFinding(ctx context.Context, app core.App, cfg *config.Config, findi
 	} else {
 		rec.Set("actor", actor)
 		rec.Set("reason", reason)
-		rec.Set("disposed_at", time.Now())
+		rec.Set("disposed_at", time.Now().UTC())
 	}
 	if err := app.Save(rec); err != nil {
 		return nil, fmt.Errorf("dispose: save finding %q: %w", findingID, err)
