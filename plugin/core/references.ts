@@ -45,7 +45,7 @@ export function discoverReferences(startDir: string): string | null {
  */
 export function defaultReferencesPath(): string | null {
   const fromEnv = process.env.DESK_REFERENCES_PATH;
-  if (fromEnv && fromEnv !== "") return fromEnv;
+  if (fromEnv) return fromEnv;
   const moduleDir = dirname(fileURLToPath(import.meta.url));
   return discoverReferences(moduleDir) ?? discoverReferences(process.cwd());
 }

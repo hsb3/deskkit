@@ -94,7 +94,7 @@ func ValidateReference(kind, target string) error {
 		return fmt.Errorf("schema: unknown reference kind %q (known: %v)", kind, v.Kinds)
 	}
 	if strings.TrimSpace(target) == "" {
-		return fmt.Errorf("schema: reference target must be non-empty")
+		return fmt.Errorf("schema: reference target must be non-empty (kind: %q)", kind)
 	}
 	return nil
 }
