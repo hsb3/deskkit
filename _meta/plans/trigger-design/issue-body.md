@@ -1,4 +1,4 @@
-> **Tracking:** #TBD, ADR 0009 / ADR 0018 (2026-07-20 design session). Design what a trigger is
+> **Tracking:** #127, ADR 0009 / ADR 0018 (2026-07-20 design session). Design what a trigger is
 > and how it fires exec outputs, so the on-demand default can graduate without producing
 > documents nobody asked for.
 
@@ -114,13 +114,13 @@ system does or does not already have:
 
 - Docs-only until build: no code, schema, or migration change ships from this issue alone.
   `make check`, `make test`, and `make verify` do NOT fire.
-- Relation to `element-model-revision` (#TBD): a prose note, not a hard edge. This design steers
+- Relation to `element-model-revision` (#125): a prose note, not a hard edge. This design steers
   the eventual shape of the output plane / `deliverable` entity
   (`_meta/research/2026-07-design-session/platform/spec-element-model.md` section 4), so the two
   should stay mutually aware, but no dependency in either direction was found that requires one
   to complete before the other - flag this again if the element-model revision changes the
   output-plane shape enough to invalidate part C/D above.
-- Parent: `epic-schema-v2-track` (#TBD), `_meta/plans/epic-schema-v2-track/issue-body.md`.
+- Parent: `epic-schema-v2-track` (#130), `_meta/plans/epic-schema-v2-track/issue-body.md`.
 - Not blocked by anything. Blocks any future "implement triggers" build issue, to be filed once
   this design is reviewed.
 

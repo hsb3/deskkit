@@ -1,4 +1,4 @@
-> **Tracking:** #TBD, ADR 0013 (2026-07-20 design session). Finish the findings-disposition sub-machine #93 started so "open findings" means one thing everywhere, a disposition records who/why/when, and the enums stop declaring values no code path can reach.
+> **Tracking:** #118, ADR 0013 (2026-07-20 design session). Finish the findings-disposition sub-machine #93 started so "open findings" means one thing everywhere, a disposition records who/why/when, and the enums stop declaring values no code path can reach.
 
 ## Problem
 

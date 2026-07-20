@@ -1,4 +1,4 @@
-> **Tracking:** #TBD, ADR 0014 (2026-07-20 design session). Ship ONE desk-persona Claude Code
+> **Tracking:** #119, ADR 0014 (2026-07-20 design session). Ship ONE desk-persona Claude Code
 > bundle that composes the librarian + PM personas under the integration contract — the
 > platform's v1 proof surface (ADR 0009) — as a new shipped, drift-guarded, identity-neutral
 > artifact.
@@ -66,7 +66,7 @@ source.
 
 ## Dependencies & gates
 
-- **Blocked by:** agent-integration-contract (#TBD) — the bundle instantiates the contract (its
+- **Blocked by:** agent-integration-contract (#114) — the bundle instantiates the contract (its
   persona claims, its mount's declared module set, and its drift-guarded prompt copy all reference
   the contract this issue cannot pre-empt).
 - **Fires.** `make check` neutrality (`scripts/check-neutrality.mjs`) — a new persona under

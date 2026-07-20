@@ -1,4 +1,4 @@
-> **Tracking:** #TBD, ADR 0015 (2026-07-20 design session). Record where a centralized prompt set
+> **Tracking:** #128, ADR 0015 (2026-07-20 design session). Record where a centralized prompt set
 > is tuned once, and how that tuning propagates to the embed, the plugin bundle, and every desk's
 > already-seeded store row — a v2-track design item, not a build.
 

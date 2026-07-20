@@ -1,4 +1,4 @@
-> **Tracking:** #TBD, ADR 0016 (2026-07-20 design session). Pin `docs/tool-surface.md`'s tool
+> **Tracking:** #121, ADR 0016 (2026-07-20 design session). Pin `docs/tool-surface.md`'s tool
 > counts to source with a mechanical drift guard, so the next tool add/remove cannot silently
 > make the doc wrong the way the old "seven-tool core" shorthand was.
 

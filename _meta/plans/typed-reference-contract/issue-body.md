@@ -1,4 +1,4 @@
-> **Tracking:** #TBD, ADR 0011 (2026-07-20 design session). Specify the typed cross-reference
+> **Tracking:** #116, ADR 0011 (2026-07-20 design session). Specify the typed cross-reference
 > contract — kind + target + optional desk-relative qualifier — in `schema/`, with a validation
 > guard in both lanes; no field migrates onto it yet.
 

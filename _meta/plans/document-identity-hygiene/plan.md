@@ -5,7 +5,7 @@ Date: 2026-07-20
 
 ## Tracking
 
-#TBD (not yet filed). ADR: `docs/decisions/0017-document-identity-and-hygiene.md` (Accepted,
+#123. ADR: `docs/decisions/0017-document-identity-and-hygiene.md` (Accepted,
 2026-07-20). Raised by decision book `_meta/research/2026-07-design-session/decision-book/D8-backlog-identity-and-hygiene.md`,
 promoted from pull-only backlog to a full session ruling at the owner's 2026-07-20 scope
 sign-off. Companion issue body: `issue-body.md` in this folder.

@@ -1,4 +1,4 @@
-> **Tracking:** #TBD, ADR 0017 (2026-07-20 design session). Rename stops discarding history for
+> **Tracking:** #123, ADR 0017 (2026-07-20 design session). Rename stops discarding history for
 > any document that carries a frontmatter `id`; the `files.entity_type` / schema `entity_type`
 > naming collision is cleared; and the repo's own "explicit `Max`" convention gets a migration
 > that closes the current gap plus a CI guard that stops it recurring.

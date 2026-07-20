@@ -1,4 +1,4 @@
-> **Tracking:** #TBD, ADR 0018 + 0009 (2026-07-20 design session). Revise the draft element
+> **Tracking:** #125, ADR 0018 + 0009 (2026-07-20 design session). Revise the draft element
 > model under the Q1-Q4 owner rulings and its two adversarial reviews' gaps, so it stops being a
 > proposal with open questions and becomes the schema-v2 track's reviewed draft.
 
@@ -144,7 +144,7 @@ build/knowledge artifact per type into the spine."
     `decision`, `open-question`, `note`, etc.) hangs its cross-plane relation identity off this
     primitive, since files-are-truth (ADR 0009) means no store-side identity can be assumed to
     survive a rebuild.
-- **The revision's own tracking line states it blocks `model-simulations (#TBD)`** — the
+- **The revision's own tracking line states it blocks `model-simulations (#126)`** — the
   ADR 0009 owner directive names simulations as the gate before the v2 model is finalized
   (`docs/decisions/0009-platform-frame.md:40-42`), and `epic-schema-v2-track`'s own child list
   already sequences `model-simulations` after `element-model-revision`
@@ -175,7 +175,7 @@ build/knowledge artifact per type into the spine."
       relations), ADR 0012 (type-vocabulary validation for new v2 element types), ADR 0013 (the
       disposition/provenance pattern as precedent for the claim-status axis), and ADR 0017
       (frontmatter `id` as entity-identity substrate).
-- [ ] The revision's tracking/provenance section states it blocks `model-simulations (#TBD)`.
+- [ ] The revision's tracking/provenance section states it blocks `model-simulations (#126)`.
 - [ ] The revision is still marked `status: draft` wherever it lands (`docs/` or `_meta/research/`)
       — this issue does not finalize the model; finalization is gated on `model-simulations`.
 - [ ] `node scripts/check-neutrality.mjs` passes bare (docs/ and `_meta/` are exempt from the
@@ -201,7 +201,7 @@ build/knowledge artifact per type into the spine."
 - CHANGELOG: no shipped product behavior changes, so `check-changelog.mjs` (which hard-gates
   only at the release tag) is not blocked by this alone; still record the revision under
   `[Unreleased]` per this repo's provenance practice.
-- **Blocks `model-simulations (#TBD)`** — ADR 0009's owner directive requires simulations
+- **Blocks `model-simulations (#126)`** — ADR 0009's owner directive requires simulations
   against both v1 and v2 data models before the v2 model is finalized
   (`docs/decisions/0009-platform-frame.md:40-42`); `model-simulations` cannot walk a coherent v2
   model until this revision exists.

@@ -1,4 +1,4 @@
-> **Tracking:** #TBD, ADR 0015 (2026-07-20 design session). Document the `Seed`/reset semantics
+> **Tracking:** #120, ADR 0015 (2026-07-20 design session). Document the `Seed`/reset semantics
 > ADR 0015 rules and add a drift guard across the version-controlled prompt copies, so the embed
 > and the spec's own "kept verbatim" quote of it cannot silently diverge again.
 

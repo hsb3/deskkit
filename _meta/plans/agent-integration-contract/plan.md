@@ -7,7 +7,7 @@ Status: draft (2026-07-20)
 
 ## Tracking
 
-- Issue: #TBD (this plan's tracking issue; first `#N` here once filed)
+- Issue: #114 (this plan's tracking issue)
 - ADR: `docs/decisions/0014-agent-integration-contract.md` (D5, Accepted 2026-07-20)
 - Also binds: `docs/decisions/0015-prompt-governance.md` (instruction-source mechanism)
 - Evidence: `_meta/research/2026-07-design-session/decision-book/D5-agent-contract-and-parity.md`,

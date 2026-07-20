@@ -1,4 +1,4 @@
-> **Tracking:** #TBD, rollup over the schema-v2 element track (ADRs 0009 + 0018, 2026-07-20 design session). The element model revised, simulated, and versioned before anything v2 ships.
+> **Tracking:** #130, rollup over the schema-v2 element track (ADRs 0009 + 0018, 2026-07-20 design session). The element model revised, simulated, and versioned before anything v2 ships.
 
 ## Why
 
@@ -15,11 +15,11 @@ promise. Nothing here changes the shipped v1 schema on its own (ADR 0018).
 
 ## Children
 
-- [ ] #TBD `schema-versioning` — ADR 0009: version the shared `schema/` contract; both lanes' loaders + drift guards
-- [ ] #TBD `element-model-revision` — ADR 0018 + 0009: revise the element model under Q1-Q4 + the review gaps
-- [ ] #TBD `model-simulations` — ADR 0009 owner directive: walk realistic scenarios through v1 AND draft v2; the deficiency report gates finalization
-- [ ] #TBD `trigger-design` — ADR 0018 Q4: triggers for exec outputs (candidates: meeting; milestone/marker); on-demand until it lands
-- [ ] #TBD `prompt-tuning-centralized` — ADR 0015 owner requirement: one canonical prompt set tuned in one place
+- [ ] #124 `schema-versioning` — ADR 0009: version the shared `schema/` contract; both lanes' loaders + drift guards
+- [ ] #125 `element-model-revision` — ADR 0018 + 0009: revise the element model under Q1-Q4 + the review gaps
+- [ ] #126 `model-simulations` — ADR 0009 owner directive: walk realistic scenarios through v1 AND draft v2; the deficiency report gates finalization
+- [ ] #127 `trigger-design` — ADR 0018 Q4: triggers for exec outputs (candidates: meeting; milestone/marker); on-demand until it lands
+- [ ] #128 `prompt-tuning-centralized` — ADR 0015 owner requirement: one canonical prompt set tuned in one place
 
 ## Close when
 

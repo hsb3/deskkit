@@ -36,6 +36,14 @@ ACTIVE plans (associated with an OPEN issue) — add a row per plan you draft:
 
 | Plan | Issue(s) | Status |
 | ---- | -------- | ------ |
+| agent-integration-contract | #114 | planned; gate:1.0.0; epic #129 |
+| findings-lifecycle-completion | #118 | planned; gate:1.0.0; epic #129; supersedes closed #99 |
+| desk-persona-bundle | #119 | planned; gate:1.0.0; epic #129; blocked by #114 |
+| document-identity-hygiene | #123 | planned; gate:1.0.0; epic #129 |
+
+The other 13 wave issues (#115-#117, #120-#122, #124-#128, epics #129/#130) carry staged,
+review-conformed bodies in their folders but no deep plan.md yet — `coverage.py` lists them
+as the planning backlog; add a row here when a plan.md is authored.
 
 ARCHIVED (issue closed/merged; plan moved to `_meta/_archive/<issue>-<slug>.md`):
 

@@ -1,4 +1,4 @@
-> **Tracking:** #TBD, ADR 0016 (2026-07-20 design session). Design — not implement — how the TS
+> **Tracking:** #122, ADR 0016 (2026-07-20 design session). Design — not implement — how the TS
 > `plugin/mcp` boundary gains server-backed capabilities by proxying deskkit's Go `mcp-serve`,
 > so a builder can pick up the implementation cold once this design is reviewed.
 
@@ -133,7 +133,7 @@ Current shipped reality, ground-truthed directly:
 
 ## Dependencies & gates
 
-- **Blocked by:** agent-integration-contract (#TBD) — ADR 0014's mount/gating rules
+- **Blocked by:** agent-integration-contract (#114) — ADR 0014's mount/gating rules
   (persona instructions, tool mount, wake layer, write-gate policy — one contract, each agent
   instantiates it, `docs/decisions/0014-agent-integration-contract.md:20-24`) are a direct input
   to "which tools surface" and "gating per ADR 0014" above; this design should read that issue's

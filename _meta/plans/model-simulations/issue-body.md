@@ -1,4 +1,4 @@
-> **Tracking:** #TBD, ADR 0009 / ADR 0018 (2026-07-20 design session). Simulate realistic
+> **Tracking:** #126, ADR 0009 / ADR 0018 (2026-07-20 design session). Simulate realistic
 > project scenarios against both the shipped v1 schema and the draft v2 element model, to
 > surface deficiencies before the v2 model finalizes.
 
@@ -36,7 +36,7 @@ inventories to walk scenarios against:
 
 **The v2 model** is the revised element model (three planes - input / activity / output - over
 a beefed spine): `_meta/research/2026-07-design-session/platform/spec-element-model.md`. This
-issue is **blocked by `element-model-revision` (#TBD)** - the v2 side of the simulation needs a
+issue is **blocked by `element-model-revision` (#125)** - the v2 side of the simulation needs a
 model that has already absorbed the ADR 0018 Q1-Q4 rulings and both adversarial reviews' fixes;
 running scenarios against the current, pre-revision draft would surface gaps the revision is
 already going to fix, wasting the exercise. The v1 side has no such dependency and can start
@@ -84,7 +84,7 @@ immediately.
 - **D - The pass/fail bar gating v2 finalization**, mirroring the schema-v2 epic's own
   close-when bullet (`_meta/plans/epic-schema-v2-track/issue-body.md`): the report exists; every
   deficiency it lists is either filed as its own issue or explicitly recorded as
-  accepted-risk with rationale; the v2 model (`element-model-revision`, #TBD) is amended to
+  accepted-risk with rationale; the v2 model (`element-model-revision`, #125) is amended to
   close each deficiency, or the deficiency is recorded accepted-risk, BEFORE that issue is
   marked finalized.
 
@@ -101,19 +101,19 @@ immediately.
       surfaced, each with a disposition: filed as its own issue (linked), or explicitly
       recorded as accepted-risk with a stated rationale.
 - [ ] Every deficiency against the v2 model is either closed by an amendment to
-      `element-model-revision` (#TBD) or recorded accepted-risk, before that issue is marked
+      `element-model-revision` (#125) or recorded accepted-risk, before that issue is marked
       finalized - matching `_meta/plans/epic-schema-v2-track/issue-body.md`'s own "Close when"
       bar.
-- [ ] `element-model-revision` (#TBD) carries a recorded blocked-by/depends-on relationship to
+- [ ] `element-model-revision` (#125) carries a recorded blocked-by/depends-on relationship to
       this issue (or its inverse) so the ordering is enforced on the board, not just in prose.
 
 ## Dependencies & gates
 
-- Blocked by `element-model-revision` (#TBD): the v2 side of the simulation needs a model that
+- Blocked by `element-model-revision` (#125): the v2 side of the simulation needs a model that
   has already absorbed the ADR 0018 Q1-Q4 rulings and the two adversarial reviews' fixes
   (`_meta/research/2026-07-design-session/platform/spec-element-model.md`, "R3 review
   findings"). The v1 side is unblocked and can start immediately.
-- Parent: `epic-schema-v2-track` (#TBD), `_meta/plans/epic-schema-v2-track/issue-body.md`.
+- Parent: `epic-schema-v2-track` (#130), `_meta/plans/epic-schema-v2-track/issue-body.md`.
 - Gate menu (`_meta/plans/_config.md`): this is docs/research work by default - `make check`,
   `make test`, and `make verify` do NOT fire unless deliverable B's scripted v1 harness adds a
   new script under `librarian/` or `scripts/`, in which case: any new script under `librarian/`
@@ -123,7 +123,7 @@ immediately.
 
 ## Out of scope
 
-- Finalizing the v2 model itself - that is `element-model-revision` (#TBD), a separate act
+- Finalizing the v2 model itself - that is `element-model-revision` (#125), a separate act
   gated BY this issue's deficiency report, not performed here.
 - Building v2 storage or migrations - explicitly out of order per the schema-v2 epic's own
   ordering rule (`_meta/plans/epic-schema-v2-track/issue-body.md`, "no v2 storage/migration

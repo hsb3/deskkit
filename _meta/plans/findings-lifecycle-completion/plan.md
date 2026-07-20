@@ -9,7 +9,7 @@ Date: 2026-07-20
 
 ## Tracking
 
-- Issue #TBD (`issue-body.md` in this folder)
+- Issue #118 (`issue-body.md` in this folder)
 - ADR: `docs/decisions/0013-disposition-completion-adoption-log.md` (Accepted, 2026-07-20)
 - Decision brief: `_meta/research/2026-07-design-session/decision-book/D4-disposition-and-adoption-log.md`
 - Predecessor: #93 (shipped the disposition axis in PR #112, the 0.8.0 bug floor)

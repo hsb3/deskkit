@@ -1,4 +1,4 @@
-> **Tracking:** #TBD, ADR 0012 (2026-07-20 design session). `CreateItem` starts hard-rejecting
+> **Tracking:** #117, ADR 0012 (2026-07-20 design session). `CreateItem` starts hard-rejecting
 > an `items.type` that is not in the shared schema-v1 vocabulary, closing the silent
 > ungated-advance hole a typo'd or unknown type opens today.
 

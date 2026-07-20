@@ -1,4 +1,4 @@
-> **Tracking:** #TBD, ADR 0010 (2026-07-20 design session). Ratify the shipped pointer grammar with a normative spec section — no code change.
+> **Tracking:** #115, ADR 0010 (2026-07-20 design session). Ratify the shipped pointer grammar with a normative spec section — no code change.
 
 ## Problem
 

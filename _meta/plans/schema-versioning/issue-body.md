@@ -1,4 +1,4 @@
-> **Tracking:** #TBD, ADR 0009 (2026-07-20 design session). Version the shared `schema/`
+> **Tracking:** #124, ADR 0009 (2026-07-20 design session). Version the shared `schema/`
 > contract so both lanes can tell v1 from v2 and refuse an unknown version loud, instead of
 > silently misreading it.
 

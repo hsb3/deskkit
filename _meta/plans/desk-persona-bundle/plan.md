@@ -6,8 +6,8 @@ Status: draft (2026-07-20)
 
 ## Tracking
 
-- Issue: #TBD (this plan's tracking issue)
-- Blocked by: agent-integration-contract (#TBD)
+- Issue: #119 (this plan's tracking issue)
+- Blocked by: agent-integration-contract (#114)
 - ADR: `docs/decisions/0014-agent-integration-contract.md` clause (a); binds
   `docs/decisions/0015-prompt-governance.md` (git-is-truth prompt copies)
 - Evidence: `_meta/research/2026-07-design-session/decision-book/D5-agent-contract-and-parity.md`,

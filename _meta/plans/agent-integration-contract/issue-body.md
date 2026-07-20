@@ -1,4 +1,4 @@
-> **Tracking:** #TBD, ADR 0014 (2026-07-20 design session). Write the agent integration contract
+> **Tracking:** #114, ADR 0014 (2026-07-20 design session). Write the agent integration contract
 > down once, then make the shared `mcp-serve` mount, the in-binary loop, and the librarian prompt
 > actually conform to it — so no tool is reachable that no persona claims.
 
