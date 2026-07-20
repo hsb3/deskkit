@@ -141,14 +141,40 @@ briefing package + the two spec corrections + `.claude/settings.json` plugin ena
 call. Note (2026-07-20, post-record): the old dev-tooling exec desk was **renamed
 `dotfiles-agents-desk`** — the frozen platform originals + migration pointers traveled with
 it; stale `dev-tooling-desk` paths in earlier session docs resolve there.
-**Next: merge PR #113, then Phase 4 — the build plan from main** (planning desk: epics/
-issues with acceptance criteria + gate labels derived from ADRs 0009–0018's Affects/
-Consequences; named deliverables: the **v1+v2 model simulations** (0009), the **TS-proxy
-design item** (0016), the **trigger design item** (0018), the **schema-v2 element-track
-revision** (0009/0018), plus the mechanism slices 0012/0013/0017 and the contract/bundle
-work 0014/0015). Decision batches for Henry ALWAYS go through the owner-signoff HTML form;
-decision packages as deck/PDF (project memory). Everything below this paragraph predates
-the reboot.
+Decision batches for Henry ALWAYS go through the owner-signoff HTML form;
+decision packages as deck/PDF (project memory).
+
+**PHASE 4 DELIVERED (2026-07-20, post-reboot session). PR #113 merged to main (`e5aee59`);
+the wave is FILED.** The planning desk was scaffolded at `_meta/plans/` (planning-desk
+standard: 7-script `_utils/` toolkit, README index, `_config.md` with the real gate menu);
+the ADR→issue derivation is recorded at
+`_meta/research/2026-07-design-session/build-plan.md`. Live on GitHub: **#114–#128** (15
+children) + **epic #129** (v1 build-out, milestone 1.0.0, native sub-issues #114–#123,
+`gate:1.0.0` on the nine build slices — #122 is a design item, no gate) + **epic #130**
+(schema-v2 track, deliberately NO milestone, sub-issues #124–#128, `gate:v2-final` on
+#124/#125/#126). Native blocked-by edges: #119 and #122 ← #114; #126 ← #125. **#99 closed
+superseded-by-ADR-0013** (implemented by #118 slice D). Process: 10 parallel draft agents →
+5 adversarial report-only reviewers (every load-bearing citation re-derived from source;
+zero refuted; the one MAJOR was the **migration-number collision between #118 and #123** —
+both claim 0015–0017 on the shared librarian chain; both plans + epic #129 now carry the
+coordination rule: numbers PROVISIONAL, real sequence assigned at landing from true HEAD,
+the two issues' migration commits must SERIALIZE) → 4 scoped fix agents → foreman
+verification. Deep `plan.md`s exist for #114/#118/#119/#123; the other bodies are staged +
+review-conformed (`coverage.py` lists them as the plan backlog). Desk gates green:
+`reconcile.py` clean, all 17 new bodies conformant (the 28 flagged are pre-existing
+backlog), `sync-bodies.py` in-sync. **Defaults applied, cheap to re-rule** (also in PR
+#131's body): Epic A rides 1.0.0; Epic B no milestone; new labels `gate:1.0.0` /
+`gate:v2-final`. Verified findings a builder should know: `UpdateItem` allows unguarded
+post-creation `type` mutation (recorded in #117, deliberately out of its scope); the
+librarian spec's "kept verbatim" prompt block is ALREADY stale on main, so #120's drift
+guard fails red on day one (correct); PocketBase reserves the field name `id` → the #123
+column is `doc_id` (frontmatter key stays `id`); `MCP_MODULES` unset must mean all-enabled
+or the documented tool-count probe breaks (#114). **The session record is PR #131** (branch
+`docs/phase-4-build-plan`: commits `ee4739d` scaffold, `7dd93a2` reviewed wave, `0ea9385`
+filed + back-filled). **Next: merge PR #131, then the build lanes open — #114 first (it
+blocks #119/#122); #115/#116/#117/#118/#120/#121/#123 are independent; #118+#123 migration
+commits serialize per the epic-#129 rule.** Everything below this paragraph predates the
+reboot.
 
 **Owner SIGNED OFF on the decision list (2026-07-20 12:11Z**, recorded at
 `_meta/signoff/2026-07-20-decision-book-scope/answers.json` — the batch dir with the form is
@@ -274,12 +300,13 @@ committed GIFs depict v2 accurately — reopen only if a real redesign needs fre
   Phase 2 of the design session. #79's merge unblocks the PM default-on lane (#83) but that
   is a feature lane — it waits on the design session per the sequencing directive. Deferred
   TUI UX items remain in `docs/development/chat-tui-ux-survey.md`.
-- **The design session is RULED (2026-07-20) — ADRs 0009–0018 bind** (see the §1 reboot
-  paragraph). Feature lanes are unblocked under those rulings; start with Phase 4 (the
-  build plan) once PR #113 merges. The decision book, dossiers, and migrated platform docs
-  under `_meta/research/2026-07-design-session/` are the historical record — the ADRs are
-  what binds. Decision packages for Henry stay non-markdown (deck/PDF); his answers are
-  collected via the owner-signoff HTML form, never chat questions.
+- **The design session is RULED and Phase 4 is FILED** (§1): ADRs 0009–0018 bind; the build
+  plan is live as epics #129/#130 with children #114–#128. Once PR #131 merges, pick up
+  #114 first (blocks #119/#122), then the independent slices. The decision book, dossiers,
+  and migrated platform docs under `_meta/research/2026-07-design-session/` are the
+  historical record — the ADRs are what binds. Decision packages for Henry stay
+  non-markdown (deck/PDF); his answers are collected via the owner-signoff HTML form,
+  never chat questions.
 - **Cut the next release** when `[Unreleased]` warrants — follow `docs/development/releasing.md`
   (bump VERSION + 3 manifests → roll `[Unreleased]` into a dated CHANGELOG section →
   `make release-prep` → tag). `check-changelog` gates the tag; `make version-status` flags drift.
