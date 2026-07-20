@@ -187,8 +187,8 @@ func TestCreateItemRejectsUnknownType(t *testing.T) {
 		if !strings.Contains(err.Error(), "no-such-type") {
 			t.Fatalf("refusal should name the offending type, got %v", err)
 		}
-		if !strings.Contains(err.Error(), "analysis") {
-			t.Fatalf("refusal should list a real known type, got %v", err)
+		if !strings.Contains(err.Error(), "analysis, ") {
+			t.Fatalf("refusal should list the known types comma-separated, got %v", err)
 		}
 		if !strings.Contains(err.Error(), "doctypes.yaml") {
 			t.Fatalf("refusal should point at the vocabulary source, got %v", err)
