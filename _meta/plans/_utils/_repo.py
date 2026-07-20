@@ -19,6 +19,7 @@ Usage (as a library):
 from __future__ import annotations
 
 import functools
+import json
 import subprocess
 
 
@@ -40,3 +41,19 @@ def owner_name() -> tuple[str, str]:
     """The current repo as (owner, name)."""
     owner, name = repo_slug().split("/", 1)
     return owner, name
+
+
+def graphql(query: str, **variables: object) -> dict:
+    """Run a GraphQL query via `gh api graphql`, passing every variable as a typed
+    field rather than string-interpolating it into the query -- injection-safe and
+    robust to unexpected owner/name/cursor formats. A `None` value is sent as
+    GraphQL `null`, the idiom for the first page of a cursor-paginated query.
+
+        page = graphql(QUERY, owner=OWNER, name=NAME, cursor=None)
+    """
+    args = ["gh", "api", "graphql", "-f", f"query={query}"]
+    for key, value in variables.items():
+        # -F types the literal `null`; -f keeps a real value a raw string (always safe).
+        args += ["-F", f"{key}=null"] if value is None else ["-f", f"{key}={value}"]
+    out = subprocess.run(args, capture_output=True, text=True, check=True).stdout
+    return json.loads(out)

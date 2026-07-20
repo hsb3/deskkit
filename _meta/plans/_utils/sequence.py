@@ -40,10 +40,31 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import reconcile  # noqa: E402, I001  (sibling toolkit - plan readiness; path set above)
 import conformance  # noqa: E402  (sibling - is_epic_type)
-from _repo import owner_name  # noqa: E402  (sibling - repo derived from gh)
+from _repo import graphql, owner_name  # noqa: E402  (sibling - repo derived from gh)
 
-OWNER, REPO = owner_name()
+OWNER, NAME = owner_name()
 UNDATED = "9999-99-99"
+
+# `gh issue list` page cap; warn if a call saturates it (results may be truncated).
+ISSUE_LIST_LIMIT = 1000
+
+# GraphQL variables (never string-interpolated) keep this injection-safe and robust
+# to unexpected owner/name/cursor formats; $cursor is null on the first page.
+GRAPH_QUERY = (
+    "query($owner: String!, $name: String!, $cursor: String) {"
+    "  repository(owner: $owner, name: $name) {"
+    "    issues(first: 100, states: OPEN, after: $cursor) {"
+    "      nodes {"
+    "        number"
+    "        blockedBy(first: 30) { nodes { number state } }"
+    "        blocking(first: 30) { nodes { number } }"
+    "        subIssues(first: 50) { nodes { number } }"
+    "      }"
+    "      pageInfo { hasNextPage endCursor }"
+    "    }"
+    "  }"
+    "}"
+)
 
 
 def fetch_issues() -> list[dict]:
@@ -55,7 +76,7 @@ def fetch_issues() -> list[dict]:
             "--state",
             "open",
             "--limit",
-            "1000",
+            str(ISSUE_LIST_LIMIT),
             "--json",
             "number,title,labels,milestone",
         ],
@@ -63,7 +84,14 @@ def fetch_issues() -> list[dict]:
         text=True,
         check=True,
     ).stdout
-    return json.loads(out)
+    items = json.loads(out)
+    if len(items) >= ISSUE_LIST_LIMIT:
+        print(
+            f"WARNING: issue list hit the {ISSUE_LIST_LIMIT}-issue limit; "
+            "results may be incomplete",
+            file=sys.stderr,
+        )
+    return items
 
 
 def fetch_milestone_due() -> dict[str, str]:
@@ -72,7 +100,7 @@ def fetch_milestone_due() -> dict[str, str]:
         [
             "gh",
             "api",
-            f"repos/{OWNER}/{REPO}/milestones",
+            f"repos/{OWNER}/{NAME}/milestones",
             "--jq",
             ".[] | select(.due_on != null) | [.title, .due_on] | @tsv",
         ],
@@ -90,22 +118,11 @@ def fetch_milestone_due() -> dict[str, str]:
 def fetch_graph() -> dict[int, dict]:
     """number -> {blocked_by: [open #], blocking: [#], children: [#]} via GraphQL."""
     graph: dict[int, dict] = {}
-    cursor = "null"
+    cursor: str | None = None
     while True:
-        q = (
-            '{ repository(owner:"%s",name:"%s"){ issues(first:100,states:OPEN,after:%s)'
-            "{ nodes{ number blockedBy(first:30){nodes{number state}}"
-            " blocking(first:30){nodes{number}} subIssues(first:50){nodes{number}} }"
-            " pageInfo{hasNextPage endCursor} } } }" % (OWNER, REPO, cursor)
-        )
-        data = json.loads(
-            subprocess.run(
-                ["gh", "api", "graphql", "-f", f"query={q}"],
-                capture_output=True,
-                text=True,
-                check=True,
-            ).stdout
-        )["data"]["repository"]["issues"]
+        data = graphql(GRAPH_QUERY, owner=OWNER, name=NAME, cursor=cursor)[
+            "data"
+        ]["repository"]["issues"]
         for n in data["nodes"]:
             graph[n["number"]] = {
                 "blocked_by": [
@@ -117,7 +134,7 @@ def fetch_graph() -> dict[int, dict]:
         page = data["pageInfo"]
         if not page["hasNextPage"]:
             return graph
-        cursor = json.dumps(page["endCursor"])
+        cursor = page["endCursor"]
 
 
 def planned_issues() -> set[int]:

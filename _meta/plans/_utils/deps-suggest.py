@@ -37,10 +37,17 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from _repo import owner_name, repo_slug  # noqa: E402  (sibling - repo derived from gh)
+from _repo import (  # noqa: E402  (sibling - repo derived from gh)
+    graphql,
+    owner_name,
+    repo_slug,
+)
 
 OWNER, NAME = owner_name()
 REPO = repo_slug()
+
+# `gh issue list` page cap; warn if a call saturates it (results may be truncated).
+ISSUE_LIST_LIMIT = 1000
 
 # A dependency signal ("blocked by", "depends on"...) immediately preceding a `#NNN`.
 SIGNAL_RE = re.compile(
@@ -50,6 +57,19 @@ SIGNAL_RE = re.compile(
 )
 # Hierarchy phrasing near the ref means parent/epic relation, not a blocker -> skip.
 EPIC_RE = re.compile(r"under epic|part of|child of|tracked by|epic |sub-issue", re.I)
+
+# GraphQL variables (never string-interpolated) keep this injection-safe and robust
+# to unexpected owner/name/cursor formats; $cursor is null on the first page.
+NATIVE_EDGES_QUERY = (
+    "query($owner: String!, $name: String!, $cursor: String) {"
+    "  repository(owner: $owner, name: $name) {"
+    "    issues(first: 100, states: OPEN, after: $cursor) {"
+    "      nodes { number blockedBy(first: 20) { nodes { number } } }"
+    "      pageInfo { hasNextPage endCursor }"
+    "    }"
+    "  }"
+    "}"
+)
 
 
 def fetch_open_issues() -> list[dict]:
@@ -70,34 +90,31 @@ def fetch_open_issues() -> list[dict]:
         text=True,
         check=True,
     ).stdout
-    return json.loads(out)
+    items = json.loads(out)
+    if len(items) >= ISSUE_LIST_LIMIT:
+        print(
+            f"WARNING: issue list hit the {ISSUE_LIST_LIMIT}-issue limit; "
+            "results may be incomplete",
+            file=sys.stderr,
+        )
+    return items
 
 
 def fetch_native_edges() -> set[tuple[int, int]]:
     """Existing native (blocked, blocker) edges, paginated through all open issues."""
     edges: set[tuple[int, int]] = set()
-    cursor = "null"
+    cursor: str | None = None
     while True:
-        query = (
-            '{ repository(owner:"%s",name:"%s"){ '
-            "issues(first:100,states:OPEN,after:%s){ "
-            "nodes{ number blockedBy(first:20){nodes{number}} } "
-            "pageInfo{hasNextPage endCursor} } } }" % (OWNER, NAME, cursor)
-        )
-        out = subprocess.run(
-            ["gh", "api", "graphql", "-f", f"query={query}"],
-            capture_output=True,
-            text=True,
-            check=True,
-        ).stdout
-        page = json.loads(out)["data"]["repository"]["issues"]
+        page = graphql(NATIVE_EDGES_QUERY, owner=OWNER, name=NAME, cursor=cursor)[
+            "data"
+        ]["repository"]["issues"]
         for node in page["nodes"]:
             for blocker in node["blockedBy"]["nodes"]:
                 edges.add((node["number"], blocker["number"]))
         info = page["pageInfo"]
         if not info["hasNextPage"]:
             return edges
-        cursor = json.dumps(info["endCursor"])
+        cursor = info["endCursor"]
 
 
 def snippet(body: str, start: int, end: int) -> str:

@@ -38,6 +38,9 @@ CLOSE_RE = re.compile(r"close when|close criteria|done / foundation", re.I)
 # carries the `epic` label or reads as a tracker.
 EPIC_TITLE_RE = re.compile(r"tracking:|^epic\b|\U0001F4CC", re.I)
 
+# `gh issue list` page cap; warn if a call saturates it (results may be truncated).
+ISSUE_LIST_LIMIT = 1000
+
 
 def fetch_open_issues() -> list[dict]:
     out = subprocess.run(
@@ -48,7 +51,7 @@ def fetch_open_issues() -> list[dict]:
             "--state",
             "open",
             "--limit",
-            "1000",
+            str(ISSUE_LIST_LIMIT),
             "--json",
             "number,title,labels,body",
         ],
@@ -56,7 +59,14 @@ def fetch_open_issues() -> list[dict]:
         text=True,
         check=True,
     ).stdout
-    return json.loads(out)
+    items = json.loads(out)
+    if len(items) >= ISSUE_LIST_LIMIT:
+        print(
+            f"WARNING: issue list hit the {ISSUE_LIST_LIMIT}-issue limit; "
+            "results may be incomplete",
+            file=sys.stderr,
+        )
+    return items
 
 
 def is_epic_type(issue: dict) -> bool:
@@ -91,7 +101,7 @@ def severity(missing: list[str], epic: bool) -> str:
     return "MINOR"
 
 
-def reconcile() -> dict:
+def run() -> dict:
     issues = fetch_open_issues()
     bad: list[dict] = []
     for it in sorted(issues, key=lambda i: -i["number"]):
@@ -111,7 +121,7 @@ def reconcile() -> dict:
 
 
 def main() -> int:
-    result = reconcile()
+    result = run()
     if "--json" in sys.argv[1:]:
         print(json.dumps(result, indent=2))
         return 1 if result["bad"] else 0

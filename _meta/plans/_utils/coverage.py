@@ -37,6 +37,9 @@ from pathlib import Path
 
 PLANS_DIR = Path(__file__).resolve().parent
 
+# `gh issue list` page cap; warn if a call saturates it (results may be truncated).
+ISSUE_LIST_LIMIT = 1000
+
 
 def _load_sibling(name: str):
     """Import a sibling single-file script by path so its logic can be reused."""
@@ -76,7 +79,7 @@ def fetch_open_issues() -> list[dict]:
             "--state",
             "open",
             "--limit",
-            "1000",
+            str(ISSUE_LIST_LIMIT),
             "--json",
             "number,title,labels,milestone",
         ],
@@ -84,7 +87,14 @@ def fetch_open_issues() -> list[dict]:
         text=True,
         check=True,
     ).stdout
-    return json.loads(out)
+    items = json.loads(out)
+    if len(items) >= ISSUE_LIST_LIMIT:
+        print(
+            f"WARNING: issue list hit the {ISSUE_LIST_LIMIT}-issue limit; "
+            "results may be incomplete",
+            file=sys.stderr,
+        )
+    return items
 
 
 def maybe_trivial(issue: dict) -> bool:

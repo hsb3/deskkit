@@ -108,9 +108,19 @@ def parse_args(argv: list[str]) -> tuple[int, str | None, bool]:
             as_json = True
         elif arg == "--limit":
             i += 1
-            limit = int(argv[i])
+            if i >= len(argv):
+                print("--limit requires a value", file=sys.stderr)
+                sys.exit(2)
+            try:
+                limit = int(argv[i])
+            except ValueError:
+                print(f"--limit requires an integer, got: {argv[i]!r}", file=sys.stderr)
+                sys.exit(2)
         elif arg == "--since":
             i += 1
+            if i >= len(argv):
+                print("--since requires a value", file=sys.stderr)
+                sys.exit(2)
             since = argv[i]
         else:
             print(f"unknown arg: {arg}", file=sys.stderr)
