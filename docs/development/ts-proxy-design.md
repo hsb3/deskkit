@@ -4,7 +4,8 @@ _The implementation design ADR 0016 calls for: how the harness-pure TypeScript `
 boundary gains server-backed (librarian) capabilities by **proxying** deskkit's Go `mcp-serve`,
 without reimplementing librarian logic in TS. A builder should be able to pick up the build slices
 in §5 cold from this document._
-Status: active (2026-07-20)
+
+- **Status:** Active (2026-07-20)
 
 > **Scope note.** This is a *design pass*, not a new architectural ruling. ADR
 > [0016](../decisions/0016-ts-boundary-deskkit-proxy.md) already made the call (extend the TS
@@ -102,7 +103,11 @@ hardcoding a list — so the proxied surface can never drift from the Go gate.
 - **Mid-session child crash:** a proxied `CallTool` after the child has died returns an MCP
   `isError` result naming the child's death (mirroring `server.ts:48-53`'s posture), and the
   proxy attempts **one** respawn (no retry storm); if respawn also fails, the proxied surface
-  stays degraded-and-loud (§3.2) while the four native tools keep serving.
+  stays degraded-and-loud (§3.2) while the four native tools keep serving. The respawn is
+  **on-call, not on-death-detection**: it happens lazily when the next proxied `CallTool`
+  arrives. Immediate respawn risks a tight loop when the child dies deterministically at
+  startup (e.g. an unresolved desk); on-call respawn bounds the cost to one `isError` for the
+  first post-crash caller, whose stderr already carries the child's own failure line.
 
 ### 3.2 Availability behavior — fail *loud*, degrade the proxy, keep native tools alive
 
@@ -287,7 +292,7 @@ slice 0 is the go/no-go probe.
 | # | Slice | Owned files | Notes / gate |
 |---|---|---|---|
 | **0** | **Spawn-feasibility probe** | *(spike, no owned prod file)* | Confirm a Claude Code plugin stdio MCP server may spawn `deskkit` as a subprocess in the target host. If not → §4 blocker → Option A fallback. **Do this first.** |
-| **1** | Proxy module | **new** `plugin/mcp/proxy.ts` | Spawn `deskkit mcp-serve` with `MCP_MODULES=librarian` (+ passthrough `LIBRARIAN_AUTONOMOUS_WRITES`); MCP **client** handshake (`initialize`→`tools/list`); `CallTool` forwarding; lifecycle/cleanup (§3.1); fail-loud + child-stderr forwarding (§3.2). Harness-pure boundary respected by living in `mcp/`, not `core/` (§3.5). |
+| **1** | Proxy module | **new** `plugin/mcp/proxy.ts` | Spawn `deskkit mcp-serve` with `MCP_MODULES=librarian` (+ passthrough `LIBRARIAN_AUTONOMOUS_WRITES`); MCP **client** handshake (`initialize`→`tools/list`); `CallTool` forwarding; lifecycle/cleanup (§3.1); fail-loud + child-stderr forwarding (§3.2). Harness-pure boundary respected by living in `mcp/`, not `core/` (§3.5). Env trap: `spawn()` inherits `process.env` by default — which the child NEEDS (`DESK_ROOT`/`DESK_NAME`/cwd walk-up feed `requireResolvedConfig`); if the spawn passes an explicit `env`, it must spread `...process.env` before adding `MCP_MODULES`, or the child exits immediately as desk-unresolved. |
 | **2** | Server wiring | `plugin/mcp/server.ts` **(edited — out of scope for #122)** | Merge native `TOOLS` with the proxy's tool list in `ListTools`; route `CallTool` to native handler or proxy by name; emit the aggregate mount signal (§3.6). |
 | **3** | Claiming skill | **new/extended** under `plugin/claude-plugin/skills/` (e.g. `desk-librarian/SKILL.md`, or `conventions-standard`) | Claim the 5 proxied librarian tools so none is unclaimed (§3.4; ADR 0014). **Must ship in the same wave as slices 1–2.** |
 | **4** | Tool-surface truth | `docs/tool-surface.md` **§3 + Summary**, and the `tool-surface-drift-guard` (tracked **separately**) | Update surface-3 count from 4 to 4 + proxied (5/6); extend the drift guard to count the proxied tools. This issue only **notes** the guard must absorb them — it does not implement/extend the guard here. |
