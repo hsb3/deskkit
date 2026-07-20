@@ -132,11 +132,23 @@ Q1–Q4); D2–D8 annotated; deck regenerated (17 slides + 4:04 audio, same fold
 grammar · typed-reference contract · item-type validation · disposition completion ·
 agent contract · prompt governance · TS-boundary-via-deskkit-proxy · identity & hygiene ·
 element-model direction), indexed in the README; the two contradicted spec passages
-corrected in place (pm-spec R6.1; librarian-spec §7.2). **Next: Phase 4 — the build plan**
-(planning desk: epics/issues with acceptance criteria + gate labels from the ADRs'
-Affects/Consequences sections; named deliverables include the v1+v2 simulations, the TS
-proxy design item, the trigger design item, and the schema-v2 element-track revision).
-Everything below this paragraph predates the reboot.
+corrected in place (pm-spec R6.1; librarian-spec §7.2). **The session record is on
+PR #113** (branch `docs/design-session-rulings`, commit `5d3046c`: ADRs + decision book +
+five dossiers + migrated platform docs + both signoff trails with `answers.json` + the
+briefing package + the two spec corrections + `.claude/settings.json` plugin enablement;
+`make check` green pre-commit). **CI is GREEN** (verified pre-clear: `ci: pass`,
+`claude-review: pass`, `claude: skipping`) — the PR is merge-ready; merging is the owner's
+call. Note (2026-07-20, post-record): the old dev-tooling exec desk was **renamed
+`dotfiles-agents-desk`** — the frozen platform originals + migration pointers traveled with
+it; stale `dev-tooling-desk` paths in earlier session docs resolve there.
+**Next: merge PR #113, then Phase 4 — the build plan from main** (planning desk: epics/
+issues with acceptance criteria + gate labels derived from ADRs 0009–0018's Affects/
+Consequences; named deliverables: the **v1+v2 model simulations** (0009), the **TS-proxy
+design item** (0016), the **trigger design item** (0018), the **schema-v2 element-track
+revision** (0009/0018), plus the mechanism slices 0012/0013/0017 and the contract/bundle
+work 0014/0015). Decision batches for Henry ALWAYS go through the owner-signoff HTML form;
+decision packages as deck/PDF (project memory). Everything below this paragraph predates
+the reboot.
 
 **Owner SIGNED OFF on the decision list (2026-07-20 12:11Z**, recorded at
 `_meta/signoff/2026-07-20-decision-book-scope/answers.json` — the batch dir with the form is
@@ -262,14 +274,12 @@ committed GIFs depict v2 accurately — reopen only if a real redesign needs fre
   Phase 2 of the design session. #79's merge unblocks the PM default-on lane (#83) but that
   is a feature lane — it waits on the design session per the sequencing directive. Deferred
   TUI UX items remain in `docs/development/chat-tui-ux-survey.md`.
-- **Owner directive (2026-07-20): after the bug floor, feature lanes wait on a design
-  session.** Agenda + two assessed owner concerns (librarian/PM agent asymmetry; document
-  data-model gaps — #92/#93/#102 are symptoms and should be fixed as modeling decisions, not
-  spot patches) are on the exec desk:
-  `analyses/desk-standard-agent-symmetry-and-document-model-2026-07-20.md`. Decision
-  packages for Henry are delivered as non-markdown briefings (deck/PDF, exec-desk comms
-  standard), never terminal markdown. Design-session **prep** teams may run concurrently
-  with bug-floor work only while bug-floor leadership is unimpaired (§1 mandate).
+- **The design session is RULED (2026-07-20) — ADRs 0009–0018 bind** (see the §1 reboot
+  paragraph). Feature lanes are unblocked under those rulings; start with Phase 4 (the
+  build plan) once PR #113 merges. The decision book, dossiers, and migrated platform docs
+  under `_meta/research/2026-07-design-session/` are the historical record — the ADRs are
+  what binds. Decision packages for Henry stay non-markdown (deck/PDF); his answers are
+  collected via the owner-signoff HTML form, never chat questions.
 - **Cut the next release** when `[Unreleased]` warrants — follow `docs/development/releasing.md`
   (bump VERSION + 3 manifests → roll `[Unreleased]` into a dated CHANGELOG section →
   `make release-prep` → tag). `check-changelog` gates the tag; `make version-status` flags drift.
