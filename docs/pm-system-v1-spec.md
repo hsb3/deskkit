@@ -393,7 +393,7 @@ table-per-level design.
 | `blocked` | bool | the side-state flag; independent of `phase` (§3.2) |
 | `status_label` | text | friendly vocabulary over the phase (R2.2; §3.3) |
 | `court` | select | `owner`,`desk`,`crew`,`vendor`,`external-session` (R2.3) |
-| `pointer` | text | doc path / issue URL / other locus (R2.3) |
+| `pointer` | text | desk-relative file path; grammar defined in §3.1a (ADR 0010) |
 | `severity` | select | `low`,`medium`,`high` (R2.3) |
 | `priority` | number | ordinal within a court/queue (R2.3) |
 | `claimed_by` | text | actor string holding the claim (R2.6) |
@@ -406,6 +406,48 @@ table-per-level design.
 `type`, `severity`, `priority` are the friendly/first-class vocabulary (data-owned). Keeping
 them separate (R2.2) is what lets the label set evolve per desk without touching the transition
 logic.
+
+### 3.1a `pointer` grammar (ADR 0010)
+
+The `items.pointer` field is a **desk-relative file path** — never an issue URL and never an
+arbitrary locus. The grammar below was shipped before it was specified; this subsection is the
+normative definition **ADR 0010** (`docs/decisions/0010-pointer-grammar.md`) ratifies, with no
+change to the shipped behavior it names.
+
+- **Form.** A pointer is a path relative to the desk root, optionally suffixed with an advisory
+  section anchor: `<path>` or `<path> § <heading>` (e.g. `notes.md § Decisions`).
+- **The `§ <heading>` suffix is advisory only and is never checked by a gate.** `Verdict`
+  resolves and validates only the FILE part of the pointer, dropping the suffix via
+  `sectionFilePart`; the heading names a location inside the document for a human reader, not
+  part of the file's identity, so renaming a heading never breaks an already-gated pointer
+  (`librarian/internal/modules/librarian/module.go:96-175` — `Verdict`, whose doc comment at
+  `:116-121` states the advisory rule explicitly; `:203-214` — `sectionFilePart`).
+- **Two forms fail closed, each with an actionable hint:**
+  - A `://`-scheme-bearing pointer (a URL) is refused outright: `"pointer %q is not a desk
+    file; a document gate needs a file path"` (`module.go:123-124`).
+  - A `#`-anchored pointer (the markdown convention, e.g. `file.md#heading`) is **not**
+    stripped — only `§` delimits a section anchor — and fails closed, naming the supported `§`
+    form instead of leaving a bare not-found (`module.go:136-138`).
+- **Pinned by tests:** `TestVerdict_ToleratesSectionAnchorSuffix`
+  (`librarian/internal/modules/librarian/module_test.go:198-258` — an absent heading still
+  passes, a genuinely missing file still fails, a URL with a section anchor still fails) and
+  `TestVerdict_HashAnchorNotStripped` (`module_test.go:260-292` — a `#`-anchored pointer fails
+  closed and the failure names `§`).
+
+**Not the same question.** The gate config's `DocRequirement.Pointer` **selector**
+(`librarian/internal/modules/pm/gates/gates.go:25`; values `""`/`"item"` — the default, resolve
+via the item's own `pointer` field — or `"note:<key>"`) answers *which document* a gate reads.
+The `items.pointer` field grammar defined above answers *where that document lives on disk*. A
+reader must not conflate "which document" with "where the document lives" — they are distinct
+questions answered by distinct fields in distinct collections.
+
+No code change: `Verdict`/`sectionFilePart` (`module.go`) and `DocRequirement`/
+`validateDocRequirement` (`gates.go`) are cited above, not modified — ADR 0010 ratifies their
+existing, test-pinned behavior as-is.
+
+Issue and URL references are **not** gate pointers under this grammar — they are a
+cross-reference, typed per ADR 0011 (§7 R6.1; `docs/decisions/0011-typed-reference-contract.md`).
+This section states only that boundary; it does not define the typed-reference contract.
 
 ### 3.2 The rigid state machine (R2.2)
 

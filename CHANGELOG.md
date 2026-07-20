@@ -15,6 +15,11 @@ for why this policy exists.
 
 ### Added
 
+- **Normative `pointer` grammar spec section** (#115). `docs/pm-system-v1-spec.md` §3.1a now
+  defines the `items.pointer` grammar ADR 0010 ratified — desk-relative file path with an
+  advisory `§ <heading>` suffix; URL and `#`-anchored forms fail closed — and corrects the
+  field-table row that still described the pointer as "doc path / issue URL / other locus".
+  Docs-only; the shipped, test-pinned behavior is unchanged.
 - **Findings disposition lifecycle** (#93). Patrol findings now carry a `disposition`
   (`open`/`acknowledged`/`triaged`/`wont_fix`), orthogonal to `state`. `deskkit findings dispose
   <id> --as <disposition>` marks a finding; `query findings` defaults to live (undisposed) items
