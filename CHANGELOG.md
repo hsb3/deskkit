@@ -15,6 +15,24 @@ for why this policy exists.
 
 ### Added
 
+- **Document identity + schema hygiene** (#123, ADR 0017). Three independent fixes shipped as
+  one package. (A) **Frontmatter `id`** is now a recognized, OPTIONAL document-identity
+  primitive: sweep reads it into a new `files.doc_id` column (migration `0018`) and matches an
+  existing row by `doc_id` FIRST, falling back to `path`, so a renamed document that carries an
+  `id` updates its existing record at the new path instead of being soft-deleted and
+  re-inserted — rename stops discarding history. A document with no `id` keeps today's
+  behavior unchanged, and two documents sharing one `id` within a sweep are never merged: the
+  duplicate falls back to path-matching and is surfaced as a patrol-visible finding
+  (`duplicate-doc-id`). (B) **`files.entity_type` is renamed to `files.doctype`**
+  (migration `0019`, in place, reversible) — the old name collided with the schema's unrelated
+  `entity_type` enum (a person/company classification); only the column name changed, the
+  value did not, and every code/test/spec literal referring to the old column name moved with
+  it. (C) **Explicit `Max` caps on seven content-bearing `TextField`s** that still rode
+  PocketBase's implicit 5,000-char default (migration `0020`; `patrol_findings.detail` /
+  `proposed_fix` widen to 50,000, five summary/detail/error fields tighten to 2,000), plus a
+  new dependency-free `scripts/check-textfield-max.mjs` recurrence guard (wired into
+  `make check` + CI) that fails any future uncapped content `TextField` by name. Store schema
+  version 17 → 20.
 - **Tool-surface drift guard** (#121, ADR 0016). `docs/tool-surface.md` — the authoritative,
   empirically-derived map of every tool-bearing surface (#94) — is now pinned to source by a
   mechanical guard, closing the manual "remember to re-run the probe" gap that let the old

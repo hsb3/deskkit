@@ -1,9 +1,13 @@
 package tools
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/pocketbase/dbx"
+	"github.com/pocketbase/pocketbase/core"
 )
 
 func TestDirKindForRoot(t *testing.T) {
@@ -331,5 +335,181 @@ func TestScanFileInlineMarkerSetsGraduatedTo(t *testing.T) {
 	}
 	if _, _, hit := r5Check(row.DirKind, content); !hit {
 		t.Fatalf("R5 must fire on an inline-marked graduated doc that is still >40 lines")
+	}
+}
+
+// --- slice A: frontmatter `id` as the document-identity primitive (ADR 0017) ---
+//
+// These four drive the actual Sweep() against a real store + on-disk desk (via newTestEnv /
+// mustWriteFile, shared with propose_fix_test.go). Each is red against the pre-change,
+// path-only matching: (1) a rename would insert a fresh record, (2) is a preservation companion,
+// (3) doc_id would be empty, (4) no duplicate finding would be filed.
+
+func firstFileRow(t *testing.T, app core.App, path string) *core.Record {
+	t.Helper()
+	r, err := app.FindFirstRecordByFilter("files", "path = {:p}", dbx.Params{"p": path})
+	if err != nil {
+		t.Fatalf("no files row at %q: %v", path, err)
+	}
+	return r
+}
+
+// TestSweep_RenameWithIDKeepsSameRecord — a doc carrying a frontmatter `id`, renamed on disk
+// between two sweeps, keeps the SAME files record at its new path (identity survives the rename);
+// the old path has no row (moved, not soft-deleted-and-orphaned). RED against path-only matching,
+// which would fresh-insert a new record and soft-delete the old path.
+func TestSweep_RenameWithIDKeepsSameRecord(t *testing.T) {
+	app, cfg := newTestEnv(t)
+	ctx := context.Background()
+
+	doc := "---\ntype: analysis\nid: analysis-alpha\ncreated: 2026-07-20\nupdated: 2026-07-20\ntags: []\n---\nbody\n"
+	oldRel := "analyses/alpha.md"
+	mustWriteFile(t, cfg.DeskRoot, oldRel, doc)
+	if _, err := Sweep(ctx, app, cfg, &SweepInput{}); err != nil {
+		t.Fatalf("first sweep: %v", err)
+	}
+	before := firstFileRow(t, app, oldRel)
+	origID := before.Id
+	if got := before.GetString("doc_id"); got != "analysis-alpha" {
+		t.Fatalf("doc_id not stored from frontmatter id: got %q", got)
+	}
+
+	// Rename on disk (same id, new path), then re-sweep.
+	if err := os.Remove(filepath.Join(cfg.DeskRoot, oldRel)); err != nil {
+		t.Fatalf("remove old path: %v", err)
+	}
+	newRel := "analyses/alpha-renamed.md"
+	mustWriteFile(t, cfg.DeskRoot, newRel, doc)
+	if _, err := Sweep(ctx, app, cfg, &SweepInput{}); err != nil {
+		t.Fatalf("second sweep: %v", err)
+	}
+
+	after := firstFileRow(t, app, newRel)
+	if after.Id != origID {
+		t.Fatalf("rename with id must keep the SAME record: old id %s, new id %s", origID, after.Id)
+	}
+	if after.GetBool("deleted") {
+		t.Fatalf("the renamed row must not be soft-deleted")
+	}
+	if orphan, _ := app.FindFirstRecordByFilter("files", "path = {:p}", dbx.Params{"p": oldRel}); orphan != nil {
+		t.Fatalf("old path must have no row after the rename, found id %s (deleted=%v)", orphan.Id, orphan.GetBool("deleted"))
+	}
+}
+
+// TestSweep_RenameWithoutIDIsSoftDeletePlusInsert — a doc with NO frontmatter id, renamed on disk,
+// still soft-deletes the old path and inserts a fresh row (today's behavior is unchanged for the
+// common no-id case). This is the preservation companion.
+func TestSweep_RenameWithoutIDIsSoftDeletePlusInsert(t *testing.T) {
+	app, cfg := newTestEnv(t)
+	ctx := context.Background()
+
+	doc := "---\ntype: analysis\ncreated: 2026-07-20\nupdated: 2026-07-20\ntags: []\n---\nbody\n" // NO id
+	oldRel := "analyses/beta.md"
+	mustWriteFile(t, cfg.DeskRoot, oldRel, doc)
+	if _, err := Sweep(ctx, app, cfg, &SweepInput{}); err != nil {
+		t.Fatalf("first sweep: %v", err)
+	}
+	origID := firstFileRow(t, app, oldRel).Id
+
+	if err := os.Remove(filepath.Join(cfg.DeskRoot, oldRel)); err != nil {
+		t.Fatalf("remove old path: %v", err)
+	}
+	newRel := "analyses/beta-renamed.md"
+	mustWriteFile(t, cfg.DeskRoot, newRel, doc)
+	if _, err := Sweep(ctx, app, cfg, &SweepInput{}); err != nil {
+		t.Fatalf("second sweep: %v", err)
+	}
+
+	old := firstFileRow(t, app, oldRel)
+	if !old.GetBool("deleted") {
+		t.Fatalf("no-id rename: the old path row must be soft-deleted")
+	}
+	newRec := firstFileRow(t, app, newRel)
+	if newRec.Id == origID {
+		t.Fatalf("no-id rename must be a fresh insert, not a moved record")
+	}
+	if newRec.GetBool("deleted") {
+		t.Fatalf("the new path row must be live")
+	}
+}
+
+// TestSweep_RebuildReproducesDocID — a fresh sweep from disk alone (after the store's files rows
+// are wiped) reproduces the same doc_id for every id-carrying doc, confirming the identity
+// primitive is re-derivable from the desk tree (files-are-truth, decision 0009). RED pre-change:
+// doc_id did not exist, so the first-pass values would be empty.
+func TestSweep_RebuildReproducesDocID(t *testing.T) {
+	app, cfg := newTestEnv(t)
+	ctx := context.Background()
+
+	docs := map[string]string{
+		"analyses/one.md": "---\ntype: analysis\nid: doc-one\ncreated: 2026-07-20\nupdated: 2026-07-20\ntags: []\n---\nx\n",
+		"tasks/two.md":    "---\ntype: task\nid: doc-two\ncreated: 2026-07-20\nupdated: 2026-07-20\ntags: []\n---\ny\n",
+	}
+	for rel, c := range docs {
+		mustWriteFile(t, cfg.DeskRoot, rel, c)
+	}
+	if _, err := Sweep(ctx, app, cfg, &SweepInput{}); err != nil {
+		t.Fatalf("sweep 1: %v", err)
+	}
+	first := map[string]string{}
+	for rel := range docs {
+		got := firstFileRow(t, app, rel).GetString("doc_id")
+		if got == "" {
+			t.Fatalf("%s: doc_id not populated from frontmatter id", rel)
+		}
+		first[rel] = got
+	}
+
+	// Wipe the store's files rows (simulate a store rebuild) and sweep the SAME disk again.
+	existing, err := app.FindRecordsByFilter("files", "", "", 0, 0, dbx.Params{})
+	if err != nil {
+		t.Fatalf("list files rows: %v", err)
+	}
+	for _, r := range existing {
+		if err := app.Delete(r); err != nil {
+			t.Fatalf("wipe files row: %v", err)
+		}
+	}
+	if _, err := Sweep(ctx, app, cfg, &SweepInput{}); err != nil {
+		t.Fatalf("sweep 2 (rebuild): %v", err)
+	}
+	for rel, want := range first {
+		if got := firstFileRow(t, app, rel).GetString("doc_id"); got != want {
+			t.Fatalf("%s: rebuild produced doc_id %q, want %q (must be re-derivable from disk)", rel, got, want)
+		}
+	}
+}
+
+// TestSweep_DuplicateIDFilesFindingNoMerge — two DIFFERENT docs sharing one frontmatter id do NOT
+// merge (each keeps its own row); the duplicate is surfaced as a patrol-visible finding. RED
+// pre-change: no doc_id, no duplicate detection, so no finding would be filed.
+func TestSweep_DuplicateIDFilesFindingNoMerge(t *testing.T) {
+	app, cfg := newTestEnv(t)
+	ctx := context.Background()
+
+	shared := "shared-id-x"
+	docA := "---\ntype: analysis\nid: " + shared + "\ncreated: 2026-07-20\nupdated: 2026-07-20\ntags: []\n---\naaa\n"
+	docB := "---\ntype: analysis\nid: " + shared + "\ncreated: 2026-07-20\nupdated: 2026-07-20\ntags: []\n---\nbbb\n"
+	relA, relB := "analyses/a.md", "analyses/b.md"
+	mustWriteFile(t, cfg.DeskRoot, relA, docA)
+	mustWriteFile(t, cfg.DeskRoot, relB, docB)
+
+	if _, err := Sweep(ctx, app, cfg, &SweepInput{}); err != nil {
+		t.Fatalf("sweep: %v", err)
+	}
+
+	recA := firstFileRow(t, app, relA)
+	recB := firstFileRow(t, app, relB)
+	if recA.Id == recB.Id {
+		t.Fatalf("two docs sharing an id must NOT be merged into one row")
+	}
+
+	findings, err := app.FindRecordsByFilter(
+		"patrol_findings", "rule = 'duplicate-doc-id' && state = 'flagged'", "", 0, 0, dbx.Params{})
+	if err != nil {
+		t.Fatalf("query findings: %v", err)
+	}
+	if len(findings) == 0 {
+		t.Fatalf("a duplicate frontmatter id must file a patrol-visible finding")
 	}
 }

@@ -13,7 +13,9 @@ func init() {
 		files.Id = "pbc_3446931122"
 		files.Fields.Add(&core.TextField{Name: "path", Required: true})
 		files.Fields.Add(&core.TextField{Name: "desk"})
-		files.Fields.Add(&core.TextField{Name: "entity_type"})
+		// Renamed to "doctype" in 0019 — this fresh-store decl carries the new name; 0019 renames
+		// the column in place on existing stores (its guard no-ops here, where doctype already exists).
+		files.Fields.Add(&core.TextField{Name: "doctype"})
 		files.Fields.Add(&core.SelectField{Name: "dir_kind", MaxSelect: 1,
 			// "infra" added in 0012 — this fresh-store decl carries it; 0012 alters existing stores.
 			Values: []string{"decisions", "tasks", "analyses", "journal", "meta", "memory", "root", "other", "infra"}})

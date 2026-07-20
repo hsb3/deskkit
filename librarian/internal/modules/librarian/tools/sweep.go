@@ -41,18 +41,33 @@ func Sweep(ctx context.Context, app core.App, cfg *config.Config, in *SweepInput
 		if cerr != nil {
 			return cerr
 		}
+		findingsCollection, fcerr := txApp.FindCollectionByNameOrId("patrol_findings")
+		if fcerr != nil {
+			return fcerr
+		}
 
 		existingList, ferr := txApp.FindRecordsByFilter("files", "", "", 0, 0, dbx.Params{})
 		if ferr != nil {
 			return ferr
 		}
+		// Two identity indexes: by path (always), and by frontmatter id -> the row that carries it
+		// (files.doc_id, ADR 0017). A sweep prefers the doc_id match so a renamed doc keeps its row;
+		// path is the fallback for a doc with no id.
 		existingByPath := make(map[string]*core.Record, len(existingList))
+		existingByDocID := make(map[string]*core.Record)
 		for _, r := range existingList {
 			existingByPath[r.GetString("path")] = r
+			if id := r.GetString("doc_id"); id != "" {
+				if _, dup := existingByDocID[id]; !dup {
+					existingByDocID[id] = r
+				}
+			}
 		}
 
 		now := time.Now().UTC()
 		seen := make(map[string]bool, len(relPaths))
+		matched := make(map[string]bool, len(existingList)) // record ids claimed this sweep
+		idClaimedBy := make(map[string]string)              // frontmatter id -> first rel that used it
 		for _, rel := range relPaths {
 			row, serr := scanFile(root, rel, dirMap, cfg.SecretsDir, cfg.DeskName)
 			if serr != nil {
@@ -61,7 +76,29 @@ func Sweep(ctx context.Context, app core.App, cfg *config.Config, in *SweepInput
 				continue
 			}
 			seen[rel] = true
-			old := existingByPath[rel]
+
+			// Identity match: doc_id first (rename survival), path fallback. A frontmatter id
+			// already claimed by an earlier doc THIS sweep is a duplicate — never merge two files
+			// into one row: fall back to path-matching and surface a patrol-visible finding.
+			var old *core.Record
+			duplicateID := false
+			if row.DocID != "" {
+				if _, claimed := idClaimedBy[row.DocID]; claimed {
+					duplicateID = true
+					old = existingByPath[rel]
+				} else {
+					idClaimedBy[row.DocID] = rel
+					if byID, ok := existingByDocID[row.DocID]; ok && !matched[byID.Id] {
+						old = byID
+					} else {
+						old = existingByPath[rel]
+					}
+				}
+			} else {
+				old = existingByPath[rel]
+			}
+
+			var recID string
 			switch {
 			case old == nil:
 				rec := core.NewRecord(filesCollection)
@@ -70,27 +107,44 @@ func Sweep(ctx context.Context, app core.App, cfg *config.Config, in *SweepInput
 				if err := txApp.Save(rec); err != nil {
 					return err
 				}
+				recID = rec.Id
 				result.Created++
-			case fileRowDiffers(old, row):
+			case old.GetString("path") != row.Path || fileRowDiffers(old, row):
+				// Update — including the rename case (matched by doc_id, new path): path is excluded
+				// from COMPARE_FIELDS, so a pure rename is applied via the explicit path comparison
+				// here, moving the SAME record to the new path.
 				applyFileRow(old, row)
 				old.Set("last_seen", now)
 				if err := txApp.Save(old); err != nil {
 					return err
 				}
+				recID = old.Id
 				result.Updated++
 			default:
+				recID = old.Id
 				result.Unchanged++
+			}
+			matched[recID] = true
+
+			if duplicateID {
+				if err := fileDuplicateIDFinding(txApp, findingsCollection, recID, row, idClaimedBy[row.DocID], now); err != nil {
+					return err
+				}
 			}
 		}
 
-		for p, old := range existingByPath {
-			if !seen[p] && !old.GetBool("deleted") {
-				old.Set("deleted", true)
-				if err := txApp.Save(old); err != nil {
-					return err
-				}
-				result.SoftDeleted++
+		// Soft-delete by RECORD identity, not by path: any existing row NOT matched this sweep (by
+		// doc_id or path) is gone from disk. A rename-with-id updated its row in place (matched), so
+		// it is never soft-deleted at its old path — only a genuinely vanished file is.
+		for _, old := range existingList {
+			if matched[old.Id] || old.GetBool("deleted") {
+				continue
 			}
+			old.Set("deleted", true)
+			if err := txApp.Save(old); err != nil {
+				return err
+			}
+			result.SoftDeleted++
 		}
 		result.Total = len(seen)
 		return nil
@@ -101,6 +155,42 @@ func Sweep(ctx context.Context, app core.App, cfg *config.Config, in *SweepInput
 	return result, nil
 }
 
+// fileDuplicateIDFinding records a patrol-visible finding when two desk documents share one
+// frontmatter `id` within a single sweep. The duplicate keeps its OWN path identity (it was
+// upserted by path, never merged into the row that first claimed the id); this finding surfaces
+// the collision for a supervisor to resolve. It is filed against the duplicate's own files record
+// (recID) and deduped on (file, rule, checksum) so a repeated sweep does not spam identical rows.
+// severity is "judgment": detection is mechanical but choosing WHICH doc keeps the id is a human
+// call, so there is no auto-fix.
+func fileDuplicateIDFinding(txApp core.App, findings *core.Collection, recID string, row fileRow, otherPath string, now time.Time) error {
+	const rule = "duplicate-doc-id"
+	existing, err := txApp.FindRecordsByFilter(
+		"patrol_findings",
+		"file = {:file} && rule = {:rule} && checksum = {:checksum} && state = 'flagged'",
+		"", 1, 0,
+		dbx.Params{"file": recID, "rule": rule, "checksum": row.Checksum},
+	)
+	if err != nil {
+		return err
+	}
+	if len(existing) > 0 {
+		return nil // already flagged for this file+content — do not duplicate the finding
+	}
+	fr := core.NewRecord(findings)
+	fr.Set("file", recID)
+	fr.Set("rule", rule)
+	fr.Set("severity", "judgment")
+	fr.Set("detail", fmt.Sprintf(
+		"frontmatter id %q is also used by %q — two documents cannot share one id; this file kept its path identity instead of merging",
+		row.DocID, otherPath))
+	fr.Set("proposed_fix", "give one of the two documents a distinct frontmatter `id`")
+	fr.Set("state", "flagged")
+	fr.Set("patrol_run", "sweep-"+now.Format("20060102T150405Z"))
+	fr.Set("checksum", row.Checksum)
+	fr.Set("disposition", "open")
+	return txApp.Save(fr)
+}
+
 // --- fileRow: the shared plain-Go shape of one `files` collection row (spec §4.2). Used by
 // sweep (built from a filesystem scan), patrol, and query (read back from the DB) so that
 // all rule/derivation logic is pure and testable without a PocketBase app. ---
@@ -108,8 +198,9 @@ func Sweep(ctx context.Context, app core.App, cfg *config.Config, in *SweepInput
 type fileRow struct {
 	ID            string
 	Path          string
+	DocID         string // frontmatter `id` (optional document-identity primitive, ADR 0017)
 	Desk          string
-	EntityType    string
+	Doctype       string // frontmatter `type` (files.doctype column; renamed by migration 0019, ADR 0017)
 	DirKind       string
 	Status        string
 	Synopsis      string
@@ -127,8 +218,9 @@ func fileRowFromRecord(r *core.Record) fileRow {
 	return fileRow{
 		ID:            r.Id,
 		Path:          r.GetString("path"),
+		DocID:         r.GetString("doc_id"),
 		Desk:          r.GetString("desk"),
-		EntityType:    r.GetString("entity_type"),
+		Doctype:       r.GetString("doctype"),
 		DirKind:       r.GetString("dir_kind"),
 		Status:        r.GetString("status"),
 		Synopsis:      r.GetString("synopsis"),
@@ -155,8 +247,9 @@ func fileRowsFromRecords(recs []*core.Record) []fileRow {
 // COMPARE_FIELDS; §5.1).
 func applyFileRow(rec *core.Record, row fileRow) {
 	rec.Set("path", row.Path)
+	rec.Set("doc_id", row.DocID)
 	rec.Set("desk", row.Desk)
-	rec.Set("entity_type", row.EntityType)
+	rec.Set("doctype", row.Doctype)
 	rec.Set("dir_kind", row.DirKind)
 	rec.Set("status", row.Status)
 	rec.Set("synopsis", row.Synopsis)
@@ -169,12 +262,15 @@ func applyFileRow(rec *core.Record, row fileRow) {
 	rec.Set("deleted", row.Deleted)
 }
 
-// fileRowDiffers implements COMPARE_FIELDS (spec §5.1): desk, entity_type, dir_kind, status,
+// fileRowDiffers implements COMPARE_FIELDS (spec §5.1): doc_id, desk, doctype, dir_kind, status,
 // synopsis, origin, graduated_to, checksum, git_last_commit, fm_created, fm_updated, deleted.
-// "path" and "last_seen" are excluded.
+// "path" and "last_seen" are excluded — a rename that carries a frontmatter `id` is matched by
+// doc_id and its new path is applied explicitly in Sweep (a pure path change is otherwise "no
+// diff" here). doc_id IS compared so a doc that gains or changes its `id` re-persists.
 func fileRowDiffers(rec *core.Record, row fileRow) bool {
-	return rec.GetString("desk") != row.Desk ||
-		rec.GetString("entity_type") != row.EntityType ||
+	return rec.GetString("doc_id") != row.DocID ||
+		rec.GetString("desk") != row.Desk ||
+		rec.GetString("doctype") != row.Doctype ||
 		rec.GetString("dir_kind") != row.DirKind ||
 		rec.GetString("status") != row.Status ||
 		rec.GetString("synopsis") != row.Synopsis ||
@@ -245,7 +341,8 @@ func scanFile(root, rel string, dirMap map[string]string, secretsDir, deskName s
 	if strings.HasSuffix(rel, ".md") && utf8.Valid(raw) {
 		text := string(raw)
 		fm := desklib.ParseFrontmatter(text)
-		row.EntityType = fmStr(fm, "type")
+		row.DocID = fmStr(fm, "id")
+		row.Doctype = fmStr(fm, "type")
 		row.Status = fmStr(fm, "status")
 		row.Synopsis = fmStr(fm, "synopsis")
 		row.FMCreated = fmStr(fm, "created")

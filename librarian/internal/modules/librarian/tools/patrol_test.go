@@ -112,7 +112,7 @@ func TestR3CheckCorrectlyPlacedNestedDecision(t *testing.T) {
 func TestR3CheckNoTypeConfigured(t *testing.T) {
 	dirMap := map[string]string{"decision": "_structure/decisions"}
 	if _, _, hit := r3Check("", "other", "README.md", dirMap); hit {
-		t.Fatalf("empty entity_type must never flag R3")
+		t.Fatalf("empty doctype must never flag R3")
 	}
 	if _, _, hit := r3Check("unknown-type", "other", "README.md", dirMap); hit {
 		t.Fatalf("a type absent from TYPE_DIR_MAP must never flag R3")

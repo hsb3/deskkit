@@ -70,7 +70,7 @@ func TestPrettyQuery_ListAdoption(t *testing.T) {
 
 func TestPrettyQuery_ListLiveFiles(t *testing.T) {
 	raw := json.RawMessage(`{"kind":"live_files","count":1,"files":[
-		{"path":"tasks/t.md","dir_kind":"tasks","entity_type":"task","status":"","graduated_to":"","git_last_commit":"abc|2026-07-15"}]}`)
+		{"path":"tasks/t.md","dir_kind":"tasks","doctype":"task","status":"","graduated_to":"","git_last_commit":"abc|2026-07-15"}]}`)
 	out, ok := prettyQuery("live_files", raw)
 	if !ok || !strings.Contains(out, "tasks/t.md") || !strings.Contains(out, "git_last_commit") {
 		t.Errorf("live_files output unexpected (ok=%v):\n%s", ok, out)

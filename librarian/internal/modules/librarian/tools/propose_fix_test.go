@@ -75,12 +75,12 @@ func mustCollection(t *testing.T, app core.App, name string) *core.Collection {
 }
 
 // mustCreateFileRecord inserts a `files` row mirroring what sweep would have produced.
-func mustCreateFileRecord(t *testing.T, app core.App, path, dirKind, entityType, checksum string) *core.Record {
+func mustCreateFileRecord(t *testing.T, app core.App, path, dirKind, doctype, checksum string) *core.Record {
 	t.Helper()
 	rec := core.NewRecord(mustCollection(t, app, "files"))
 	rec.Set("path", path)
 	rec.Set("dir_kind", dirKind)
-	rec.Set("entity_type", entityType)
+	rec.Set("doctype", doctype)
 	rec.Set("checksum", checksum)
 	rec.Set("deleted", false)
 	if err := app.Save(rec); err != nil {
@@ -408,7 +408,7 @@ func TestProposeFix_NeverClobberNoop(t *testing.T) {
 	content := "---\ntype: decision\ncreated: 2026-01-01\nupdated: 2026-01-01\ntags: []\nsynopsis: \"x\"\n---\nbody\n"
 	abs := mustWriteFile(t, cfg.DeskRoot, "tasks/misplaced.md", content)
 	checksum := desklib.Checksum([]byte(content))
-	// entity_type "decision" but living under "tasks" -> R3 mismatch; expected dir is
+	// doctype "decision" but living under "tasks" -> R3 mismatch; expected dir is
 	// cfg.DecisionsDir ("_structure/decisions").
 	fileRec := mustCreateFileRecord(t, app, "tasks/misplaced.md", "tasks", "decision", checksum)
 	mustCreateFinding(t, app, fileRec, "R3", checksum, "run-1")
@@ -434,5 +434,28 @@ func TestProposeFix_NeverClobberNoop(t *testing.T) {
 	revs, _ := app.FindRecordsByFilter("revisions", "", "", 0, 0)
 	if len(revs) != 0 {
 		t.Fatalf("expected no revisions row for a noop, got %d", len(revs))
+	}
+}
+
+// TestPlanR3_ResolvesDoctypeDestination pins planR3's read of the `files.doctype` column
+// (ADR 0017): a record with doctype "decision" living under the wrong dir, with NO existing
+// destination, must produce a non-nil "move" plan whose NewPath sits under cfg.DecisionsDir.
+// This is red if planR3 still reads a stale column name — GetString against a column that no
+// longer exists on the `files` collection returns "", so cfg.EntityDirMap()[""] resolves to ""
+// and planR3 returns nil (never a move plan) regardless of the record's real doctype.
+func TestPlanR3_ResolvesDoctypeDestination(t *testing.T) {
+	app, cfg := newTestEnv(t)
+	checksum := desklib.Checksum([]byte("body"))
+	fileRec := mustCreateFileRecord(t, app, "tasks/x.md", "tasks", "decision", checksum)
+
+	plan := planR3(cfg, fileRec)
+	if plan == nil {
+		t.Fatalf("planR3 returned nil — expected a move plan for a misplaced 'decision' doctype")
+	}
+	if plan.Action != "move" {
+		t.Fatalf("expected Action=move, got %q", plan.Action)
+	}
+	if !strings.HasPrefix(plan.NewPath, cfg.DecisionsDir+"/") {
+		t.Fatalf("expected NewPath under %s/, got %q", cfg.DecisionsDir, plan.NewPath)
 	}
 }

@@ -90,7 +90,7 @@ summary: build ## Show the file + open-findings summary counts (query summary)
 adoption: build ## Show the apply-fix adoption log (query adoption)
 	@./$(BIN) query adoption
 
-orphans: build ## Show .md files with no entity_type / not under a meta prefix (query orphans)
+orphans: build ## Show .md files with no doctype / not under a meta prefix (query orphans)
 	@./$(BIN) query orphans
 
 uncollapsed: build ## Show open R5 judgment findings — graduated-but-not-collapsed docs (query uncollapsed)

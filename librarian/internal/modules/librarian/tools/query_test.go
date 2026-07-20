@@ -58,19 +58,19 @@ func TestIsOrphan(t *testing.T) {
 		secretsDir string
 		want       bool
 	}{
-		{fileRow{Path: "docs/spec.md", EntityType: ""}, "_meta/secrets", true},
-		{fileRow{Path: "docs/spec.md", EntityType: "analysis"}, "_meta/secrets", false}, // has a type
-		{fileRow{Path: "README.txt", EntityType: ""}, "_meta/secrets", false},           // not .md
-		{fileRow{Path: "_meta/HANDOFF.md", EntityType: ""}, "_meta/secrets", false},     // under _meta/
-		{fileRow{Path: "_meta/secrets/key.md", EntityType: ""}, "_meta/secrets", false}, // under SECRETS_DIR
-		{fileRow{Path: "custom-secrets/k.md", EntityType: ""}, "custom-secrets", false}, // configurable SECRETS_DIR
+		{fileRow{Path: "docs/spec.md", Doctype: ""}, "_meta/secrets", true},
+		{fileRow{Path: "docs/spec.md", Doctype: "analysis"}, "_meta/secrets", false}, // has a type
+		{fileRow{Path: "README.txt", Doctype: ""}, "_meta/secrets", false},           // not .md
+		{fileRow{Path: "_meta/HANDOFF.md", Doctype: ""}, "_meta/secrets", false},     // under _meta/
+		{fileRow{Path: "_meta/secrets/key.md", Doctype: ""}, "_meta/secrets", false}, // under SECRETS_DIR
+		{fileRow{Path: "custom-secrets/k.md", Doctype: ""}, "custom-secrets", false}, // configurable SECRETS_DIR
 		// Non-entity infrastructure is not an orphan, keyed off dir_kind (spec §5.6): dotted
 		// infra dirs and the memory store are outside the desk taxonomy, not misfiled content.
-		{fileRow{Path: ".claude/agents/reviewer.md", EntityType: "", DirKind: "infra"}, "_meta/secrets", false},
-		{fileRow{Path: ".agents/skills/x.md", EntityType: "", DirKind: "infra"}, "_meta/secrets", false},
-		{fileRow{Path: ".claude/memory/note.md", EntityType: "", DirKind: "memory"}, "_meta/secrets", false},
+		{fileRow{Path: ".claude/agents/reviewer.md", Doctype: "", DirKind: "infra"}, "_meta/secrets", false},
+		{fileRow{Path: ".agents/skills/x.md", Doctype: "", DirKind: "infra"}, "_meta/secrets", false},
+		{fileRow{Path: ".claude/memory/note.md", Doctype: "", DirKind: "memory"}, "_meta/secrets", false},
 		// A genuinely misfiled .md in a non-infra dir is still an orphan.
-		{fileRow{Path: "scratch/loose.md", EntityType: "", DirKind: "other"}, "_meta/secrets", true},
+		{fileRow{Path: "scratch/loose.md", Doctype: "", DirKind: "other"}, "_meta/secrets", true},
 	}
 	for _, c := range cases {
 		if got := isOrphan(c.row, c.secretsDir); got != c.want {
@@ -147,12 +147,12 @@ func TestAdoptionDate(t *testing.T) {
 
 func TestToFileBrief(t *testing.T) {
 	row := fileRow{
-		Path: "tasks/x.md", DirKind: "tasks", EntityType: "task", Status: "",
+		Path: "tasks/x.md", DirKind: "tasks", Doctype: "task", Status: "",
 		GraduatedTo: "", GitLastCommit: "abc|2026-07-15",
 	}
 	got := toFileBrief(row)
 	want := fileBrief{
-		Path: "tasks/x.md", DirKind: "tasks", EntityType: "task", Status: "",
+		Path: "tasks/x.md", DirKind: "tasks", Doctype: "task", Status: "",
 		GraduatedTo: "", GitLastCommit: "abc|2026-07-15",
 	}
 	if got != want {
