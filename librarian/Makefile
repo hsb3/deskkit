@@ -16,6 +16,11 @@
 #   ./deskkit apply-fix --run <run_id>
 # (optionally under sandbox-exec — see sandbox/README.md). The throwaway-copy write path
 # (propose-fix -> apply-fix) is exercised only inside `verify`.
+#
+# `dogfood-agent` is a separate, deliberately-manual harness: it drives the REAL in-binary
+# eino agent loop (`deskkit agent`) against a throwaway scratch desk, using a real
+# ANTHROPIC_API_KEY. It is NOT part of `verify`/`make check`/CI (real LLM calls cost money and
+# aren't deterministic) — run it by hand when you want to dogfood the agent loop itself.
 .DEFAULT_GOAL := help
 SHELL := /bin/bash
 
@@ -36,7 +41,7 @@ VERSION  := $(shell cat ../VERSION 2>/dev/null || echo dev)
 LDFLAGS  := -X main.version=$(VERSION)
 
 .PHONY: help build install gui serve stop sweep patrol propose-fix findings summary \
-        adoption orphans uncollapsed verify clean test vet fmt
+        adoption orphans uncollapsed verify dogfood-agent clean test vet fmt
 
 help: ## List targets
 	@grep -hE '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) \
@@ -98,6 +103,9 @@ uncollapsed: build ## Show open R5 judgment findings — graduated-but-not-colla
 
 verify: ## Run the Phase-1 verify gate against a throwaway scratch desk (never the real desk)
 	@bash verify.sh
+
+dogfood-agent: build ## Manual dogfood: drive the REAL agent LLM loop end-to-end (needs ANTHROPIC_API_KEY; not part of verify/CI)
+	@bash dogfood-agent.sh
 
 clean: stop ## Stop serve + remove build artifacts (binary, pidfile, serve log)
 	@rm -rf $(BIN) $(PIDFILE) $(LOGFILE)

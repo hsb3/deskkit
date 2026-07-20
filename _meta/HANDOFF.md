@@ -27,6 +27,37 @@ desk's genesis record 0001.
 
 ## 1. Current standing + top priority
 
+**SESSION 2026-07-20 (integration testing) — first agent-led integration pass across both
+products; 4 real bugs filed, 1 open question flagged.** Henry noted the v1 build wave had no
+integration tests or agent-led usage proof beyond unit tests + `librarian/verify.sh`'s scripted
+CLI gate. Foreman-led: 3 parallel testers (plugin/ MCP + skills; librarian core's real
+`deskkit agent` LLM loop + a live MCP protocol session; the PM module's real work-graph
+workflow) → 2 independent adversarial reviewers (9 claims re-derived from scratch: 8
+CONFIRMED, 1 PLAUSIBLE, 0 REFUTED). Full report: `_meta/research/2026-07-20-integration-
+agent-led-testing/report.md`. **Filed as issues** (all independently confirmed):
+**#148** (high — building/running `deskkit` from a `$TMPDIR` path, e.g. `mktemp -d`, silently
+triggers PocketBase dev-mode and dumps raw SQL to stdout, corrupting a real MCP client's
+JSON-RPC stream), **#149** (medium — the real agent loop can drop a state-mutating tool call
+from its own transcript when it hits `AGENT_MAX_STEP` right after that call — an audit-trail
+integrity gap, store `revisions` show the mutation, `messages` doesn't), **#150** (low —
+`pm --actor` flag's help placement implies pre-leaf usage that fails), **#151** (low —
+`conventions-standard`'s frontmatter-exemption prose omits `_knowledge/README.md`, which the
+plugin's own shipped scaffold ships unfrontmattered — the machine gate is already correct,
+only the prose checklist is stale). **Open question, NOT filed as a bug** (unclear if it's a
+desk-standard defect or a Claude Code harness/session-timing behavior): despite
+`.claude/settings.json`'s `enabledPlugins["desk-standard@desk-standard"]: true`, neither the
+original tester nor either reviewer could get the plugin's 4 MCP tools to surface as
+agent-callable in a live session working in this repo — needs a from-scratch session test to
+pin down. Backlog candidates not yet filed (§7 of the report): a `propose_fix --run <id>`
+scoping trap, `AGENT_MAX_STEP`'s tight default (12), LLM mechanical-vs-judgment
+non-determinism across runs, two divergently-drifted `improvement-log.md` template copies.
+Three reusable scripts left behind (all pass neutrality + shellcheck):
+`plugin/scripts/verify-mcp-protocol.sh` (deterministic MCP-protocol harness),
+`librarian/dogfood-agent.sh` (manual, real-LLM, NOT wired into CI — 19/19 passing),
+`librarian/dogfood-pm.sh` (deterministic, 13/13 passing) — none yet wired into `make
+check`/`make verify`, a deliberate follow-on decision. **This session's new files (the report
++ 3 scripts + this handoff edit) are UNCOMMITTED** — commit when Henry's ready.
+
 **SESSION 2026-07-20 (build) — THE V1 BUILD WAVE IS LANDED; EPIC #129 IS CLOSED; THE
 `gate:1.0.0` LABEL QUERY IS EMPTY.** All ten children (#114–#123) shipped same-day as PRs
 #136–#145 plus the serial reconciliation pass #146 (main HEAD `cd22b9f`; `make verify` 48/48
