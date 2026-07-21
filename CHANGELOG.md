@@ -15,6 +15,38 @@ for why this policy exists.
 
 ### Added
 
+- **Chat TUI sessions surface** (#51). The `ctrl+o` resume picker grows into a keyboard-driven
+  sessions manager: per-thread message counts + last-activity, built-in fuzzy filter, a live
+  preview pane of the highlighted thread's recent transcript, inline rename, and delete behind a
+  y/n confirm. Delete is a hard delete (messages cascade via the existing `messages.run`
+  relation; no new migration) — the record-original-first boundary governs desk files, not the
+  user's own chat history. New `agent` package surface: `RenameConversation`,
+  `DeleteConversation`, `PreviewConversation`; `ListConversations` now enriches rows with
+  `MsgCount`/`LastActivity`.
+- **Chat TUI context + token accounting** (#52). Provider token usage flows from the eino stream
+  callbacks through the `Event` substrate (json-tagged `prompt_tokens`/`completion_tokens`/
+  `total_tokens`, so a future SSE webapp inherits it) to a header `NN% ctx · N tok` segment and a
+  per-turn footer counter. The context window resolves `LLM_CONTEXT_WINDOW` env > profile
+  `models.context_window` > a per-model table; ctx% reads the latest step's prompt tokens (the
+  live replayed context). Usage is live-only, not persisted.
+- **Chat TUI external-editor hatch** (#64, the one item that issue marked build-now). `ctrl+e`
+  writes the draft to a temp `.md`, hands the terminal to `$VISUAL`/`$EDITOR` via
+  `tea.ExecProcess`, reads the composed text back on return, and always removes the temp file;
+  no-op while streaming; the draft is never auto-sent.
+- **PM items carry a long-form `body`** (#90). New forward migration `0006_pm_items_body`
+  (explicit 50,000,000-char cap per ADR 0017; PM store schema version 5 → 6) plus end-to-end
+  threading: `create_item`/`update_item` tool params, `pm create`/`pm update --body` flags, and
+  `get_item` returns it (detail-only — list/context summaries stay lean). Empty on update means
+  unchanged; clearing a set body is engine-only for now.
+- **CI enforcement of the local-only gates** (#34, #97, #74, #35). Branch CI (and the release
+  gate, as a strict superset) now runs shellcheck over the shell entry points, actionlint
+  (version-pinned build via the Go toolchain), and a new SHA-pin drift guard
+  (`scripts/check-workflow-pins.mjs` + `--self-test`) asserting every workflow `uses:` stays
+  pinned to a 40-hex commit; first-party actions bumped to their latest majors at resolved SHAs.
+  New enforcing tests: byte-equality drift guard for the plugin's two schema copies (`bun test`
+  lane, #97); a secret-shaped-field recurrence guard over every desk-owned collection — librarian
+  AND PM (#74); `requireConfig` self-init coverage on a genuinely never-migrated store plus a
+  behavioral TS MCP server test over an in-memory transport pair (#35).
 - **Sweep-time content indexing + `query search`/`content` kinds** (#89). Sweep now stores each
   file's body in a new `files.content` column (migration `0021`), so swept content is retrievable
   and searchable through a tool surface for the first time — previously the raw bytes were used
@@ -166,6 +198,29 @@ for why this policy exists.
 
 ### Changed
 
+- **Go module renamed to its real hosting path** (#98). `librarian/go.mod` moves off the
+  placeholder `github.com/example/pocket-librarian` to `github.com/hsb3/desk-standard/librarian`
+  (78 importing files rewritten), unblocking the remote
+  `go install github.com/hsb3/desk-standard/librarian/cmd/deskkit@<version>` flow once the repo
+  is public; the local `make install` path is unchanged. The module-path literal is sanctioned by
+  token-scoped `schema/neutrality-lint.allow` entries (owner ruling on the issue): a Go module
+  path is compile-time public API and cannot be profile-templated.
+- **A live PM claim is now authoritative over every direct mutation** (#96,
+  [ADR 0020](docs/decisions/0020-pm-claim-semantics.md)). `liveForeignClaim` now gates `Block`,
+  `Unblock`, and `UpdateItem` (including the `status_label` path) alongside `Transition` — a
+  non-holder is refused with a message naming the holder and expiry until the claim lapses (TTL,
+  ADR 0019) or is released. Cascade/auto-unblock paths are deliberately untouched (claims
+  coordinate actors, not the graph's own derived state). Docs now also state the actor-attribution
+  surface (#95 — shipped earlier with the PM surfaces PR, docs were the gap) and which
+  transitions gate under the shipped defaults (#101: only `decision review→terminal` and
+  `task work→review`; frontmatter validation is key-presence-only).
+- **PM realtime broadcast is bounded and per-client ordered** (#68). The unbounded per-message
+  goroutine fan-out becomes a per-client dispatcher: one 64-message queue + one drain goroutine
+  per client (FIFO by construction), non-blocking enqueue with drop-newest under sustained
+  backpressure (realtime is the observer channel — a dropped event is acceptable, a blocked
+  transition is not), reap-on-broadcast + idle recheck so no goroutine outlives its client.
+- **`printJSON` takes an `io.Writer`** (#154). All 19 cobra callers pass `cmd.OutOrStdout()`,
+  ending the `os.Pipe`/`os.Stdout`-swap capture pattern in the command tests.
 - **`query orphans` hides by-design-unreferenced index/entry files by default** (#100). Basename
   `CLAUDE.md`, `README.md`, and `INDEX.md` (case-insensitive) are structural orphans — empty-doctype
   `.md` files outside `meta`/`memory`/`infra` — but an entry/index doc is what *other* docs point at,
@@ -175,6 +230,14 @@ for why this policy exists.
 
 ### Fixed
 
+- **The agent loop flushes the pending transcript round on ANY abort** (#153). The prior fix
+  covered only the MaxStep path of the non-streaming turn; now `Run()` flushes on any abort with
+  a non-empty pending buffer (MaxStep, cancellation, provider error), and `Session.StreamTurn()`
+  gains the same guarantee — the turn-events layer reconstructs each step's assistant message
+  from the streamed chunks, records the tool round as pending, and flushes it on any abort, with
+  in-memory history rolled back to stay a valid replay input while the persisted transcript
+  keeps the complete round. Three regression tests, each proven red against pre-fix source;
+  independently adversarially reviewed (8/8 claims confirmed).
 - **R6 handoff-staleness self-clears on a handoff update, without a re-baseline** (#100). Patrol now
   measures the handoff against the newest change it GUARDS — the newest desk commit **excluding the
   handoff file itself** (`git log -1 --format=%cs -- . :(exclude)<HANDOFF_PATH>`, new
