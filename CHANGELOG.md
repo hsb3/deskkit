@@ -15,6 +15,29 @@ for why this policy exists.
 
 ### Added
 
+- **Browser session surface** (#19, PR #177). `deskkit serve` now serves a purpose-built chat
+  page at `/desk/chat` via a custom route on the embedded PocketBase — the same multi-turn
+  stewardship session as the `chat` REPL, over the same `internal/agent` session type and gated
+  tool registry (no new write path; `apply_fix` stays env-gated; `restore` unreachable).
+  Responses stream as SSE frames riding `StreamTurn`'s JSON-tagged events; history keeps the
+  ≤ 40-message bound. The page is a single `go:embed`ded self-contained file — zero frontend
+  toolchain. Posture: unauthenticated + loopback binding, with a loopback-origin guard on the
+  write/stream routes (cross-origin browser POSTs get 403 before any SSE header).
+- **TUI polish** (#171, PR #176). Sessions-list delegate now themed per-palette (no more
+  hardcoded bubbles dark colors); resume-first launch (prior conversations open on the sessions
+  list; fresh desks drop straight into a new session); session **archive lifecycle** — soft,
+  reversible hide distinct from hard delete (migration `0022_agent_runs_archived`, `a`/`A`
+  picker keys, archived excluded from the default listing with an opt-in reveal). The picker
+  N+1 GROUP-BY collapse stays deliberately unbuilt (conditional on `pickerLimit` growing).
+- **ADR 0021 — decision-0021 graduation** (PR #178). The off-repo executive-desk ruling that
+  several 1.0.0 lanes cited by fork label (F1–F7) is now an in-repo decision record, with the
+  2026-07-21 owner sign-off rulings recorded for F2 (PM default-on), F5 (`_knowledge/` move —
+  approved pending target), and F7 (value-evaluation scoping). ADR 0020 carries its owner
+  confirmation (supersession window closed). K24 brownfield **retrofit-preservation defaults**
+  ruled into the standard (#81): `custom.original_<field>` preservation on overwrites, fixed
+  `created`-derivation order, tags merge-not-replace; retrofit-over-exempt is a supported
+  disposition.
+
 - **Chat TUI sessions surface** (#51). The `ctrl+o` resume picker grows into a keyboard-driven
   sessions manager: per-thread message counts + last-activity, built-in fuzzy filter, a live
   preview pane of the highlighted thread's recent transcript, inline rename, and delete behind a
@@ -217,6 +240,18 @@ for why this policy exists.
 
 ### Changed
 
+- **The PM module now ships default-on** (#83, PR #179). Layering unchanged — env `PM_ENABLED`
+  > profile `modules.pm.enabled` > default — but the default leg flips to ON; opt out with
+  `PM_ENABLED=false` or `modules.pm.enabled: false` (three-state resolution: only a literal
+  profile boolean decides, absent inherits the default). A fresh desk boots with the blessed
+  §4.2 gate-rule seed and §3.3 status-label vocabulary. Owner-ruled 2026-07-21 (decision-queue
+  sign-off); ADR 0008 carries the dated amendment; spec/pm-guide/READMEs/CHARTER/tool-surface
+  updated to the on-by-default posture.
+- **`desk-pm` folded into `desk-persona`; standalone bundle retired** (PR #180; owner ruling
+  2026-07-21, ADR 0014(a)). desk-persona now carries the SessionStart PM briefing hook and the
+  three PM skills; the duplicate `pm-operator` agent-name collision is gone. Persona-drift now
+  generates only `librarian-operator` (the PM agent/skills are authored in place — one source
+  per surface, ADR 0014(d)); the version-sync manifest set shrinks 7 → 5.
 - **Docs made true to the shipped product** (#85). The spec (`docs/pocket-librarian-v1-spec.md`,
   path unchanged) is retitled to `deskkit` with `Status: active`; `docs/getting-started.md` leads
   with the authenticated `gh release download` install path while the repo is private (the

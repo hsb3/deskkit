@@ -19,13 +19,15 @@ GitHub release with `checksums.txt`.
 
 ## Cutting a release
 
-1. **Bump `VERSION`** and the three shipped manifests so they agree:
+1. **Bump `VERSION`** and the shipped manifests so they agree:
    - `VERSION`
    - `plugin/claude-plugin/.claude-plugin/plugin.json`
+   - `plugin/desk-persona/.claude-plugin/plugin.json`
    - `plugin/package.json`
-   - `.claude-plugin/marketplace.json`
+   - `.claude-plugin/marketplace.json` (both `plugins[].version` entries)
 
-   `node scripts/check-version-sync.mjs` fails until all four match.
+   `node scripts/check-version-sync.mjs` is the authoritative manifest list — it fails until
+   every entry matches `VERSION`.
 
 2. **Update `CHANGELOG.md`.** Move the accumulated `[Unreleased]` entries into a new dated
    `## [<version>] — YYYY-MM-DD` section (Keep a Changelog: `Added` / `Changed` / `Fixed` / …).
