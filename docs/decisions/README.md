@@ -28,4 +28,5 @@ where the decision binds; never delete a record — supersede or correct in plac
 | [0017](0017-document-identity-and-hygiene.md) | Document identity & hygiene — frontmatter id, `entity_type` column rename, text-cap sweep + guard | Accepted (2026-07-20) |
 | [0018](0018-element-model-direction.md) | Element-model direction — simple goal, optional workstream tag, research loop, trigger-gated exec outputs | Accepted (2026-07-20) |
 | [0019](0019-durable-pm-defaults.md) | Durable PM defaults — autonomous-writes-on and claim-TTL-30m recorded from spec §13 | Accepted (2026-07-21) |
-| [0020](0020-pm-claim-semantics.md) | PM claim semantics — a live claim is authoritative over every direct mutation | Accepted (2026-07-21) |
+| [0020](0020-pm-claim-semantics.md) | PM claim semantics — a live claim is authoritative over every direct mutation | Accepted (owner-confirmed 2026-07-21) |
+| [0021](0021-desk-standard-1-0-0-direction.md) | desk-standard 1.0.0 release direction — the F1–F7 forks graduated from the executive desk (PM default-on, webapp lane, `_knowledge/` move, cohesion+value eval) | Accepted (2026-07-21) |
