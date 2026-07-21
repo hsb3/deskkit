@@ -192,6 +192,78 @@ func TestPMActorFlagBeforeLeaf(t *testing.T) {
 	}
 }
 
+// TestPMUpdateBody_UnsetVsEmpty proves both directions of the presence-not-value convention on the
+// CLI surface (spec §5.3): `pm update` signals optionality by whether a flag was PASSED, not by its
+// value. Omitting --body leaves the stored body untouched; passing --body "" clears it on purpose.
+// It drives the real cobra command tree end to end against a bootstrapped store, mirroring
+// TestPMActorFlagBeforeLeaf's harness (requireConfig's self-initializing store, ADR 0003).
+func TestPMUpdateBody_UnsetVsEmpty(t *testing.T) {
+	prevReg := moduleReg
+	t.Cleanup(func() { moduleReg = prevReg })
+
+	cfg := &config.Config{
+		DeskRoot: t.TempDir(), DeskName: "pm-body-cli-test", PMEnabled: true, PMAutonomousWrites: true,
+	}
+	reg, err := module.Register(cfg, librarian.New(), pm.New())
+	if err != nil {
+		t.Fatalf("module.Register: %v", err)
+	}
+	moduleReg = reg
+
+	app := pocketbase.NewWithConfig(pocketbase.Config{DefaultDataDir: t.TempDir()})
+	if err := app.Bootstrap(); err != nil {
+		t.Fatalf("app.Bootstrap: %v", err)
+	}
+	t.Cleanup(func() { _ = app.ResetBootstrapState() })
+
+	registerToolCommands(app, cfg, nil)
+
+	run := func(args ...string) map[string]any {
+		t.Helper()
+		var buf bytes.Buffer
+		app.RootCmd.SetOut(&buf)
+		app.RootCmd.SetArgs(args)
+		if execErr := app.RootCmd.Execute(); execErr != nil {
+			t.Fatalf("execute %v: %v\noutput: %s", args, execErr, buf.String())
+		}
+		var result map[string]any
+		if err := json.Unmarshal(buf.Bytes(), &result); err != nil {
+			t.Fatalf("unmarshal output %q for %v: %v", buf.String(), args, err)
+		}
+		return result
+	}
+
+	// bodyOf reads the stored body via `pm get` (ItemDetail.Body; the key is omitted when empty).
+	bodyOf := func(id string) string {
+		got := run("pm", "get", id)
+		b, _ := got["body"].(string)
+		return b
+	}
+
+	const body = "inline acceptance criteria stored on the item"
+	created := run("pm", "create", "--title", "bodied", "--body", body)
+	item, _ := created["item"].(map[string]any)
+	id, _ := item["id"].(string)
+	if id == "" {
+		t.Fatalf("create produced no item id: %+v", created)
+	}
+	if got := bodyOf(id); got != body {
+		t.Fatalf("stored body after create = %q, want %q", got, body)
+	}
+
+	// Direction 1 — omit --body (change only --priority): the stored body is left untouched.
+	run("pm", "update", id, "--priority", "5")
+	if got := bodyOf(id); got != body {
+		t.Fatalf("omitting --body must leave it unchanged: got %q, want %q", got, body)
+	}
+
+	// Direction 2 — pass --body "" explicitly: the stored body is cleared.
+	run("pm", "update", id, "--body", "")
+	if got := bodyOf(id); got != "" {
+		t.Fatalf(`--body "" must clear the body: got %q, want empty`, got)
+	}
+}
+
 // TestPMActorBeforeLeaf_Subprocess is the true, black-box regression test: it builds the
 // REAL deskkit binary and runs it as a subprocess, exercising main() end to end — including the
 // pre-cobra unknown-subcommand guard (unknownSubcommand/nextNonFlagToken in main.go) that

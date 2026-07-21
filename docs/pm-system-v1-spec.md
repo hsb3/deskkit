@@ -1011,9 +1011,11 @@ than unit-tested), name the enforcing artifact and are called out in the note be
 | R2.1 universal self-referencing item | MUST | §3.1 | `TestGetItem_Detail`, `TestImport_BuildsTheGraph` (`.../pm/importer`) |
 | R2.2 rigid machine ⟂ status labels | MUST | §3.2, §3.3 | `TestEdge_Legality`, `TestDefaultStatusLabels` (`.../pm/statemachine`), `TestSetStatusLabelRoutesThroughMachine` |
 | R2.3 court/pointer/type/severity/priority | MUST | §3.1 | `TestListItems_Filters`, `TestGetItem_Detail` |
+| body — inline long-form field (§3.1, resolves #90) | MUST | §3.1 | `TestCreateItemBody`, `TestItemBody_UpdateAndProjection`, `TestItemBody_ToolRoundTrip` (`.../pm/tools`), `TestMigration0006_AddsItemsBody_Fresh`, `TestMigration0006_AddsItemsBody_ExistingStore` (`.../pm/collections`), `TestImport_CarriesBody` (`.../pm/importer`) |
 | R2.4 typed edges, unblock_at, cascade | MUST | §3.4, §3.5 | `TestCascadeAuto`, `TestCascadeAutoReopen`, `TestCascadeManualAndPermanent`, `TestCascadeMultiBlocker`, `TestLinkIsBlockedByCanonicalizes` |
 | R2.5 append-only audit + actor attribution | MUST | §3.6 | `TestAuditTrail` |
 | R2.6 optimistic concurrency + claim TTL | SHOULD → adopted | §3.6 | `TestVersionMismatchRefused`, `TestClaimSemantics`, `TestClaimTTLFromDeskConfig`, `TestReleaseClearsClaim` |
+| R2.6 (ADR 0020) — claim authoritative over every direct mutation | MUST | §3.6 + [ADR 0020](decisions/0020-pm-claim-semantics.md) | `TestClaimGatesBlockUnblock`, `TestUpdateItemGatedByClaim`, `TestClaimSemantics` |
 | R3.1 server-enforced transitions, names what's missing | MUST | §4.1 | `TestGateRefusedThenSatisfied`, `TestIllegalEdgeRefusedBeforeGates`, `TestBlockedRefusesAdvanceOnly` |
 | R3.2 artifacts = librarian-validated documents | MUST | §4.4, §2.5; notes §3.7 | `TestGateFailsClosedWithoutValidator`, `TestEvaluate_StubValidator` (`.../pm/gates`) |
 | R3.3 gate rules in editable per-desk YAML + traits | MUST | §4.2 | `TestDeskConfigOverridesDefaults`, `TestTraitCompositionThroughFrontmatter`, `TestParseRules_SpecExample`, `TestEffective_TraitComposition` (`.../pm/gates`) |

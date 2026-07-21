@@ -115,7 +115,7 @@ and a gate/engine refusal prints its refusal line, never a usage dump. Audit ide
 | `pm list` | Filtered work-graph query | `--phase` `--court` `--type` `--blocked true\|false` `--parent <id>` |
 | `pm get <id>` | One item with notes, dependencies, transitions, ancestors | — |
 | `pm create` | Add a work item (starts at `queue`) | `--title` (required) `--type` `--parent` `--court` `--pointer` `--body` `--severity low\|medium\|high` `--priority N` |
-| `pm update <id>` | Edit first-class fields (empty flag = unchanged; `--priority 0` also = unchanged — `0` is the zero-value sentinel, not a settable priority) | `--title` `--type` `--court` `--pointer` `--body` `--severity` `--priority` `--properties <json>` `--status-label` `--version N` |
+| `pm update <id>` | Edit first-class fields (omit a flag = unchanged; pass `""` to clear — see [Editing fields: omit vs clear](#editing-fields-omit-vs-clear) below; `--priority 0` also = unchanged — `0` is the zero-value sentinel, not a settable priority) | `--title` `--type` `--court` `--pointer` `--body` `--severity` `--priority` `--properties <json>` `--status-label` `--version N` |
 | `pm transition <id>` | Request a phase transition; gates may refuse | `--to queue\|work\|review\|terminal` (required) `--version N` |
 | `pm block <id>` | Set the blocked side-state (preserves the phase) | `--reason` `--version N` |
 | `pm unblock <id>` | Clear the blocked side-state | `--reason` `--version N` |
@@ -172,6 +172,26 @@ Wire it into a Claude Code project (or use the `desk-pm` plugin, below):
     }
   }
 }
+```
+
+## Editing fields: omit vs clear
+
+On `update_item` (MCP) and `pm update` (CLI), optionality is signaled by **presence, not value**:
+
+- Omit a field entirely → it is left unchanged.
+- Provide a field, even as an empty string → it is written verbatim; an explicit empty string
+  deliberately **clears** the stored value.
+- MCP: an absent key (or a JSON `null`) means unchanged; `"body": ""` means clear.
+- CLI: no `--body` flag means unchanged; `--body ""` means clear.
+- `title` is the one exception — the engine refuses an empty title, so it can only be changed,
+  never cleared.
+
+This mirrors the engine's `*string` update contract (`nil` = unchanged, non-nil — including an
+empty string — = set), so both surfaces are a zero-translation passthrough over it rather than
+inventing their own sentinel.
+
+```bash
+deskkit pm update <id> --body ""  # clears body
 ```
 
 ## The TUI views

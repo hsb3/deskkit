@@ -151,8 +151,13 @@ func (s toolsSurface) AddNote(ctx context.Context, id, key, body string, a engin
 	return err
 }
 func (s toolsSurface) Update(ctx context.Context, id string, version int, severity string, priority int, a engine.Actor) error {
-	_, err := pmtools.UpdateItem(ctx, s.app, s.cfg, s.val, &pmtools.UpdateItemInput{
-		ItemID: id, Version: version, Severity: severity, Priority: priority, ActorFields: af(a),
-	})
+	// The optional string fields are now *string (presence, not value, signals a write), so guard
+	// severity into a pointer — mirroring the engineSurface.Update just above so the two surfaces
+	// stay behaviourally identical field-for-field (thin-surface parity, §10.10).
+	in := pmtools.UpdateItemInput{ItemID: id, Version: version, Priority: priority, ActorFields: af(a)}
+	if severity != "" {
+		in.Severity = &severity
+	}
+	_, err := pmtools.UpdateItem(ctx, s.app, s.cfg, s.val, &in)
 	return err
 }

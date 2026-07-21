@@ -110,6 +110,58 @@ func TestImport_BuildsTheGraph(t *testing.T) {
 	}
 }
 
+// TestImport_CarriesBody proves the long-form body survives the round trip the importer is the
+// oracle for: manifest-with-body -> Import(fresh store) -> GraphSnapshot projection carries the
+// exact bytes back. There is no store->Manifest exporter and item keys are not persisted (the
+// record id is a one-way hash), so the faithful "export" is the ItemProjection/Snapshot the §10.8
+// reproducibility oracle already compares. Before the e_createItem wiring passed Body, the imported
+// body was empty and the projected body came back "" — this test caught that gap red-first.
+func TestImport_CarriesBody(t *testing.T) {
+	ctx := context.Background()
+
+	// A non-trivial, multi-line body: exercises newline + indentation preservation, not just a
+	// short token that a truncation bug could accidentally pass.
+	body := "Acceptance criteria:\n" +
+		"  - the widget renders\n" +
+		"  - the round trip is byte-exact\n" +
+		"\nNotes: body must survive export -> fresh-store import unchanged."
+	m := Manifest{
+		Items: []ManifestItem{
+			{Key: "task-body", Title: "Item with a body", Type: "task", Court: "desk", Priority: 1, Body: body},
+		},
+	}
+
+	engA := newEngine(t, "body-desk")
+	if _, err := Import(ctx, engA, m); err != nil {
+		t.Fatalf("import into store A: %v", err)
+	}
+	snapA, err := GraphSnapshot(ctx, engA)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(snapA.Items) != 1 {
+		t.Fatalf("expected 1 projected item, got %d", len(snapA.Items))
+	}
+	if got := snapA.Items[0].Body; got != body {
+		t.Fatalf("projected body did not survive the round trip:\n--- want ---\n%q\n--- got ---\n%q", body, got)
+	}
+
+	// The same manifest into a wholly independent fresh store is byte-identical (§8.2) — body
+	// included — so the projection is deterministic and body is part of the graph's identity.
+	engB := newEngine(t, "body-desk")
+	if _, err := Import(ctx, engB, m); err != nil {
+		t.Fatalf("import into store B: %v", err)
+	}
+	snapB, err := GraphSnapshot(ctx, engB)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if snapA.Canonical() != snapB.Canonical() {
+		t.Fatalf("two rebuilds must be byte-identical incl. body:\n--- A ---\n%s\n--- B ---\n%s",
+			snapA.Canonical(), snapB.Canonical())
+	}
+}
+
 // TestImport_Idempotent: a second import into the same store creates nothing new and leaves the
 // graph identical (§8.1 "the import is idempotent and desk-scoped").
 func TestImport_Idempotent(t *testing.T) {

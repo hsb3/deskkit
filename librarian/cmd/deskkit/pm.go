@@ -163,11 +163,18 @@ func registerPMCommands(app *pocketbase.PocketBase, cfg *config.Config, cfgErr e
 	pmCmd.AddCommand(createCmd)
 
 	// pm update <id>
-	var ui pmtools.UpdateItemInput
+	//
+	// Optionality is signaled by PRESENCE, not value (spec §5.1 convention): a flag the user did
+	// NOT pass leaves its field nil (unchanged); a flag the user passed — even `--body ""` — sets
+	// the field, so `--body ""` deliberately clears the body. The optional string fields are built
+	// from cmd.Flags().Changed(name) here so the "present-empty" signal a plain StringVar loses is
+	// preserved. --priority keeps the value convention (0 = unchanged).
 	var updateVersion int
+	var upTitle, upType, upCourt, upPointer, upBody, upSeverity, upProperties, upStatusLabel string
+	var upPriority int
 	updateCmd := &cobra.Command{
 		Use:   "update <id>",
-		Short: "Edit an item's first-class fields (empty flag = unchanged)",
+		Short: "Edit an item's first-class fields (omit a flag = unchanged; pass \"\" to clear)",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := requireConfig(app, cfg, cfgErr)
@@ -178,21 +185,39 @@ func registerPMCommands(app *pocketbase.PocketBase, cfg *config.Config, cfgErr e
 			if verr != nil {
 				return verr
 			}
-			ui.ItemID, ui.Version, ui.ActorFields = args[0], ver, actor()
-			res, perr := pmtools.UpdateItem(cmd.Context(), app, c, pmValidator(), &ui)
+			in := pmtools.UpdateItemInput{
+				ItemID: args[0], Version: ver, Priority: upPriority, ActorFields: actor(),
+			}
+			// setStr writes a pointer ONLY when the flag was passed (present), so an unpassed flag
+			// stays nil (unchanged) and a passed empty string clears the field.
+			setStr := func(name, val string, dst **string) {
+				if cmd.Flags().Changed(name) {
+					v := val
+					*dst = &v
+				}
+			}
+			setStr("title", upTitle, &in.Title)
+			setStr("type", upType, &in.Type)
+			setStr("court", upCourt, &in.Court)
+			setStr("pointer", upPointer, &in.Pointer)
+			setStr("body", upBody, &in.Body)
+			setStr("severity", upSeverity, &in.Severity)
+			setStr("properties", upProperties, &in.Properties)
+			setStr("status-label", upStatusLabel, &in.StatusLabel)
+			res, perr := pmtools.UpdateItem(cmd.Context(), app, c, pmValidator(), &in)
 			return printJSON(cmd.OutOrStdout(), res, perr)
 		},
 	}
 	updateCmd.Flags().IntVar(&updateVersion, "version", -1, "version token you read, >= 1 (omit = use the item's current version)")
-	updateCmd.Flags().StringVar(&ui.Title, "title", "", "new title")
-	updateCmd.Flags().StringVar(&ui.Type, "type", "", "new schema-v1/kit type")
-	updateCmd.Flags().StringVar(&ui.Court, "court", "", "new court")
-	updateCmd.Flags().StringVar(&ui.Pointer, "pointer", "", "new document pointer")
-	updateCmd.Flags().StringVar(&ui.Body, "body", "", "new body (empty = unchanged)")
-	updateCmd.Flags().StringVar(&ui.Severity, "severity", "", "new severity")
-	updateCmd.Flags().IntVar(&ui.Priority, "priority", 0, "new priority (0 = unchanged)")
-	updateCmd.Flags().StringVar(&ui.Properties, "properties", "", "new properties JSON object")
-	updateCmd.Flags().StringVar(&ui.StatusLabel, "status-label", "", "new status label (a different phase's label is a gated transition request)")
+	updateCmd.Flags().StringVar(&upTitle, "title", "", "new title (omit = unchanged)")
+	updateCmd.Flags().StringVar(&upType, "type", "", "new schema-v1/kit type (omit = unchanged; pass \"\" to clear)")
+	updateCmd.Flags().StringVar(&upCourt, "court", "", "new court (omit = unchanged; pass \"\" to clear)")
+	updateCmd.Flags().StringVar(&upPointer, "pointer", "", "new document pointer (omit = unchanged; pass \"\" to clear)")
+	updateCmd.Flags().StringVar(&upBody, "body", "", "new body (omit = unchanged; pass \"\" to clear)")
+	updateCmd.Flags().StringVar(&upSeverity, "severity", "", "new severity (omit = unchanged; pass \"\" to clear)")
+	updateCmd.Flags().IntVar(&upPriority, "priority", 0, "new priority (0 = unchanged)")
+	updateCmd.Flags().StringVar(&upProperties, "properties", "", "new properties JSON object (omit = unchanged; pass \"\" to clear)")
+	updateCmd.Flags().StringVar(&upStatusLabel, "status-label", "", "new status label (a different phase's label is a gated transition request)")
 	pmCmd.AddCommand(updateCmd)
 
 	// pm transition <id> --to <phase>

@@ -3,6 +3,7 @@ package tools
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"reflect"
 	"testing"
 	"time"
@@ -11,6 +12,7 @@ import (
 	"github.com/pocketbase/pocketbase/tests"
 
 	"github.com/hsb3/desk-standard/librarian/internal/core/config"
+	"github.com/hsb3/desk-standard/librarian/internal/core/toolcore"
 	"github.com/hsb3/desk-standard/librarian/internal/modules/pm/collections"
 	"github.com/hsb3/desk-standard/librarian/internal/modules/pm/engine"
 	pmtui "github.com/hsb3/desk-standard/librarian/internal/modules/pm/tui"
@@ -210,8 +212,9 @@ func TestToolBodies_EndToEnd(t *testing.T) {
 		t.Error("auto cascade should have unblocked the dependent item at unblock_at=work")
 	}
 
+	high := "high"
 	upd, err := UpdateItem(ctx, app, cfg, nil, &UpdateItemInput{
-		ItemID: id, Version: moved.Item.Version, Severity: "high", Priority: 3, ActorFields: me,
+		ItemID: id, Version: moved.Item.Version, Severity: &high, Priority: 3, ActorFields: me,
 	})
 	if err != nil {
 		t.Fatalf("UpdateItem: %v", err)
@@ -286,7 +289,8 @@ func TestItemBody_ToolRoundTrip(t *testing.T) {
 		t.Fatalf("get_item body projection: got %q, want %q", detail.Body, body)
 	}
 
-	// An UpdateItem with an empty body leaves it unchanged (tool-layer empty = unchanged).
+	// An UpdateItem that OMITS the body (nil pointer) leaves it unchanged (presence, not value,
+	// signals a write — see types.go; the explicit-clear direction is TestUpdateItemBody_UnsetVsEmpty_MCP).
 	unchanged, err := UpdateItem(ctx, app, cfg, nil, &UpdateItemInput{
 		ItemID: id, Version: detail.Version, Priority: 2, ActorFields: me,
 	})
@@ -298,13 +302,13 @@ func TestItemBody_ToolRoundTrip(t *testing.T) {
 		t.Fatalf("GetItem after no-op body update: %v", err)
 	}
 	if afterNoop.Body != body {
-		t.Fatalf("empty body must leave it unchanged: got %q, want %q", afterNoop.Body, body)
+		t.Fatalf("omitted body must leave it unchanged: got %q, want %q", afterNoop.Body, body)
 	}
 
 	// A non-empty body edits it.
-	const revised = "revised inline spec"
+	revised := "revised inline spec"
 	if _, err := UpdateItem(ctx, app, cfg, nil, &UpdateItemInput{
-		ItemID: id, Version: unchanged.Item.Version, Body: revised, ActorFields: me,
+		ItemID: id, Version: unchanged.Item.Version, Body: &revised, ActorFields: me,
 	}); err != nil {
 		t.Fatalf("UpdateItem(body): %v", err)
 	}
@@ -314,5 +318,103 @@ func TestItemBody_ToolRoundTrip(t *testing.T) {
 	}
 	if final.Body != revised {
 		t.Fatalf("update_item body edit: got %q, want %q", final.Body, revised)
+	}
+}
+
+// TestUpdateItemBody_UnsetVsEmpty_MCP proves both directions of the presence-not-value convention
+// on the MCP tool surface (spec §5.1): optionality is signaled by whether the body KEY is present
+// in the model's JSON arguments, never by its value. An omitted key (or null) leaves the stored
+// body untouched; an explicit empty string clears it. Decoding JSON into UpdateItemInput is exactly
+// how the eino/MCP binding feeds the tool body, so this exercises the real model-facing contract
+// rather than a hand-built struct.
+func TestUpdateItemBody_UnsetVsEmpty_MCP(t *testing.T) {
+	app, cfg := newPMApp(t)
+	ctx := context.Background()
+	me := ActorFields{Actor: "crew-1", ActorKind: "agent"}
+
+	const body = "inline spec body stored on the item"
+	created, err := CreateItem(ctx, app, cfg, nil, &CreateItemInput{Title: "bodied", Body: body, ActorFields: me})
+	if err != nil {
+		t.Fatalf("CreateItem: %v", err)
+	}
+	id := created.Item.ID
+
+	// decode models an MCP call: the model's JSON arguments unmarshaled into the tool input.
+	decode := func(payload string) *UpdateItemInput {
+		in := &UpdateItemInput{}
+		if uerr := json.Unmarshal([]byte(payload), in); uerr != nil {
+			t.Fatalf("unmarshal %s: %v", payload, uerr)
+		}
+		return in
+	}
+
+	// Direction 1 — the body key is OMITTED: the stored body is left untouched.
+	omit := decode(fmt.Sprintf(`{"item_id":%q,"version":%d,"priority":2,"actor":"crew-1","actor_kind":"agent"}`,
+		id, created.Item.Version))
+	res1, err := UpdateItem(ctx, app, cfg, nil, omit)
+	if err != nil {
+		t.Fatalf("UpdateItem(omit body): %v", err)
+	}
+	after1, err := GetItem(ctx, app, cfg, nil, &GetItemInput{ItemID: id})
+	if err != nil {
+		t.Fatalf("GetItem after omit: %v", err)
+	}
+	if after1.Body != body {
+		t.Fatalf("omitted body key must leave it unchanged: got %q, want %q", after1.Body, body)
+	}
+
+	// Direction 2 — the body key is an explicit empty string: the stored body is CLEARED.
+	clear := decode(fmt.Sprintf(`{"item_id":%q,"version":%d,"body":"","actor":"crew-1","actor_kind":"agent"}`,
+		id, res1.Item.Version))
+	if _, err := UpdateItem(ctx, app, cfg, nil, clear); err != nil {
+		t.Fatalf("UpdateItem(clear body): %v", err)
+	}
+	after2, err := GetItem(ctx, app, cfg, nil, &GetItemInput{ItemID: id})
+	if err != nil {
+		t.Fatalf("GetItem after clear: %v", err)
+	}
+	if after2.Body != "" {
+		t.Fatalf("explicit empty body must clear it: got %q, want empty", after2.Body)
+	}
+}
+
+// TestUpdateItemSchema_OptionalStringsSurvive proves the *string fields still reflect into the
+// MCP InputSchema as plain JSON "string" properties (with their descriptions) after the pointer
+// change — i.e. the toolcore pointer deref keeps update_item's model-facing schema intact, so the
+// present-empty clear signal costs nothing at the schema layer. Without the deref these fields
+// would silently VANISH from the schema (goTypeSchema returned nil for a pointer), which is the
+// failure this guards.
+func TestUpdateItemSchema_OptionalStringsSurvive(t *testing.T) {
+	m := toolcore.SchemaForType(reflect.TypeOf(UpdateItemInput{}))
+	props, _ := m["properties"].(map[string]any)
+	if props == nil {
+		t.Fatalf("update_item schema has no properties: %v", m)
+	}
+	for _, name := range []string{"title", "type", "court", "pointer", "body", "severity", "properties", "status_label"} {
+		p, ok := props[name].(map[string]any)
+		if !ok {
+			t.Errorf("update_item schema dropped the %q property (pointer deref missing): %v", name, props[name])
+			continue
+		}
+		if p["type"] != "string" {
+			t.Errorf("update_item.%s type = %v, want string", name, p["type"])
+		}
+		if d, _ := p["description"].(string); d == "" {
+			t.Errorf("update_item.%s: expected a non-empty description", name)
+		}
+	}
+	// The optional string fields stay OPTIONAL (omitempty ⇒ not required); only item_id + version are.
+	req, _ := m["required"].([]string)
+	reqSet := map[string]bool{}
+	for _, r := range req {
+		reqSet[r] = true
+	}
+	if !reqSet["item_id"] || !reqSet["version"] {
+		t.Errorf("update_item required = %v, want item_id + version present", req)
+	}
+	for _, name := range []string{"body", "title", "severity"} {
+		if reqSet[name] {
+			t.Errorf("update_item.%s must stay optional (omitempty), not required", name)
+		}
 	}
 }

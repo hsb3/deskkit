@@ -39,6 +39,7 @@ type ManifestItem struct {
 	Type     string `json:"type,omitempty"`
 	Court    string `json:"court,omitempty"`
 	Pointer  string `json:"pointer,omitempty"`
+	Body     string `json:"body,omitempty"` // long-form body: narrative, acceptance criteria, or spec (§3.1)
 	Severity string `json:"severity,omitempty"`
 	Priority int    `json:"priority,omitempty"`
 	Parent   string `json:"parent,omitempty"` // parent item's Key; "" = a root
@@ -190,7 +191,7 @@ func e_createItem(ctx context.Context, eng *engine.Engine, desk string, it Manif
 	}
 	if _, err := eng.CreateItem(ctx, engine.CreateItemInput{
 		ID: id, Title: it.Title, Type: it.Type, Parent: parentID, Court: it.Court,
-		Pointer: it.Pointer, Severity: it.Severity, Priority: it.Priority,
+		Pointer: it.Pointer, Body: it.Body, Severity: it.Severity, Priority: it.Priority,
 		Actor: engine.Actor{Name: "import", Kind: "agent"},
 	}); err != nil {
 		return false, fmt.Errorf("importer: create item %q: %w", it.Key, err)
@@ -240,6 +241,7 @@ type ItemProjection struct {
 	Blocked     bool   `json:"blocked"`
 	Court       string `json:"court"`
 	Pointer     string `json:"pointer"`
+	Body        string `json:"body"`
 	Severity    string `json:"severity"`
 	Priority    int    `json:"priority"`
 	Parent      string `json:"parent"`
@@ -281,6 +283,7 @@ func GraphSnapshot(ctx context.Context, eng *engine.Engine) (Snapshot, error) {
 			Type: it.GetString("type"), Phase: it.GetString("phase"),
 			StatusLabel: it.GetString("status_label"), Blocked: it.GetBool("blocked"),
 			Court: it.GetString("court"), Pointer: it.GetString("pointer"),
+			Body:     it.GetString("body"),
 			Severity: it.GetString("severity"), Priority: it.GetInt("priority"),
 			Parent: it.GetString("parent"), Root: it.GetString("root"),
 			Version: it.GetInt("version"),
