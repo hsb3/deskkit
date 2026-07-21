@@ -38,7 +38,7 @@ test: ## Fast tests both lanes: plugin (bun test) + librarian (go test ./...)
 	@cd plugin && bun run test
 	@$(MAKE) -C librarian test
 
-check: ## Repo gates: neutrality lint + self-test, kit-manifest drift, prompt-copy drift, tool-surface drift + self-test, scaffold frontmatter, persona drift, plugin core purity, actionlint
+check: ## Repo gates: neutrality lint + self-test, kit-manifest drift, prompt-copy drift, tool-surface drift + self-test, scaffold frontmatter, persona drift, plugin core purity, shellcheck, actionlint, workflow SHA-pin drift + self-test
 	@node scripts/check-neutrality.mjs
 	@node scripts/check-neutrality.mjs --self-test
 	@node scripts/check-kits.mjs
@@ -49,7 +49,10 @@ check: ## Repo gates: neutrality lint + self-test, kit-manifest drift, prompt-co
 	@node scripts/check-persona-drift.mjs
 	@node scripts/check-textfield-max.mjs
 	@cd plugin && bun run check:purity
+	@shellcheck install.sh librarian/verify.sh librarian/sandbox/*.sh scripts/record-media.sh
 	@actionlint
+	@node scripts/check-workflow-pins.mjs
+	@node scripts/check-workflow-pins.mjs --self-test
 
 verify: ## Run the librarian Phase-1 verify gate (throwaway scratch desk; never a real store)
 	@bash librarian/verify.sh

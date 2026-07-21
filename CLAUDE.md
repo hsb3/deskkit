@@ -75,7 +75,7 @@ the exit code and has let a failing gate through before (incident, 2026-07-17).
 | `make setup` | `bun install` (plugin) + `lefthook install` (git hooks) |
 | `make build` | Build both lanes: plugin (`bun run build`) + librarian binary (version-stamped) |
 | `make test` | Fast unit tests: plugin `bun test` (75) + librarian `go test ./...` (594) |
-| `make check` | Repo gates: neutrality + self-test, kit-drift, prompt-drift, tool-surface drift + self-test, scaffold frontmatter, plugin core-purity, actionlint |
+| `make check` | Repo gates: neutrality + self-test, kit-drift, prompt-drift, tool-surface drift + self-test, scaffold frontmatter, plugin core-purity, shellcheck, actionlint, workflow SHA-pin drift + self-test |
 | `make verify` | Librarian integration gate — `librarian/verify.sh` (48 checks, throwaway scratch desk) |
 | `make package` | Regenerate the marketplace bundle (`plugin/claude-plugin/` artifacts) |
 | `make install` | Build + install the `deskkit` binary to `~/.local/bin` (override `PREFIX=`) |
@@ -115,6 +115,8 @@ self-contained — that's why it's committed and drift-guarded.
 | Persona bundle stays generated from its sources (ADR 0014) | `scripts/check-persona-drift.mjs` |
 | Content TextFields carry an explicit Max (ADR 0017) | `scripts/check-textfield-max.mjs` (+ `--self-test`) |
 | A tagged release has a CHANGELOG section | `scripts/check-changelog.mjs` (release gate) |
+| Every workflow `uses:` stays SHA-pinned (no mutable `@vN` tag) | `scripts/check-workflow-pins.mjs` (+ `--self-test`) |
+| Shell entry points stay lint-clean (install.sh, verify.sh, sandbox/*, record-media) | `shellcheck` (CI + `make check`) |
 
 ### Order-sensitive chains
 
