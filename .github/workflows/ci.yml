@@ -82,6 +82,14 @@ jobs:
           node scripts/check-textfield-max.mjs
           node scripts/check-textfield-max.mjs --self-test
 
+      # Query-kind drift: the librarian `query` tool's fixed kind list must agree across the MCP
+      # schema struct tag (types.go), the spec's §5.6 quote of it, and the runtime dispatch switch
+      # in func Query (query.go). Self-test proves the guard still detects a seeded add/drop.
+      - name: Query-kind drift guard (+ self-test)
+        run: |
+          node scripts/check-query-kinds.mjs
+          node scripts/check-query-kinds.mjs --self-test
+
       # Advisory only (never fails the build): nudges when user-facing changes have piled up
       # under plugin/ or librarian/ since the last v* tag without a VERSION bump. The hard gate
       # (a documented CHANGELOG section for the tagged version) lives in release.yml.
@@ -95,7 +103,7 @@ jobs:
       # the media recorder) were never linted in any workflow — a broken install.sh could ship. The
       # ubuntu-latest runner image ships shellcheck, so no install step is needed.
       - name: Shellcheck — shell entry points
-        run: shellcheck install.sh librarian/verify.sh librarian/sandbox/*.sh scripts/record-media.sh
+        run: shellcheck install.sh librarian/verify.sh librarian/dogfood-agent.sh librarian/dogfood-pm.sh librarian/sandbox/*.sh scripts/record-media.sh
 
       # actionlint: previously pre-commit / `make check` only, so a bypassed push escaped it. Built
       # with the Go toolchain already set up above (no new third-party action to pin and maintain).
@@ -146,6 +154,12 @@ jobs:
       - name: Librarian — vet
         working-directory: librarian
         run: go vet ./...
+
+      # gofmt formatting gate: fail if any file under librarian/ is not gofmt-clean. Uses the
+      # librarian Makefile's `fmt` target (gofmt -l over the tree, fail-on-nonempty) so the gate
+      # logic lives in one place; mirrors how `vet` above is a standing Go-lane check.
+      - name: Librarian — gofmt (formatting gate)
+        run: make -C librarian fmt
 
       - name: Librarian — tests
         working-directory: librarian

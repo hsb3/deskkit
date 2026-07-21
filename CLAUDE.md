@@ -75,15 +75,15 @@ the exit code and has let a failing gate through before (incident, 2026-07-17).
 | `make setup` | `bun install` (plugin) + `lefthook install` (git hooks) |
 | `make build` | Build both lanes: plugin (`bun run build`) + librarian binary (version-stamped) |
 | `make test` | Fast unit tests: plugin `bun test` + librarian `go test ./...` |
-| `make check` | Repo gates: neutrality + self-test, kit-drift, prompt-drift, tool-surface drift + self-test, scaffold frontmatter, plugin core-purity, shellcheck, actionlint, workflow SHA-pin drift + self-test |
-| `make verify` | Librarian integration gate — `librarian/verify.sh` (48 checks, throwaway scratch desk) |
+| `make check` | Repo gates: neutrality + self-test, kit-drift, prompt-drift, tool-surface drift + self-test, scaffold frontmatter, textfield-max, query-kind drift + self-test, plugin core-purity, shellcheck, actionlint, workflow SHA-pin drift + self-test |
+| `make verify` | Librarian integration gate — `librarian/verify.sh` (55 checks, throwaway scratch desk) |
 | `make package` | Regenerate the marketplace bundle (`plugin/claude-plugin/` artifacts) |
 | `make install` | Build + install the `deskkit` binary to `~/.local/bin` (override `PREFIX=`) |
 | `node scripts/check-version-sync.mjs` | Assert root `VERSION` matches the shipped plugin manifests |
 | `make version-status` | Advisory (non-blocking): unreleased product changes since the last tag |
 | `make release-prep` | Pre-tag gate (see order below) |
 
-The librarian lane has its own `librarian/Makefile` (`make -C librarian build|test|sweep|patrol`);
+The librarian lane has its own `librarian/Makefile` (`make -C librarian build|test|fmt|sweep|patrol`; `fmt` is the gofmt gate, also run in CI);
 `apply-fix` is deliberately **not** a target — it's supervised-only, run by hand, and every fix is
 reversible with `deskkit restore --by-path <path>`.
 
@@ -114,9 +114,11 @@ self-contained — that's why it's committed and drift-guarded.
 | Scaffold instruments carry conformant frontmatter | `scripts/check-scaffold-frontmatter.mjs` |
 | Persona bundle stays generated from its sources (ADR 0014) | `scripts/check-persona-drift.mjs` |
 | Content TextFields carry an explicit Max (ADR 0017) | `scripts/check-textfield-max.mjs` (+ `--self-test`) |
+| Spec query-kind list == CLI/MCP registry (types.go ↔ spec §5.6 ↔ query.go switch) | `scripts/check-query-kinds.mjs` (+ `--self-test`) |
+| Librarian Go tree stays gofmt-clean | `gofmt -l` via `make -C librarian fmt` (CI librarian lane) |
 | A tagged release has a CHANGELOG section | `scripts/check-changelog.mjs` (release gate) |
 | Every workflow `uses:` stays SHA-pinned (no mutable `@vN` tag) | `scripts/check-workflow-pins.mjs` (+ `--self-test`) |
-| Shell entry points stay lint-clean (install.sh, verify.sh, sandbox/*, record-media) | `shellcheck` (CI + `make check`) |
+| Shell entry points stay lint-clean (install.sh, verify.sh, dogfood-*.sh, sandbox/*, record-media) | `shellcheck` (CI + `make check`) |
 
 ### Order-sensitive chains
 
