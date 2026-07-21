@@ -1,7 +1,7 @@
 _Session-to-session bridge for desk-standard. Read this before working; update it at the end
 of any substantial session. Secret-free — live URLs/credentials belong in `_meta/operations/`
 (untracked) if that dir is ever created._
-Status: active (2026-07-20)
+Status: active (2026-07-21)
 
 # HANDOFF
 
@@ -25,7 +25,8 @@ issue bodies, and the friction ledger live there.
 ## 1. Current standing + top priority
 
 **SESSION 2026-07-20 (integration testing + bug-fix wave) — 4 real bugs found by real agent-led
-testing, all fixed; PR #152 open, owner-gated to merge.** Henry asked for evidence the v1 build
+testing, all fixed; PR #152 MERGED 2026-07-21 (squash `bbfc1a8`, closed #148–#151, main CI
+green post-merge).** Henry asked for evidence the v1 build
 wave actually works when driven by an agent, not just unit tests + `librarian/verify.sh`.
 Foreman-led: 3 parallel testers (plugin MCP + skills; librarian's real `deskkit agent` LLM loop
 + a live MCP protocol session; the PM module's real work-graph workflow) → 2 adversarial
@@ -47,10 +48,8 @@ this repo — needs a from-scratch session test to pin down. Three reusable scri
 `main` (committed `41357e2`, all pass neutrality + shellcheck): `plugin/scripts/verify-mcp-
 protocol.sh` (deterministic), `librarian/dogfood-agent.sh` (manual, real-LLM, NOT in CI),
 `librarian/dogfood-pm.sh` (deterministic) — none wired into `make check`/`make verify` yet
-(deliberate). **`41357e2` is committed on local `main` but NOT YET PUSHED to origin** — push it
-before trusting `origin/main` to have it (a fresh clone/CI won't see it until then). All four
-bugs then fixed on **PR #152** (branch `fix/agent-led-test-findings`,
-commits `26b4495`+`79daa00`, closes #148–#151 on merge): flat fan-out (2 sonnet builders on the
+(deliberate). All four bugs then fixed on **PR #152** (branch `fix/agent-led-test-findings`,
+commits `26b4495`+`79daa00`, squash-merged as `bbfc1a8` closing #148–#151): flat fan-out (2 sonnet builders on the
 bounded fixes, 1 opus on the #149 persistence fix given the risk of touching agent-transcript
 semantics), each fix with a red-before/green-after regression test, foreman reconciliation
 caught a builder-left compile break + 11 neutrality-lint violations (bare issue numbers in new
@@ -59,9 +58,14 @@ Go test comments — a brief-writing miss, see incident log), full gates green (
 "simplification" was empirically proven wrong before declining it — see incident log). Follow-up
 **#153** filed for the two gaps review surfaced but PR #152 deliberately left out of scope
 (`Session.StreamTurn()` has the same MaxStep transcript gap; a non-MaxStep abort right after a
-tool call is still unflushed). **CI is green** (`ci: pass`, `claude-review: pass`) — **merging
-PR #152 is Henry's call.** Repo is back on `main` as of this handoff (worktree was
-`fix/agent-led-test-findings` mid-session).
+tool call is still unflushed). **MERGE COMPLETED 2026-07-21** (Henry's go-ahead): the bot's
+second review pass (ran against head `79daa00`) came back all-confirmations with zero blockers;
+its one non-blocking cleanup idea was filed as **#154** (`printJSON` hardwires `os.Stdout`,
+forcing the pipe-swap capture pattern in `pm` command tests — give it an `io.Writer` /
+`cmd.OutOrStdout()`); all 12 review threads were replied-to and resolved; closing keywords were
+added to the PR body pre-merge (the body originally had NO `closes #N` keywords — the handoff's
+"closes on merge" claim would silently not have happened); squash-merged as `bbfc1a8`, branch
+deleted, #148–#151 auto-closed, main CI green post-merge.
 
 **v1 build wave landed 2026-07-20 — epic #129 closed, `gate:1.0.0` label query empty.** All ten
 children (#114–#123) shipped as PRs #136–#147 (main HEAD `cd22b9f` pre-this-session); `make
@@ -69,15 +73,14 @@ verify` 48/48. Highlights live in CLAUDE.md (guard families, tool-surface counts
 bundle) — not repeated here.
 
 **NEXT, in order of consequence:**
-1. **Merge PR #152** (this session's bug-fix wave) — gates green, owner's call.
-2. **Owner ruling: fold `desk-pm` into `desk-persona`, or ship both?** Deliberately additive for
+1. **Owner ruling: fold `desk-pm` into `desk-persona`, or ship both?** Deliberately additive for
    now (duplicate `pm-operator` agent name if both installed; PR #143's body has the facets). A
    fold is a small follow-up PR.
-3. **Release cut (owner-gated)** — `[Unreleased]` holds the whole v1 wave + the 0.8.0 bug floor;
-   `make version-status` will shout. Runbook `docs/development/releasing.md`.
-4. **Epic #130 (schema-v2, #124–#128)** — its own arc, deliberately no milestone; v1+v2 model
+2. **Release cut (owner-gated)** — `[Unreleased]` holds the whole v1 wave + the 0.8.0 bug floor
+   + the #152 fixes; `make version-status` will shout. Runbook `docs/development/releasing.md`.
+3. **Epic #130 (schema-v2, #124–#128)** — its own arc, deliberately no milestone; v1+v2 model
    simulations before v2 finalizes (owner's signoff note).
-5. **ts-proxy implementation** — `docs/development/ts-proxy-design.md` §5 slices; slice 0 (host
+4. **ts-proxy implementation** — `docs/development/ts-proxy-design.md` §5 slices; slice 0 (host
    spawn-capability probe) is the go/no-go before anything else.
 
 **Design session (2026-07-20) is RULED — ADRs 0009–0018 bind** (`docs/decisions/README.md` has
@@ -103,12 +106,15 @@ test for the TS MCP server · **#19** PB-served webapp chat (deferred; ADR 0001 
 `StreamTurn`'s JSON-taggable events already give it a substrate) · **#36** template SOP library
 v-next major, needs a design ruling first (vendor-vs-sync, type↔dir_kind) — the "librarian
 knows ~20 SOPs" premise never existed, the 2-template boundary was intentional · **#153** the
-two transcript-gap follow-ups from this session (above).
+two transcript-gap follow-ups from the bug-fix wave (above) · **#154** test-hygiene cleanup
+(`printJSON` → `io.Writer`, drops the stdout pipe-swap in `pm` tests; filed from #152 review).
 
 ## 2. Recent deliveries (newest first — full detail in the cited PRs / ADRs / issues)
 
+- **2026-07-21 — PR #152 merged** (`bbfc1a8`, closed #148–#151); review threads dispositioned,
+  #154 filed. See §1 top entry.
 - **2026-07-20 — agent-led integration testing + bug-fix wave.** See §1 top entry. Report +
-  PR #152 (open) + issue #153 (filed).
+  PR #152 + issues #153/#154.
 - **2026-07-20 — v1 build wave, epic #129 closed.** PRs #136–#147; see §1 + CLAUDE.md.
 - **2026-07-20 — design session ruled + Phase 4 filed.** ADRs 0009–0018; PRs #113, #131; see §1.
 - **2026-07-20 — 0.8.0 bug floor merged.** PR #112 (`51235f6`): closed #67/#78/#79/#80/#91/#92/
@@ -127,7 +133,6 @@ two transcript-gap follow-ups from this session (above).
 
 ## 3. Where to start next
 
-- **Merge PR #152** when Henry's ready (gates green, no open review threads).
 - **The design session is RULED and Phase 4 is FILED** (§1): ADRs 0009–0018 bind; pick up #114
   first (blocks #119/#122) if opening a new v1 build lane, then the independent slices.
 - **Cut the next release** when `[Unreleased]` warrants — `docs/development/releasing.md`
@@ -142,11 +147,6 @@ _Core coding conventions — gates, generated artifacts, PocketBase-bootstraps-b
 migration patterns, config resolution, store self-init — are in **CLAUDE.md** (hot-loaded every
 session). Only what CLAUDE.md doesn't cover lives below._
 
-- **KNOWN BUG on `main` until PR #152 merges**: building/running `deskkit` from a path under
-  `$TMPDIR` (e.g. `go build -o "$(mktemp -d)/deskkit"`) silently triggers PocketBase dev-mode
-  and dumps raw SQL debug lines to stdout, corrupting anything reading stdout as
-  machine-readable (an MCP client's JSON-RPC stream included). Work around with `--dev=false`
-  or build to a path outside `$TMPDIR` (e.g. `/tmp` directly) until merged; fixed on PR #152.
 - **Installing from the private repo** (until public launch ≥ v1.0.0): the public `install.sh` /
   `curl|bash` path 404s by design — use authed `gh` instead.
   - From a local clone: `make install` (root or `librarian/`) → `~/.local/bin/deskkit`.
