@@ -394,6 +394,7 @@ table-per-level design.
 | `status_label` | text | friendly vocabulary over the phase (R2.2; §3.3) |
 | `court` | select | `owner`,`desk`,`crew`,`vendor`,`external-session` (R2.3) |
 | `pointer` | text | desk-relative file path; grammar defined in §3.1a (ADR 0010) |
+| `body` | text | long-form inline prose — narrative, acceptance criteria, or spec — distinct from the `pointer` external-doc reference and from `notes` (§3.7); `create_item`/`update_item` set it, `get_item`'s detail shape returns it (the list/summary shape omits it) |
 | `severity` | select | `low`,`medium`,`high` (R2.3) |
 | `priority` | number | ordinal within a court/queue (R2.3) |
 | `claimed_by` | text | actor string holding the claim (R2.6) |
@@ -406,6 +407,14 @@ table-per-level design.
 `type`, `severity`, `priority` are the friendly/first-class vocabulary (data-owned). Keeping
 them separate (R2.2) is what lets the label set evolve per desk without touching the transition
 logic.
+
+**`body` — issue resolution (#90).** Before this field, an item's long-form content had nowhere
+first-class to live: `pointer` names an *external* document, `notes` (§3.7) is a separate
+collection of phase-scoped keyed snippets, and `properties` is a free-form overflow bag, not a
+designated prose surface. `#90` resolved this by **adding** a dedicated `body` text field
+(migration `0006_pm_items_body.go`) rather than repurposing one of those three — an item can now
+carry its own narrative, acceptance criteria, or inline spec directly, with no separate document
+required.
 
 ### 3.1a `pointer` grammar (ADR 0010)
 
@@ -556,9 +565,15 @@ parent).
 
 **Optimistic concurrency + claim (R2.6, SHOULD — adopted):** every mutating PM tool takes the
 item's `version` and refuses on mismatch (`409`-style, "item changed since you read it"). A
-**claim** sets `claimed_by` + `claim_expires` (default TTL 30 min, `PM_CLAIM_TTL` configurable);
-`advance`/`demote` on a live, foreign claim is refused. An expired claim is treated as free. This
-is the "enough to stop two desk agents double-working an item" bar (R2.6), not a distributed lock.
+**claim** sets `claimed_by` + `claim_expires` (default TTL 30 min, `PM_CLAIM_TTL` configurable).
+**A live foreign claim is authoritative over every direct mutation of the item** — transition,
+block, unblock, and update are all refused for a non-holder while the claim is live; it is
+honored by the holder (whose own writes proceed as normal) and lapses at its TTL, or immediately
+on `release`. An expired or absent claim is treated as free. Cascade/auto-unblock (§3.5) is
+derived graph state driven by the transition hook, not a direct call, so it is unaffected by
+claims — a claim coordinates people/agents, not the graph's own derived state. See
+[ADR 0020](decisions/0020-pm-claim-semantics.md). This is the "enough to stop two desk agents
+double-working an item" bar (R2.6), not a distributed lock.
 
 ### 3.7 `notes` — lighter artifacts (R3.2)
 
@@ -657,6 +672,23 @@ traits:
 - The loader validates this YAML against the gate-config schema on write; an invalid config is
   rejected (fail-loud, R7 discipline) rather than silently disabling gates.
 
+**Which transitions gate under the shipped default (worked example).** Gates are per-transition,
+not universal: only the `(type, edge)` pairs a rule names are gated; every other edge passes
+through ungated (subject only to the machine, §3.2, and any live claim, §3.6). The shipped
+`DefaultRulesYAML` (the YAML above) gates exactly two edges:
+
+| Item type | Edge | Requires |
+|---|---|---|
+| `decision` | `review→terminal` | a `decision` document, status `accepted`, at the item's `pointer` |
+| `task` | `work→review` | a `task` document, status `active`, at the item's `pointer` |
+
+Contrast: a `task` item's `queue→work` transition is **ungated** under the shipped default — the
+machine admits it and it always succeeds (subject to §3.2/§3.6). The same item's `work→review`
+transition **is** gated — refused until a `task` document exists at the item's pointer,
+validates, and is at status `active`. Demote (`work→queue`, `review→work`) and reopen
+(`terminal→work`) follow the same rule: ungated unless the desk's `desk_config` explicitly binds
+a rule to that edge (§3.2).
+
 ### 4.3 Kit/type ids as the reference vocabulary (R3.4)
 
 The `type` and `status` values in gate rules reference the **schema-v1 / SOP-kit ids** produced
@@ -676,9 +708,18 @@ never reference an unknown type, but an item could still be born with one until 
 
 Via the seam (§2.5), a document is "filled" for a gate when: it **exists** at the pointer, its
 **frontmatter validates** against schema v1 for its `type`, and it carries the **required
-status**. The librarian's existing validation (the same engine behind its patrol R-rules and the
-plugin's `profile_validate`) is the single source of the verdict — the PM system adds no second,
-divergent notion of document validity.
+status**. "Frontmatter validates" means every schema-v1 **universal** key is present — `type`,
+`status`, `created`, `updated`, `tags` (`status` optional on `lightweight` types) — plus every
+field the doctype itself requires (`schema/doctypes.yaml`). `updated` is a universal key like the
+rest: a gated document missing it is refused exactly as one missing a doctype-specific field.
+`schema/doctypes.yaml` additionally names value-format expectations for the universal keys
+(`created`/`updated` as `YYYY-MM-DD` dates, `tags` as a kebab-array) — a stated part of the
+schema-v1 contract, but the current gate engine's `ValidateFrontmatter`
+(`librarian/internal/core/schema/doctypes.go`) checks key **presence**, not value **format**; a
+malformed-but-present date or tag does not by itself fail the gate today (a deliberate, flagged
+v1 scope gap in that file, not an oversight). The librarian's existing validation (the same
+engine behind its patrol R-rules and the plugin's `profile_validate`) is the single source of the
+verdict — the PM system adds no second, divergent notion of document validity.
 
 ---
 

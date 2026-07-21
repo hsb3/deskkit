@@ -42,6 +42,13 @@ Legal edges only (everything else is refused by the machine, before gates):
 Pass the `version` you read in step 1. If another writer moved the item first, the write is
 refused as a version conflict — re-read with `get_item` and retry against the new version.
 
+A **live foreign claim** refuses the write too, but it is a distinct case from a version
+conflict: it means someone else is actively holding the item (via `claim_item`), and the refusal
+holds regardless of version until the claim's TTL lapses or the holder releases it. If you intend
+to mutate an item across more than one call, `claim_item` it first so a foreign write cannot land
+underneath you; a non-holder is refused on every direct mutation (transition, block, unblock,
+update) of a claimed item.
+
 A **blocked** item is refused: clear the block first (see pm-triage / `unblock_item`), then
 transition.
 
@@ -52,7 +59,14 @@ required document's **type**, the **status** it must hold, and where it is expec
 `pointer`). For example, a `decision` item advancing `review→terminal` requires its decision
 document to be **accepted**; a `task` item advancing `work→review` requires its task document to
 exist, validate, and be **active**. (These rules are the desk's `desk_config` gate ruleset — a
-desk edits them; the shipped default carries only these two examples.)
+desk edits them; the shipped default carries only these two examples. Not every edge gates —
+`queue→work` is ungated by default, for instance; only the `(type, edge)` pairs the desk's
+config names carry a document requirement.)
+
+"Validate" means the document's frontmatter carries every schema-v1 **universal** key —
+`type`, `status`, `created`, `updated`, `tags` (`status` optional on lightweight types) — plus
+every field its doctype requires. `updated` is a universal key like the rest: a document that is
+otherwise correct but missing `updated` still fails the gate, and the refusal names it.
 
 The gate reads a document verdict; **it never writes the document, and neither do you through the
 PM system.** To satisfy a refusal:

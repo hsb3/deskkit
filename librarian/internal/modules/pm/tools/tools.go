@@ -69,7 +69,7 @@ func GetItem(ctx context.Context, app core.App, cfg *cfgpkg.Config, v schema.Doc
 func CreateItem(ctx context.Context, app core.App, cfg *cfgpkg.Config, v schema.DocumentValidator, in *CreateItemInput) (*itemResult, error) {
 	rec, err := newEngine(app, cfg, v).CreateItem(ctx, engine.CreateItemInput{
 		Title: in.Title, Type: in.Type, Parent: in.Parent, Court: in.Court,
-		Pointer: in.Pointer, Severity: in.Severity, Priority: in.Priority,
+		Pointer: in.Pointer, Body: in.Body, Severity: in.Severity, Priority: in.Priority,
 		Actor: actorOf(in.ActorFields),
 	})
 	if err != nil {
@@ -94,6 +94,9 @@ func UpdateItem(ctx context.Context, app core.App, cfg *cfgpkg.Config, v schema.
 	}
 	if in.Pointer != "" {
 		up.Pointer = &in.Pointer
+	}
+	if in.Body != "" {
+		up.Body = &in.Body
 	}
 	if in.Severity != "" {
 		up.Severity = &in.Severity

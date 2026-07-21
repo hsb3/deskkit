@@ -11,8 +11,7 @@ package main
 // shared path the other nine commands depend on without their own direct coverage.
 
 import (
-	"bytes"
-	"os"
+	"io"
 	"path/filepath"
 	"testing"
 
@@ -112,24 +111,14 @@ func TestSweep_SelfInitsNeverMigratedStore(t *testing.T) {
 	registerToolCommands(app, cfg, nil)
 
 	// runSweep executes the real `sweep` RunE (which calls requireConfig, then tools.Sweep) via
-	// cobra, discarding sweep's JSON stdout — only the exit status matters here (mirrors the
-	// os.Stdout-pipe capture idiom in pm_test.go's `run` closure; printJSON writes via
-	// fmt.Println, i.e. straight to os.Stdout, not cmd.OutOrStdout()).
+	// cobra, discarding sweep's JSON output — only the exit status matters here. sweep's RunE
+	// calls printJSON(cmd.OutOrStdout(), ...), so pointing RootCmd's own writer at io.Discard via
+	// SetOut is enough; no process-global os.Stdout swap needed.
 	runSweep := func() error {
 		t.Helper()
-		r, w, perr := os.Pipe()
-		if perr != nil {
-			t.Fatalf("os.Pipe: %v", perr)
-		}
-		orig := os.Stdout
-		os.Stdout = w
+		app.RootCmd.SetOut(io.Discard)
 		app.RootCmd.SetArgs([]string{"sweep"})
-		execErr := app.RootCmd.Execute()
-		os.Stdout = orig
-		_ = w.Close()
-		var buf bytes.Buffer
-		_, _ = buf.ReadFrom(r)
-		return execErr
+		return app.RootCmd.Execute()
 	}
 
 	// First run: against a never-migrated store, requireConfig must self-init the schema before

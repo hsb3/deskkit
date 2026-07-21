@@ -86,7 +86,7 @@ test("every PM tool is referenced by at least one skill or the agent (no undocum
 // prose, add it here — otherwise the ToolNames-anchored guard below will (correctly) flag it
 // as an unrecognized identifier.
 const NON_TOOL_FIELDS = new Set([
-  "by_court", "by_phase", "desk_config", "recent_transitions", "status_label",
+  "by_court", "by_phase", "desk_config", "recent_transitions", "status_label", "delegation_parent",
 ]);
 
 // The guard, as a pure function so it can be proven red on an injected fake. Returns the list

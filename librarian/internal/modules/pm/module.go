@@ -12,11 +12,9 @@
 package pm
 
 import (
-	"encoding/json"
 	"fmt"
 
 	"github.com/pocketbase/pocketbase/core"
-	"github.com/pocketbase/pocketbase/tools/subscriptions"
 
 	"github.com/hsb3/desk-standard/librarian/internal/core/config"
 	"github.com/hsb3/desk-standard/librarian/internal/core/migrate"
@@ -43,6 +41,7 @@ func New() module.Module { return &Mod{} }
 type Mod struct {
 	cfg       *config.Config           // injected via Configure; nil until then
 	validator schema.DocumentValidator // injected via SetValidator (the librarian's, via core)
+	realtime  *realtimeManager         // the per-client realtime dispatcher; nil until RegisterRealtime
 }
 
 // Configure implements module.Configurable: the resolved config drives the tool write gate
@@ -55,8 +54,8 @@ func (m *Mod) SetValidator(v schema.DocumentValidator) { m.validator = v }
 
 func (*Mod) Name() string { return "pm" }
 
-// SchemaVersion is the highest migration sequence the pm module declares (0005).
-func (*Mod) SchemaVersion() int { return 5 }
+// SchemaVersion is the highest migration sequence the pm module declares (0006).
+func (*Mod) SchemaVersion() int { return 6 }
 
 // Enabled is the per-desk feature gate (R5.5c): env PM_ENABLED > profile modules.pm.enabled >
 // off. A nil cfg (config.Load failed) is off — fail closed.
@@ -120,41 +119,19 @@ func (*Mod) RegisterHooks(app core.App, cfg *config.Config) error {
 // subscribed to it. Wired by main under OnServe ONLY (realtime is serve-only, like the
 // trigger layer; one-shot CLI calls emit no events). A marshal failure or an absent broker is
 // swallowed — realtime is an observer channel, never allowed to fail a transition.
-func (*Mod) RegisterRealtime(app core.App) error {
+//
+// The per-client dispatcher (realtimeManager) is initialized here and closed over by the hook,
+// so its state hangs off THIS *Mod — each app/test gets its own, with no cross-app leakage.
+// The hook does a bounded, non-blocking enqueue; a single per-client goroutine delivers in
+// order (see realtime.go), so the transition hook never blocks and per-client FIFO holds.
+func (m *Mod) RegisterRealtime(app core.App) error {
+	m.realtime = newRealtimeManager()
+	mgr := m.realtime
 	app.OnRecordAfterCreateSuccess("transitions").BindFunc(func(e *core.RecordEvent) error {
-		broadcastTransition(e.App, e.Record)
+		mgr.broadcastTransition(e.App, e.Record)
 		return e.Next()
 	})
 	return nil
-}
-
-// broadcastTransition sends one transitions row to every client subscribed to RealtimeTopic.
-func broadcastTransition(app core.App, rec *core.Record) {
-	payload, err := json.Marshal(map[string]any{
-		"item":       rec.GetString("item"),
-		"event":      rec.GetString("event"),
-		"from_phase": rec.GetString("from_phase"),
-		"to_phase":   rec.GetString("to_phase"),
-		"actor":      rec.GetString("actor"),
-		"actor_kind": rec.GetString("actor_kind"),
-		"detail":     rec.GetString("detail"),
-		"created":    rec.GetDateTime("created").String(),
-	})
-	if err != nil {
-		return
-	}
-	msg := subscriptions.Message{Name: RealtimeTopic, Data: payload}
-	for _, client := range app.SubscriptionsBroker().Clients() {
-		if client.IsDiscarded() || !client.HasSubscription(RealtimeTopic) {
-			continue
-		}
-		// Async per client: DefaultClient.Send writes an UNBUFFERED channel that only the
-		// client's live SSE writer drains, so a synchronous send from this record hook would
-		// let one stuck consumer block the transition itself. Realtime is an observer channel
-		// (§5.4); the transition never waits on it. Send recovers a closed-channel panic
-		// internally, so a client discarded mid-flight is safe.
-		go client.Send(msg)
-	}
 }
 
 // validateDeskConfigRecord fail-louds an invalid desk_config write (§4.2: an invalid config

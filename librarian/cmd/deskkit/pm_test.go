@@ -135,30 +135,15 @@ func TestPMActorFlagBeforeLeaf(t *testing.T) {
 	registerToolCommands(app, cfg, nil)
 
 	// run executes the real RootCmd (the same command tree `deskkit` builds) with args and
-	// returns the parsed JSON stdout payload. printJSON writes straight to os.Stdout (not
-	// cmd.OutOrStdout()), so stdout itself is captured via a pipe.
-	//
-	// Known limitation: swapping the process-global os.Stdout isn't safe against a concurrent
-	// writer (e.g. a PocketBase background timer/log flusher during app.Bootstrap()). This test
-	// doesn't call t.Parallel() and no other test in this package swaps os.Stdout, which keeps
-	// the risk low, but it isn't zero. The authoritative regression coverage for this fix
-	// (TestPMActorBeforeLeaf_Subprocess, below) runs the real binary as a subprocess and reads
-	// its own dedicated stdout pipe via exec.Command, which has no such risk — this in-process
-	// test's job is only to prove --actor's value threads through the pm engine end to end.
+	// returns the parsed JSON stdout payload. Every leaf RunE calls printJSON(cmd.OutOrStdout(),
+	// ...), which walks up to the root's configured writer, so pointing RootCmd's own writer at
+	// buf via SetOut captures a leaf's output directly — no process-global os.Stdout swap needed.
 	run := func(args []string) map[string]any {
 		t.Helper()
-		r, w, perr := os.Pipe()
-		if perr != nil {
-			t.Fatalf("os.Pipe: %v", perr)
-		}
-		orig := os.Stdout
-		os.Stdout = w
+		var buf bytes.Buffer
+		app.RootCmd.SetOut(&buf)
 		app.RootCmd.SetArgs(args)
 		execErr := app.RootCmd.Execute()
-		os.Stdout = orig
-		_ = w.Close()
-		var buf bytes.Buffer
-		_, _ = buf.ReadFrom(r)
 		if execErr != nil {
 			t.Fatalf("execute %v: %v\noutput: %s", args, execErr, buf.String())
 		}

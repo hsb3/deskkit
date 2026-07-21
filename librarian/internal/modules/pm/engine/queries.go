@@ -368,6 +368,7 @@ type DependencyRow struct {
 // ancestor chain.
 type ItemDetail struct {
 	ItemSummary
+	Body              string          `json:"body,omitempty"`
 	Properties        json.RawMessage `json:"properties,omitempty"`
 	Notes             []NoteRow       `json:"notes"`
 	Dependencies      []DependencyRow `json:"dependencies"`
@@ -383,6 +384,7 @@ func (e *Engine) GetItem(ctx context.Context, itemID string) (*ItemDetail, error
 	}
 	d := &ItemDetail{
 		ItemSummary:       summarize(item),
+		Body:              item.GetString("body"),
 		Notes:             []NoteRow{},
 		Dependencies:      []DependencyRow{},
 		RecentTransitions: []TransitionRow{},
@@ -479,6 +481,7 @@ type UpdateItemInput struct {
 	Type        *string
 	Court       *string
 	Pointer     *string
+	Body        *string
 	Severity    *string
 	Priority    *int
 	Properties  *string
@@ -495,6 +498,14 @@ func (e *Engine) UpdateItem(ctx context.Context, in UpdateItemInput) (*core.Reco
 	}
 	if err := checkVersion(item, in.Version); err != nil {
 		return nil, err
+	}
+	// A live foreign claim is authoritative over every direct mutation (ADR 0020). This check
+	// sits up front so it covers BOTH the field-edit path below AND the status_label path that
+	// delegates to SetStatusLabel, and refuses a non-holder naming the holder and the expiry in
+	// the same shape the transition path uses.
+	if holder := liveForeignClaim(item, in.Actor, time.Now()); holder != "" {
+		return nil, refuse("item %q is claimed by %q until %s", item.Id, holder,
+			item.GetDateTime("claim_expires").Time().Format(time.RFC3339))
 	}
 	if in.Severity != nil && *in.Severity != "" {
 		switch *in.Severity {
@@ -524,6 +535,11 @@ func (e *Engine) UpdateItem(ctx context.Context, in UpdateItemInput) (*core.Reco
 	}
 	if in.Pointer != nil {
 		item.Set("pointer", *in.Pointer)
+	}
+	if in.Body != nil {
+		// A non-nil pointer to an empty string is a deliberate clear (mirrors the other *string
+		// fields), so the body can be emptied on purpose.
+		item.Set("body", *in.Body)
 	}
 	if in.Severity != nil {
 		item.Set("severity", *in.Severity)

@@ -91,8 +91,9 @@ func registerPMCommands(app *pocketbase.PocketBase, cfg *config.Config, cfgErr e
 			if err != nil {
 				return err
 			}
-			return printJSON(pmtools.GetContext(cmd.Context(), app, c, pmValidator(),
-				&pmtools.GetContextInput{StalledDays: stalledDays}))
+			res, perr := pmtools.GetContext(cmd.Context(), app, c, pmValidator(),
+				&pmtools.GetContextInput{StalledDays: stalledDays})
+			return printJSON(cmd.OutOrStdout(), res, perr)
 		},
 	}
 	contextCmd.Flags().IntVar(&stalledDays, "stalled-days", 0, "stalled threshold in days (default 14 / PM_STALLED_DAYS)")
@@ -108,7 +109,8 @@ func registerPMCommands(app *pocketbase.PocketBase, cfg *config.Config, cfgErr e
 			if err != nil {
 				return err
 			}
-			return printJSON(pmtools.ListItems(cmd.Context(), app, c, pmValidator(), &lf))
+			res, perr := pmtools.ListItems(cmd.Context(), app, c, pmValidator(), &lf)
+			return printJSON(cmd.OutOrStdout(), res, perr)
 		},
 	}
 	listCmd.Flags().StringVar(&lf.Phase, "phase", "", "filter: queue, work, review, terminal")
@@ -128,8 +130,9 @@ func registerPMCommands(app *pocketbase.PocketBase, cfg *config.Config, cfgErr e
 			if err != nil {
 				return err
 			}
-			return printJSON(pmtools.GetItem(cmd.Context(), app, c, pmValidator(),
-				&pmtools.GetItemInput{ItemID: args[0]}))
+			res, perr := pmtools.GetItem(cmd.Context(), app, c, pmValidator(),
+				&pmtools.GetItemInput{ItemID: args[0]})
+			return printJSON(cmd.OutOrStdout(), res, perr)
 		},
 	})
 
@@ -144,7 +147,8 @@ func registerPMCommands(app *pocketbase.PocketBase, cfg *config.Config, cfgErr e
 				return err
 			}
 			ci.ActorFields = actor()
-			return printJSON(pmtools.CreateItem(cmd.Context(), app, c, pmValidator(), &ci))
+			res, perr := pmtools.CreateItem(cmd.Context(), app, c, pmValidator(), &ci)
+			return printJSON(cmd.OutOrStdout(), res, perr)
 		},
 	}
 	createCmd.Flags().StringVar(&ci.Title, "title", "", "the item title")
@@ -152,6 +156,7 @@ func registerPMCommands(app *pocketbase.PocketBase, cfg *config.Config, cfgErr e
 	createCmd.Flags().StringVar(&ci.Parent, "parent", "", "parent item id (omit for a root)")
 	createCmd.Flags().StringVar(&ci.Court, "court", "", "owner, desk, crew, vendor, external-session")
 	createCmd.Flags().StringVar(&ci.Pointer, "pointer", "", "doc path / issue URL / other locus")
+	createCmd.Flags().StringVar(&ci.Body, "body", "", "long-form body: narrative, acceptance criteria, or spec, stored inline")
 	createCmd.Flags().StringVar(&ci.Severity, "severity", "", "low, medium, high")
 	createCmd.Flags().IntVar(&ci.Priority, "priority", 0, "ordinal within a court/queue")
 	_ = createCmd.MarkFlagRequired("title")
@@ -174,7 +179,8 @@ func registerPMCommands(app *pocketbase.PocketBase, cfg *config.Config, cfgErr e
 				return verr
 			}
 			ui.ItemID, ui.Version, ui.ActorFields = args[0], ver, actor()
-			return printJSON(pmtools.UpdateItem(cmd.Context(), app, c, pmValidator(), &ui))
+			res, perr := pmtools.UpdateItem(cmd.Context(), app, c, pmValidator(), &ui)
+			return printJSON(cmd.OutOrStdout(), res, perr)
 		},
 	}
 	updateCmd.Flags().IntVar(&updateVersion, "version", -1, "version token you read, >= 1 (omit = use the item's current version)")
@@ -182,6 +188,7 @@ func registerPMCommands(app *pocketbase.PocketBase, cfg *config.Config, cfgErr e
 	updateCmd.Flags().StringVar(&ui.Type, "type", "", "new schema-v1/kit type")
 	updateCmd.Flags().StringVar(&ui.Court, "court", "", "new court")
 	updateCmd.Flags().StringVar(&ui.Pointer, "pointer", "", "new document pointer")
+	updateCmd.Flags().StringVar(&ui.Body, "body", "", "new body (empty = unchanged)")
 	updateCmd.Flags().StringVar(&ui.Severity, "severity", "", "new severity")
 	updateCmd.Flags().IntVar(&ui.Priority, "priority", 0, "new priority (0 = unchanged)")
 	updateCmd.Flags().StringVar(&ui.Properties, "properties", "", "new properties JSON object")
@@ -204,10 +211,11 @@ func registerPMCommands(app *pocketbase.PocketBase, cfg *config.Config, cfgErr e
 			if verr != nil {
 				return verr
 			}
-			return printJSON(pmtools.TransitionItem(cmd.Context(), app, c, pmValidator(),
+			res, perr := pmtools.TransitionItem(cmd.Context(), app, c, pmValidator(),
 				&pmtools.TransitionItemInput{
 					ItemID: args[0], TargetPhase: toPhase, Version: ver, ActorFields: actor(),
-				}))
+				})
+			return printJSON(cmd.OutOrStdout(), res, perr)
 		},
 	}
 	transitionCmd.Flags().StringVar(&toPhase, "to", "", "target phase: queue, work, review, terminal")
@@ -231,8 +239,9 @@ func registerPMCommands(app *pocketbase.PocketBase, cfg *config.Config, cfgErr e
 			if verr != nil {
 				return verr
 			}
-			return printJSON(pmtools.BlockItem(cmd.Context(), app, c, pmValidator(),
-				&pmtools.BlockItemInput{ItemID: args[0], Version: ver, Reason: blockReason, ActorFields: actor()}))
+			res, perr := pmtools.BlockItem(cmd.Context(), app, c, pmValidator(),
+				&pmtools.BlockItemInput{ItemID: args[0], Version: ver, Reason: blockReason, ActorFields: actor()})
+			return printJSON(cmd.OutOrStdout(), res, perr)
 		},
 	}
 	blockCmd.Flags().StringVar(&blockReason, "reason", "", "why the item is blocked (audit detail)")
@@ -254,8 +263,9 @@ func registerPMCommands(app *pocketbase.PocketBase, cfg *config.Config, cfgErr e
 			if verr != nil {
 				return verr
 			}
-			return printJSON(pmtools.UnblockItem(cmd.Context(), app, c, pmValidator(),
-				&pmtools.UnblockItemInput{ItemID: args[0], Version: ver, Reason: unblockReason, ActorFields: actor()}))
+			res, perr := pmtools.UnblockItem(cmd.Context(), app, c, pmValidator(),
+				&pmtools.UnblockItemInput{ItemID: args[0], Version: ver, Reason: unblockReason, ActorFields: actor()})
+			return printJSON(cmd.OutOrStdout(), res, perr)
 		},
 	}
 	unblockCmd.Flags().StringVar(&unblockReason, "reason", "", "why the block clears (audit detail)")
@@ -273,8 +283,9 @@ func registerPMCommands(app *pocketbase.PocketBase, cfg *config.Config, cfgErr e
 			if err != nil {
 				return err
 			}
-			return printJSON(pmtools.AddNote(cmd.Context(), app, c, pmValidator(),
-				&pmtools.AddNoteInput{ItemID: args[0], Key: noteKey, Body: noteBody, ActorFields: actor()}))
+			res, perr := pmtools.AddNote(cmd.Context(), app, c, pmValidator(),
+				&pmtools.AddNoteInput{ItemID: args[0], Key: noteKey, Body: noteBody, ActorFields: actor()})
+			return printJSON(cmd.OutOrStdout(), res, perr)
 		},
 	}
 	noteCmd.Flags().StringVar(&noteKey, "key", "", "the note key (e.g. rationale, handoff)")
@@ -295,7 +306,8 @@ func registerPMCommands(app *pocketbase.PocketBase, cfg *config.Config, cfgErr e
 				return err
 			}
 			li.From, li.To, li.ActorFields = args[0], args[1], actor()
-			return printJSON(pmtools.LinkItems(cmd.Context(), app, c, pmValidator(), &li))
+			res, perr := pmtools.LinkItems(cmd.Context(), app, c, pmValidator(), &li)
+			return printJSON(cmd.OutOrStdout(), res, perr)
 		},
 	}
 	linkCmd.Flags().StringVar(&li.Kind, "kind", "", "blocks, is-blocked-by, or relates-to")
@@ -319,8 +331,9 @@ func registerPMCommands(app *pocketbase.PocketBase, cfg *config.Config, cfgErr e
 			if verr != nil {
 				return verr
 			}
-			return printJSON(pmtools.ClaimItem(cmd.Context(), app, c, pmValidator(),
-				&pmtools.ClaimItemInput{ItemID: args[0], Version: ver, ActorFields: actor()}))
+			res, perr := pmtools.ClaimItem(cmd.Context(), app, c, pmValidator(),
+				&pmtools.ClaimItemInput{ItemID: args[0], Version: ver, ActorFields: actor()})
+			return printJSON(cmd.OutOrStdout(), res, perr)
 		},
 	}
 	claimCmd.Flags().IntVar(&claimVersion, "version", -1, "version token you read, >= 1 (omit = use the item's current version)")
@@ -340,8 +353,9 @@ func registerPMCommands(app *pocketbase.PocketBase, cfg *config.Config, cfgErr e
 			if verr != nil {
 				return verr
 			}
-			return printJSON(pmtools.ReleaseItem(cmd.Context(), app, c, pmValidator(),
-				&pmtools.ReleaseItemInput{ItemID: args[0], Version: ver, ActorFields: actor()}))
+			res, perr := pmtools.ReleaseItem(cmd.Context(), app, c, pmValidator(),
+				&pmtools.ReleaseItemInput{ItemID: args[0], Version: ver, ActorFields: actor()})
+			return printJSON(cmd.OutOrStdout(), res, perr)
 		},
 	}
 	releaseCmd.Flags().IntVar(&releaseVersion, "version", -1, "version token you read, >= 1 (omit = use the item's current version)")

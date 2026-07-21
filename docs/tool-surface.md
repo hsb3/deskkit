@@ -71,9 +71,26 @@ two independent switches, so there are four combinations:
 | both flags | **18** | the 6 (with `apply_fix`) **+ 12 PM tools** |
 
 The 12 PM tools (added only under `PM_ENABLED`, from the PM module's specs under
-`librarian/internal/modules/pm/`): `get_context`, `list_items`, `get_item`, `create_item`,
-`update_item`, `transition_item`, `block_item`, `unblock_item`, `add_note`, `link_items`,
-`claim_item`, `release_item`.
+`librarian/internal/modules/pm/`):
+
+| Tool | Writes | Notes |
+|---|---|---|
+| `get_context` | no | single-call cold-start briefing |
+| `list_items` | no | filtered graph query |
+| `get_item` | no | one item + notes/deps/transitions/ancestors, including its `body` (the list/summary shape omits it) |
+| `create_item` | yes | accepts an optional long-form `body`; carries the optional actor fields below |
+| `update_item` | yes | accepts an optional `body` (empty = unchanged); carries the optional actor fields below; refused by a live foreign claim ([ADR 0020](decisions/0020-pm-claim-semantics.md)) |
+| `transition_item` | yes | carries the optional actor fields below; refused by a live foreign claim (ADR 0020) |
+| `block_item` / `unblock_item` | yes | carry the optional actor fields below; refused by a live foreign claim (ADR 0020) |
+| `add_note` | yes | carries the optional actor fields below |
+| `link_items` | yes | carries the optional actor fields below |
+| `claim_item` / `release_item` | yes | carry the optional actor fields below |
+
+Every write tool's input carries optional `actor` / `actor_kind` / `delegation_parent` fields
+(`librarian/internal/modules/pm/tools/types.go` `ActorFields`), recorded verbatim on the audit
+row (pm-system-v1-spec.md §3.6); unset, they default to actor `"agent"`, kind `"agent"` — the
+model-facing surfaces are agent-driven by default. The CLI instead defaults its persistent
+`--actor` flag to `$USER` (else `"operator"`), kind `human` (`librarian/cmd/deskkit/pm.go`).
 
 **Gate rules that make the count differ from the CLI:**
 
