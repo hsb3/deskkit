@@ -20,7 +20,7 @@ org, repo, or issue number:
   carries the **PM module** — a document-gated work graph (items move through a rigid phase
   machine; a phase advance is refused until the document that phase requires validates),
   **on by default** — opt a desk out per desk with `PM_ENABLED=false`. See
-  [docs/pm-guide.md](docs/pm-guide.md) and the complementary `desk-pm` plugin.
+  [docs/pm-guide.md](docs/pm-guide.md) and the composed `desk-persona` plugin.
 - **`schema/`** — schema v1: the shared, product-neutral contract both `plugin/` and
   `librarian/` read as their rule/structure source.
 
@@ -41,8 +41,8 @@ Known, intentional gaps — not bugs:
 
 - **OpenCode adapter** — not built (see above).
 - **Hooks and agents surfaces (`desk-standard` plugin)** — the `desk-standard` plugin itself
-  ships skills only; no `hooks/` or `agents/` definitions. (The companion `desk-pm` plugin does
-  ship a `pm-operator` agent and a SessionStart briefing hook.)
+  ships skills only; no `hooks/` or `agents/` definitions. (The composed `desk-persona` plugin
+  does ship the `librarian-operator` + `pm-operator` agents and a SessionStart briefing hook.)
 
 Marketplace packaging and schema distribution are now wired (see below); they are no longer gaps.
 
@@ -164,8 +164,8 @@ for the full index.
 - **[docs/getting-started.md](docs/getting-started.md)** — install, fill your profile, build the librarian, first sweep + patrol.
 - **[docs/plugin-guide.md](docs/plugin-guide.md)** — the four skills as user journeys: when to reach for each, what you get.
 - **[docs/librarian-guide.md](docs/librarian-guide.md)** — the daily loop: sweep → patrol → fix → byte-exact restore.
-- **[docs/pm-guide.md](docs/pm-guide.md)** — the PM work graph: enable it, the phase machine + gates, and the CLI / MCP / TUI / `desk-pm` plugin surfaces.
-- `plugin/README.md`, `plugin/desk-pm/README.md`, `schema/README.md`, `librarian/README.md` — per-product operator detail.
+- **[docs/pm-guide.md](docs/pm-guide.md)** — the PM work graph: enable it, the phase machine + gates, and the CLI / MCP / TUI / `desk-persona` plugin surfaces.
+- `plugin/README.md`, `plugin/desk-persona/README.md`, `schema/README.md`, `librarian/README.md` — per-product operator detail.
 
 **Developing it** — build, test, release:
 

@@ -1,5 +1,5 @@
 {
   "name": "desk-persona",
   "version": "0.7.0",
-  "description": "The platform v1 proof surface: a composed mount of the librarian and PM tool families (17 tools) behind one MCP server, plus the librarian-operator and pm-operator agents and the three PM skills. Instantiates the agent integration contract (docs/agent-integration-contract-v1-spec.md). Personalize via the desk profile and desk_config, never by editing shipped definitions."
+  "description": "The platform v1 proof surface: a composed mount of the librarian and PM tool families (17 tools) behind one MCP server, plus the librarian-operator and pm-operator agents, the three PM skills, and a SessionStart cold-start briefing hook. Instantiates the agent integration contract (docs/agent-integration-contract-v1-spec.md). Personalize via the desk profile and desk_config, never by editing shipped definitions."
 }

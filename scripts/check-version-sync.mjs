@@ -3,7 +3,6 @@
 // the shipped manifests must agree with it:
 //   - plugin/claude-plugin/.claude-plugin/plugin.json   (the installed desk-standard plugin)
 //   - plugin/package.json                               (the plugin build package)
-//   - plugin/desk-pm/.claude-plugin/plugin.json         (the installed desk-pm plugin, D5)
 //   - plugin/desk-persona/.claude-plugin/plugin.json    (the installed desk-persona plugin)
 //   - .claude-plugin/marketplace.json                   (each plugins[].version in the marketplace)
 // Exits 1 (listing every disagreement) if any manifest differs from VERSION; exits 0 when all
@@ -30,19 +29,9 @@ const SOURCES = [
     pick: (j) => j.version,
   },
   {
-    label: "plugin/desk-pm/.claude-plugin/plugin.json",
-    file: "plugin/desk-pm/.claude-plugin/plugin.json",
-    pick: (j) => j.version,
-  },
-  {
     label: ".claude-plugin/marketplace.json (desk-standard plugins[].version)",
     file: ".claude-plugin/marketplace.json",
     pick: (j) => marketplaceVersion(j, "desk-standard"),
-  },
-  {
-    label: ".claude-plugin/marketplace.json (desk-pm plugins[].version)",
-    file: ".claude-plugin/marketplace.json",
-    pick: (j) => marketplaceVersion(j, "desk-pm"),
   },
   {
     label: "plugin/desk-persona/.claude-plugin/plugin.json",

@@ -124,8 +124,8 @@ each tool's `ToolSpec.Module` (`internal/core/mcp/server.go` → `toolcore.Selec
 - **`MCP_MODULES` unset** → no module filter; every tool the §5.4 gate exposes is served. **The
   5 / 6 / 17 / 18 counts in the table above are all the unset case** — unchanged behavior.
 - **`MCP_MODULES` set, non-empty** (e.g. `pm`, or `librarian,pm`) → the exposed set is filtered to
-  tools whose owning module is in the declared set. The **desk-pm mount**
-  (`plugin/desk-pm/.mcp.json`) declares `MCP_MODULES=pm` alongside `PM_ENABLED=true`, so it exposes
+  tools whose owning module is in the declared set. The **desk-pm mount** shape — a mount that
+  declares `MCP_MODULES=pm` alongside `PM_ENABLED=true` — exposes
   **exactly the 12 PM tools** and **none** of the 5 librarian ride-alongs (`sweep`, `patrol`,
   `propose_fix`, `query`, `record_feedback`). A partially-matching set (`librarian,bogus`) keeps the
   matched subset and serves.

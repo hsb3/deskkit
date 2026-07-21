@@ -32,7 +32,7 @@ plugin/            TS lane — harness-pure core + MCP server, packaged as a Cla
   core/            harness-pure domain library (profile, schema validation, templating, indexing)
   mcp/             stdio MCP server entry (server.ts)
   claude-plugin/   marketplace adapter: manifest, skills/, GENERATED mcp/server.js + schema copy
-  desk-pm/         the desk-pm companion plugin (pm-operator agent + SessionStart hook)
+  desk-persona/    the composed librarian+PM bundle: librarian-operator + pm-operator agents, 3 PM skills, SessionStart hook
   opencode/        frozen, unwired OpenCode spike — ships nothing in v1
 librarian/         Go lane — the deskkit binary; embedded PocketBase; CLI/MCP/TUI; verify.sh gate
 schema/            schema v1 — shared rule/structure source for both lanes
@@ -112,7 +112,7 @@ self-contained — that's why it's committed and drift-guarded.
 | Prompt copies byte-identical (embed ↔ spec quote; ADR 0015) | `scripts/check-prompt-drift.mjs` |
 | `docs/tool-surface.md` counts match source (ADR 0016) | `scripts/check-tool-surface.mjs` (+ `--self-test`; MCP gated counts by `TestToolSurfaceDoc_MCPCounts` on `make test`) |
 | Scaffold instruments carry conformant frontmatter | `scripts/check-scaffold-frontmatter.mjs` |
-| Persona bundle stays generated from its sources (ADR 0014) | `scripts/check-persona-drift.mjs` |
+| Persona `librarian-operator` agent stays generated from the librarian prompt (ADR 0014/0015); PM surfaces are authored-in-place post-fold | `scripts/check-persona-drift.mjs` |
 | Content TextFields carry an explicit Max (ADR 0017) | `scripts/check-textfield-max.mjs` (+ `--self-test`) |
 | Spec query-kind list == CLI/MCP registry (types.go ↔ spec §5.6 ↔ query.go switch) | `scripts/check-query-kinds.mjs` (+ `--self-test`) |
 | Librarian Go tree stays gofmt-clean | `gofmt -l` via `make -C librarian fmt` (CI librarian lane) |
