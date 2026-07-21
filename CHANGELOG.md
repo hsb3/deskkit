@@ -13,6 +13,8 @@ for why this policy exists.
 
 ## [Unreleased]
 
+## [0.8.0] — 2026-07-21
+
 ### Added
 
 - **Browser session surface** (#19, PR #177). `deskkit serve` now serves a purpose-built chat

@@ -9,7 +9,7 @@
       "name": "desk-standard",
       "source": "./plugin/claude-plugin",
       "description": "Profile-driven repo conventions: knowledge indexing, template rendering, and schema validation over a shared MCP tool surface, plus the desk-setup / conventions-standard / harvest-loop / brownfield-adoption skills. Personalize via _knowledge/profile.yaml, never by editing shipped definitions.",
-      "version": "0.7.0",
+      "version": "0.8.0",
       "author": {
         "name": "Henry Burden"
       }
@@ -18,7 +18,7 @@
       "name": "desk-persona",
       "source": "./plugin/desk-persona",
       "description": "The platform v1 proof surface: a composed mount of the librarian and PM tool families (17 tools) over the deskkit binary, plus the librarian-operator and pm-operator agents, the three PM skills, and a SessionStart cold-start briefing hook. Instantiates the agent integration contract. Personalize via the desk profile and desk_config, never by editing shipped definitions.",
-      "version": "0.7.0",
+      "version": "0.8.0",
       "author": {
         "name": "Henry Burden"
       }
