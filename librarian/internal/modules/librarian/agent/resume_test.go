@@ -311,7 +311,7 @@ func TestListConversations(t *testing.T) {
 	liveRun := mkRun("manual", "live chat", t0)     // the caller's own run: excluded by ID
 	mkRun("hook", "a hook run", t0)                 // non-manual: excluded
 
-	convos, err := ListConversations(app, 10, liveRun.Id)
+	convos, err := ListConversations(app, 10, liveRun.Id, false)
 	if err != nil {
 		t.Fatalf("ListConversations: %v", err)
 	}

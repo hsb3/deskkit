@@ -51,12 +51,13 @@ type streamer interface {
 // agent package's functions directly, so the picker + session-swap paths are unit-testable with a
 // fake (picker_test.go).
 type sessionProvider interface {
-	list(limit int, excludeRunID string) ([]agent.ConversationInfo, error)
+	list(limit int, excludeRunID string, includeArchived bool) ([]agent.ConversationInfo, error)
 	resume(ctx context.Context, runID string) (streamer, []agent.TranscriptEntry, error)
 	fresh(ctx context.Context) (streamer, error)
 	closeSession(ctx context.Context, s streamer) error
 	rename(runID, title string) error
 	delete(runID string) error
+	setArchived(runID string, archived bool) error
 	preview(runID string) ([]agent.TranscriptEntry, error)
 }
 
@@ -72,9 +73,9 @@ type agentProvider struct {
 }
 
 // list returns the most recent resumable conversations for the picker, excluding the caller's
-// own live run.
-func (p *agentProvider) list(limit int, excludeRunID string) ([]agent.ConversationInfo, error) {
-	return agent.ListConversations(p.app, limit, excludeRunID)
+// own live run. includeArchived reveals soft-archived conversations (default view hides them).
+func (p *agentProvider) list(limit int, excludeRunID string, includeArchived bool) ([]agent.ConversationInfo, error) {
+	return agent.ListConversations(p.app, limit, excludeRunID, includeArchived)
 }
 
 // resume rebuilds a live Session over an existing run and returns it (as a streamer) with the
@@ -116,6 +117,12 @@ func (p *agentProvider) rename(runID, title string) error {
 // discard (see agent/sessions.go).
 func (p *agentProvider) delete(runID string) error {
 	return agent.DeleteConversation(p.app, runID)
+}
+
+// setArchived toggles a conversation's soft-archive flag. Archiving is reversible and leaves the
+// conversation's messages intact — distinct from delete's hard cascade (see agent/sessions.go).
+func (p *agentProvider) setArchived(runID string, archived bool) error {
+	return agent.SetConversationArchived(p.app, runID, archived)
 }
 
 // preview loads the highlighted conversation's recent transcript for the picker's preview pane.
@@ -271,16 +278,20 @@ func (k keymap) FullHelp() [][]key.Binding {
 // the chat footer's help). Navigation, filter, resume, and close are handled via the list's own
 // keys and the model's send/cancel bindings; these three are the lifecycle verbs the picker adds.
 type pickerKeymap struct {
-	rename     key.Binding // enter inline rename over the selected row
-	delete     key.Binding // open the delete-confirm gate for the selected row
-	confirmYes key.Binding // confirm a pending delete
+	rename       key.Binding // enter inline rename over the selected row
+	delete       key.Binding // open the delete-confirm gate for the selected row
+	confirmYes   key.Binding // confirm a pending delete
+	archive      key.Binding // toggle the selected row's soft-archive flag (archive / unarchive)
+	showArchived key.Binding // reveal / hide archived conversations in the list
 }
 
 func defaultPickerKeymap() pickerKeymap {
 	return pickerKeymap{
-		rename:     key.NewBinding(key.WithKeys("r")),
-		delete:     key.NewBinding(key.WithKeys("d", "delete")),
-		confirmYes: key.NewBinding(key.WithKeys("y")),
+		rename:       key.NewBinding(key.WithKeys("r")),
+		delete:       key.NewBinding(key.WithKeys("d", "delete")),
+		confirmYes:   key.NewBinding(key.WithKeys("y")),
+		archive:      key.NewBinding(key.WithKeys("a")),
+		showArchived: key.NewBinding(key.WithKeys("A")),
 	}
 }
 
@@ -340,6 +351,12 @@ type model struct {
 	ready    bool
 
 	picker *pickerModel // conversation-resume overlay (ctrl+o); nil when closed.
+
+	// resumeFirst requests the sessions overlay be opened once at launch when prior resumable
+	// conversations exist (resume-first launch). Set by Run via enableResumeFirst; consumed
+	// (cleared) on the first sizing WindowSizeMsg so a later terminal resize never reopens it. It
+	// defaults false, so the pure-Update tests — which never set it — keep their launch behavior.
+	resumeFirst bool
 
 	// Module-contributed views (spec §5.3; host_views.go): views is the mounted set (empty on
 	// a librarian-only desk), activeView the index of the one occupying the body region, or
@@ -423,6 +440,13 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.resize(msg.Width, msg.Height)
+		if m.resumeFirst {
+			// One-shot: the overlay needs a sized viewport (only known after this first
+			// WindowSizeMsg), so resume-first fires here rather than in Init/newModel. Clear the
+			// flag first so a later resize can never reopen it.
+			m.resumeFirst = false
+			m.openLaunchPicker()
+		}
 		return m, nil
 
 	case tea.KeyPressMsg:
@@ -706,7 +730,7 @@ func (m model) openPicker() (tea.Model, tea.Cmd) {
 	if m.streaming || m.picker != nil {
 		return m, nil
 	}
-	convos, err := m.provider.list(pickerLimit, m.sess.RunID())
+	convos, err := m.provider.list(pickerLimit, m.sess.RunID(), false)
 	if err != nil {
 		// Degraded: keep the surface open without a picker, but say why — a silent ctrl+o that
 		// does nothing reads as a dead keybinding, not a failed lookup.
@@ -717,6 +741,29 @@ func (m model) openPicker() (tea.Model, tea.Cmd) {
 	m.picker = newPicker(convos, m.styles, m.vp.Width(), m.vp.Height())
 	m.refreshPreview()
 	return m, nil
+}
+
+// enableResumeFirst arms the resume-first launch behavior: when prior resumable conversations
+// exist, the surface opens on the sessions list at startup instead of dropping straight into a
+// fresh conversation. Called once by Run before the program starts.
+func (m *model) enableResumeFirst() { m.resumeFirst = true }
+
+// openLaunchPicker opens the sessions overlay at startup when prior resumable conversations exist
+// (resume-first launch): the reader lands on the list to pick one, or esc / ctrl+n to start
+// fresh in the session Run already created. With NO prior conversations — or a list error — it is a
+// no-op and the surface drops straight into the fresh conversation. This deliberately differs from
+// openPicker, which opens even on an empty list (an explicit ctrl+o earns visible feedback): an
+// empty overlay the user never asked for would just be dead chrome to esc past on first run.
+func (m *model) openLaunchPicker() {
+	if m.streaming || m.picker != nil {
+		return
+	}
+	convos, err := m.provider.list(pickerLimit, m.sess.RunID(), false)
+	if err != nil || len(convos) == 0 {
+		return
+	}
+	m.picker = newPicker(convos, m.styles, m.vp.Width(), m.vp.Height())
+	m.refreshPreview()
 }
 
 // appendError appends an inline red assistant entry — the visible-feedback path for a degraded
@@ -818,11 +865,50 @@ func (m model) handlePickerKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.picker.startConfirmDelete()
 		return m, nil
 
+	case key.Matches(msg, m.pickerKeys.archive):
+		return m.toggleArchiveSelected()
+
+	case key.Matches(msg, m.pickerKeys.showArchived):
+		return m.toggleShowArchived()
+
 	default:
 		cmd := m.picker.Update(msg)
 		m.refreshPreview()
 		return m, cmd
 	}
+}
+
+// toggleArchiveSelected soft-archives the highlighted conversation, or unarchives it when it is
+// already archived — a reversible hide from the default resume list that never touches the
+// conversation's messages (distinct from delete's hard cascade). It then reloads the list: when
+// archiving out of the default view the row vanishes, so the list settles on the nearest remaining
+// row; when unarchiving in the reveal view the row stays, so it keeps the selection. An empty
+// selection is a no-op; a store error dismisses the overlay with a visible reason.
+func (m model) toggleArchiveSelected() (tea.Model, tea.Cmd) {
+	runID := m.picker.selectedRunID()
+	if runID == "" {
+		return m, nil
+	}
+	archived := !m.picker.selectedArchived()
+	if err := m.provider.setArchived(runID, archived); err != nil {
+		m.picker = nil
+		m.appendError("could not archive conversation: " + err.Error())
+		m.refreshViewport()
+		return m, nil
+	}
+	keep := ""
+	if m.picker.showArchived {
+		keep = runID // still visible in the reveal view — keep it selected
+	}
+	return m.reloadPicker(keep)
+}
+
+// toggleShowArchived flips whether archived conversations are revealed in the list, then reloads it
+// (keeping the current selection when it survives the new filter). This is the only path that opens
+// the archived rows for unarchiving, since the default view hides them.
+func (m model) toggleShowArchived() (tea.Model, tea.Cmd) {
+	m.picker.showArchived = !m.picker.showArchived
+	return m.reloadPicker(m.picker.selectedRunID())
 }
 
 // resumeSelected resumes the highlighted conversation, swapping the live session for it. An empty
@@ -916,7 +1002,7 @@ func (m model) handleConfirmDeleteKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) 
 // on the nearest remaining row), then reloads the preview for the new selection. A list error
 // dismisses the overlay with a visible reason rather than leaving a stale list.
 func (m model) reloadPicker(selectRunID string) (tea.Model, tea.Cmd) {
-	convos, err := m.provider.list(pickerLimit, m.sess.RunID())
+	convos, err := m.provider.list(pickerLimit, m.sess.RunID(), m.picker.showArchived)
 	if err != nil {
 		m.picker = nil
 		m.appendError("could not list conversations: " + err.Error())

@@ -39,9 +39,10 @@ const renamePromptLabel = "rename: "
 // raw title, kept so entering rename can seed the input with it. The whole label lives on Title so
 // rows are single-line (the delegate's description line is disabled); Description returns "".
 type pickerItem struct {
-	runID string
-	title string
-	label string
+	runID    string
+	title    string
+	label    string
+	archived bool // soft-archived; drives the archive/unarchive verb and the row's "archived" marker
 }
 
 // Title is the single visible line.
@@ -70,6 +71,8 @@ type pickerModel struct {
 	previewID      string                  // runID whose preview is currently loaded ("" = none)
 	previewEntries []agent.TranscriptEntry // recent transcript of the highlighted conversation
 
+	showArchived bool // reveal soft-archived conversations in the list (default false: hide them)
+
 	width  int
 	height int
 }
@@ -79,7 +82,10 @@ type pickerModel struct {
 // never eats a bare enter/esc while browsing — the model owns those.
 func newPicker(convos []agent.ConversationInfo, styles styleSet, width, height int) *pickerModel {
 	delegate := list.NewDefaultDelegate()
-	delegate.ShowDescription = false // single-line rows: the whole label lives on Title
+	delegate.ShowDescription = false        // single-line rows: the whole label lives on Title
+	delegate.Styles = styles.pickerDelegate // theme the rows to the app palette (styles.go), not the
+	// delegate's hardcoded-dark defaults — so the title is legible on a light terminal and the
+	// selected row carries the surface's cyan accent instead of bubbles' magenta.
 
 	l := list.New(pickerItemsOf(convos), delegate, width, height)
 	l.Title = "sessions"
@@ -103,7 +109,7 @@ func newPicker(convos []agent.ConversationInfo, styles styleSet, width, height i
 func pickerItemsOf(convos []agent.ConversationInfo) []list.Item {
 	items := make([]list.Item, 0, len(convos))
 	for _, c := range convos {
-		items = append(items, pickerItem{runID: c.RunID, title: c.Title, label: convoLabel(c)})
+		items = append(items, pickerItem{runID: c.RunID, title: c.Title, label: convoLabel(c), archived: c.Archived})
 	}
 	return items
 }
@@ -118,7 +124,11 @@ func convoLabel(c agent.ConversationInfo) string {
 		title = "(untitled conversation)"
 	}
 	when := c.LastActivity.Time().Format("2006-01-02 15:04")
-	return title + " — " + when + " · " + msgCountLabel(c.MsgCount) + " · " + c.Status
+	label := title + " — " + when + " · " + msgCountLabel(c.MsgCount) + " · " + c.Status
+	if c.Archived {
+		label += " · archived" // only ever visible in the reveal view; marks a row as soft-archived
+	}
+	return label
 }
 
 // msgCountLabel renders a message count with singular/plural agreement.
@@ -222,10 +232,18 @@ func (p *pickerModel) renderAction() string {
 	case pickerConfirmDelete:
 		return p.styles.pickerDeleteConfirm.Render("delete this conversation? (y)es / (n)o")
 	default:
-		if p.selectedRunID() == "" {
-			return p.styles.pickerHint.Render("no conversations · esc close")
+		reveal := "A show archived"
+		if p.showArchived {
+			reveal = "A hide archived"
 		}
-		return p.styles.pickerHint.Render("↑↓ navigate · enter resume · r rename · d delete · / filter · esc close")
+		if p.selectedRunID() == "" {
+			return p.styles.pickerHint.Render("no conversations · " + reveal + " · esc close")
+		}
+		archiveVerb := "a archive"
+		if p.selectedArchived() {
+			archiveVerb = "a unarchive"
+		}
+		return p.styles.pickerHint.Render("↑↓ navigate · enter resume · r rename · d delete · " + archiveVerb + " · " + reveal + " · / filter · esc close")
 	}
 }
 
@@ -252,6 +270,15 @@ func (p *pickerModel) selectedTitle() string {
 		return it.title
 	}
 	return ""
+}
+
+// selectedArchived reports whether the highlighted conversation is soft-archived — which way the
+// archive key toggles it (archive vs unarchive) and how the hint reads.
+func (p *pickerModel) selectedArchived() bool {
+	if it, ok := p.list.SelectedItem().(pickerItem); ok {
+		return it.archived
+	}
+	return false
 }
 
 // settingFilter reports whether the list is actively editing a filter query (the user is typing

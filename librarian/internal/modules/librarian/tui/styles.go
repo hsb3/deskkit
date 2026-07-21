@@ -15,6 +15,7 @@ import (
 	"image/color"
 
 	"charm.land/bubbles/v2/help"
+	"charm.land/bubbles/v2/list"
 	"charm.land/lipgloss/v2"
 )
 
@@ -63,6 +64,11 @@ type styleSet struct {
 	pickerHint          lipgloss.Style // faint keybinding hint line / empty-list message
 	pickerRenamePrompt  lipgloss.Style // accent "rename:" label before the inline text input
 	pickerDeleteConfirm lipgloss.Style // red bold delete-confirm prompt
+
+	// pickerDelegate themes the sessions-LIST rows (the bubbles list DefaultDelegate). Built here,
+	// off the resolved theme, so the rows follow the palette instead of the delegate's own
+	// hardcoded-dark defaults (see pickerDelegateStyles). Applied in newPicker.
+	pickerDelegate list.DefaultItemStyles
 
 	help    help.Styles // bubbles/help styles for the ctrl+g overlay (no bar fill)
 	helpBar help.Styles // bubbles/help styles for the collapsed status bar (with bar fill)
@@ -160,9 +166,32 @@ func newStyles(theme string) styleSet {
 		pickerHint:          lipgloss.NewStyle().Foreground(faint),
 		pickerRenamePrompt:  lipgloss.NewStyle().Foreground(accent).Bold(true),
 		pickerDeleteConfirm: lipgloss.NewStyle().Foreground(red).Bold(true),
+		pickerDelegate:      pickerDelegateStyles(theme == themeDark, accent, body, faint),
 		help:                helpStyles(muted, faint, nil),
 		helpBar:             helpStyles(muted, faint, barBG),
 	}
+}
+
+// pickerDelegateStyles themes the sessions-list rows (the bubbles list DefaultDelegate) to the app
+// palette. The bubbles default (list.NewDefaultDelegate) hardcodes its item styles to the DARK set
+// regardless of the resolved theme — a light-gray title that is near-invisible on a light terminal
+// — and paints the selected row in bubbles' own magenta rather than the surface's cyan accent. This
+// re-colors only the color-bearing fields to concrete per-theme colors (never AdaptiveColor, so the
+// no-runtime-query invariant — ADR 0004 — still holds), inheriting the geometry (row padding, the
+// selected-row left border) from the bubbles defaults. Rows read in the body tone; the selected row
+// carries the cyan accent (foreground + its left border); dimmed rows (filter activation) fall to
+// faint; a filter match keeps its underline with an accent tint. isDark seeds only that geometry
+// baseline; every rendered color is set explicitly here.
+func pickerDelegateStyles(isDark bool, accent, body, faint color.Color) list.DefaultItemStyles {
+	s := list.NewDefaultItemStyles(isDark)
+	s.NormalTitle = s.NormalTitle.Foreground(body)
+	s.NormalDesc = s.NormalDesc.Foreground(faint)
+	s.SelectedTitle = s.SelectedTitle.Foreground(accent).BorderForeground(accent)
+	s.SelectedDesc = s.SelectedDesc.Foreground(accent)
+	s.DimmedTitle = s.DimmedTitle.Foreground(faint)
+	s.DimmedDesc = s.DimmedDesc.Foreground(faint)
+	s.FilterMatch = s.FilterMatch.Foreground(accent)
+	return s
 }
 
 // helpStyles builds the bubbles/help palette from concrete per-theme colors. help.New()'s defaults

@@ -48,6 +48,10 @@ func Run(ctx context.Context, app core.App, cfg *config.Config, theme string, vi
 	// v.AltScreen = true on every returned View, in every code path).
 	mdl := newModel(ctx, sess, provider, cfg, theme)
 	mdl.attachViews(views)
+	// Resume-first launch: open the sessions overlay at startup when prior conversations
+	// exist, so `chat` lands on the list instead of a blank fresh session. Consumed once, on the
+	// first WindowSizeMsg (the overlay needs a sized viewport); a no-op on a first-run desk.
+	mdl.enableResumeFirst()
 	p := tea.NewProgram(mdl, tea.WithContext(ctx))
 	final, runErr := p.Run()
 
