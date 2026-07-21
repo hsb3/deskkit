@@ -15,8 +15,8 @@ import (
 // disposition rides along untouched.
 //
 // FORWARD: add the field (guard-before-add so a re-run is a no-op), then BACKFILL every existing
-// row whose disposition is empty to 'open'. PocketBase leaves a new select column ” on existing
-// rows; without the backfill those pre-existing findings would vanish from the disposition='open'
+// row whose disposition is empty to 'open'. PocketBase leaves a new select column empty on
+// existing rows; without the backfill those pre-existing findings would vanish from the disposition='open'
 // default filter. The backfill is idempotent (only touches empty rows).
 //
 // DOWN: drop the disposition field entirely (guard-before-remove). No enum-value data remap is
