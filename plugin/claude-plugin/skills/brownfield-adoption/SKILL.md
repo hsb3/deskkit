@@ -39,8 +39,8 @@ Settle these before Phase 1; they bind every phase.
   the published release artifact and verifying its checksum** before first use. Release-built binaries
   report their release version via `--version`; a binary that prints `dev` was built from
   source without the version stamp — pin such a build from its source commit, not `--version`.
-- **The desk-pm MCP tool surface needs `deskkit` ON PATH and a fresh session.** The PM tools are
-  served by `deskkit mcp-serve` (launched by the desk-pm plugin's `.mcp.json`), so they exist
+- **The desk-persona MCP tool surface needs `deskkit` ON PATH and a fresh session.** The PM tools are
+  served by `deskkit mcp-serve` (launched by the desk-persona plugin's `.mcp.json`), so they exist
   **only** once `deskkit` is **installed AND resolvable on the session's PATH** — a GUI-launched
   host may not see `~/.local/bin`, in which case the plain `deskkit` command is **silently dropped**
   — **and the Claude Code session has been restarted**. MCP servers wire at session start: a

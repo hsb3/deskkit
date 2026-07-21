@@ -10,7 +10,7 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "test": "bun test core mcp opencode desk-pm desk-persona",
+    "test": "bun test core mcp opencode desk-persona",
     "check:purity": "node scripts/check-core-purity.mjs",
     "check:neutrality": "node ../scripts/check-neutrality.mjs",
     "mcp": "bun mcp/server.ts",

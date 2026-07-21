@@ -1,12 +1,13 @@
 # desk-persona — the platform v1 proof surface
 
-A companion Claude Code plugin (distinct from the `desk-standard` and `desk-pm` plugins, shared
-marketplace) that instantiates the **agent integration contract**
+A companion Claude Code plugin (distinct from the `desk-standard` plugin, shared marketplace) that
+instantiates the **agent integration contract**
 (`docs/agent-integration-contract-v1-spec.md`, ADR 0014, ADR 0015) as a single composed mount:
 one `deskkit` MCP server exposing both the librarian and PM tool families together, plus the
-agents and skills that operate them. Where `desk-pm` mounts only the PM tool family, desk-persona
-proves the contract's general case — a desk that has *both* modules registered on one mount at
-once.
+agents, skills, and briefing hook that operate them. It proves the contract's general case — a desk
+that has *both* modules registered on one mount at once. The PM surfaces (the `pm-operator` agent,
+the three `pm-*` skills, the SessionStart hook) folded in from the retired standalone `desk-pm`
+bundle (owner ruling 2026-07-21; ADR 0014(a) one composed bundle).
 
 ## What it ships
 
@@ -18,9 +19,10 @@ once.
 | `pm-advance-item` | skill | `get_item` → `transition_item`; handle a gate refusal by routing the missing document to the authoring path, then retry |
 | `pm-triage` | skill | `create_item`, `link_items`, `block_item`/`unblock_item`, reprioritize, `list_items` — intake and wire the graph |
 | `.mcp.json` | MCP wiring | launches `deskkit mcp-serve` with `PM_ENABLED=true` and `MCP_MODULES=librarian,pm`, composing both tool families onto one mount |
+| `hooks/session-briefing.sh` | SessionStart hook | injects the `deskkit pm context` cold-start briefing at session start; a silent no-op when PM is off or `deskkit` is absent |
 
-Like `desk-pm`, this bundle mounts the `deskkit` Go binary directly — it carries no generated
-TypeScript server and is not part of `make package`.
+This bundle mounts the `deskkit` Go binary directly — it carries no generated TypeScript server and
+is not part of `make package`.
 
 ## The composed mount
 
@@ -46,8 +48,7 @@ single MCP server exposing 17 tools, zero phantom entries:
 ## The gates
 
 - **`MCP_MODULES`** — which registered tool families the mount surfaces. This bundle sets
-  `librarian,pm`; unset or a single value narrows the mount to just that family (the shape
-  `desk-pm` uses).
+  `librarian,pm`; unset or a single value (e.g. `pm`) narrows the mount to just that family.
 - **`PM_ENABLED`** — whether the PM tools exist at all. Off → the PM tools and `deskkit pm ...`
   CLI group are absent; the PM skills and `pm-operator` say so and stop.
 - **`PM_AUTONOMOUS_WRITES=false`** — withholds the nine PM write tools, leaving only the three

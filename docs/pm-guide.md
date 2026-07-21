@@ -8,8 +8,8 @@ Status: active
 The **PM module** is `deskkit`'s second capability, alongside the librarian. It is a
 document-gated work graph: work items move through a rigid phase machine, and a phase advance is
 **refused until the document that phase requires exists and validates** against schema v1. One
-binary, one per-desk store, three surfaces (CLI, MCP, TUI) over one engine — plus a complementary
-Claude Code plugin (`desk-pm`).
+binary, one per-desk store, three surfaces (CLI, MCP, TUI) over one engine — plus the composed
+Claude Code plugin (`desk-persona`).
 
 Design and rationale: `pm-system-v1-spec.md` and
 `decisions/0008-pm-core-modules-architecture.md`.
@@ -164,7 +164,7 @@ recorded verbatim on the audit trail (§3.6 of the spec); left unset they defaul
 — the item's long-form narrative, acceptance criteria, or spec, stored inline; `get_item` returns
 it (the `list_items` summary shape omits it).
 
-Wire it into a Claude Code project (or use the `desk-pm` plugin, below):
+Wire it into a Claude Code project (or use the `desk-persona` plugin, below):
 
 ```json
 {
@@ -208,14 +208,16 @@ engine as the CLI and MCP surfaces:
 - **`pm board`** — the work graph by phase / court.
 - **`pm item`** — one item's detail: notes, dependencies, transitions, ancestors.
 
-## The `desk-pm` plugin
+## The `desk-persona` plugin
 
-A separate Claude Code plugin (shared marketplace) turns the graph into an agent-facing layer over
-the PM MCP tools: session-open briefing, advance-an-item, and triage skills; a `pm-operator` agent
-that runs the graph over the twelve tools but never authors gate documents or writes a repo; and a
-`SessionStart` hook that injects `deskkit pm context` at session start (silent no-op when PM is off
-or `deskkit` is absent). The data and runtime stay in the one binary — the plugin is the surface,
-not a second store. Details: `../plugin/desk-pm/README.md`.
+The composed `desk-persona` Claude Code plugin (shared marketplace) turns the graph into an
+agent-facing layer over the PM MCP tools: session-open briefing, advance-an-item, and triage
+skills; a `pm-operator` agent that runs the graph over the twelve tools but never authors gate
+documents or writes a repo; and a `SessionStart` hook that injects `deskkit pm context` at session
+start (silent no-op when PM is off or `deskkit` is absent). It mounts these alongside the librarian
+surfaces on one MCP server (`MCP_MODULES=librarian,pm`). The data and runtime stay in the one
+binary — the plugin is the surface, not a second store. Details:
+`../plugin/desk-persona/README.md`.
 
 ## Adopting the PM graph on a real desk
 

@@ -1,22 +1,24 @@
 #!/usr/bin/env node
-// Persona drift guard (#119, ADR 0014(a) + ADR 0015). The composed `desk-persona` bundle is a
-// GENERATED artifact: its persona/skill bodies are version-controlled copies of exactly one
-// authored source per surface, so they cannot silently diverge from that source. This guard is
-// the repo's generated-artifact pattern (regenerate + compare) applied to the bundle:
+// Persona drift guard (#119, ADR 0014(a) + ADR 0015). The composed `desk-persona` bundle's
+// librarian-operator agent is a GENERATED artifact: its persona body is a version-controlled copy
+// of exactly one authored source, so it cannot silently diverge from that source. This guard is
+// the repo's generated-artifact pattern (regenerate + compare) applied to that agent:
 //
 //   plugin/desk-persona/agents/librarian-operator.md   ← librarian/templates/librarian-system-prompt.txt
 //                                                          (the canonical librarian instruction; ADR 0015)
-//   plugin/desk-persona/agents/pm-operator.md          ← plugin/desk-pm/agents/pm-operator.md
-//   plugin/desk-persona/skills/pm-session-open/SKILL.md ← plugin/desk-pm/skills/pm-session-open/SKILL.md
-//   plugin/desk-persona/skills/pm-advance-item/SKILL.md ← plugin/desk-pm/skills/pm-advance-item/SKILL.md
-//   plugin/desk-persona/skills/pm-triage/SKILL.md       ← plugin/desk-pm/skills/pm-triage/SKILL.md
 //
-// The PM-sourced files are copied from desk-pm — the ONE authored PM source (desk-pm coexists,
-// untouched) — with the MCP server-name prefix rewritten `mcp__desk-pm__` → `mcp__desk-persona__`
-// so the composed mount's tool namespace is correct. The librarian agent is derived from the
-// corrected 5-tool eino system prompt: its `tools:` frontmatter and its embedded prompt body are
-// both regenerated from that one file, so a tool added to / removed from the canonical prompt
-// changes the persona and trips this guard.
+// The librarian agent is derived from the corrected 5-tool eino system prompt: its `tools:`
+// frontmatter and its embedded prompt body are both regenerated from that one file, so a tool
+// added to / removed from the canonical prompt changes the persona and trips this guard.
+//
+// The bundle's PM surfaces — pm-operator + the three pm-* skills — are NOT generated. When the
+// standalone `desk-pm` plugin was folded into desk-persona and retired (owner ruling 2026-07-21,
+// ADR 0014(a) one-bundle), those files stopped being copies of an upstream desk-pm source and
+// became the ONE authored PM source per surface themselves (ADR 0014(d)). With no second copy to
+// diverge from, a copy/compare guard for them would guard nothing; they are authored-in-place in
+// plugin/desk-persona/, alongside the bundle's other authored artifacts (.mcp.json, plugin.json,
+// hooks/, README.md). The plugin/desk-persona.test.ts bundle guard still holds them to the real
+// tool surface (no phantom / un-namespaced tool names).
 //
 // Usage (plain Node, no deps — like the other scripts/ guards):
 //   node scripts/check-persona-drift.mjs           compare on-disk vs regenerated; exit 1 on drift
@@ -33,13 +35,6 @@ const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const r = (p) => readFileSync(join(REPO_ROOT, p), "utf8");
 
 const LIBRARIAN_PROMPT = "librarian/templates/librarian-system-prompt.txt";
-const PM_AGENT_SRC = "plugin/desk-pm/agents/pm-operator.md";
-const PM_SKILL_NAMES = ["pm-session-open", "pm-advance-item", "pm-triage"];
-
-// The single namespace rewrite: the composed bundle's MCP server key is `desk-persona`.
-function toPersonaNamespace(text) {
-  return text.split("mcp__desk-pm__").join("mcp__desk-persona__");
-}
 
 // Parse the ordered tool list out of the canonical librarian prompt's "You have these tools:"
 // block — the list whose membership the frontmatter must track.
@@ -97,14 +92,6 @@ const DERIVED = [
     target: "plugin/desk-persona/agents/librarian-operator.md",
     build: buildLibrarianAgent,
   },
-  {
-    target: "plugin/desk-persona/agents/pm-operator.md",
-    build: () => toPersonaNamespace(r(PM_AGENT_SRC)),
-  },
-  ...PM_SKILL_NAMES.map((name) => ({
-    target: `plugin/desk-persona/skills/${name}/SKILL.md`,
-    build: () => toPersonaNamespace(r(`plugin/desk-pm/skills/${name}/SKILL.md`)),
-  })),
 ];
 
 const write = process.argv.includes("--write");
@@ -134,8 +121,8 @@ if (drifted.length > 0) {
   );
   for (const d of drifted) console.error(`  ${d}`);
   console.error(
-    "\nThe desk-persona bundle is generated; edit the SOURCE (the eino prompt / the desk-pm content),",
-    "then regenerate:  node scripts/check-persona-drift.mjs --write",
+    "\nThe desk-persona librarian-operator agent is generated; edit the SOURCE (the eino prompt at",
+    `${LIBRARIAN_PROMPT}), then regenerate:  node scripts/check-persona-drift.mjs --write`,
   );
   process.exit(1);
 }

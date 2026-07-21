@@ -13,7 +13,7 @@ entry points.
 
 | Suite | Location | Runner | What it covers |
 |---|---|---|---|
-| Plugin (TS) | `plugin/{core,mcp,opencode,desk-pm}` | `bun test` (59 tests) | Harness-pure core, MCP tool surface, schema validation, PM tool parity. |
+| Plugin (TS) | `plugin/{core,mcp,opencode,desk-persona}` | `bun test` (69 tests) | Harness-pure core, MCP tool surface, schema validation, PM tool parity, composed desk-persona bundle (agents/skills/hook). |
 | Librarian (Go) | `librarian/...` (`*_test.go`) | `go test ./...` (314 tests) | Store, write-boundary, PM engine, CLI/MCP surfaces, regression guards. |
 | Integration gate | `librarian/verify.sh` | `bash librarian/verify.sh` | End-to-end sweep → patrol → propose-fix → apply-fix → restore, store self-init, XDG store home, desk open-guard (currently 55 checks; the script prints its own `N passed` summary). |
 

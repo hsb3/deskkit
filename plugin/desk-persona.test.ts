@@ -2,9 +2,10 @@
 // load-bearing part — that every surface the artifacts name is a REAL frozen surface: the 5
 // librarian tools + 12 PM tools this mount exposes (17 total), and no invented ones. A persona
 // or skill that instructs an agent to call a tool that does not exist on this mount is the
-// failure mode this test exists to catch. Sibling of plugin/desk-pm.test.ts; mirrors its shape.
+// failure mode this test exists to catch. (The former plugin/desk-pm.test.ts — for the now-retired
+// standalone desk-pm bundle — was folded into this file when desk-pm was folded into desk-persona.)
 import { test, expect } from "bun:test";
-import { readFileSync } from "node:fs";
+import { readFileSync, statSync, existsSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parse as parseYaml } from "yaml";
@@ -106,8 +107,8 @@ test("every one of the 17 exposed tools is referenced by name somewhere in the c
 });
 
 // Store/config data-field names that are legitimately two-word snake_case but are NOT tools
-// (get_context response fields + the desk_config collection) — reused verbatim from
-// plugin/desk-pm.test.ts's NON_TOOL_FIELDS. Plus one addition specific to this composed bundle:
+// (get_context response fields + the desk_config collection). Plus one addition specific to this
+// composed bundle:
 // `apply_fix` is a REAL librarian tool (librarian/internal/core/toolcore/toolcore.go,
 // docs/tool-surface.md) that this bundle's README legitimately names as the tool withheld unless
 // LIBRARIAN_AUTONOMOUS_WRITES=true — it is not part of the 17-tool exposed set on this mount, but
@@ -159,13 +160,47 @@ test("any mcp__desk-persona__<x> reference names one of the 17 exposed tools", (
   }
 });
 
-test("the marketplace registers desk-persona alongside desk-standard and desk-pm, version-synced", () => {
+test("the marketplace registers desk-persona alongside desk-standard; desk-pm is retired", () => {
   const mk = JSON.parse(readFileSync(join(REPO_ROOT, ".claude-plugin", "marketplace.json"), "utf8"));
   const entry = mk.plugins.find((p: any) => p.name === "desk-persona");
   expect(entry).toBeDefined();
   expect(entry.source).toBe("./plugin/desk-persona");
   expect(entry.version).toBe(canonicalVersion);
-  // The bundle ADDS a third front door; it never replaces the first two (locked invariant).
+  // desk-standard stays; desk-pm was folded into desk-persona and removed from the marketplace
+  // (owner ruling 2026-07-21 "fold"; ADR 0014(a) one composed bundle).
   expect(mk.plugins.some((p: any) => p.name === "desk-standard")).toBe(true);
-  expect(mk.plugins.some((p: any) => p.name === "desk-pm")).toBe(true);
+  expect(mk.plugins.some((p: any) => p.name === "desk-pm")).toBe(false);
+});
+
+// The SessionStart briefing hook — folded in from the retired desk-pm bundle. Mirrors the hook
+// guards in the former plugin/desk-pm.test.ts so the composed bundle carries the same contract.
+test("hooks.json wires a SessionStart command hook to the shipped script", () => {
+  const j = JSON.parse(read(join("hooks", "hooks.json")));
+  const ss = j.hooks?.SessionStart;
+  expect(Array.isArray(ss)).toBe(true);
+  const entry = ss?.[0];
+  expect(entry).toBeDefined();
+  const cmd = entry?.hooks?.[0];
+  expect(cmd).toBeDefined();
+  expect(cmd.type).toBe("command");
+  expect(cmd.command).toContain("session-briefing.sh");
+  expect(cmd.command).toContain("${CLAUDE_PLUGIN_ROOT}");
+});
+
+test("the SessionStart hook script exists and is executable", () => {
+  const p = join(BUNDLE, "hooks", "session-briefing.sh");
+  expect(existsSync(p)).toBe(true);
+  const mode = statSync(p).mode;
+  expect(mode & 0o111).toBeGreaterThan(0); // some execute bit set
+});
+
+test("the hook self-gates on binary-absent AND on non-JSON stdout (PM-off contract)", () => {
+  const sh = read(join("hooks", "session-briefing.sh"));
+  expect(sh).toContain("command -v deskkit");
+  expect(sh).toContain("deskkit pm context");
+  expect(sh).toContain("|| exit 0");
+  // The load-bearing guard: emit ONLY when stdout is a JSON object. A PM-off desk exits 0 with
+  // a cobra error on stdout at exit 0, so an exit-code / non-empty check is insufficient.
+  expect(sh).toMatch(/case\s+"\$context"/);
+  expect(sh).toContain("'{'*)");
 });
