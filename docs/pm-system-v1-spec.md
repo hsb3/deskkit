@@ -58,7 +58,10 @@ already uses (R5.4).
 - **Extractable domains** (R5.5): the PM module never reaches into the librarian's collections;
   it obtains document verdicts through a narrow Go interface. The two domains stay separable
   even though they run in one process.
-- **Off by default** (R5.5c, R1.3): a desk runs librarian-only until it opts the PM module on.
+- **On by default at 1.0** (R5.5c, R1.3; ADR 0008 amendment 2026-07-21): every fresh desk boots
+  with the PM module on. It shipped dark through the v1 proving period; the 1.0 maturity
+  milestone flips the default on. A desk still opts OUT with `PM_ENABLED=false` or profile
+  `modules.pm.enabled: false`, running librarian-only.
 
 ### 1.3 Non-goals (v1)
 
@@ -356,17 +359,20 @@ migrations and stamps `module_schema_versions`.
 
 ### 2.9 Feature gating (R5.5c, R1.3)
 
-The PM module is enabled per desk via config layering (env > profile > default), default off:
+The PM module is enabled per desk via config layering (env > profile > default), **default ON**
+(since 1.0; ADR 0008 amendment 2026-07-21 — every fresh desk boots with PM on):
 
-- env `PM_ENABLED=true`, or
-- `_knowledge/profile.*` key `modules.pm.enabled: true`, or
-- a `desk_config` row once the module is on (the profile/env decides *initial* activation; the
-  store carries it thereafter).
+- env `PM_ENABLED` (`true`/`false`) wins, else
+- `_knowledge/profile.*` key `modules.pm.enabled` (`true`/`false`), else
+- the built-in **default: ON**.
 
-When disabled: PM migrations are not registered (no collections), PM tools are absent from every
-surface, PM hooks/cron are not bound, and PM TUI views are not mounted. The librarian is wholly
-unaffected. This directly serves R1.3 (ship minimal; prove; add on) — the PM module can ride in
-the same binary release while staying dark until a desk turns it on.
+Once the module is on, a `desk_config` row carries desk-level workflow config thereafter (the
+profile/env decides *initial* activation). A desk opts OUT with `PM_ENABLED=false` or
+`modules.pm.enabled: false`. When disabled: PM migrations are not registered (no collections),
+PM tools are absent from every surface, PM hooks/cron are not bound, and PM TUI views are not
+mounted. The librarian is wholly unaffected. R1.3's ship-minimal-then-add-on posture held
+through the v1 proving period — the PM module rode dark in the binary release while it proved
+out on one desk; 1.0 completes that arc by turning it on for every desk.
 
 ---
 
@@ -861,10 +867,13 @@ build (the D8 gate that already exists).
 The generic adoption sequence a desk follows to turn the PM module on and seed it (described
 identity-neutrally — the doc ships neutral):
 
-1. **Enable** the module (`PM_ENABLED=true` or the profile key; §2.9). On next `serve`/`migrate`,
-   the PM migrations run and stamp `module_schema_versions`.
-2. **Seed `desk_config`** — write the gate rules (§4.2) and the `status_label` vocabulary for the
-   desk's types.
+1. **Enable** the module — since 1.0 it is **on by default** (§2.9), so a fresh desk skips this
+   step; a previously opted-out desk re-enables by clearing `PM_ENABLED=false` /
+   `modules.pm.enabled: false`. On next `serve`/`migrate`, the PM migrations run and stamp
+   `module_schema_versions`.
+2. **Seed `desk_config`** — the shipped §4.2 gate rules and §3.3 `status_label` vocabulary apply
+   as the default seed (owner-blessed 2026-07-21); a desk overrides them per its own types by
+   writing a `desk_config` row.
 3. **Import the desk's existing work surfaces** as the first dataset: the handoff threads index
    rows, any standing plans/task rows, each becoming an `items` row with its `court`, `type`,
    `pointer`, and phase. A one-time import script (or the `create_item` tool driven from a
@@ -919,8 +928,10 @@ v1 is stated.
   sufficient to let an external driver pick the next unclaimed, unblocked item, claim it, and
   record its work — they are. `get_context`'s `active`/`stalled` sets are the queue a drainer
   would read. Not built: no driver loop, no worktree/circuit-breaker orchestration.
-- **R1.3 — minimal-first.** The whole PM module is feature-gated off by default (§2.9) so v1 can
-  ship in the binary and prove out on one desk before any desk is required to adopt it.
+- **R1.3 — minimal-first.** The whole PM module shipped feature-gated off through v1 (§2.9) so it
+  could ride in the binary and prove out on one desk before any desk was required to adopt it.
+  Having proved out, the 1.0 maturity milestone flips the default on (ADR 0008 amendment
+  2026-07-21) — the ship-minimal-then-add-on arc completing as designed.
 - **R5.2 (partial) — portfolio read-only fan-out.** The cross-desk read-only portfolio view is
   **explicitly LATER** (ADR 0002 itself frames it as "if one ever materializes"). **Constraint on
   v1:** the store layout keeps all desks enumerable under one XDG application root

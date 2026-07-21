@@ -14,24 +14,28 @@ Claude Code plugin (`desk-pm`).
 Design and rationale: `pm-system-v1-spec.md` and
 `decisions/0008-pm-core-modules-architecture.md`.
 
-## It's off until you enable it
+## It's on by default — how to opt out
 
-The PM module is **feature-gated OFF by default**. On a fresh desk, `deskkit` is the librarian and
-nothing else — no `pm` command, no PM tools, no PM collections in the store. You opt a desk in:
+The PM module is **on by default** (since 1.0; owner-ruled 2026-07-21, ADR 0008 amendment). On a
+fresh desk, `deskkit` boots with the PM module live — the `pm` command group, the PM tools, and
+the five PM collections all present, with the shipped gate rules and status-label vocabulary
+seeded. The first `serve`/`migrate` (or any store-touching command) runs the PM migrations and
+stamps the module's schema version automatically.
+
+To run a desk **librarian-only**, opt out:
 
 ```bash
-export PM_ENABLED=true        # or set modules.pm.enabled: true in _knowledge/profile.yaml
-deskkit migrate up            # runs the PM migrations, creates the five PM collections
+export PM_ENABLED=false        # or set modules.pm.enabled: false in _knowledge/profile.yaml
 ```
 
 Enablement resolves by config layering, env winning: `PM_ENABLED` > profile
-`modules.pm.enabled` > default off. With it off, `deskkit pm ...` is just cobra's normal
+`modules.pm.enabled` > default **on**. With it off, `deskkit pm ...` is just cobra's normal
 unknown-command error, and the store carries no PM tables at all — physical omission, not inert
-tables. Turning it on is what runs the PM migrations and stamps the module's schema version.
+tables. Turning it back on is what runs the PM migrations and stamps the module's schema version.
 
 | Env var | Default | Effect |
 |---|---|---|
-| `PM_ENABLED` | `false` | Turns the whole PM module on for this desk. |
+| `PM_ENABLED` | `true` | On by default; set `false` (or profile `modules.pm.enabled: false`) to run librarian-only — no `pm` command, no PM tools, no PM collections. |
 | `PM_AUTONOMOUS_WRITES` | `true` | When `false`, agents get only the three read tools over MCP; the nine write tools are withheld. Owner/script writes via the `deskkit pm` CLI are unaffected. The document gate is the real safety either way. |
 | `PM_STALLED_DAYS` | `14` | How many days without a transition marks an item "stalled" in `get_context`. |
 | `PM_CLAIM_TTL` | `30m` | How long a claim holds before another actor may treat the item as free. |
@@ -217,8 +221,10 @@ not a second store. Details: `../plugin/desk-pm/README.md`.
 
 The generic adoption path (spec §8.1), identity-neutral:
 
-1. **Enable + migrate** — `PM_ENABLED=true` (or the profile key), then `deskkit migrate up` so the
-   PM collections and their stable ids exist.
+1. **Migrate** — since 1.0 the module is **on by default**, so a fresh desk skips enabling; the
+   first `serve`/`migrate` (or any store-touching command) creates the PM collections and their
+   stable ids. A previously opted-out desk first clears `PM_ENABLED=false` /
+   `modules.pm.enabled: false`, then runs `deskkit migrate up`.
 2. **Seed `desk_config`** — write the gate rules (which document type/status gates which
    transition per item type) and the `status_label` vocabulary for the desk's types. The shipped
    defaults are a starting seed, meant to be re-ruled to the desk's own workflow.

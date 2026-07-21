@@ -22,7 +22,7 @@ carries a person, org, repo, or issue number. You personalize by filling `_knowl
   (byte-exact reversible via `restore`). Surfaces over one tool core: **CLI**, an **MCP server**
   (`deskkit mcp-serve`), and a **chat TUI**. Admin console (`make gui`) serves PocketBase at
   `http://127.0.0.1:8090/_/`. It also carries the **PM module** (a document-gated work graph),
-  feature-gated OFF by default.
+  on by default (opt out with `PM_ENABLED=false`).
 - **`schema/`** — schema v1: the product-neutral contract both lanes read.
 
 **Project structure** (every top-level entry annotated):

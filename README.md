@@ -19,7 +19,7 @@ org, repo, or issue number:
   `apply_fix` is gated behind an env flag) and a CLI over one tool core. The same binary also
   carries the **PM module** — a document-gated work graph (items move through a rigid phase
   machine; a phase advance is refused until the document that phase requires validates),
-  feature-gated **OFF by default** and enabled per desk with `PM_ENABLED`. See
+  **on by default** — opt a desk out per desk with `PM_ENABLED=false`. See
   [docs/pm-guide.md](docs/pm-guide.md) and the complementary `desk-pm` plugin.
 - **`schema/`** — schema v1: the shared, product-neutral contract both `plugin/` and
   `librarian/` read as their rule/structure source.

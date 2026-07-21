@@ -50,9 +50,9 @@ supervised `apply-fix`/`findings dispose` actions.
 | `migrate` | migratecmd | Schema migrations (`up`/`down`/…). |
 | `superuser` | PocketBase | Manage superusers. |
 | `help`, `completion` | Cobra built-ins | — |
-| `pm` (group) | `registerPMCommands` | **Only when `PM_ENABLED`** (the PM module is off by default). |
+| `pm` (group) | `registerPMCommands` | Registered when the PM module is enabled — **on by default** since 1.0 (ADR 0008 amendment); `PM_ENABLED=false` (or profile `modules.pm.enabled: false`) disables it and `pm` becomes cobra's unknown-command error. |
 
-Verify live: `deskkit --help` (add `PM_ENABLED=true` to see the `pm` group).
+Verify live: `deskkit --help` (the `pm` group shows by default; add `PM_ENABLED=false` to hide it).
 
 ---
 
@@ -70,8 +70,13 @@ two independent switches, so there are four combinations:
 | `PM_ENABLED=true` | **17** | the 5 above **+ 12 PM tools** (below) |
 | both flags | **18** | the 6 (with `apply_fix`) **+ 12 PM tools** |
 
-The 12 PM tools (added only under `PM_ENABLED`, from the PM module's specs under
-`librarian/internal/modules/pm/`):
+The column labels are a **gate truth-table** — the count as a function of the two flags, not the
+runtime default. Since 1.0 `PM_ENABLED` **defaults on** (ADR 0008 amendment 2026-07-21), so a
+fresh desk's live MCP surface is the `PM_ENABLED=true` row (**17**, or **18** with
+`LIBRARIAN_AUTONOMOUS_WRITES`) unless the desk opts out with `PM_ENABLED=false`.
+
+The 12 PM tools (present whenever the PM module is enabled — the default; from the PM module's
+specs under `librarian/internal/modules/pm/`):
 
 | Tool | Writes | Notes |
 |---|---|---|
