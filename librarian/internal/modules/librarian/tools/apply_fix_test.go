@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/example/pocket-librarian/internal/modules/librarian/desklib"
+	"github.com/hsb3/desk-standard/librarian/internal/modules/librarian/desklib"
 )
 
 func TestApplyFix_AppliesWriteAndMarksFixed(t *testing.T) {

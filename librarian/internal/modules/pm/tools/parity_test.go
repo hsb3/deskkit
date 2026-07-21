@@ -10,10 +10,10 @@ import (
 	pbcore "github.com/pocketbase/pocketbase/core"
 	"github.com/pocketbase/pocketbase/tests"
 
-	"github.com/example/pocket-librarian/internal/core/config"
-	"github.com/example/pocket-librarian/internal/modules/pm/collections"
-	"github.com/example/pocket-librarian/internal/modules/pm/engine"
-	pmtui "github.com/example/pocket-librarian/internal/modules/pm/tui"
+	"github.com/hsb3/desk-standard/librarian/internal/core/config"
+	"github.com/hsb3/desk-standard/librarian/internal/modules/pm/collections"
+	"github.com/hsb3/desk-standard/librarian/internal/modules/pm/engine"
+	pmtui "github.com/hsb3/desk-standard/librarian/internal/modules/pm/tui"
 )
 
 // newPMApp boots a fresh test app with the pm collections applied directly (no global

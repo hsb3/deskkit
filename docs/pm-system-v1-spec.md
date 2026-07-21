@@ -95,7 +95,7 @@ onto the *actual current package layout* under `librarian/` and names what moves
 
 ### 2.2 Current layout (what exists today)
 
-The single Go module `github.com/example/pocket-librarian` is today a flat `internal/` tree
+The single Go module `github.com/hsb3/desk-standard/librarian` is today a flat `internal/` tree
 (verified against the repo):
 
 ```text

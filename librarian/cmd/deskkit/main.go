@@ -25,27 +25,27 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
-	"github.com/example/pocket-librarian/internal/core/config"
-	"github.com/example/pocket-librarian/internal/core/mcp"
-	"github.com/example/pocket-librarian/internal/core/migrate"
-	"github.com/example/pocket-librarian/internal/core/module"
-	"github.com/example/pocket-librarian/internal/core/store"
-	"github.com/example/pocket-librarian/internal/modules/librarian/agent"
-	"github.com/example/pocket-librarian/internal/modules/librarian/desklib"
-	"github.com/example/pocket-librarian/internal/modules/librarian/prompt"
-	"github.com/example/pocket-librarian/internal/modules/librarian/setup"
-	"github.com/example/pocket-librarian/internal/modules/librarian/tools"
-	"github.com/example/pocket-librarian/internal/modules/librarian/trigger"
-	"github.com/example/pocket-librarian/internal/modules/librarian/tui"
+	"github.com/hsb3/desk-standard/librarian/internal/core/config"
+	"github.com/hsb3/desk-standard/librarian/internal/core/mcp"
+	"github.com/hsb3/desk-standard/librarian/internal/core/migrate"
+	"github.com/hsb3/desk-standard/librarian/internal/core/module"
+	"github.com/hsb3/desk-standard/librarian/internal/core/store"
+	"github.com/hsb3/desk-standard/librarian/internal/modules/librarian/agent"
+	"github.com/hsb3/desk-standard/librarian/internal/modules/librarian/desklib"
+	"github.com/hsb3/desk-standard/librarian/internal/modules/librarian/prompt"
+	"github.com/hsb3/desk-standard/librarian/internal/modules/librarian/setup"
+	"github.com/hsb3/desk-standard/librarian/internal/modules/librarian/tools"
+	"github.com/hsb3/desk-standard/librarian/internal/modules/librarian/trigger"
+	"github.com/hsb3/desk-standard/librarian/internal/modules/librarian/tui"
 
-	"github.com/example/pocket-librarian/internal/modules/librarian"
-	"github.com/example/pocket-librarian/internal/modules/pm"
+	"github.com/hsb3/desk-standard/librarian/internal/modules/librarian"
+	"github.com/hsb3/desk-standard/librarian/internal/modules/pm"
 
 	// Blank-import registers the librarian's Go migrations (spec §4.11). The core-owned
 	// module_schema_versions meta migration self-registers via internal/core/migrate's own
 	// init() — that package is already imported normally above (for GuardDowngrade/
 	// StampModules), which is sufficient to run its init().
-	_ "github.com/example/pocket-librarian/internal/modules/librarian/collections"
+	_ "github.com/hsb3/desk-standard/librarian/internal/modules/librarian/collections"
 )
 
 // version is stamped at build time via ldflags (-X main.version=<VERSION>), wired from the

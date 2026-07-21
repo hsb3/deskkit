@@ -6,10 +6,10 @@ import (
 	"github.com/pocketbase/pocketbase/core"
 	"github.com/pocketbase/pocketbase/tests"
 
-	"github.com/example/pocket-librarian/internal/core/config"
+	"github.com/hsb3/desk-standard/librarian/internal/core/config"
 
 	// Blank-import registers this project's Go migrations so tests.NewTestApp applies them.
-	_ "github.com/example/pocket-librarian/internal/modules/librarian/collections"
+	_ "github.com/hsb3/desk-standard/librarian/internal/modules/librarian/collections"
 )
 
 const (

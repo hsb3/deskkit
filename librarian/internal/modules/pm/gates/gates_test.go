@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/example/pocket-librarian/internal/core/schema"
+	"github.com/hsb3/desk-standard/librarian/internal/core/schema"
 )
 
 func TestDefaultRulesYAML_Parses(t *testing.T) {

@@ -1,4 +1,4 @@
-module github.com/example/pocket-librarian
+module github.com/hsb3/desk-standard/librarian
 
 // Resolved floor: PocketBase v0.39.6 go.mod declares go 1.25.0 (spec §3.1, verified).
 // Use a 1.25.x toolchain. A go 1.23 directive will NOT compile the dependency graph.

@@ -18,7 +18,7 @@ import (
 	"github.com/cloudwego/eino/schema"
 	"github.com/pocketbase/pocketbase/core"
 
-	"github.com/example/pocket-librarian/internal/core/config"
+	"github.com/hsb3/desk-standard/librarian/internal/core/config"
 )
 
 // maxHistoryMessages bounds the conversation context replayed to the model on each Turn.

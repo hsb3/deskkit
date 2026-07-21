@@ -14,20 +14,20 @@ import (
 	pbcore "github.com/pocketbase/pocketbase/core"
 	"github.com/pocketbase/pocketbase/tests"
 
-	"github.com/example/pocket-librarian/internal/core/config"
-	"github.com/example/pocket-librarian/internal/core/mcp"
-	"github.com/example/pocket-librarian/internal/core/migrate"
-	"github.com/example/pocket-librarian/internal/core/module"
-	"github.com/example/pocket-librarian/internal/core/toolcore"
-	"github.com/example/pocket-librarian/internal/modules/librarian"
-	"github.com/example/pocket-librarian/internal/modules/pm"
-	"github.com/example/pocket-librarian/internal/modules/pm/collections"
-	pmtools "github.com/example/pocket-librarian/internal/modules/pm/tools"
-	pmtui "github.com/example/pocket-librarian/internal/modules/pm/tui"
+	"github.com/hsb3/desk-standard/librarian/internal/core/config"
+	"github.com/hsb3/desk-standard/librarian/internal/core/mcp"
+	"github.com/hsb3/desk-standard/librarian/internal/core/migrate"
+	"github.com/hsb3/desk-standard/librarian/internal/core/module"
+	"github.com/hsb3/desk-standard/librarian/internal/core/toolcore"
+	"github.com/hsb3/desk-standard/librarian/internal/modules/librarian"
+	"github.com/hsb3/desk-standard/librarian/internal/modules/pm"
+	"github.com/hsb3/desk-standard/librarian/internal/modules/pm/collections"
+	pmtools "github.com/hsb3/desk-standard/librarian/internal/modules/pm/tools"
+	pmtui "github.com/hsb3/desk-standard/librarian/internal/modules/pm/tui"
 
 	// Librarian migrations register via init()+blank-import as in main: this desk runs BOTH
 	// modules, proving the two version rows stay independent (R7.1).
-	_ "github.com/example/pocket-librarian/internal/modules/librarian/collections"
+	_ "github.com/hsb3/desk-standard/librarian/internal/modules/librarian/collections"
 )
 
 func TestGatedOnDeskCreatesPMCollectionsAndStamps(t *testing.T) {

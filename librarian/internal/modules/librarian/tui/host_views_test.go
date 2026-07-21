@@ -6,7 +6,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/example/pocket-librarian/internal/core/tuiview"
+	"github.com/hsb3/desk-standard/librarian/internal/core/tuiview"
 )
 
 // fakeView is a minimal tuiview.View: it records lifecycle calls and can ask the host to

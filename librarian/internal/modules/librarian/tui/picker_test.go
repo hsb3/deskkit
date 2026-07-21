@@ -7,7 +7,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/example/pocket-librarian/internal/modules/librarian/agent"
+	"github.com/hsb3/desk-standard/librarian/internal/modules/librarian/agent"
 )
 
 // fakeProvider is the injected session lifecycle for pure-Update tests: it records what was asked

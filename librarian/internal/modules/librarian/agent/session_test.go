@@ -12,12 +12,12 @@ import (
 	"github.com/cloudwego/eino/schema"
 	"github.com/pocketbase/pocketbase/tests"
 
-	"github.com/example/pocket-librarian/internal/core/config"
+	"github.com/hsb3/desk-standard/librarian/internal/core/config"
 
 	// Blank-import registers this project's Go migrations into the same global registry
 	// PocketBase's built-in migrations use, so tests.NewTestApp's RunAllMigrations() creates
 	// our collections (agent_runs, messages, prompts, ...) too.
-	_ "github.com/example/pocket-librarian/internal/modules/librarian/collections"
+	_ "github.com/hsb3/desk-standard/librarian/internal/modules/librarian/collections"
 )
 
 // fakeChatModel is a stub model.ToolCallingChatModel that never emits tool calls and echoes

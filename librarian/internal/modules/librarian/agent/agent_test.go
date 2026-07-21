@@ -5,9 +5,9 @@ import (
 
 	"github.com/cloudwego/eino/schema"
 
-	"github.com/example/pocket-librarian/internal/core/config"
-	"github.com/example/pocket-librarian/internal/core/toolcore"
-	"github.com/example/pocket-librarian/internal/modules/librarian/tools"
+	"github.com/hsb3/desk-standard/librarian/internal/core/config"
+	"github.com/hsb3/desk-standard/librarian/internal/core/toolcore"
+	"github.com/hsb3/desk-standard/librarian/internal/modules/librarian/tools"
 )
 
 // TestDeltaMessages_NoDoublePersist simulates the cumulative model inputs across a ReAct run

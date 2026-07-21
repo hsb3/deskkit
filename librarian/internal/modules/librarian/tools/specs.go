@@ -5,8 +5,8 @@ import (
 
 	"github.com/pocketbase/pocketbase/core"
 
-	cfgpkg "github.com/example/pocket-librarian/internal/core/config"
-	"github.com/example/pocket-librarian/internal/core/toolcore"
+	cfgpkg "github.com/hsb3/desk-standard/librarian/internal/core/config"
+	"github.com/hsb3/desk-standard/librarian/internal/core/toolcore"
 )
 
 // Specs returns the librarian module's seven tools as toolcore.ToolSpecs (spec §5, plus

@@ -13,8 +13,8 @@ import (
 	"github.com/pocketbase/dbx"
 	"github.com/pocketbase/pocketbase/core"
 
-	"github.com/example/pocket-librarian/internal/core/config"
-	"github.com/example/pocket-librarian/internal/modules/librarian/desklib"
+	"github.com/hsb3/desk-standard/librarian/internal/core/config"
+	"github.com/hsb3/desk-standard/librarian/internal/modules/librarian/desklib"
 )
 
 // Patrol — §5.2: run rules R1–R6 over the non-deleted files (filtered by Path), file new

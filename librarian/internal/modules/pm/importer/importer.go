@@ -27,7 +27,7 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/example/pocket-librarian/internal/modules/pm/engine"
+	"github.com/hsb3/desk-standard/librarian/internal/modules/pm/engine"
 )
 
 // ManifestItem is one work item to import. Key is the manifest-local stable identity (the

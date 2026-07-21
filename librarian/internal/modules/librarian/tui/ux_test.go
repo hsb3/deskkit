@@ -8,7 +8,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 
-	"github.com/example/pocket-librarian/internal/modules/librarian/agent"
+	"github.com/hsb3/desk-standard/librarian/internal/modules/librarian/agent"
 )
 
 // TestLastAssistantMarkdown_Selection: copy targets the most recent FINALIZED assistant answer's

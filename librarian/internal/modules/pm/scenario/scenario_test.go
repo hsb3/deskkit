@@ -8,10 +8,10 @@ import (
 	pbcore "github.com/pocketbase/pocketbase/core"
 	"github.com/pocketbase/pocketbase/tests"
 
-	"github.com/example/pocket-librarian/internal/core/config"
-	"github.com/example/pocket-librarian/internal/modules/pm/collections"
-	"github.com/example/pocket-librarian/internal/modules/pm/engine"
-	"github.com/example/pocket-librarian/internal/modules/pm/importer"
+	"github.com/hsb3/desk-standard/librarian/internal/core/config"
+	"github.com/hsb3/desk-standard/librarian/internal/modules/pm/collections"
+	"github.com/hsb3/desk-standard/librarian/internal/modules/pm/engine"
+	"github.com/hsb3/desk-standard/librarian/internal/modules/pm/importer"
 )
 
 // newApp boots a fresh test app with the pm collections applied and a resolved config.

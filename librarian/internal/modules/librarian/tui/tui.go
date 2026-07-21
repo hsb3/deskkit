@@ -17,8 +17,8 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/pocketbase/pocketbase/core"
 
-	"github.com/example/pocket-librarian/internal/core/config"
-	"github.com/example/pocket-librarian/internal/core/tuiview"
+	"github.com/hsb3/desk-standard/librarian/internal/core/config"
+	"github.com/hsb3/desk-standard/librarian/internal/core/tuiview"
 )
 
 // Run opens a Session eagerly (so a build/config failure surfaces before the alternate screen

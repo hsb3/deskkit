@@ -13,9 +13,9 @@ import (
 	"github.com/pocketbase/dbx"
 	"github.com/pocketbase/pocketbase/core"
 
-	"github.com/example/pocket-librarian/internal/core/config"
-	"github.com/example/pocket-librarian/internal/modules/librarian/desklib"
-	"github.com/example/pocket-librarian/templates"
+	"github.com/hsb3/desk-standard/librarian/internal/core/config"
+	"github.com/hsb3/desk-standard/librarian/internal/modules/librarian/desklib"
+	"github.com/hsb3/desk-standard/librarian/templates"
 )
 
 // ProposeFix — §5.3: load the ignore list FIRST (fail closed via desklib.Ignored), then for

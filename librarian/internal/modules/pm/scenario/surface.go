@@ -5,10 +5,10 @@ import (
 
 	pbcore "github.com/pocketbase/pocketbase/core"
 
-	"github.com/example/pocket-librarian/internal/core/config"
-	"github.com/example/pocket-librarian/internal/core/schema"
-	"github.com/example/pocket-librarian/internal/modules/pm/engine"
-	pmtools "github.com/example/pocket-librarian/internal/modules/pm/tools"
+	"github.com/hsb3/desk-standard/librarian/internal/core/config"
+	"github.com/hsb3/desk-standard/librarian/internal/core/schema"
+	"github.com/hsb3/desk-standard/librarian/internal/modules/pm/engine"
+	pmtools "github.com/hsb3/desk-standard/librarian/internal/modules/pm/tools"
 )
 
 // Surface is the set of PM mutations a scenario step drives. Two implementations exist so the

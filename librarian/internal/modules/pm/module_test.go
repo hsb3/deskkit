@@ -13,8 +13,8 @@ import (
 
 	pbcore "github.com/pocketbase/pocketbase/core"
 
-	"github.com/example/pocket-librarian/internal/core/config"
-	"github.com/example/pocket-librarian/internal/modules/pm/collections"
+	"github.com/hsb3/desk-standard/librarian/internal/core/config"
+	"github.com/hsb3/desk-standard/librarian/internal/modules/pm/collections"
 )
 
 // TestNoSelfRegisteredMigrations is the spec §2.8a drift test: a PM migration written in the

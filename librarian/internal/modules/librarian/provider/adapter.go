@@ -25,7 +25,7 @@ import (
 	"github.com/cloudwego/eino/components/model"
 	"google.golang.org/genai"
 
-	"github.com/example/pocket-librarian/internal/core/config"
+	"github.com/hsb3/desk-standard/librarian/internal/core/config"
 )
 
 // NewChatModel constructs the provider-selected chat model (spec §6.3). Selection is purely

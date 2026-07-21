@@ -24,11 +24,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/example/pocket-librarian/internal/core/config"
-	coreschema "github.com/example/pocket-librarian/internal/core/schema"
-	"github.com/example/pocket-librarian/internal/core/toolcore"
-	"github.com/example/pocket-librarian/internal/modules/librarian/tools"
-	pmtools "github.com/example/pocket-librarian/internal/modules/pm/tools"
+	"github.com/hsb3/desk-standard/librarian/internal/core/config"
+	coreschema "github.com/hsb3/desk-standard/librarian/internal/core/schema"
+	"github.com/hsb3/desk-standard/librarian/internal/core/toolcore"
+	"github.com/hsb3/desk-standard/librarian/internal/modules/librarian/tools"
+	pmtools "github.com/hsb3/desk-standard/librarian/internal/modules/pm/tools"
 )
 
 // docSurfaceCounts holds the Librarian-MCP counts a parse of docs/tool-surface.md found, each as

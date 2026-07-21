@@ -38,3 +38,17 @@ librarian/internal/core/schema/doctypes.yaml
 # authoring surface (SCAN_DIRS does not cover docs/), allow-listed explicitly since the doc
 # necessarily names internal path/tool identifiers across both lanes.
 docs/agent-integration-contract-v1-spec.md
+
+# Go module hosting path: the module at librarian/go.mod is
+# github.com/hsb3/desk-standard/librarian, so it — and every import path derived from it — names
+# this project's own org/repo. This is NOT a de-identification bypass: unlike an ordinary
+# hardcoded identifier, a Go module path is compile-time public API. It cannot be moved into
+# _knowledge/profile.yaml and templated via {{profile.<path>}} (the allow file's stated remedy
+# above) without breaking `go build`/`go install` for every consumer. The lint's own bare
+# `github.com/o/r` import-path exclusion (scripts/check-neutrality.mjs, "Deliberate deviation"
+# header note) already keeps this path out of the structural github-identity detectors; these
+# entries are the belt-and-suspenders, explicitly documented sanction for the literal — narrowly
+# token-scoped, not a whole-file exemption.
+librarian/go.mod | github.com/hsb3/desk-standard/librarian
+librarian/**/*.go | github.com/hsb3/desk-standard/librarian
+librarian/README.md | github.com/hsb3/desk-standard/librarian

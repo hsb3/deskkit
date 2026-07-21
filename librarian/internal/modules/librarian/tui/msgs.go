@@ -5,7 +5,7 @@
 // construction (the plan's "all model mutation on the bubbletea goroutine" invariant).
 package tui
 
-import "github.com/example/pocket-librarian/internal/modules/librarian/agent"
+import "github.com/hsb3/desk-standard/librarian/internal/modules/librarian/agent"
 
 // eventMsg wraps one live engine event (token, tool_start, tool_end, final, or error). The
 // terminal event (final|error) arrives as an eventMsg too; the channel-closed signal that

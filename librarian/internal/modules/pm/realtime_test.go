@@ -10,9 +10,9 @@ import (
 	"github.com/pocketbase/pocketbase/tests"
 	"github.com/pocketbase/pocketbase/tools/subscriptions"
 
-	"github.com/example/pocket-librarian/internal/core/config"
-	"github.com/example/pocket-librarian/internal/modules/pm/collections"
-	"github.com/example/pocket-librarian/internal/modules/pm/engine"
+	"github.com/hsb3/desk-standard/librarian/internal/core/config"
+	"github.com/hsb3/desk-standard/librarian/internal/modules/pm/collections"
+	"github.com/hsb3/desk-standard/librarian/internal/modules/pm/engine"
 )
 
 // newRealtimeApp boots a test app with the pm collections applied directly and the pm

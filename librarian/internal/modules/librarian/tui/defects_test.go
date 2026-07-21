@@ -10,7 +10,7 @@ import (
 	"charm.land/glamour/v2/styles"
 	"charm.land/lipgloss/v2"
 
-	"github.com/example/pocket-librarian/internal/core/config"
+	"github.com/hsb3/desk-standard/librarian/internal/core/config"
 )
 
 // TestGlamourStyle_NoRuntimeQuery guards the Defect-1 fix: the markdown style must resolve

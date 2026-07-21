@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/example/pocket-librarian/internal/modules/librarian/desklib"
+	"github.com/hsb3/desk-standard/librarian/internal/modules/librarian/desklib"
 )
 
 // fullFM is a complete universal-frontmatter doc: R1 finds no missing keys, so R1 does not fire.

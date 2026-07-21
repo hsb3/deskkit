@@ -58,6 +58,11 @@ make findings        # or: summary / adoption / orphans / uncollapsed
 The store self-initializes on first run (ADR 0003) — no separate setup step needed.
 `./deskkit migrate up` remains available as an explicit, optional step (idempotent).
 
+`go install github.com/hsb3/desk-standard/librarian/cmd/deskkit@<version>` becomes available once
+the repo is public (the module root has no `main` package; the buildable command lives at
+`cmd/deskkit`); the local `make install` path (root `Makefile` → build + install `deskkit` to
+`~/.local/bin`) is unaffected either way.
+
 `make help` lists every target.
 
 ## Where the store lives

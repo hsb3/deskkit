@@ -9,7 +9,7 @@ package tui
 import (
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/example/pocket-librarian/internal/modules/librarian/agent"
+	"github.com/hsb3/desk-standard/librarian/internal/modules/librarian/agent"
 )
 
 // waitForEvent returns a command that blocks on the next engine event and reports it. On a

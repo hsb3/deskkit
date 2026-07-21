@@ -11,7 +11,7 @@ import (
 	"charm.land/bubbles/v2/list"
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/example/pocket-librarian/internal/modules/librarian/agent"
+	"github.com/hsb3/desk-standard/librarian/internal/modules/librarian/agent"
 )
 
 // pickerItem adapts one agent.ConversationInfo to the bubbles/list Item (and DefaultItem)
