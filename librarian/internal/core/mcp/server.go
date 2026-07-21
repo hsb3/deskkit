@@ -42,13 +42,13 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/pocketbase/pocketbase/core"
 
-	"github.com/example/pocket-librarian/internal/core/config"
-	"github.com/example/pocket-librarian/internal/core/toolcore"
+	"github.com/hsb3/desk-standard/librarian/internal/core/config"
+	"github.com/hsb3/desk-standard/librarian/internal/core/toolcore"
 )
 
 // serverName / serverVersion identify the MCP server in the initialize handshake.
 // Identity-neutral: no person/org/repo/issue (0013 item 9). The module path is already
-// github.com/example/pocket-librarian; this keeps the wire identity neutral too.
+// github.com/hsb3/desk-standard/librarian; this keeps the wire identity neutral too.
 const (
 	serverName    = "deskkit"
 	serverVersion = "v1"

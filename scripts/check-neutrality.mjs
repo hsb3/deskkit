@@ -26,8 +26,9 @@
 //
 // ── Deliberate deviation from the spec's literal pattern list (documented for review) ──
 // m-05 lists a bare, scheme-less `github.com/owner/repo` pattern. In a Go repo that form is
-// the *import-path* form: `github.com/example/pocket-librarian/...` (the sanctioned-neutral
-// module path) and every third-party dependency (`github.com/pocketbase/pocketbase`, …) are
+// the *import-path* form: `github.com/hsb3/desk-standard/librarian/...` (the module's own,
+// token-scoped-allowlisted, hosting path — schema/neutrality-lint.allow) and every third-party
+// dependency (`github.com/pocketbase/pocketbase`, …) are
 // bare `github.com/o/r`. Matching it flags hundreds of legitimate imports, making D8's
 // "returns zero on a clean tree" unsatisfiable — the *identical* collision the spec itself
 // invokes to drop bare hostless slugs (m-05 "Token patterns it flags", the owner/repo note).

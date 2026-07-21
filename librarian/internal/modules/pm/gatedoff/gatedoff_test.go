@@ -15,19 +15,19 @@ import (
 	pbcore "github.com/pocketbase/pocketbase/core"
 	"github.com/pocketbase/pocketbase/tests"
 
-	"github.com/example/pocket-librarian/internal/core/config"
-	"github.com/example/pocket-librarian/internal/core/mcp"
-	"github.com/example/pocket-librarian/internal/core/migrate"
-	"github.com/example/pocket-librarian/internal/core/module"
-	"github.com/example/pocket-librarian/internal/core/toolcore"
-	"github.com/example/pocket-librarian/internal/modules/librarian"
-	"github.com/example/pocket-librarian/internal/modules/pm"
-	"github.com/example/pocket-librarian/internal/modules/pm/collections"
-	pmtools "github.com/example/pocket-librarian/internal/modules/pm/tools"
+	"github.com/hsb3/desk-standard/librarian/internal/core/config"
+	"github.com/hsb3/desk-standard/librarian/internal/core/mcp"
+	"github.com/hsb3/desk-standard/librarian/internal/core/migrate"
+	"github.com/hsb3/desk-standard/librarian/internal/core/module"
+	"github.com/hsb3/desk-standard/librarian/internal/core/toolcore"
+	"github.com/hsb3/desk-standard/librarian/internal/modules/librarian"
+	"github.com/hsb3/desk-standard/librarian/internal/modules/pm"
+	"github.com/hsb3/desk-standard/librarian/internal/modules/pm/collections"
+	pmtools "github.com/hsb3/desk-standard/librarian/internal/modules/pm/tools"
 
 	// The librarian's migrations register via init()+blank-import exactly as in main — this
 	// desk is a normal librarian desk that simply has not enabled pm.
-	_ "github.com/example/pocket-librarian/internal/modules/librarian/collections"
+	_ "github.com/hsb3/desk-standard/librarian/internal/modules/librarian/collections"
 )
 
 // TestGatedOffDeskHasNoPMCollections registers the pm module DISABLED (PM_ENABLED unset ->

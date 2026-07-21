@@ -7,7 +7,7 @@ import (
 
 	"github.com/pocketbase/pocketbase/core"
 
-	"github.com/example/pocket-librarian/internal/core/config"
+	"github.com/hsb3/desk-standard/librarian/internal/core/config"
 )
 
 // RecordFeedback writes one row to the feedback collection and returns the created id plus a

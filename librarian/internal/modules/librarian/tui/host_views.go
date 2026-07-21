@@ -12,7 +12,7 @@ import (
 	"charm.land/bubbles/v2/key"
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/example/pocket-librarian/internal/core/tuiview"
+	"github.com/hsb3/desk-standard/librarian/internal/core/tuiview"
 )
 
 // attachViews mounts the module-contributed view set and enables the switcher binding when

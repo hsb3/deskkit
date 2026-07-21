@@ -5,9 +5,9 @@ import (
 
 	"github.com/pocketbase/pocketbase/core"
 
-	cfgpkg "github.com/example/pocket-librarian/internal/core/config"
-	"github.com/example/pocket-librarian/internal/core/schema"
-	"github.com/example/pocket-librarian/internal/core/toolcore"
+	cfgpkg "github.com/hsb3/desk-standard/librarian/internal/core/config"
+	"github.com/hsb3/desk-standard/librarian/internal/core/schema"
+	"github.com/hsb3/desk-standard/librarian/internal/core/toolcore"
 )
 
 // Specs returns the PM module's twelve tools as toolcore.ToolSpecs (spec §5.1). The tool

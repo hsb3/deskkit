@@ -9,7 +9,7 @@ import (
 
 	"github.com/pocketbase/pocketbase/core"
 
-	"github.com/example/pocket-librarian/internal/core/config"
+	"github.com/hsb3/desk-standard/librarian/internal/core/config"
 )
 
 // EnsureSuperuser creates the PocketBase superuser named by PB_SUPERUSER_EMAIL /

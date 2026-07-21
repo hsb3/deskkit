@@ -24,7 +24,7 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/pocketbase/pocketbase/core"
 
-	"github.com/example/pocket-librarian/internal/core/config"
+	"github.com/hsb3/desk-standard/librarian/internal/core/config"
 )
 
 // ToolSpec is the harness-agnostic descriptor for one tool. It carries the same fields the

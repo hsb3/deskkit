@@ -18,16 +18,16 @@ import (
 	"github.com/pocketbase/pocketbase/core"
 	"github.com/pocketbase/pocketbase/tools/subscriptions"
 
-	"github.com/example/pocket-librarian/internal/core/config"
-	"github.com/example/pocket-librarian/internal/core/migrate"
-	"github.com/example/pocket-librarian/internal/core/module"
-	"github.com/example/pocket-librarian/internal/core/schema"
-	"github.com/example/pocket-librarian/internal/core/toolcore"
-	"github.com/example/pocket-librarian/internal/core/tuiview"
-	"github.com/example/pocket-librarian/internal/modules/pm/collections"
-	"github.com/example/pocket-librarian/internal/modules/pm/gates"
-	pmtools "github.com/example/pocket-librarian/internal/modules/pm/tools"
-	pmtui "github.com/example/pocket-librarian/internal/modules/pm/tui"
+	"github.com/hsb3/desk-standard/librarian/internal/core/config"
+	"github.com/hsb3/desk-standard/librarian/internal/core/migrate"
+	"github.com/hsb3/desk-standard/librarian/internal/core/module"
+	"github.com/hsb3/desk-standard/librarian/internal/core/schema"
+	"github.com/hsb3/desk-standard/librarian/internal/core/toolcore"
+	"github.com/hsb3/desk-standard/librarian/internal/core/tuiview"
+	"github.com/hsb3/desk-standard/librarian/internal/modules/pm/collections"
+	"github.com/hsb3/desk-standard/librarian/internal/modules/pm/gates"
+	pmtools "github.com/hsb3/desk-standard/librarian/internal/modules/pm/tools"
+	pmtui "github.com/hsb3/desk-standard/librarian/internal/modules/pm/tui"
 )
 
 // RealtimeTopic is the subscription topic PM realtime events are broadcast on (spec §5.4):

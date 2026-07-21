@@ -3,9 +3,9 @@ package tools
 import (
 	"testing"
 
-	"github.com/example/pocket-librarian/internal/core/config"
-	"github.com/example/pocket-librarian/internal/core/schema"
-	"github.com/example/pocket-librarian/internal/core/toolcore"
+	"github.com/hsb3/desk-standard/librarian/internal/core/config"
+	"github.com/hsb3/desk-standard/librarian/internal/core/schema"
+	"github.com/hsb3/desk-standard/librarian/internal/core/toolcore"
 )
 
 func noValidator() schema.DocumentValidator { return nil }

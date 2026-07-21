@@ -7,7 +7,7 @@ import (
 
 	// Blank-import registers this project's Go migrations so tests.NewTestApp's
 	// RunAllMigrations() creates the prompts collection Seed writes into.
-	_ "github.com/example/pocket-librarian/internal/modules/librarian/collections"
+	_ "github.com/hsb3/desk-standard/librarian/internal/modules/librarian/collections"
 )
 
 // Seed materializes the editable system-prompt row. It runs from requireConfig (the shared

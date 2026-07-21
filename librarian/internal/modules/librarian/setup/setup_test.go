@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/example/pocket-librarian/internal/core/config"
+	"github.com/hsb3/desk-standard/librarian/internal/core/config"
 )
 
 // hermeticXDG points XDG_DATA_HOME at a throwaway scratch so no test can touch a real

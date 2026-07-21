@@ -26,10 +26,10 @@ import (
 	"github.com/pocketbase/dbx"
 	"github.com/pocketbase/pocketbase/core"
 
-	"github.com/example/pocket-librarian/internal/core/config"
-	"github.com/example/pocket-librarian/internal/core/toolcore"
-	"github.com/example/pocket-librarian/internal/modules/librarian/prompt"
-	"github.com/example/pocket-librarian/internal/modules/librarian/provider"
+	"github.com/hsb3/desk-standard/librarian/internal/core/config"
+	"github.com/hsb3/desk-standard/librarian/internal/core/toolcore"
+	"github.com/hsb3/desk-standard/librarian/internal/modules/librarian/prompt"
+	"github.com/hsb3/desk-standard/librarian/internal/modules/librarian/provider"
 )
 
 // chatModelFactory builds the provider chat model; overridable in tests to inject a stub

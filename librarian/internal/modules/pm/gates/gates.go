@@ -14,8 +14,8 @@ import (
 
 	"gopkg.in/yaml.v3"
 
-	"github.com/example/pocket-librarian/internal/core/schema"
-	"github.com/example/pocket-librarian/internal/modules/pm/statemachine"
+	"github.com/hsb3/desk-standard/librarian/internal/core/schema"
+	"github.com/hsb3/desk-standard/librarian/internal/modules/pm/statemachine"
 )
 
 // DocRequirement is one required document in a gate rule (§4.2).

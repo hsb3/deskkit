@@ -19,7 +19,7 @@ package prompt
 import (
 	"github.com/pocketbase/pocketbase/core"
 
-	"github.com/example/pocket-librarian/templates"
+	"github.com/hsb3/desk-standard/librarian/templates"
 )
 
 // Embedded returns the verbatim embedded-default system prompt (spec §6.1), which is both

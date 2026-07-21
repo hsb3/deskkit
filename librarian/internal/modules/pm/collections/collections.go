@@ -15,7 +15,7 @@ package collections
 import (
 	"github.com/pocketbase/pocketbase/core"
 
-	"github.com/example/pocket-librarian/internal/core/migrate"
+	"github.com/hsb3/desk-standard/librarian/internal/core/migrate"
 )
 
 // Stable collection ids (§8.2). Authored once, never changed.

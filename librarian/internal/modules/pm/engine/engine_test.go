@@ -10,10 +10,10 @@ import (
 	"github.com/pocketbase/pocketbase/core"
 	"github.com/pocketbase/pocketbase/tests"
 
-	"github.com/example/pocket-librarian/internal/core/config"
-	"github.com/example/pocket-librarian/internal/core/schema"
-	"github.com/example/pocket-librarian/internal/modules/pm/collections"
-	"github.com/example/pocket-librarian/internal/modules/pm/gates"
+	"github.com/hsb3/desk-standard/librarian/internal/core/config"
+	"github.com/hsb3/desk-standard/librarian/internal/core/schema"
+	"github.com/hsb3/desk-standard/librarian/internal/modules/pm/collections"
+	"github.com/hsb3/desk-standard/librarian/internal/modules/pm/gates"
 )
 
 // stubValidator drives the gate engine with no librarian internals (test lane §10.5: the PM

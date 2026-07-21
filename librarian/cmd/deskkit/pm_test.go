@@ -12,10 +12,10 @@ import (
 
 	"github.com/pocketbase/pocketbase"
 
-	"github.com/example/pocket-librarian/internal/core/config"
-	"github.com/example/pocket-librarian/internal/core/module"
-	"github.com/example/pocket-librarian/internal/modules/librarian"
-	"github.com/example/pocket-librarian/internal/modules/pm"
+	"github.com/hsb3/desk-standard/librarian/internal/core/config"
+	"github.com/hsb3/desk-standard/librarian/internal/core/module"
+	"github.com/hsb3/desk-standard/librarian/internal/modules/librarian"
+	"github.com/hsb3/desk-standard/librarian/internal/modules/pm"
 )
 
 // findCommand returns the RootCmd subcommand with the given name, or nil.

@@ -28,9 +28,9 @@ import (
 
 	pbcore "github.com/pocketbase/pocketbase/core"
 
-	"github.com/example/pocket-librarian/internal/core/store"
-	"github.com/example/pocket-librarian/internal/modules/pm/engine"
-	"github.com/example/pocket-librarian/internal/modules/pm/importer"
+	"github.com/hsb3/desk-standard/librarian/internal/core/store"
+	"github.com/hsb3/desk-standard/librarian/internal/modules/pm/engine"
+	"github.com/hsb3/desk-standard/librarian/internal/modules/pm/importer"
 )
 
 // adoptionSeed is the neutral manifest standing in for a desk's handoff threads-index / plan

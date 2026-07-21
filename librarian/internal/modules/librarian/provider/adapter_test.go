@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/example/pocket-librarian/internal/core/config"
+	"github.com/hsb3/desk-standard/librarian/internal/core/config"
 )
 
 // These tests exercise the provider-selection switch and the loud missing-key failure

@@ -27,9 +27,9 @@ import (
 	pbcore "github.com/pocketbase/pocketbase/core"
 	"github.com/spf13/cobra"
 
-	"github.com/example/pocket-librarian/internal/core/config"
-	"github.com/example/pocket-librarian/internal/core/schema"
-	pmtools "github.com/example/pocket-librarian/internal/modules/pm/tools"
+	"github.com/hsb3/desk-standard/librarian/internal/core/config"
+	"github.com/hsb3/desk-standard/librarian/internal/core/schema"
+	pmtools "github.com/hsb3/desk-standard/librarian/internal/modules/pm/tools"
 )
 
 // pmValidator resolves the document validator captured at module registration (the

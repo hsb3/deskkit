@@ -11,8 +11,8 @@ import (
 
 	"github.com/pocketbase/pocketbase/core"
 
-	"github.com/example/pocket-librarian/internal/core/config"
-	"github.com/example/pocket-librarian/internal/modules/librarian/desklib"
+	"github.com/hsb3/desk-standard/librarian/internal/core/config"
+	"github.com/hsb3/desk-standard/librarian/internal/modules/librarian/desklib"
 )
 
 // ApplyFix — §5.4: the write path. Reload the ignore list and re-run the ignore + staleness

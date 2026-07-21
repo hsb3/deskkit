@@ -9,9 +9,9 @@ import (
 
 	"github.com/pocketbase/pocketbase/core"
 
-	cfgpkg "github.com/example/pocket-librarian/internal/core/config"
-	"github.com/example/pocket-librarian/internal/core/schema"
-	"github.com/example/pocket-librarian/internal/modules/pm/engine"
+	cfgpkg "github.com/hsb3/desk-standard/librarian/internal/core/config"
+	"github.com/hsb3/desk-standard/librarian/internal/core/schema"
+	"github.com/hsb3/desk-standard/librarian/internal/modules/pm/engine"
 )
 
 // newEngine binds one call's engine: the surface's app + cfg, and the DocumentValidator the

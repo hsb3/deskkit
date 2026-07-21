@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/example/pocket-librarian/internal/modules/pm/statemachine"
+	"github.com/hsb3/desk-standard/librarian/internal/modules/pm/statemachine"
 )
 
 // DefaultRulesYAML is the shipped default gate ruleset a desk starts from when its

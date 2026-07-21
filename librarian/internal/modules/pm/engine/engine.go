@@ -16,10 +16,10 @@ import (
 
 	"github.com/pocketbase/pocketbase/core"
 
-	"github.com/example/pocket-librarian/internal/core/config"
-	"github.com/example/pocket-librarian/internal/core/schema"
-	"github.com/example/pocket-librarian/internal/modules/pm/gates"
-	"github.com/example/pocket-librarian/internal/modules/pm/statemachine"
+	"github.com/hsb3/desk-standard/librarian/internal/core/config"
+	"github.com/hsb3/desk-standard/librarian/internal/core/schema"
+	"github.com/hsb3/desk-standard/librarian/internal/modules/pm/gates"
+	"github.com/hsb3/desk-standard/librarian/internal/modules/pm/statemachine"
 )
 
 // Engine binds the store, config, and the injected document validator (module.Registry

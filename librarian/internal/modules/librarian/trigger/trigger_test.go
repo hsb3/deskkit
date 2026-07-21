@@ -9,12 +9,12 @@ import (
 	"github.com/pocketbase/pocketbase/core"
 	"github.com/pocketbase/pocketbase/tests"
 
-	"github.com/example/pocket-librarian/internal/core/config"
+	"github.com/hsb3/desk-standard/librarian/internal/core/config"
 
 	// Blank-import registers this project's Go migrations (files, tasks, ...) into the
 	// same global registry PocketBase's built-in migrations use, so tests.NewTestApp's
 	// RunAllMigrations() creates our collections too.
-	_ "github.com/example/pocket-librarian/internal/modules/librarian/collections"
+	_ "github.com/hsb3/desk-standard/librarian/internal/modules/librarian/collections"
 )
 
 // newTestEnv boots a fresh PocketBase test app (own temp SQLite data dir, all migrations

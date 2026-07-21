@@ -8,8 +8,8 @@ import (
 	"github.com/cloudwego/eino/compose"
 	"github.com/pocketbase/pocketbase/core"
 
-	"github.com/example/pocket-librarian/internal/core/toolcore"
-	"github.com/example/pocket-librarian/internal/modules/librarian/tools"
+	"github.com/hsb3/desk-standard/librarian/internal/core/toolcore"
+	"github.com/hsb3/desk-standard/librarian/internal/modules/librarian/tools"
 )
 
 // registerLibrarianTools populates the shared toolcore registry with the librarian specs so a
