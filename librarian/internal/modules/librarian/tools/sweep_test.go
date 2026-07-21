@@ -228,10 +228,10 @@ func TestFmStr(t *testing.T) {
 // token appears in this source (scripts/check-neutrality.mjs family 2a). The scanner also
 // whole-file-exempts this test, but building refs at runtime keeps the file clean regardless.
 const (
-	refHash = "#"    // bare-issue-ref sigil, kept split from its digits at the source level
-	refN    = "111"  // the sample issue number
-	refWB   = "wb#"  // the wb-prefixed alternative sigil
-	refWBN  = "37"   // the wb sample number
+	refHash = "#"   // bare-issue-ref sigil, kept split from its digits at the source level
+	refN    = "111" // the sample issue number
+	refWB   = "wb#" // the wb-prefixed alternative sigil
+	refWBN  = "37"  // the wb sample number
 )
 
 // scanTempMD writes content to name under a throwaway desk root and returns the scanned

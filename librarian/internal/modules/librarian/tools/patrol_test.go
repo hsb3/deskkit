@@ -29,9 +29,9 @@ func TestIsEntityDoc(t *testing.T) {
 		{"journal", "journal/z.md", true},
 		{"meta", "_meta/HANDOFF.md", false},
 		{"other", "README.md", false},
-		{"decisions", "_structure/decisions/0001-foo.txt", false},  // not .md
-		{"decisions", "_structure/decisions/README.md", false},     // index README, not an entity record
-		{"tasks", "tasks/README.md", false},                        // index README in another entity dir
+		{"decisions", "_structure/decisions/0001-foo.txt", false},          // not .md
+		{"decisions", "_structure/decisions/README.md", false},             // index README, not an entity record
+		{"tasks", "tasks/README.md", false},                                // index README in another entity dir
 		{"decisions", "_structure/decisions/9999-ignore-fixture.md", true}, // non-README decisions-dir .md is still an entity doc
 	}
 	for _, c := range cases {

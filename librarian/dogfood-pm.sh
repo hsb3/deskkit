@@ -63,8 +63,8 @@ mkdir -p "$DESK" "$STORE"
 
 if [ -n "${DESKKIT_BIN:-}" ]; then
   BIN="$DESKKIT_BIN"
-  [ -x "$BIN" ]
-  check "reuse existing binary (DESKKIT_BIN=$BIN)" $?
+  if [ -x "$BIN" ]; then rc=0; else rc=1; fi
+  check "reuse existing binary (DESKKIT_BIN=$BIN)" "$rc"
 else
   BIN="$WORK/deskkit"
   go build -o "$BIN" ./cmd/deskkit
@@ -96,8 +96,8 @@ check "link: A blocks B (cascade=auto, unblock_at=work)" $?
 
 B_GET=$(run_cli pm get "$B_ID" 2>&1)
 B_BLOCKED=$(printf '%s' "$B_GET" | jq -r '.blocked // false')
-[ "$B_BLOCKED" = "true" ]
-check "item B comes up blocked=true after the link" $?
+if [ "$B_BLOCKED" = "true" ]; then rc=0; else rc=1; fi
+check "item B comes up blocked=true after the link" "$rc"
 B_VERSION=$(printf '%s' "$B_GET" | jq -r '.version')
 
 # --- MCP stdio JSON-RPC helper (one-shot tools/call; framing per docs/tool-surface.md) ---
@@ -141,44 +141,44 @@ mcp_text() { printf '%s' "$1" | jq -r '.result.content[0].text'; }
 # 1) transition while blocked -> must be refused
 RESP1=$(mcp_call transition_item "$(jq -n --arg id "$B_ID" --argjson v "$B_VERSION" '{item_id:$id,target_phase:"work",version:$v}')")
 ERR1=$(mcp_is_error "$RESP1")
-[ "$ERR1" = "true" ]
-check "transition_item refused while B is blocked" $?
+if [ "$ERR1" = "true" ]; then rc=0; else rc=1; fi
+check "transition_item refused while B is blocked" "$rc"
 echo "      refusal message: $(mcp_text "$RESP1")"
 
 # 2) unblock
 RESP2=$(mcp_call unblock_item "$(jq -n --arg id "$B_ID" --argjson v "$B_VERSION" '{item_id:$id,version:$v,reason:"dependency check complete"}')")
 ERR2=$(mcp_is_error "$RESP2")
-[ "$ERR2" != "true" ]
-check "unblock_item succeeds" $?
+if [ "$ERR2" != "true" ]; then rc=0; else rc=1; fi
+check "unblock_item succeeds" "$rc"
 B_VERSION=$(mcp_text "$RESP2" | jq -r '.item.version')
 
 # 3) transition again -> must now succeed
 RESP3=$(mcp_call transition_item "$(jq -n --arg id "$B_ID" --argjson v "$B_VERSION" '{item_id:$id,target_phase:"work",version:$v}')")
 ERR3=$(mcp_is_error "$RESP3")
 NEWPHASE=$(mcp_text "$RESP3" | jq -r '.item.phase // empty')
-[ "$ERR3" != "true" ] && [ "$NEWPHASE" = "work" ]
-check "transition_item succeeds once unblocked (queue -> work)" $?
+if [ "$ERR3" != "true" ] && [ "$NEWPHASE" = "work" ]; then rc=0; else rc=1; fi
+check "transition_item succeeds once unblocked (queue -> work)" "$rc"
 B_VERSION=$(mcp_text "$RESP3" | jq -r '.item.version')
 
 # 4) add a note
 RESP4=$(mcp_call add_note "$(jq -n --arg id "$B_ID" '{item_id:$id,key:"rationale",body:"Unblocked after confirming the widget dependency was satisfied; advancing to work."}')")
 ERR4=$(mcp_is_error "$RESP4")
-[ "$ERR4" != "true" ]
-check "add_note succeeds" $?
+if [ "$ERR4" != "true" ]; then rc=0; else rc=1; fi
+check "add_note succeeds" "$rc"
 
 # 5) claim
 RESP5=$(mcp_call claim_item "$(jq -n --argjson v "$B_VERSION" --arg id "$B_ID" '{item_id:$id,version:$v}')")
 ERR5=$(mcp_is_error "$RESP5")
 CLAIMED_BY=$(mcp_text "$RESP5" | jq -r '.item.claimed_by // empty')
-[ "$ERR5" != "true" ] && [ -n "$CLAIMED_BY" ]
-check "claim_item succeeds (claimed_by=$CLAIMED_BY)" $?
+if [ "$ERR5" != "true" ] && [ -n "$CLAIMED_BY" ]; then rc=0; else rc=1; fi
+check "claim_item succeeds (claimed_by=$CLAIMED_BY)" "$rc"
 B_VERSION=$(mcp_text "$RESP5" | jq -r '.item.version')
 
 # 6) release
 RESP6=$(mcp_call release_item "$(jq -n --argjson v "$B_VERSION" --arg id "$B_ID" '{item_id:$id,version:$v}')")
 ERR6=$(mcp_is_error "$RESP6")
-[ "$ERR6" != "true" ]
-check "release_item succeeds" $?
+if [ "$ERR6" != "true" ]; then rc=0; else rc=1; fi
+check "release_item succeeds" "$rc"
 
 # --- module-gating check: MCP_MODULES=pm exposes exactly the 12 PM tools ---
 

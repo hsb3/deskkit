@@ -73,8 +73,8 @@ mkdir -p "$DESK/tasks" "$DESK/journal" "$DESK/analyses" "$DESK/_structure/decisi
 
 if [ -n "${DESKKIT_BIN:-}" ]; then
   BIN="$DESKKIT_BIN"
-  [ -x "$BIN" ]
-  check "reuse existing binary (DESKKIT_BIN=$BIN)" $?
+  if [ -x "$BIN" ]; then rc=0; else rc=1; fi
+  check "reuse existing binary (DESKKIT_BIN=$BIN)" "$rc"
 else
   BIN="$WORK/deskkit"
   go build -o "$BIN" ./cmd/deskkit
@@ -209,7 +209,7 @@ run_desk() { "$BIN" --dir "$STORE" --dev=false "$@"; }
 
 # --- sweep + patrol --------------------------------------------------------------------
 
-SWEEP_OUT=$(run_desk sweep); RC=$?
+run_desk sweep > /dev/null; RC=$?
 check "sweep runs" $RC
 PATROL_OUT=$(run_desk patrol); RC=$?
 check "patrol runs" $RC
@@ -218,8 +218,8 @@ N_R2=$(echo "$PATROL_OUT" | jq -r '.by_rule.R2 // 0')
 N_R3=$(echo "$PATROL_OUT" | jq -r '.by_rule.R3 // 0')
 N_R4=$(echo "$PATROL_OUT" | jq -r '.by_rule.R4 // 0')
 N_R5=$(echo "$PATROL_OUT" | jq -r '.by_rule.R5 // 0')
-[ "$N_R1" -eq 2 ] && [ "$N_R2" -eq 1 ] && [ "$N_R3" -eq 1 ] && [ "$N_R4" -eq 1 ] && [ "$N_R5" -eq 1 ]
-check "patrol found exactly the designed findings (R1=$N_R1 R2=$N_R2 R3=$N_R3 R4=$N_R4 R5=$N_R5)" $?
+if [ "$N_R1" -eq 2 ] && [ "$N_R2" -eq 1 ] && [ "$N_R3" -eq 1 ] && [ "$N_R4" -eq 1 ] && [ "$N_R5" -eq 1 ]; then rc=0; else rc=1; fi
+check "patrol found exactly the designed findings (R1=$N_R1 R2=$N_R2 R3=$N_R3 R4=$N_R4 R5=$N_R5)" "$rc"
 
 echo
 echo "--- patrol findings detail ---"
@@ -239,10 +239,10 @@ AGENT_RC_1=$?
 echo "$AGENT_OUT_1"
 check "agent run (no writes) exits 0" $AGENT_RC_1
 
-[ "$(sha "$DESK/tasks/dogfood-r1-partial-fm.md")" = "$SHA_BEFORE_R1" ] \
+if [ "$(sha "$DESK/tasks/dogfood-r1-partial-fm.md")" = "$SHA_BEFORE_R1" ] \
   && [ "$(sha "$DESK/journal/dogfood-meeting-notes.md")" = "$SHA_BEFORE_R2" ] \
-  && [ "$(sha "$DESK/tasks/dogfood-analysis-misfiled.md")" = "$SHA_BEFORE_R3" ]
-check "no fixture file was mutated (apply_fix is structurally absent from the agent's tool slice)" $?
+  && [ "$(sha "$DESK/tasks/dogfood-analysis-misfiled.md")" = "$SHA_BEFORE_R3" ]; then rc=0; else rc=1; fi
+check "no fixture file was mutated (apply_fix is structurally absent from the agent's tool slice)" "$rc"
 
 # --- real agent run WITH autonomous writes, then restore round-trip ---------------------
 
@@ -255,15 +255,15 @@ echo "$AGENT_OUT_2"
 check "agent run (autonomous writes) exits 0" $AGENT_RC_2
 
 SHA_AFTER_R1=$(sha "$DESK/tasks/dogfood-r1-partial-fm.md" 2>/dev/null || echo "MISSING")
-[ "$SHA_AFTER_R1" != "$SHA_BEFORE_R1" ]
-check "a real mechanical fix landed on disk (R1 file content changed)" $?
+if [ "$SHA_AFTER_R1" != "$SHA_BEFORE_R1" ]; then rc=0; else rc=1; fi
+check "a real mechanical fix landed on disk (R1 file content changed)" "$rc"
 
 RESTORE_OUT=$(run_desk restore --by-path "tasks/dogfood-r1-partial-fm.md"); RESTORE_RC=$?
 echo "restore: $RESTORE_OUT"
 check "restore --by-path runs" $RESTORE_RC
 SHA_RESTORED=$(sha "$DESK/tasks/dogfood-r1-partial-fm.md")
-[ "$SHA_RESTORED" = "$SHA_BEFORE_R1" ]
-check "restore is byte-exact back to the pre-fix original (sha256 match)" $?
+if [ "$SHA_RESTORED" = "$SHA_BEFORE_R1" ]; then rc=0; else rc=1; fi
+check "restore is byte-exact back to the pre-fix original (sha256 match)" "$rc"
 unset LIBRARIAN_AUTONOMOUS_WRITES
 
 # --- real multi-message MCP protocol session, both tool surfaces ------------------------
@@ -312,8 +312,8 @@ echo "--- MCP session: 5-tool default surface ---"
 LIST5=$(mcp_list "$MCPSTORE5" DESK_ROOT="$MCPDESK" DESK_NAME=mcp-probe-5); RC=$?
 echo "tools/list: $LIST5"
 COUNT5=$(printf '%s' "$LIST5" | jq -r '.result.tools | length')
-[ "$RC" -eq 0 ] && [ "$COUNT5" -eq 5 ]
-check "5-tool surface: tools/list returns exactly 5 tools (got $COUNT5)" $?
+if [ "$RC" -eq 0 ] && [ "$COUNT5" -eq 5 ]; then rc=0; else rc=1; fi
+check "5-tool surface: tools/list returns exactly 5 tools (got $COUNT5)" "$rc"
 
 SWEEP5=$(mcp_call "$MCPSTORE5" sweep '{}' DESK_ROOT="$MCPDESK" DESK_NAME=mcp-probe-5); RC=$?
 echo "sweep: $SWEEP5"
@@ -336,8 +336,8 @@ echo "--- MCP session: 6-tool LIBRARIAN_AUTONOMOUS_WRITES=true surface ---"
 LIST6=$(mcp_list "$MCPSTORE6" DESK_ROOT="$MCPDESK" DESK_NAME=mcp-probe-6 LIBRARIAN_AUTONOMOUS_WRITES=true); RC=$?
 echo "tools/list: $LIST6"
 COUNT6=$(printf '%s' "$LIST6" | jq -r '.result.tools | length')
-[ "$RC" -eq 0 ] && [ "$COUNT6" -eq 6 ]
-check "6-tool surface: tools/list returns exactly 6 tools, incl. apply_fix (got $COUNT6)" $?
+if [ "$RC" -eq 0 ] && [ "$COUNT6" -eq 6 ]; then rc=0; else rc=1; fi
+check "6-tool surface: tools/list returns exactly 6 tools, incl. apply_fix (got $COUNT6)" "$rc"
 
 mcp_call "$MCPSTORE6" sweep '{}' DESK_ROOT="$MCPDESK" DESK_NAME=mcp-probe-6 LIBRARIAN_AUTONOMOUS_WRITES=true > /dev/null
 mcp_call "$MCPSTORE6" patrol '{}' DESK_ROOT="$MCPDESK" DESK_NAME=mcp-probe-6 LIBRARIAN_AUTONOMOUS_WRITES=true > /dev/null
