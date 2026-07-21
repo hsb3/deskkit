@@ -2,6 +2,7 @@ package tui
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -298,5 +299,150 @@ func TestUnexpectedEvent_RendersRawNoPanic(t *testing.T) {
 	}
 	if !strings.Contains(m.renderTranscript(), "unexpected event") {
 		t.Error("raw fallback line not rendered")
+	}
+}
+
+// TestFmtTokens covers the compact K/M formatter's boundaries.
+func TestFmtTokens(t *testing.T) {
+	cases := []struct {
+		in   int
+		want string
+	}{
+		{0, "0"},
+		{42, "42"},
+		{999, "999"},
+		{1000, "1.0K"},
+		{12300, "12.3K"},
+		{999_999, "1000.0K"},
+		{1_000_000, "1.0M"},
+		{1_200_000, "1.2M"},
+	}
+	for _, c := range cases {
+		if got := fmtTokens(c.in); got != c.want {
+			t.Errorf("fmtTokens(%d) = %q, want %q", c.in, got, c.want)
+		}
+	}
+}
+
+// TestContextWindow covers override precedence, model-substring matching, provider fallback, and
+// the conservative default for a fully-unknown provider/model.
+func TestContextWindow(t *testing.T) {
+	cases := []struct {
+		provider, model string
+		override, want  int
+	}{
+		{"anthropic", "claude-opus-4-8", 12345, 12345},        // override always wins
+		{"openai", "claude-opus-4-8", 0, windowAnthropic},     // model substring beats provider
+		{"anthropic", "gpt-5", 0, windowOpenAI},               // gpt substring
+		{"x", "gemini-3-pro", 0, windowGemini},                // gemini substring
+		{"openai", "some-custom-deployment", 0, windowOpenAI}, // provider fallback
+		{"anthropic", "mystery", 0, windowAnthropic},          // provider fallback
+		{"local-llm", "mystery", 0, windowDefault},            // unknown/unknown → default
+	}
+	for _, c := range cases {
+		if got := contextWindow(c.provider, c.model, c.override); got != c.want {
+			t.Errorf("contextWindow(%q, %q, %d) = %d, want %d", c.provider, c.model, c.override, got, c.want)
+		}
+	}
+}
+
+// TestUsageAccounting_TerminalEventRecords proves a terminal EventFinal folds its token accounting
+// into the model + the finishing entry, and that the header's ctx% segment and the per-turn footer
+// then render the usage. The provider/model here is unknown ("test-model") so ctxWindow falls back
+// to the openai provider family — the percent is computed against whatever that resolves to.
+func TestUsageAccounting_TerminalEventRecords(t *testing.T) {
+	m, _ := newTestModel(t) // provider "openai", model "test-model"
+	m = startStreaming(t, m, "q")
+	m = send(m, eventMsg{ev: agent.Event{Kind: agent.EventToken, Step: 1, Token: "answer"}})
+
+	// A token event alone must NOT move the context gauge (only a terminal event carries usage).
+	if m.ctxTokens != 0 {
+		t.Fatalf("ctxTokens = %d before terminal event, want 0", m.ctxTokens)
+	}
+
+	m = send(m, eventMsg{ev: agent.Event{
+		Kind: agent.EventFinal, Content: "answer",
+		PromptTokens: 100_000, CompletionTokens: 500, TotalTokens: 100_500,
+	}})
+	m = send(m, turnDoneMsg{})
+
+	if m.ctxTokens != 100_000 {
+		t.Errorf("ctxTokens = %d, want 100000", m.ctxTokens)
+	}
+	if m.sessionTokens != 100_500 {
+		t.Errorf("sessionTokens = %d, want 100500", m.sessionTokens)
+	}
+	if got := m.entries[m.inflightIdx].tokens; got != 500 {
+		t.Errorf("entry.tokens = %d, want 500", got)
+	}
+
+	// Header shows `NN% ctx · <tok> tok`, with the percent computed against the resolved window.
+	wantPct := 100_000 * 100 / m.ctxWindow
+	hdr := m.renderHeader()
+	if !strings.Contains(hdr, fmt.Sprintf("%d%% ctx", wantPct)) {
+		t.Errorf("header missing ctx%% segment (want %d%%): %q", wantPct, hdr)
+	}
+	if !strings.Contains(hdr, "tok") {
+		t.Errorf("header missing token segment: %q", hdr)
+	}
+
+	// Per-turn footer joins tokens onto the `model · latency` line without a new line.
+	transcript := m.renderTranscript()
+	if !strings.Contains(transcript, "500 tok") {
+		t.Errorf("per-turn footer missing token count: %q", transcript)
+	}
+}
+
+// TestUsageAccounting_HeaderHiddenWithoutUsage: before any terminal usage the header carries only
+// the desk/provider/model chrome — no ctx% segment (the gauge stays hidden until a turn reports).
+func TestUsageAccounting_HeaderHiddenWithoutUsage(t *testing.T) {
+	m, _ := newTestModel(t)
+	if strings.Contains(m.renderHeader(), "ctx") {
+		t.Errorf("header shows a ctx segment before any usage was reported: %q", m.renderHeader())
+	}
+}
+
+// TestUsageAccounting_SessionTotalAccumulates: sessionTokens sums TotalTokens across turns, and
+// ctxTokens tracks the LATEST turn's prompt count (the current context size).
+func TestUsageAccounting_SessionTotalAccumulates(t *testing.T) {
+	m, _ := newTestModel(t)
+
+	m = startStreaming(t, m, "q1")
+	m = send(m, eventMsg{ev: agent.Event{Kind: agent.EventFinal, Content: "a1", PromptTokens: 1000, CompletionTokens: 100, TotalTokens: 1100}})
+	m = send(m, turnDoneMsg{})
+	if m.sessionTokens != 1100 || m.ctxTokens != 1000 {
+		t.Fatalf("after turn 1: sessionTokens=%d ctxTokens=%d, want 1100/1000", m.sessionTokens, m.ctxTokens)
+	}
+
+	m = startStreaming(t, m, "q2")
+	m = send(m, eventMsg{ev: agent.Event{Kind: agent.EventFinal, Content: "a2", PromptTokens: 2000, CompletionTokens: 200, TotalTokens: 2200}})
+	m = send(m, turnDoneMsg{})
+	if m.sessionTokens != 3300 {
+		t.Errorf("sessionTokens = %d, want 3300 (1100+2200)", m.sessionTokens)
+	}
+	if m.ctxTokens != 2000 {
+		t.Errorf("ctxTokens = %d, want 2000 (latest turn's prompt)", m.ctxTokens)
+	}
+}
+
+// TestUsageAccounting_CanceledTurnRecords: a canceled terminal event still records whatever usage
+// was counted (partial turns report what they had), so the gauge reflects the interrupted turn.
+func TestUsageAccounting_CanceledTurnRecords(t *testing.T) {
+	m, _ := newTestModel(t)
+	m = startStreaming(t, m, "q")
+	m = send(m, eventMsg{ev: agent.Event{
+		Kind: agent.EventError, Canceled: true, Partial: "half",
+		PromptTokens: 4000, CompletionTokens: 15, TotalTokens: 4015,
+	}})
+	m = send(m, turnDoneMsg{})
+
+	if m.ctxTokens != 4000 {
+		t.Errorf("ctxTokens = %d, want 4000 (counted on a canceled turn)", m.ctxTokens)
+	}
+	if got := m.entries[m.inflightIdx].tokens; got != 15 {
+		t.Errorf("entry.tokens = %d, want 15", got)
+	}
+	if m.sessionTokens != 4015 {
+		t.Errorf("sessionTokens = %d, want 4015", m.sessionTokens)
 	}
 }
