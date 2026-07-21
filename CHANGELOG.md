@@ -224,8 +224,8 @@ for why this policy exists.
   lives in `schema/doctypes.yaml` (schema v1's doc-type dimension, successor of the vault
   `types:` model), with the seven previously-unschematized kit types added and the `user-defined`
   nonstandard types deliberately excluded. `kits/` is inside the neutrality-lint scan surface.
-  Port + gap dispositions: `docs/decisions/0006-kit-port-schema-reconciliation.md`. The vault
-  copies are frozen (read-only journal).
+  Port + gap dispositions: `docs/decisions/0006-kit-port-schema-reconciliation.md` (epic #55,
+  D1). The vault copies are frozen (read-only journal).
 - **`make install`** — build the version-stamped librarian binary and install it to `~/.local/bin`
   (override with `make install PREFIX=/usr/local`). The one-command update-from-source path.
 - **`record_feedback`** — the librarian can log feedback entries into its own store: a `problem`
@@ -251,8 +251,9 @@ for why this policy exists.
 
 - **Core + modules architecture.** The librarian is refactored into a shared `internal/core/`
   (config, store, migrate, mcp, schema, module registry) with librarian-specific code moved under
-  `internal/modules/librarian/`, making the librarian the first module on a reusable substrate.
-  Internal reorganization only — no change to the CLI, MCP tool surface, schema, or store layout.
+  `internal/modules/librarian/`, making the librarian the first module on a reusable substrate
+  (epic #55, D2). Internal reorganization only — no change to the CLI, MCP tool surface, schema,
+  or store layout.
 - **Chat TUI migrated to the Charm v2 stack** (bubbletea v2, lipgloss v2, bubbles v2,
   glamour v2 — the `charm.land` modules), recorded as
   [ADR 0007](docs/decisions/0007-tui-charm-v2-stack.md). No feature or visual changes: the

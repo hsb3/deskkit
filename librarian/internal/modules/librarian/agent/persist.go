@@ -54,12 +54,15 @@ type runCtx struct {
 	hwm   int
 	steps int
 	// pending buffers the CURRENT round's messages (the model's assistant output and its tool
-	// result[s]) between model calls, for the one-shot Run() only. The input-side callback
-	// (persistHandler) flushes a round only on the NEXT model call — where those messages first
-	// appear in a model input — so a MaxStep abort right after a tool executes would lose the
-	// round from the transcript even though the tool really ran. Run()'s MaxStep path flushes
-	// this buffer (flushPending) to close that gap. Reset at each model OnStart (the prior round
-	// is persisted there by the delta), so it only ever holds the not-yet-persisted current round.
+	// result[s]) between model calls. The input-side callback (persistHandler) flushes a round
+	// only on the NEXT model call — where those messages first appear in a model input — so an
+	// abort right after a tool executes (MaxStep, cancellation, or any other error before the next
+	// model call) would lose the round from the transcript even though the tool really ran. Both
+	// entry points flush this buffer (flushPending) on abort to close that gap: the one-shot Run()
+	// fills it via captureHandler, and the streaming Session fills it via turnEvents (stream.go,
+	// which reconstructs the assistant message from the model output stream). Reset at each model
+	// OnStart (the prior round is persisted there by the delta), so it only ever holds the
+	// not-yet-persisted current round.
 	pending []*schema.Message
 }
 
@@ -139,18 +142,20 @@ func deltaMessages(msgs []*schema.Message, hwm int) ([]*schema.Message, int) {
 
 // captureHandler builds a SECONDARY eino callback that mirrors the current round's messages into
 // rc.pending, in memory, WITHOUT persisting anything. It exists solely so the one-shot Run() can
-// recover the last round when the loop aborts on MaxStep: the input-side persistHandler only
-// flushes a round on the NEXT model call (that is when the round's assistant+tool messages first
-// appear in a model input), so if MaxStep cuts the loop right after a tool executes, that round
-// never reaches the transcript — even though the tool ran (e.g. propose_fix wrote a revisions
-// row). Run()'s MaxStep path flushes rc.pending to close that audit-trail gap.
+// recover the last round when the loop aborts: the input-side persistHandler only flushes a round
+// on the NEXT model call (that is when the round's assistant+tool messages first appear in a model
+// input), so if the loop cuts short right after a tool executes, that round never reaches the
+// transcript — even though the tool ran (e.g. propose_fix wrote a revisions row). Run()'s abort
+// path flushes rc.pending to close that audit-trail gap.
 //
 // Model OnEnd captures the exact assistant message eino produced (content + all tool_calls);
 // Tool OnEnd reconstructs each tool result from the callback (call id, tool name, response). The
 // model OnStart resets the buffer because the delta on the same event persists the prior round,
 // so after a model call rc.pending only holds the not-yet-persisted current round. This handler
-// is registered ONLY by Run(); the streaming Session path does not use it and is unchanged (it
-// has the same MaxStep transcript gap, tracked separately, not fixed here).
+// relies on the model node running via Generate (non-stream), so it is registered ONLY by Run();
+// the streaming Session's model node emits a stream (only OnEndWithStreamOutput fires, never
+// OnEnd), so it fills rc.pending from turnEvents instead (stream.go), reusing the same buffer and
+// flushPending.
 //
 // Ordering invariant this relies on: every tool OnEnd for round N must complete before round
 // N+1's model OnStart resets rc.pending — true for eino's ReAct loop today (rc.mu only
@@ -197,11 +202,11 @@ func (rc *runCtx) captureHandler() callbacks.Handler {
 
 // flushPending writes the buffered current-round messages (the assistant tool-call message and
 // its tool result[s]) that the input-side callback never flushed, assigning each the next run
-// seq. Run() calls this ONLY when the loop aborts on MaxStep — the one outcome where a round's
-// tool call really executed but no later model input carried it into the transcript. On every
-// other outcome the buffer is either empty (a fresh model OnStart reset it before returning) or
-// deliberately left unflushed (a successful final message is persisted by the caller instead),
-// so this is never a double-persist.
+// seq. The entry points call this when the loop aborts (MaxStep, cancellation, or another error)
+// with a non-empty buffer — the outcome where a round's tool call really executed but no later
+// model input carried it into the transcript. On a clean completion the buffer is either empty (a
+// fresh model OnStart reset it before returning) or deliberately left unflushed (a successful
+// final message is persisted by the caller instead), so this is never a double-persist.
 func (rc *runCtx) flushPending() {
 	rc.mu.Lock()
 	defer rc.mu.Unlock()

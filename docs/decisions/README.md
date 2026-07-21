@@ -27,3 +27,4 @@ where the decision binds; never delete a record — supersede or correct in plac
 | [0016](0016-ts-boundary-deskkit-proxy.md) | TS plugin boundary — extend via a designed deskkit proxy; drift-guarded tool-surface truth | Accepted (2026-07-20) |
 | [0017](0017-document-identity-and-hygiene.md) | Document identity & hygiene — frontmatter id, `entity_type` column rename, text-cap sweep + guard | Accepted (2026-07-20) |
 | [0018](0018-element-model-direction.md) | Element-model direction — simple goal, optional workstream tag, research loop, trigger-gated exec outputs | Accepted (2026-07-20) |
+| [0019](0019-durable-pm-defaults.md) | Durable PM defaults — autonomous-writes-on and claim-TTL-30m recorded from spec §13 | Accepted (2026-07-21) |

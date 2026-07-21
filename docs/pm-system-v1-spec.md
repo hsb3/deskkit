@@ -1039,12 +1039,14 @@ flagged here for the foreman/owner to review; none is claimed as ruled.
    readable.
 6. **Cascade `auto` vs `auto-reopen`** given the concrete standing-vs-one-shot semantics in §3.5.
 7. **Claim TTL default 30 min** (`PM_CLAIM_TTL` override), and version-token optimistic
-   concurrency as the "light" concurrency bar (R2.6).
+   concurrency as the "light" concurrency bar (R2.6). Recorded as a durable build-contract
+   default in [ADR 0019](decisions/0019-durable-pm-defaults.md).
 8. **`stalled` threshold default 14 days** in `get_context` (§5.2), configurable.
 9. **PM writes default autonomous-on** (§5.1): the real safety is the document gate on `advance`,
    not a write flag, so agents may drive the graph by default; a `PM_AUTONOMOUS_WRITES=false` desk
    can make agents read-only. Alternative: default off (mirror the librarian's `apply_fix` gate);
    rejected because graph mutation is the PM system's whole point and it writes no desk files.
+   Recorded as a durable build-contract default in [ADR 0019](decisions/0019-durable-pm-defaults.md).
 10. **Realtime (R4.3) and secrets/concurrency SHOULDs adopted**, not argued down — each is
     cheap on the existing chassis (PB-native realtime; the seam; the version token). The R5.2
     portfolio read-only fan-out is NOT adopted in v1 — it is LATER (§9), with the enumerable

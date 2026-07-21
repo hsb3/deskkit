@@ -12,7 +12,6 @@ package agent
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"strings"
@@ -172,7 +171,7 @@ func Run(ctx context.Context, app core.App, cfg *config.Config, trigger, input s
 	}
 
 	handler := rc.persistHandler() // the ONE persistence mechanism (persist.go)
-	capture := rc.captureHandler() // in-memory current-round buffer, flushed only on MaxStep
+	capture := rc.captureHandler() // in-memory current-round buffer, flushed on any abort
 	out, genErr := ag.Generate(ctx, []*schema.Message{schema.UserMessage(input)},
 		einoagent.WithComposeOptions(compose.WithCallbacks(handler, capture)))
 
@@ -183,17 +182,19 @@ func Run(ctx context.Context, app core.App, cfg *config.Config, trigger, input s
 		if perr := rc.persist(out); perr != nil {
 			app.Logger().Error("persist final message", "run", run.Id, "err", perr)
 		}
-	} else if errors.Is(genErr, compose.ErrExceedMaxSteps) {
-		// MaxStep aborted the loop right after a tool executed. The input-side callback flushes a
+	} else if genErr != nil {
+		// The loop aborted right after a tool may have executed. The input-side callback flushes a
 		// round only on the NEXT model call, which never came, so the assistant tool-call message
-		// and its tool result are still buffered in rc.pending. Flush them so the transcript
+		// and its tool result may still be buffered in rc.pending. Flush them so the transcript
 		// records the tool call whose effect (e.g. a revisions row) really landed — the
 		// audit-trail integrity fix.
 		//
-		// Scope: this branch only covers the MaxStep case. A different abort right after a tool
-		// executed (e.g. ctx cancellation between the tool's OnEnd and the next model's OnStart)
-		// leaves rc.pending unflushed too, and isn't handled here — that gap is real but tracked
-		// separately, not silently assumed away.
+		// The flush fires on ANY abort, not just MaxStep: a context cancellation that lands between
+		// a tool's OnEnd and the next model's OnStart (the graph runner aborts before submitting the
+		// next model task) leaves the same round buffered. The invariant is "a real tool call
+		// executed and was not yet flushed", not which error ended the loop. flushPending is a no-op
+		// when the buffer is empty (a fresh model OnStart reset it, or no tool ran), so a pre-tool
+		// failure persists nothing spurious.
 		rc.flushPending()
 	}
 	final := ""
