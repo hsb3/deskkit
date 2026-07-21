@@ -24,48 +24,41 @@ issue bodies, and the friction ledger live there.
 
 ## 1. Current standing + top priority
 
-**SESSION 2026-07-20 (integration testing + bug-fix wave) — 4 real bugs found by real agent-led
-testing, all fixed; PR #152 MERGED 2026-07-21 (squash `bbfc1a8`, closed #148–#151, main CI
-green post-merge).** Henry asked for evidence the v1 build
-wave actually works when driven by an agent, not just unit tests + `librarian/verify.sh`.
-Foreman-led: 3 parallel testers (plugin MCP + skills; librarian's real `deskkit agent` LLM loop
-+ a live MCP protocol session; the PM module's real work-graph workflow) → 2 adversarial
-reviewers (9 claims re-derived from scratch: 8 confirmed, 1 plausible, 0 refuted) → filed
-**#148** (high — `deskkit` built/run from a `$TMPDIR` path, e.g. `mktemp -d`, silently triggers
-PocketBase dev-mode and dumps raw SQL to stdout, corrupting an MCP client's JSON-RPC stream),
-**#149** (medium — the real agent loop could drop a state-mutating tool call from its own
-`messages` transcript when it hit `AGENT_MAX_STEP` right after that call — an audit-trail
-integrity gap), **#150** (low — `pm --actor`'s help placement implied pre-leaf usage that
-actually failed; real root cause was `main()`'s pre-cobra unknown-command guard, not cobra
-config), **#151** (low — `conventions-standard`'s frontmatter-exemption prose omitted
-`_knowledge/`, which the shipped scaffold ships unfrontmattered even though the machine gate
-already exempts it by basename). Full report:
-`_meta/research/2026-07-20-integration-agent-led-testing/report.md`. **Open question, not filed
-as a bug** (unclear if it's a desk-standard defect or Claude-Code-harness/session-timing
-behavior): despite `enabledPlugins["desk-standard@desk-standard"]: true`, no tester or reviewer
-could get the plugin's 4 MCP tools to surface as agent-callable in a live session working in
-this repo — needs a from-scratch session test to pin down. Three reusable scripts landed on
-`main` (committed `41357e2`, all pass neutrality + shellcheck): `plugin/scripts/verify-mcp-
-protocol.sh` (deterministic), `librarian/dogfood-agent.sh` (manual, real-LLM, NOT in CI),
-`librarian/dogfood-pm.sh` (deterministic) — none wired into `make check`/`make verify` yet
-(deliberate). All four bugs then fixed on **PR #152** (branch `fix/agent-led-test-findings`,
-commits `26b4495`+`79daa00`, squash-merged as `bbfc1a8` closing #148–#151): flat fan-out (2 sonnet builders on the
-bounded fixes, 1 opus on the #149 persistence fix given the risk of touching agent-transcript
-semantics), each fix with a red-before/green-after regression test, foreman reconciliation
-caught a builder-left compile break + 11 neutrality-lint violations (bare issue numbers in new
-Go test comments — a brief-writing miss, see incident log), full gates green (`make check` /
-`make test` / `make verify`), `claude-review`'s 6 comments addressed (one suggested
-"simplification" was empirically proven wrong before declining it — see incident log). Follow-up
-**#153** filed for the two gaps review surfaced but PR #152 deliberately left out of scope
-(`Session.StreamTurn()` has the same MaxStep transcript gap; a non-MaxStep abort right after a
-tool call is still unflushed). **MERGE COMPLETED 2026-07-21** (Henry's go-ahead): the bot's
-second review pass (ran against head `79daa00`) came back all-confirmations with zero blockers;
-its one non-blocking cleanup idea was filed as **#154** (`printJSON` hardwires `os.Stdout`,
-forcing the pipe-swap capture pattern in `pm` command tests — give it an `io.Writer` /
-`cmd.OutOrStdout()`); all 12 review threads were replied-to and resolved; closing keywords were
-added to the PR body pre-merge (the body originally had NO `closes #N` keywords — the handoff's
-"closes on merge" claim would silently not have happened); squash-merged as `bbfc1a8`, branch
-deleted, #148–#151 auto-closed, main CI green post-merge.
+**SESSION 2026-07-21 (delivery-wave run) — the ENTIRE #155 delivery plan, waves 0–3, executed
+and merged: 7 PRs (#156–#162), 20 issues closed, main at `001e0e6`, all gates green.**
+Fable-led foreman session; each branch built by an isolated worktree crew (builders or
+lead-driven teams), every branch gate-verified independently by the session before landing,
+every claude-review thread dispositioned (applied or declined-with-reasoning):
+- **#156** wave 0 — Go module renamed to `github.com/hsb3/desk-standard/librarian` (#98);
+  token-scoped neutrality-allowlist entries per the owner ruling on the issue.
+- **#157** docs — ADR 0006 kit-consumption correction (erratum protocol) + **ADR 0019** durable
+  PM defaults (#63, #103).
+- **#158** hardening — shellcheck/actionlint/SHA-pin-drift enforced in CI (+ release gate
+  mirror), schema-copy drift test, secrets-shaped-field guard, requireConfig self-init + TS MCP
+  behavioral tests (#34, #97, #74, #35); action majors bumped at landing with API-resolved SHAs.
+- **#159** — transcript flush on ANY agent-loop abort, both Run() and StreamTurn() (#153);
+  adversarial reviewer re-derived all 8 claims (0 refuted; red-before proven via `go test
+  -overlay`).
+- **#160** — TUI sessions surface / token accounting / $EDITOR hatch (#51, #52, #64); the
+  cross-crew `agent/stream.go` collision with #159 was merged by the session as a union and
+  race-verified.
+- **#161** — PM completion (#90 body field via migration 0006, #96 claim semantics, #68 bounded
+  ordered realtime, #154 printJSON io.Writer, #95 confirmed already-shipped-by-#66 + docs,
+  #101 gating contract). **ADR 0020 (authoritative claims) ACCEPTED at PR merge** per the
+  delivery plan's "PR review is the ruling" mechanism — Henry can supersede; the ADR lists the
+  exact revert set for the advisory reading.
+- **#162** wave 3 — content indexing + `query search`/`content` kinds on CLI+MCP (no tool-count
+  changes), orphans de-noise (`--show-index`), R6 self-clear via handoff-excluding git pathspec
+  (#89, #100); sweep result now carries a `truncated` counter (no silent caps).
+
+**Wave 4 (schema-v2, epic #130) deliberately NOT started**: its own gate #126 (v1+v2 model
+simulations) is an owner-signoff, desk-side condition — starting #124/#125 before that ruling
+risks rework. The run record + accumulated small-backlog list live in **issue #155's body**
+("Delivery plan — EXECUTED 2026-07-21").
+
+**Carried-over open question** (from the 2026-07-20 session, still unresolved): despite
+`enabledPlugins["desk-standard@desk-standard"]: true`, the plugin's 4 MCP tools would not
+surface as agent-callable in a live session in this repo — needs a from-scratch session test.
 
 **v1 build wave landed 2026-07-20 — epic #129 closed, `gate:1.0.0` label query empty.** All ten
 children (#114–#123) shipped as PRs #136–#147 (main HEAD `cd22b9f` pre-this-session); `make
@@ -73,15 +66,20 @@ verify` 48/48. Highlights live in CLAUDE.md (guard families, tool-surface counts
 bundle) — not repeated here.
 
 **NEXT, in order of consequence:**
-1. **Owner ruling: fold `desk-pm` into `desk-persona`, or ship both?** Deliberately additive for
-   now (duplicate `pm-operator` agent name if both installed; PR #143's body has the facets). A
-   fold is a small follow-up PR.
-2. **Release cut (owner-gated)** — `[Unreleased]` holds the whole v1 wave + the 0.8.0 bug floor
-   + the #152 fixes; `make version-status` will shout. Runbook `docs/development/releasing.md`.
-3. **Epic #130 (schema-v2, #124–#128)** — its own arc, deliberately no milestone; v1+v2 model
-   simulations before v2 finalizes (owner's signoff note).
-4. **ts-proxy implementation** — `docs/development/ts-proxy-design.md` §5 slices; slice 0 (host
+1. **Release cut (owner-gated)** — `[Unreleased]` now holds the v1 wave + 0.8.0 floor + #152 +
+   the ENTIRE delivery-wave run; `make version-status` will shout. Runbook
+   `docs/development/releasing.md`.
+2. **Owner review of ADR 0020** — accepted at PR #161 merge by the coordinating session per the
+   delivery plan's mechanism; supersede if the advisory reading is preferred (revert set listed
+   in the ADR).
+3. **Owner ruling: fold `desk-pm` into `desk-persona`, or ship both?** Deliberately additive for
+   now (duplicate `pm-operator` agent name if both installed; PR #143's body has the facets).
+4. **Epic #130 (schema-v2, #124–#128)** — blocked on #126 (owner's desk-side v1+v2 simulations)
+   before the arc starts; see the Wave 4 note above.
+5. **ts-proxy implementation** — `docs/development/ts-proxy-design.md` §5 slices; slice 0 (host
    spawn-capability probe) is the go/no-go before anything else.
+6. **Dependabot action-major PRs** (checkout v7 / setup-node v7 / upload-artifact v7) supersede
+   #158's v5/v6 SHA bumps — cheap merges once their CI is green.
 
 **Design session (2026-07-20) is RULED — ADRs 0009–0018 bind** (`docs/decisions/README.md` has
 the index). The build plan derived from those ADRs is live as epic #129 (v1, closed above) +
@@ -108,8 +106,16 @@ test-hygiene; #12 stays ON HOLD (owner ruling above); #36 needs a design ruling 
 
 ## 2. Recent deliveries (newest first — full detail in the cited PRs / ADRs / issues)
 
-- **2026-07-21 — PR #152 merged** (`bbfc1a8`, closed #148–#151); review threads dispositioned,
-  #154 filed. See §1 top entry.
+- **2026-07-21 — delivery-wave run: PRs #156–#162 merged, 20 issues closed.** See §1 top entry
+  and issue #155's "Delivery plan — EXECUTED" section.
+- **2026-07-21 — PR #152 merged** (`bbfc1a8`, closed #148–#151): the 2026-07-20 agent-led
+  integration-testing wave's 4 bug fixes (#148 $TMPDIR dev-mode stdout corruption, #149 MaxStep
+  transcript drop, #150 pre-cobra flag guard, #151 skill prose); 12 review threads
+  dispositioned, #153/#154 filed as follow-ups (both closed by this session's run). Test report:
+  `_meta/research/2026-07-20-integration-agent-led-testing/report.md`. Reusable scripts on main
+  (`41357e2`): `plugin/scripts/verify-mcp-protocol.sh`, `librarian/dogfood-agent.sh` (manual,
+  real-LLM, NOT in CI), `librarian/dogfood-pm.sh` — deliberately not wired into `make
+  check`/`make verify`.
 - **2026-07-20 — agent-led integration testing + bug-fix wave.** See §1 top entry. Report +
   PR #152 + issues #153/#154.
 - **2026-07-20 — v1 build wave, epic #129 closed.** PRs #136–#147; see §1 + CLAUDE.md.
@@ -130,8 +136,9 @@ test-hygiene; #12 stays ON HOLD (owner ruling above); #36 needs a design ruling 
 
 ## 3. Where to start next
 
-- **The design session is RULED and Phase 4 is FILED** (§1): ADRs 0009–0018 bind; pick up #114
-  first (blocks #119/#122) if opening a new v1 build lane, then the independent slices.
+- **The delivery plan in #155 is EXECUTED through wave 3** (§1): the buildable backlog is now
+  the small-items list in #155's "New small backlog" section plus the lane epics' residue —
+  re-check each epic (#82–#88) for closability before opening new work.
 - **Cut the next release** when `[Unreleased]` warrants — `docs/development/releasing.md`
   (bump VERSION + 3 manifests → dated CHANGELOG section → `make release-prep` → tag).
 - **Repo-visibility decision** (§1) gates the public `curl|bash` path — Henry's call, on hold.
@@ -180,6 +187,26 @@ session). Only what CLAUDE.md doesn't cover lives below._
 
 ## 5. Incident log
 
+- 2026-07-21 (delivery-wave run): a worker/lead task-notification routing quirk — a lead's
+  spawned worker's completion notification routes to the ROOT session, not the waiting lead, so
+  a lead that stops "awaiting the notification" can orphan forever. Pattern that worked: the
+  root session forwards the worker's report to the lead via SendMessage with "verify its status
+  yourself; don't wait on notifications from me." Also: a process restart mid-run stops all
+  live agents — resumed agents must re-verify tree state before trusting their transcript.
+- 2026-07-21 (delivery-wave run): CI shellcheck flagged SC2317 on verify.sh's trap-invoked
+  cleanup while the LOCAL shellcheck (older) flagged the same code as SC2319/SC2329 — version
+  skew between Homebrew and the runner image means "clean locally" does not prove the CI gate;
+  the disable comment now carries both codes.
+- 2026-07-21 (delivery-wave run): the #155 collision map said the TUI branch was "tui/ pkg
+  only", but #52's token accounting legitimately extended `agent/stream.go` — colliding with
+  #159's rewrite of the same struct. Lesson: surface predictions in a delivery plan are
+  hypotheses; the session must diff-check overlap before merging parallel branches (the union
+  merge + race re-verification caught it cleanly here).
+- 2026-07-21 (delivery-wave run): `make test` failed on the MAIN tree right after the last
+  merge — stale `plugin/node_modules` (each worktree had installed its own; main's predated the
+  new SDK import path). Re-`bun install` fixed it. Lesson: after a multi-worktree session,
+  refresh the main tree's deps before reading a local gate failure as a broken main; the
+  authoritative signal is main-branch CI.
 - 2026-07-20 (bug-fix wave): background builder agents were interrupted mid-response/mid-edit
   by connection errors 3 times; a resumed builder's self-reported "done" was wrong once — it
   left `pm_test.go` missing 3 imports (a non-compiling state) that only surfaced when the

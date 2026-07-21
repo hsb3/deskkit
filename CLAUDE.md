@@ -74,7 +74,7 @@ the exit code and has let a failing gate through before (incident, 2026-07-17).
 | `make help` | List all targets (default goal) |
 | `make setup` | `bun install` (plugin) + `lefthook install` (git hooks) |
 | `make build` | Build both lanes: plugin (`bun run build`) + librarian binary (version-stamped) |
-| `make test` | Fast unit tests: plugin `bun test` (75) + librarian `go test ./...` (594) |
+| `make test` | Fast unit tests: plugin `bun test` + librarian `go test ./...` |
 | `make check` | Repo gates: neutrality + self-test, kit-drift, prompt-drift, tool-surface drift + self-test, scaffold frontmatter, plugin core-purity, shellcheck, actionlint, workflow SHA-pin drift + self-test |
 | `make verify` | Librarian integration gate — `librarian/verify.sh` (48 checks, throwaway scratch desk) |
 | `make package` | Regenerate the marketplace bundle (`plugin/claude-plugin/` artifacts) |
