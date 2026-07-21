@@ -28,11 +28,48 @@ type fakeProvider struct {
 	freshSess  streamer // the session handed back by the last fresh
 
 	listExcluded string // the excludeRunID the model passed on the last list call
+	listCalls    int    // how many times list was called (a reload after rename/delete calls it)
+
+	// Sessions-manager recording (rename/delete/preview), mirroring the resumeErr/freshErr pattern.
+	renamedID    string
+	renamedTitle string
+	renameErr    error
+	deletedID    string
+	deleteErr    error
+	previewedID  string
+	previewData  []agent.TranscriptEntry
+	previewErr   error
 }
 
 func (f *fakeProvider) list(limit int, excludeRunID string) ([]agent.ConversationInfo, error) {
 	f.listExcluded = excludeRunID
+	f.listCalls++
 	return f.convos, f.listErr
+}
+
+func (f *fakeProvider) rename(runID, title string) error {
+	if f.renameErr != nil {
+		return f.renameErr
+	}
+	f.renamedID = runID
+	f.renamedTitle = title
+	return nil
+}
+
+func (f *fakeProvider) delete(runID string) error {
+	if f.deleteErr != nil {
+		return f.deleteErr
+	}
+	f.deletedID = runID
+	return nil
+}
+
+func (f *fakeProvider) preview(runID string) ([]agent.TranscriptEntry, error) {
+	f.previewedID = runID
+	if f.previewErr != nil {
+		return nil, f.previewErr
+	}
+	return f.previewData, nil
 }
 
 func (f *fakeProvider) resume(ctx context.Context, runID string) (streamer, []agent.TranscriptEntry, error) {
@@ -317,5 +354,222 @@ func TestFooter_ResumeHints(t *testing.T) {
 	}
 	if !strings.Contains(m.View().Content, "ctrl+o") {
 		t.Error("View output missing ctrl+o hint")
+	}
+}
+
+// twoConvoModel opens the picker over two conversations (run-1 newest, run-2 older) with a preview
+// payload, and returns the opened model plus the shared fake provider.
+func twoConvoModel(t *testing.T) (model, *fakeProvider) {
+	t.Helper()
+	fp := &fakeProvider{
+		convos: []agent.ConversationInfo{
+			{RunID: "run-1", Title: "first chat", Status: "succeeded", MsgCount: 2},
+			{RunID: "run-2", Title: "second chat", Status: "succeeded", MsgCount: 4},
+		},
+		previewData: []agent.TranscriptEntry{{Role: "user", Text: "hi"}, {Role: "assistant", Text: "hello"}},
+	}
+	m, _, _ := newTestModelWithProvider(t, fp)
+	m = openPickerKey(m)
+	if m.picker == nil {
+		t.Fatal("picker not open")
+	}
+	return m, fp
+}
+
+// key builders for the sessions-surface contextual keys.
+func renameKey(m model) model { return send(m, tea.KeyPressMsg{Code: 'r'}) }
+func deleteKey(m model) model { return send(m, tea.KeyPressMsg{Code: 'd'}) }
+func yesKey(m model) model    { return send(m, tea.KeyPressMsg{Code: 'y'}) }
+func noKey(m model) model     { return send(m, tea.KeyPressMsg{Code: 'n'}) }
+func filterKey(m model) model { return send(m, tea.KeyPressMsg{Code: '/'}) }
+func escKey(m model) model    { return send(m, tea.KeyPressMsg{Code: tea.KeyEscape}) }
+func enterKey(m model) model  { return send(m, tea.KeyPressMsg{Code: tea.KeyEnter}) }
+func downKey(m model) model   { return send(m, tea.KeyPressMsg{Code: tea.KeyDown}) }
+
+// TestPicker_PreviewLoadsOnOpenAndMove: the preview pane loads the highlighted run on open and
+// re-loads it as the cursor moves — a fast local query per selection.
+func TestPicker_PreviewLoadsOnOpenAndMove(t *testing.T) {
+	m, fp := twoConvoModel(t)
+
+	// On open, the newest (default-selected) row's preview is loaded.
+	if fp.previewedID != "run-1" {
+		t.Fatalf("preview loaded for %q on open, want run-1 (the highlighted row)", fp.previewedID)
+	}
+	if m.picker.previewID != "run-1" || len(m.picker.previewEntries) != 2 {
+		t.Fatalf("picker preview state = id %q, %d entries; want run-1 with 2 entries", m.picker.previewID, len(m.picker.previewEntries))
+	}
+
+	// Moving the cursor down re-loads the preview for the newly highlighted row.
+	m = downKey(m)
+	if m.picker.selectedRunID() != "run-2" {
+		t.Fatalf("cursor did not move to run-2 (selected %q)", m.picker.selectedRunID())
+	}
+	if fp.previewedID != "run-2" {
+		t.Fatalf("preview not reloaded on move; previewedID = %q, want run-2", fp.previewedID)
+	}
+}
+
+// TestPicker_ViewRendersSurface: with the overlay open, the composed View renders the sessions
+// list title, a row label, and the browse hint line — a smoke guard that the list + preview + hint
+// layout composes without panicking and that the surface is on screen.
+func TestPicker_ViewRendersSurface(t *testing.T) {
+	m, _ := twoConvoModel(t)
+	content := m.View().Content
+	for _, want := range []string{"sessions", "first chat", "enter resume"} {
+		if !strings.Contains(content, want) {
+			t.Errorf("picker View missing %q; got:\n%s", want, content)
+		}
+	}
+}
+
+// TestPicker_RenameCommits: r enters rename mode, enter commits the edited title via
+// provider.rename and reloads the list back to browse mode.
+func TestPicker_RenameCommits(t *testing.T) {
+	m, fp := twoConvoModel(t)
+
+	m = renameKey(m)
+	if m.picker.mode != pickerRename {
+		t.Fatalf("r did not enter rename mode (mode = %d)", m.picker.mode)
+	}
+	// The input seeds with the current title.
+	if got := m.picker.rename.Value(); got != "first chat" {
+		t.Fatalf("rename input seeded with %q, want the current title %q", got, "first chat")
+	}
+	m.picker.rename.SetValue("renamed chat")
+
+	listBefore := fp.listCalls
+	m = enterKey(m)
+
+	if fp.renamedID != "run-1" || fp.renamedTitle != "renamed chat" {
+		t.Fatalf("rename called with (%q, %q), want (run-1, renamed chat)", fp.renamedID, fp.renamedTitle)
+	}
+	if fp.listCalls != listBefore+1 {
+		t.Errorf("list not re-called after rename (calls %d -> %d)", listBefore, fp.listCalls)
+	}
+	if m.picker == nil || m.picker.mode != pickerBrowse {
+		t.Error("picker did not return to browse mode after a committed rename")
+	}
+}
+
+// TestPicker_RenameEmptyCancels: committing a blank/whitespace title does not call provider.rename
+// (an empty input_summary would hide the run) and returns to browse without touching the row.
+func TestPicker_RenameEmptyCancels(t *testing.T) {
+	m, fp := twoConvoModel(t)
+
+	m = renameKey(m)
+	m.picker.rename.SetValue("   ")
+	m = enterKey(m)
+
+	if fp.renamedID != "" {
+		t.Errorf("rename called with a blank title (id = %q); it must be rejected", fp.renamedID)
+	}
+	if m.picker == nil || m.picker.mode != pickerBrowse {
+		t.Error("picker did not return to browse mode after a blank-title rename")
+	}
+}
+
+// TestPicker_RenameEscCancels: esc abandons the rename without calling provider.rename.
+func TestPicker_RenameEscCancels(t *testing.T) {
+	m, fp := twoConvoModel(t)
+
+	m = renameKey(m)
+	m.picker.rename.SetValue("throwaway")
+	m = escKey(m)
+
+	if fp.renamedID != "" {
+		t.Errorf("esc during rename still committed (id = %q)", fp.renamedID)
+	}
+	if m.picker == nil {
+		t.Fatal("esc during rename closed the whole picker; it must only cancel the rename")
+	}
+	if m.picker.mode != pickerBrowse {
+		t.Errorf("esc did not return to browse mode (mode = %d)", m.picker.mode)
+	}
+}
+
+// TestPicker_DeleteConfirmDeletes: d opens the confirm gate, y hard-deletes via provider.delete and
+// reloads the list.
+func TestPicker_DeleteConfirmDeletes(t *testing.T) {
+	m, fp := twoConvoModel(t)
+
+	m = deleteKey(m)
+	if m.picker.mode != pickerConfirmDelete {
+		t.Fatalf("d did not open the delete-confirm gate (mode = %d)", m.picker.mode)
+	}
+	listBefore := fp.listCalls
+	m = yesKey(m)
+
+	if fp.deletedID != "run-1" {
+		t.Fatalf("delete called with %q, want run-1", fp.deletedID)
+	}
+	if fp.listCalls != listBefore+1 {
+		t.Errorf("list not re-called after delete (calls %d -> %d)", listBefore, fp.listCalls)
+	}
+	if m.picker == nil || m.picker.mode != pickerBrowse {
+		t.Error("picker did not return to browse mode after a confirmed delete")
+	}
+}
+
+// TestPicker_DeleteCancelWithN: n backs out of the confirm gate without deleting.
+func TestPicker_DeleteCancelWithN(t *testing.T) {
+	m, fp := twoConvoModel(t)
+
+	m = deleteKey(m)
+	m = noKey(m)
+
+	if fp.deletedID != "" {
+		t.Errorf("n still deleted (id = %q); the gate must require y", fp.deletedID)
+	}
+	if m.picker == nil || m.picker.mode != pickerBrowse {
+		t.Error("n did not return to browse mode without deleting")
+	}
+}
+
+// TestPicker_DeleteCancelWithEsc: esc backs out of the confirm gate without deleting AND without
+// closing the whole picker.
+func TestPicker_DeleteCancelWithEsc(t *testing.T) {
+	m, fp := twoConvoModel(t)
+
+	m = deleteKey(m)
+	m = escKey(m)
+
+	if fp.deletedID != "" {
+		t.Errorf("esc still deleted (id = %q)", fp.deletedID)
+	}
+	if m.picker == nil {
+		t.Fatal("esc during the delete gate closed the whole picker; it must only cancel the gate")
+	}
+	if m.picker.mode != pickerBrowse {
+		t.Errorf("esc did not return to browse mode (mode = %d)", m.picker.mode)
+	}
+}
+
+// TestPicker_FilterRoutesKeys: "/" starts the built-in fuzzy filter; while filtering, esc cancels
+// the FILTER (not the overlay) and outer lifecycle keys are inert (typed into the filter, not acted
+// on). This is the SetFilteringEnabled re-enablement the surface asked for.
+func TestPicker_FilterRoutesKeys(t *testing.T) {
+	m, fp := twoConvoModel(t)
+
+	m = filterKey(m)
+	if !m.picker.settingFilter() {
+		t.Fatal("\"/\" did not put the list into its filtering state")
+	}
+
+	// While filtering, a bare "d" is filter input, not a delete.
+	m = deleteKey(m)
+	if fp.deletedID != "" {
+		t.Errorf("a key while filtering triggered a delete (id = %q); it must route to the filter", fp.deletedID)
+	}
+	if m.picker == nil {
+		t.Fatal("the picker closed while filtering")
+	}
+
+	// esc while filtering cancels the FILTER, leaving the overlay open.
+	m = escKey(m)
+	if m.picker == nil {
+		t.Fatal("esc while filtering closed the overlay; it must only cancel the filter")
+	}
+	if m.picker.settingFilter() {
+		t.Error("esc did not cancel the filtering state")
 	}
 }

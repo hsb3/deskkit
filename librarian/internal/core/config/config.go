@@ -40,6 +40,7 @@ type Config struct {
 	LLMModel            string        // LLM_MODEL
 	LLMAPIKeyEnv        string        // secrets_ref.llm_api_key — NAME of the env var holding the LLM API key (profile indirection; empty falls back to the per-provider default var)
 	LLMMaxTokens        int           // LLM_MAX_TOKENS
+	LLMContextWindow    int           // LLM_CONTEXT_WINDOW / profile models.context_window — token budget for ctx% (0 = unset; the TUI's per-model table default applies)
 	AgentMaxStep        int           // AGENT_MAX_STEP
 	PMEnabled           bool          // PM_ENABLED / profile modules.pm.enabled (spec §2.9; default off)
 	PMClaimTTL          time.Duration // PM_CLAIM_TTL — pm claim horizon (spec §3.6; default 30m)
@@ -121,6 +122,16 @@ func Load() (*Config, error) {
 	c.PMAutonomousWrites = envBool("PM_AUTONOMOUS_WRITES", true)
 	c.PMStalledDays = envInt("PM_STALLED_DAYS", 14)
 	c.LLMMaxTokens = envInt("LLM_MAX_TOKENS", 4096)
+	// Context-window budget for the TUI's ctx% gauge: env LLM_CONTEXT_WINDOW > profile
+	// models.context_window > 0. 0 means "unset" — the TUI falls back to its per-model table
+	// default. envInt's default is sourced from the profile so the precedence stays env > profile.
+	profileCtxWindow := 0
+	if v := ps("models.context_window"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			profileCtxWindow = n
+		}
+	}
+	c.LLMContextWindow = envInt("LLM_CONTEXT_WINDOW", profileCtxWindow)
 	c.AgentMaxStep = envInt("AGENT_MAX_STEP", 12)
 	c.ClaimerPollInterval = envDuration("CLAIMER_POLL_INTERVAL", 5*time.Second)
 

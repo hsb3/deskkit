@@ -25,3 +25,13 @@ type turnDoneMsg struct{}
 type toastExpireMsg struct {
 	seq int
 }
+
+// editorFinishedMsg is delivered when the external editor spawned for the compose-in-$EDITOR hatch
+// exits (the callback of the tea.ExecProcess that ran it). path is the temp file the draft was
+// written to; err carries any failure spawning or running the editor. Update reads the composed
+// text back into the textarea on success, reports a toast on failure, and ALWAYS removes the temp
+// file — so the msg is the single place the round-trip is finalized on Bubble Tea's goroutine.
+type editorFinishedMsg struct {
+	path string
+	err  error
+}

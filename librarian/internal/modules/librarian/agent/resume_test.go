@@ -80,9 +80,9 @@ func TestResume_RehydrationFiltering(t *testing.T) {
 	}
 	seedMessage(t, app, run.Id, 1, "system", "you are the librarian", nil, "")
 	seedMessage(t, app, run.Id, 2, "user", "u1", nil, "")
-	seedMessage(t, app, run.Id, 3, "assistant", "a1", nil, "")                       // final answer
-	seedMessage(t, app, run.Id, 4, "assistant", "", oneToolCall("query"), "")        // tool-calling
-	seedMessage(t, app, run.Id, 5, "tool", "tool result", nil, "query")              // tool row
+	seedMessage(t, app, run.Id, 3, "assistant", "a1", nil, "")                // final answer
+	seedMessage(t, app, run.Id, 4, "assistant", "", oneToolCall("query"), "") // tool-calling
+	seedMessage(t, app, run.Id, 5, "tool", "tool result", nil, "query")       // tool row
 	seedMessage(t, app, run.Id, 6, "user", "u2", nil, "")
 	seedMessage(t, app, run.Id, 7, "assistant", "a2", nil, "")
 
@@ -160,9 +160,9 @@ func TestResume_OrphanCollapse(t *testing.T) {
 		role, content string
 	}
 	cases := []struct {
-		name  string
-		rows  []seed
-		want  []string // expected history contents
+		name string
+		rows []seed
+		want []string // expected history contents
 	}{
 		{
 			name: "interior",
