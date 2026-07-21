@@ -132,6 +132,25 @@ func postJSON(t *testing.T, url, body string) *http.Response {
 	return resp
 }
 
+// postWithOrigin POSTs with an explicit Origin header; an empty origin omits the header entirely
+// (modeling a non-browser client like curl).
+func postWithOrigin(t *testing.T, url, body, origin string) *http.Response {
+	t.Helper()
+	req, err := http.NewRequest(http.MethodPost, url, strings.NewReader(body))
+	if err != nil {
+		t.Fatalf("new request %s: %v", url, err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	if origin != "" {
+		req.Header.Set("Origin", origin)
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("POST %s (origin %q): %v", url, origin, err)
+	}
+	return resp
+}
+
 // TestPageRoute_ServesHTML: DoD 1 — a running server serves the session page at the documented
 // URL with 200 + text/html, via the custom Go route registered by web.Register.
 func TestPageRoute_ServesHTML(t *testing.T) {
@@ -314,6 +333,63 @@ func TestResetRoute_ClosesAndRebuilds(t *testing.T) {
 	if fakes[1].isClosed() {
 		t.Fatalf("the second session must still be live")
 	}
+}
+
+// TestOriginGuard: the state-changing routes (POST stream + reset) accept a request with NO Origin
+// (non-browser tools) and one whose Origin is any loopback form (127.0.0.1 OR localhost, distinct
+// origins), but reject a cross-origin browser request with 403 — and for the SSE route the
+// rejection arrives as a JSON error status BEFORE any text/event-stream header, never a broken
+// stream. This closes the browser cross-site vector without adding auth (the posture stays
+// unauthenticated + loopback-bound). The GET page is a navigation and is intentionally unguarded.
+func TestOriginGuard(t *testing.T) {
+	srv, _ := newTestServer(t, func(context.Context) (Streamer, error) {
+		return &fakeStreamer{events: scriptedTurn()}, nil
+	})
+	// srv.URL is http://127.0.0.1:<port>; the localhost form is a DISTINCT origin that must also pass.
+	origin127 := srv.URL
+	originLocalhost := strings.Replace(srv.URL, "127.0.0.1", "localhost", 1)
+
+	for _, origin := range []string{"" /* absent */, origin127, originLocalhost} {
+		resp := postWithOrigin(t, srv.URL+PathStream, `{"message":"hi"}`, origin)
+		if resp.StatusCode != http.StatusOK {
+			t.Fatalf("stream with allowed origin %q: status = %d, want 200", origin, resp.StatusCode)
+		}
+		if ct := resp.Header.Get("Content-Type"); !strings.HasPrefix(ct, "text/event-stream") {
+			t.Fatalf("stream with allowed origin %q: Content-Type = %q, want text/event-stream", origin, ct)
+		}
+		io.Copy(io.Discard, resp.Body)
+		resp.Body.Close()
+	}
+
+	// A cross-origin browser request is rejected 403 — as JSON, BEFORE any SSE header.
+	resp := postWithOrigin(t, srv.URL+PathStream, `{"message":"hi"}`, "https://evil.example")
+	if resp.StatusCode != http.StatusForbidden {
+		t.Fatalf("stream cross-origin: status = %d, want 403", resp.StatusCode)
+	}
+	if ct := resp.Header.Get("Content-Type"); strings.HasPrefix(ct, "text/event-stream") {
+		t.Fatalf("cross-origin rejection must NOT open an SSE stream; Content-Type = %q", ct)
+	}
+	if ct := resp.Header.Get("Content-Type"); !strings.HasPrefix(ct, "application/json") {
+		t.Fatalf("cross-origin rejection Content-Type = %q, want application/json", ct)
+	}
+	resp.Body.Close()
+
+	// The reset route is guarded the same way.
+	rr := postWithOrigin(t, srv.URL+PathReset, ``, "https://evil.example")
+	if rr.StatusCode != http.StatusForbidden {
+		t.Fatalf("reset cross-origin: status = %d, want 403", rr.StatusCode)
+	}
+	rr.Body.Close()
+
+	// The GET page is a navigation and is NOT origin-guarded (loads regardless).
+	pr, err := http.Get(srv.URL + PathChat)
+	if err != nil {
+		t.Fatalf("GET page: %v", err)
+	}
+	if pr.StatusCode != http.StatusOK {
+		t.Fatalf("page route status = %d, want 200 (page must not be origin-guarded)", pr.StatusCode)
+	}
+	pr.Body.Close()
 }
 
 // TestSessionHolder_ResetWaitsForInFlightTurn: reset (and shutdown close) must never Close the

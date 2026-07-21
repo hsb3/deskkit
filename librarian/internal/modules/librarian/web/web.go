@@ -24,6 +24,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"sync"
 
 	_ "embed"
@@ -165,6 +166,9 @@ type streamRequest struct {
 // an agent.Event{Kind: error} frame — matching the streaming contract (exactly one terminal
 // event per turn).
 func (h *handler) stream(e *core.RequestEvent) error {
+	if !originAllowed(e.Request) {
+		return e.JSON(http.StatusForbidden, crossOriginRejected)
+	}
 	e.Request.Body = http.MaxBytesReader(e.Response, e.Request.Body, maxRequestBody)
 	var req streamRequest
 	if err := json.NewDecoder(e.Request.Body).Decode(&req); err != nil {
@@ -214,8 +218,47 @@ func (h *handler) stream(e *core.RequestEvent) error {
 
 // reset ends the current conversation. The next stream builds a fresh session.
 func (h *handler) reset(e *core.RequestEvent) error {
+	if !originAllowed(e.Request) {
+		return e.JSON(http.StatusForbidden, crossOriginRejected)
+	}
 	h.holder.reset(e.Request.Context())
 	return e.NoContent(http.StatusNoContent)
+}
+
+// crossOriginRejected is the 403 body for a request whose Origin is not a loopback origin.
+var crossOriginRejected = map[string]string{
+	"error": "cross-origin request rejected: this local surface accepts only same-machine (loopback) browser origins",
+}
+
+// originAllowed is the cross-origin guard for the state-changing routes (POST stream + reset; the
+// GET page is a navigation and is not guarded). It does NOT add authentication — the posture stays
+// unauthenticated and loopback-bound; it closes only the browser cross-site vector (a page on
+// another origin silently POSTing to this local surface).
+//
+// Rule: a request WITH an Origin header must name a loopback origin — an http/https scheme and a
+// host of 127.0.0.1, localhost, or ::1 (any port). Both the 127.0.0.1 and the localhost forms pass
+// regardless of which the operator browsed to (they are distinct origins). A request with NO Origin
+// header — curl and other non-browser tools, or a same-origin navigation — is allowed: absence
+// means it is not a browser cross-site request. Chosen over matching the request's own Host because
+// the loopback allowlist is simpler and inherently accepts both loopback host spellings.
+func originAllowed(r *http.Request) bool {
+	origin := r.Header.Get("Origin")
+	if origin == "" {
+		return true // not a browser cross-site request
+	}
+	u, err := url.Parse(origin)
+	if err != nil {
+		return false
+	}
+	if u.Scheme != "http" && u.Scheme != "https" {
+		return false
+	}
+	switch u.Hostname() {
+	case "127.0.0.1", "localhost", "::1":
+		return true
+	default:
+		return false
+	}
 }
 
 // writeSSE marshals one event and writes it as a single SSE `data:` frame. The event carries its

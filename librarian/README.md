@@ -216,6 +216,13 @@ surface, not a hosted service, and it deliberately sits outside the PocketBase s
 admin login below (that gating would disqualify it as a general session surface). Don't
 put `serve` on a public interface.
 
+As a second layer (defense against a page on another site quietly driving your local
+session from your browser), the state-changing endpoints — the turn/stream and the reset —
+reject any request whose browser `Origin` is not a loopback origin (`127.0.0.1`,
+`localhost`, or `[::1]`, any port) with a `403`. Requests with no `Origin` header (curl and
+other non-browser tools) are unaffected. This is not authentication — it only closes the
+cross-origin browser vector.
+
 ## The admin console
 
 The embedded PocketBase serves its full React admin console — browse the `files` index,
