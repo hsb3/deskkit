@@ -1,7 +1,7 @@
 # Chat-TUI UX survey — conventions → gap list → recommendations
 
 _Findings note for the chat-TUI UX pass (#45): what modern AI chat TUIs converge on,
-where `pocket-librarian chat` falls short, and what we adopt vs. defer._
+where `deskkit chat` falls short, and what we adopt vs. defer._
 Status: active (2026-07-18)
 
 ## Method
@@ -31,7 +31,7 @@ official docs and (for the Charm wave) the actual repo sources at HEAD:
 | Scroll-anchored streaming | Mods/bubbles viewport: auto-follow only if `ScrollPercent()==1`; Claude Code "Jump to bottom (N new)" | Never yank the reader down mid-scrollback |
 | External `$EDITOR` escape hatch | All of Claude Code, aider, gptme, Crush, Mods | The single most universal input affordance |
 
-## Gap list for `pocket-librarian chat` (pre-pass state)
+## Gap list for `deskkit chat` (pre-pass state)
 
 1. **Readability on light terminals** — fixed dark palette (`Color("15")` body, glamour
    DarkStyle). Tracked as the blocking bug; fixed first in this pass.

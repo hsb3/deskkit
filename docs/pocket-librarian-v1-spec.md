@@ -1,8 +1,8 @@
-# pocket-librarian — Product & Technical Specification
+# deskkit — Product & Technical Specification
 
 _The build spec for the single-binary Go agent that lives on the desk's PocketBase database, indexes and repairs desk files under a binding safety boundary, and is architected to grow into a broader desk agent._
 
-Status: draft
+Status: active
 Date: 2026-07-15
 
 ## Table of contents
@@ -23,9 +23,9 @@ Date: 2026-07-15
 
 ## 1. Overview, goals, non-goals, and migration from the Python PoC
 
-### 1.1 What pocket-librarian is
+### 1.1 What deskkit is
 
-pocket-librarian is a single Go binary that is simultaneously a PocketBase database server and an
+deskkit (named `pocket-librarian` through v0.6.0) is a single Go binary that is simultaneously a PocketBase database server and an
 LLM-driven agent. The database is the agent's whole world: it is both the **state backend**
 (conversation history, run logs, a task queue) and the **work surface** (an index of desk files,
 patrol findings, and a record-original-first revision ledger the agent reads and edits through
@@ -98,7 +98,7 @@ verified reproducible against the real desk before the Python scripts are retire
 
 ### 2.1 Runtime model (settled — build on this)
 
-pocket-librarian imports PocketBase as a Go **library** (`pocketbase.New()`), registers its
+deskkit imports PocketBase as a Go **library** (`pocketbase.New()`), registers its
 collections, hooks, routes, and CLI commands, and runs the agent loop in-process. Tools are direct
 DAO calls inside real transactions — there is no network hop between the agent and its data. The
 prebuilt-binary + JS-hooks model (today's PoC) and a TypeScript sidecar were both evaluated and
@@ -111,7 +111,7 @@ design.
 
 ```mermaid
 graph TD
-    subgraph Binary [pocket-librarian single binary]
+    subgraph Binary [deskkit single binary]
         PB[PocketBase core: SQLite, auth, API rules, admin GUI, realtime]
         Hooks[Event hooks and cron scheduler]
         Route[Custom route GET api desk summary]
@@ -236,20 +236,20 @@ names a concrete provider. Full interface and wiring in §6.
 Each tool is an eino `tool.InvokableTool`. Tools are built once at startup (they close over the
 `core.App`) and registered in `react.AgentConfig.ToolsConfig.Tools`. The same tool functions back
 the Cobra CLI subcommands, so `sweep` behaves identically whether the agent calls it or an
-operator runs `pocket-librarian sweep`. Registration detail in §5 and §7.
+operator runs `deskkit sweep`. Registration detail in §5 and §7.
 
 ### 2.7 Deployment / run model
 
-- **`pocket-librarian serve`** — starts the DB server, admin GUI, realtime, custom route, cron,
+- **`deskkit serve`** — starts the DB server, admin GUI, realtime, custom route, cron,
   event hooks, and the task-claimer goroutine that hosts the agent loop. This is the long-running
   process.
-- **`pocket-librarian <tool>`** — one-shot CLI subcommands (`sweep`, `patrol`, `apply-fix`,
+- **`deskkit <tool>`** — one-shot CLI subcommands (`sweep`, `patrol`, `apply-fix`,
   `restore`, `query …`) that run the tool directly and exit. These run in a **separate process**
   from `serve`; PocketBase console commands do not share the serve process's hooks/realtime, so a
   CLI `sweep` will not itself fire the file-created hook chain. The agent loop only lives under
   `serve`.
 - **Migrations** run automatically on startup (`Automigrate: true`) and can be invoked explicitly
-  via `pocket-librarian migrate up`.
+  via `deskkit migrate up`.
 
 Single deployment artifact: the binary plus its SQLite store directory. The store is **not**
 a cwd-relative `pb_data/` by default — it resolves to the canonical, per-desk location
@@ -270,8 +270,8 @@ six tool implementations, the provider adapter, the migrations, `main`, and conf
 home. `internal/` keeps them un-importable from outside the module.
 
 ```text
-pocket-librarian/
-├── cmd/pocket-librarian/
+librarian/
+├── cmd/deskkit/
 │   └── main.go              # entry: pocketbase.New(), migratecmd, hooks, route, cron,
 │                            #   CLI (cobra) wiring, agent registration (§2.4, §4.11, §6)
 ├── migrations/              # Go up/down migrations, blank-imported by main (§4.11)
@@ -366,23 +366,23 @@ wait out the window rather than disabling protection.
 
 ```bash
 # Build the single binary.
-go build -o pocket-librarian ./cmd/pocket-librarian
+go build -o deskkit ./cmd/deskkit
 
 # Run the server (DB + admin GUI + agent loop + cron + hooks).
-./pocket-librarian serve --http=127.0.0.1:8090
+./deskkit serve --http=127.0.0.1:8090
 
 # One-shot tools (separate process, no agent loop).
-./pocket-librarian sweep
-./pocket-librarian patrol                        # dry-run: files findings, NO fs writes
-./pocket-librarian propose-fix --run <run_id>    # plan + record originals; NO fs writes
-./pocket-librarian apply-fix --run <run_id>      # supervised commit; never a Makefile default target
-./pocket-librarian restore --revision <id>
-./pocket-librarian restore --by-path <path>      # latest applied, unrestored revision for <path>; falls back to an FS-confirmed half-applied move (§5.4)
-./pocket-librarian query recent --days 7
+./deskkit sweep
+./deskkit patrol                        # dry-run: files findings, NO fs writes
+./deskkit propose-fix --run <run_id>    # plan + record originals; NO fs writes
+./deskkit apply-fix --run <run_id>      # supervised commit; never a Makefile default target
+./deskkit restore --revision <id>
+./deskkit restore --by-path <path>      # latest applied, unrestored revision for <path>; falls back to an FS-confirmed half-applied move (§5.4)
+./deskkit query recent --days 7
 
 # Admin GUI + migrations.
-./pocket-librarian gui                           # convenience: serve, open the admin GUI
-./pocket-librarian migrate up                    # explicit; also runs automatically on serve
+./deskkit gui                           # convenience: serve, open the admin GUI
+./deskkit migrate up                    # explicit; also runs automatically on serve
 ```
 
 **Full subcommand surface.** There is **no `patrol --fix`** — the monolithic fix path is split
@@ -931,7 +931,7 @@ non-empty line to be `---`; parse `key: value` lines until the closing `---`; su
 inline arrays and empty-value-opens-a-block-array (`- item` lines); strip surrounding quotes from
 values. The parser **splits each line on the first colon only**, so an unquoted
 `synopsis: text: more` is tolerated (the desk's YAML-colon gotcha) where a strict YAML parser
-would fail — pocket-librarian deliberately uses this tolerant parse. An UNTERMINATED or malformed
+would fail — deskkit deliberately uses this tolerant parse. An UNTERMINATED or malformed
 fence returns an **empty map**, treated as no frontmatter (→ `doctype = ""`); the parser never
 crashes the sweep.
 
@@ -984,7 +984,7 @@ sweep); a DAO/transaction failure aborts and rolls back.
 Reference DAO lookup:
 
 ```go
-rel := "docs/pocket-librarian-spec.md"
+rel := "docs/deskkit-spec.md"
 existing, err := app.FindFirstRecordByFilter("files", "path = {:p}", dbx.Params{"p": rel})
 // existing == nil (and err is sql.ErrNoRows-wrapped) => create; else compare + maybe patch
 ```
@@ -1406,7 +1406,7 @@ a `count`, plus a kind-specific body. Examples:
 ```jsonc
 // live_files → array of file rows (trimmed to useful fields)
 {"kind":"live_files","count":79,"files":[
-  {"path":"docs/pocket-librarian-spec.md","dir_kind":"root","doctype":"","status":"",
+  {"path":"docs/deskkit-spec.md","dir_kind":"root","doctype":"","status":"",
    "graduated_to":"","git_last_commit":"b94499b|2026-07-15"}]}
 
 // recent → same file shape, filtered to the window
@@ -1414,7 +1414,7 @@ a `count`, plus a kind-specific body. Examples:
   {"path":"_structure/decisions/0014-librarian-enforcement-boundary.md","git_last_commit":"b94499b|2026-07-15"}]}
 
 // orphans → .md files with empty doctype not under _meta/
-{"kind":"orphans","count":3,"files":[{"path":"docs/pocket-librarian-spec.md","dir_kind":"root"}]}
+{"kind":"orphans","count":3,"files":[{"path":"docs/deskkit-spec.md","dir_kind":"root"}]}
 
 // uncollapsed → open R5 findings (path + detail)
 {"kind":"uncollapsed","count":1,"findings":[
@@ -1866,7 +1866,7 @@ as deferred/out-of-scope in §7.4 and §11.1.
 **Outbound MCP server — the librarian's "hands" (Added 2026-07-16 per the outbound-MCP ruling,
 build-brief §5, punch-list 4).** The paragraph above is the *inbound* vector (eino consuming an
 external MCP server's tools). The librarian ALSO exposes its own tool core *outbound* as an MCP
-**stdio server** (`pocket-librarian mcp-serve`, §3.3), so a Claude Code or OpenCode session can
+**stdio server** (`deskkit mcp-serve`, §3.3), so a Claude Code or OpenCode session can
 call the librarian's tools directly by mounting it. *(Correction 2026-07-20, ADR 0016: the
 dual-format plugin's `plugin/mcp` boundary does NOT carry librarian tools today — it ships
 exactly the four profile/template/knowledge tools, per `docs/tool-surface.md`; a designed proxy
@@ -2130,10 +2130,10 @@ is deliberately supervised-only and is not a default Makefile/CI target.
 
 Mirror the PoC targets against the binary: `gui`, `serve`, `stop`, `sweep`, `patrol`,
 `propose-fix`, `findings`, `summary`, `adoption`, `orphans`, `uncollapsed`, `verify`, `clean`.
-`stop` is a Makefile-only helper (not a `pocket-librarian` subcommand) that stops the running
+`stop` is a Makefile-only helper (not a `deskkit` subcommand) that stops the running
 `serve` process (e.g. via its pid file) — the single-writer rule (§2.7) requires `serve` stopped
 before a one-shot write command runs. `findings`/`summary`/`adoption`/`orphans`/`uncollapsed` each
-map to `pocket-librarian query <kind>` (§3.3, §5.6). In the split model there is **no `patrol
+map to `deskkit query <kind>` (§3.3, §5.6). In the split model there is **no `patrol
 --fix` target and no `patrol --fix` command** — `patrol` is dry-run only; `propose-fix` records
 originals; `apply-fix` commits. `apply-fix` against the **real** desk is intentionally NOT a
 Makefile target (supervised CLI only); the throwaway-copy write path (`propose-fix` then
@@ -2241,7 +2241,7 @@ binary's own directory — and outbound network **only** to the configured LLM p
 everything else is denied. The provider host is **derived from the provider base URL** in config: `api.anthropic.com`
 for the Anthropic default, and it substitutes when the provider swaps (`api.openai.com` for OpenAI,
 `generativelanguage.googleapis.com` for Gemini) — the profile's network allowance is generated from
-the resolved base URL, not hardcoded. Profile shape (`pocket-librarian.sb`, parameterized so paths
+the resolved base URL, not hardcoded. Profile shape (`deskkit.sb`, parameterized so paths
 stay identity-neutral):
 
 ```scheme
@@ -2256,7 +2256,7 @@ stay identity-neutral):
 (allow file-read* file-write*
     (subpath (param "DESK_ROOT"))                ; the desk the librarian stewards
     (subpath (param "PB_DATA"))                  ; the store dir (canonical location, §10.6 — not under DESK_ROOT)
-    (subpath (param "BIN_DIR")))                 ; the pocket-librarian binary's own dir
+    (subpath (param "BIN_DIR")))                 ; the deskkit binary's own dir
 
 ;; network: outbound ONLY to the configured provider host (derived from the base URL) + DNS
 (allow network-outbound
@@ -2271,11 +2271,11 @@ provider base URL, `PB_DATA` from the same store-resolution logic the binary its
 ```bash
 sandbox-exec \
   -D DESK_ROOT="$DESK_ROOT" \
-  -D PB_DATA="${XDG_DATA_HOME:-$HOME/.local/share}/pocket-librarian/$DESK_NAME" \
-  -D BIN_DIR="$(dirname "$(command -v ./pocket-librarian)")" \
+  -D PB_DATA="${XDG_DATA_HOME:-$HOME/.local/share}/deskkit/$DESK_NAME" \
+  -D BIN_DIR="$(dirname "$(command -v ./deskkit)")" \
   -D PROVIDER_HOSTPORT="api.anthropic.com:443" \
-  -f pocket-librarian.sb \
-  ./pocket-librarian apply-fix --run <run_id>   # or: serve --http=127.0.0.1:8090
+  -f deskkit.sb \
+  ./deskkit apply-fix --run <run_id>   # or: serve --http=127.0.0.1:8090
 ```
 
 **Portable / CI alternative — Docker container.** `DESK_ROOT` is bind-mounted read-write, the
@@ -2288,9 +2288,9 @@ the provider host:
 docker run --rm \
   -v "$DESK_ROOT":"$DESK_ROOT":rw \              # bind-mount the desk rw at the same path
   -e ANTHROPIC_API_KEY -e DESK_ROOT -e DESK_NAME \
-  --network pocket-librarian-egress \            # user-defined net; egress policy allows ONLY the provider host
+  --network deskkit-egress \            # user-defined net; egress policy allows ONLY the provider host
   # (alternative: -e HTTPS_PROXY=http://allowlist-proxy:3128 with only the provider host allow-listed)
-  pocket-librarian:latest \
+  deskkit:latest \
   apply-fix --run <run_id>
 ```
 
@@ -2305,8 +2305,8 @@ This subsection documents where that store lives on disk and the guard that keep
 from colliding on one.
 
 **Canonical store home.** When `--dir` is absent, the store resolves to
-**`$XDG_DATA_HOME/pocket-librarian/<DESK_NAME>/`**, falling back to
-**`~/.local/share/pocket-librarian/<DESK_NAME>/`** when `XDG_DATA_HOME` is unset or empty
+**`$XDG_DATA_HOME/deskkit/<DESK_NAME>/`**, falling back to
+**`~/.local/share/deskkit/<DESK_NAME>/`** when `XDG_DATA_HOME` is unset or empty
 (the XDG spec treats an empty value as unset). `--dir`
 remains the explicit override and always wins. There is **no silent fallback to a cwd-relative
 `pb_data/`**: a command that needs to resolve a store location and has neither `--dir` nor a
