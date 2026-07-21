@@ -350,6 +350,9 @@ func snippet(content, term string, window int) string {
 	if term != "" {
 		if i := strings.Index(strings.ToLower(content), strings.ToLower(term)); i >= 0 {
 			start = i
+			// Byte length, deliberately: for a multi-byte term this overshoots the rune count,
+			// biasing the window a little right of the match end. Harmless — the boundaries are
+			// rune-snapped below — and cheaper than a rune count per snippet.
 			matchLen = len(term)
 		}
 	}
@@ -580,6 +583,10 @@ func querySearch(app core.App, term string, limit int) (json.RawMessage, error) 
 	if limit > 200 {
 		limit = 200
 	}
+	// The `~` operator compiles to SQLite LIKE, whose `%`/`_` metacharacters are NOT escaped by
+	// the param binding — a term containing them widens the match (`_` = any one char). Desk
+	// prose rarely searches on bare `%`/`_`, so this is accepted v1 behavior, stated here so a
+	// surprised future caller finds the explanation at the query site.
 	recs, err := app.FindRecordsByFilter(
 		"files",
 		"deleted = false && content ~ {:term}",
@@ -604,6 +611,11 @@ func querySearch(app core.App, term string, limit int) (json.RawMessage, error) 
 // desk-relative path (the retrieval companion to search). found=false when no live row exists at
 // that path. The lookup error routes through translateUninitializedStoreError like every other kind.
 func queryContent(app core.App, p string) (json.RawMessage, error) {
+	if p == "" {
+		// Mirror the search kind's empty-term error: a missing --path/path is a usage error, not
+		// a "file not found" — a silent found=false here would mask the caller's mistake.
+		return nil, errors.New("query content: path is required")
+	}
 	recs, err := app.FindRecordsByFilter(
 		"files",
 		"path = {:path} && deleted = false",

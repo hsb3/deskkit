@@ -18,6 +18,10 @@ type SweepResult struct {
 	Updated     int `json:"updated"`
 	Unchanged   int `json:"unchanged"`
 	SoftDeleted int `json:"soft_deleted"`
+	// Truncated counts files whose indexed content was clipped at the per-file cap this sweep —
+	// surfaced so an over-cap body is never a silent truncation (query content returns the
+	// clipped body; this counter is how an operator learns why).
+	Truncated int `json:"truncated"`
 }
 
 // --- §5.2 patrol ---

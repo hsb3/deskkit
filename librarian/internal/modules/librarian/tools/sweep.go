@@ -76,6 +76,9 @@ func Sweep(ctx context.Context, app core.App, cfg *config.Config, in *SweepInput
 				continue
 			}
 			seen[rel] = true
+			if row.Truncated {
+				result.Truncated++
+			}
 
 			// Identity match: doc_id first (rename survival), path fallback. A frontmatter id
 			// already claimed by an earlier doc THIS sweep is a duplicate — never merge two files
@@ -212,6 +215,7 @@ type fileRow struct {
 	FMUpdated     string
 	Deleted       bool
 	Content       string // swept file body, indexed for retrieval/search (§5.6 content/search kinds)
+	Truncated     bool   // transient scan flag: Content was clipped at maxContentRunes (never persisted)
 }
 
 // fileRowFromRecord reads a `files` collection *core.Record into the plain fileRow shape.
@@ -377,7 +381,9 @@ func scanFile(root, rel string, dirMap map[string]string, secretsDir, deskName s
 	case secretsDir != "" && pathOrSubtree(rel, secretsDir):
 		row.Content = ""
 	case utf8.Valid(raw):
-		row.Content = truncateRunes(string(raw), maxContentRunes)
+		body := string(raw)
+		row.Content = truncateRunes(body, maxContentRunes)
+		row.Truncated = len(row.Content) < len(body)
 	default:
 		row.Content = ""
 	}
@@ -389,11 +395,9 @@ func scanFile(root, rel string, dirMap map[string]string, secretsDir, deskName s
 const maxContentRunes = 1000000
 
 // truncateRunes returns s unchanged when it holds at most max runes, else the first max runes of s
-// (never splitting a multi-byte rune). A pure helper: no allocation on the common (short) path.
+// (never splitting a multi-byte rune). Single pass: the range loop yields rune-start byte offsets,
+// so the cutoff is found without a separate RuneCountInString traversal.
 func truncateRunes(s string, max int) string {
-	if utf8.RuneCountInString(s) <= max {
-		return s
-	}
 	n := 0
 	for i := range s {
 		if n == max {
