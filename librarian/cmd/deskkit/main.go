@@ -3,7 +3,8 @@
 // spine wires: pocketbase.New(), migratecmd (automigrate), the blank-imported migrations,
 // first-run seeding (ignore boundary + system prompt) on serve, and the Cobra subcommands
 // routed through the tools seam. Core + module wiring (spec §2.7): main builds the enabled
-// module set (librarian, always on; pm, disabled by default) via module.Register, which
+// module set (librarian, always on; pm, ON by default — ADR 0008 amendment; opt out with
+// PM_ENABLED=false / profile modules.pm.enabled: false) via module.Register, which
 // merges each module's tools into the shared toolcore registry before any surface builds.
 package main
 

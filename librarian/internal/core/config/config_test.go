@@ -138,8 +138,10 @@ func chdir(t *testing.T, dir string) func() {
 	return func() { _ = os.Chdir(prev) }
 }
 
-// TestLoadPMGate covers the D3 additions: PM_ENABLED env > profile modules.pm.enabled > off
-// (spec §2.9), and PM_CLAIM_TTL (spec §3.6, default 30m).
+// TestLoadPMGate covers the PM feature gate layering: PM_ENABLED env > profile
+// modules.pm.enabled > default ON (spec §2.9; owner-ruled 2026-07-21, ADR 0008 amendment —
+// PM ships default-on for 1.0), and PM_CLAIM_TTL (spec §3.6, default 30m). Both override
+// legs must still cleanly disable the module.
 func TestLoadPMGate(t *testing.T) {
 	dir := t.TempDir()
 	restore := chdir(t, dir)
@@ -147,26 +149,52 @@ func TestLoadPMGate(t *testing.T) {
 	t.Setenv("DESK_ROOT", dir)
 	t.Setenv("DESK_NAME", "example-desk")
 
-	// Default: off, 30m.
+	// Default (no env, no profile key): ON. Claim TTL 30m.
 	os.Unsetenv("PM_ENABLED")
 	os.Unsetenv("PM_CLAIM_TTL")
 	cfg, err := Load()
 	if err != nil {
 		t.Fatal(err)
 	}
-	if cfg.PMEnabled {
-		t.Error("PMEnabled must default off")
+	if !cfg.PMEnabled {
+		t.Error("PMEnabled must default ON (1.0 flip; ADR 0008 amendment)")
 	}
 	if cfg.PMClaimTTL != 30*time.Minute {
 		t.Errorf("PMClaimTTL default = %v, want 30m", cfg.PMClaimTTL)
 	}
 
-	// Profile turns it on when env is unset.
+	// Env PM_ENABLED=false disables the module even with no profile — the ON default must
+	// stay overridable from the env leg alone.
+	t.Setenv("PM_ENABLED", "false")
+	cfg, err = Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.PMEnabled {
+		t.Error("PM_ENABLED=false must disable pm despite the ON default")
+	}
+	os.Unsetenv("PM_ENABLED")
+
+	// Profile modules.pm.enabled: false disables it when env is unset — an explicit profile
+	// opt-out still beats the ON default (three-state profile leg).
 	if err := os.MkdirAll(filepath.Join(dir, "_knowledge"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	profile := "desk:\n  name: example-desk\nmodules:\n  pm:\n    enabled: true\n"
-	if err := os.WriteFile(filepath.Join(dir, "_knowledge", "profile.yaml"), []byte(profile), 0o644); err != nil {
+	profileOff := "desk:\n  name: example-desk\nmodules:\n  pm:\n    enabled: false\n"
+	if err := os.WriteFile(filepath.Join(dir, "_knowledge", "profile.yaml"), []byte(profileOff), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err = Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.PMEnabled {
+		t.Error("profile modules.pm.enabled: false must disable pm (three-state override of the ON default)")
+	}
+
+	// Profile modules.pm.enabled: true keeps it on when env is unset.
+	profileOn := "desk:\n  name: example-desk\nmodules:\n  pm:\n    enabled: true\n"
+	if err := os.WriteFile(filepath.Join(dir, "_knowledge", "profile.yaml"), []byte(profileOn), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	cfg, err = Load()
@@ -177,7 +205,7 @@ func TestLoadPMGate(t *testing.T) {
 		t.Error("profile modules.pm.enabled: true must enable pm")
 	}
 
-	// Env wins over the profile.
+	// Env wins over the profile: PM_ENABLED=false beats the profile's true.
 	t.Setenv("PM_ENABLED", "false")
 	cfg, err = Load()
 	if err != nil {

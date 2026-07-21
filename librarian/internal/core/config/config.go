@@ -42,7 +42,7 @@ type Config struct {
 	LLMMaxTokens        int           // LLM_MAX_TOKENS
 	LLMContextWindow    int           // LLM_CONTEXT_WINDOW / profile models.context_window — token budget for ctx% (0 = unset; the TUI's per-model table default applies)
 	AgentMaxStep        int           // AGENT_MAX_STEP
-	PMEnabled           bool          // PM_ENABLED / profile modules.pm.enabled (spec §2.9; default off)
+	PMEnabled           bool          // PM_ENABLED / profile modules.pm.enabled (spec §2.9; default ON since 1.0 — ADR 0008 amendment 2026-07-21)
 	PMClaimTTL          time.Duration // PM_CLAIM_TTL — pm claim horizon (spec §3.6; default 30m)
 	PMAutonomousWrites  bool          // PM_AUTONOMOUS_WRITES (spec §5.1/§13 item 9; default ON — the document gate is the real safety)
 	PMStalledDays       int           // PM_STALLED_DAYS — get_context stalled threshold (spec §5.2; default 14)
@@ -111,10 +111,18 @@ func Load() (*Config, error) {
 		LLMAPIKeyEnv: pick("LLM_API_KEY_ENV", ps("secrets_ref.llm_api_key"), ""),
 	}
 	c.AutonomousWrites = envBool("LIBRARIAN_AUTONOMOUS_WRITES", false)
-	// PM feature gate (spec §2.9): env PM_ENABLED > profile modules.pm.enabled > default off.
-	// envBool keeps the env var's exact prior semantics (ParseBool, invalid falls through);
-	// profileScalar renders a YAML bool as "true"/"false", supplying the fallback default.
-	c.PMEnabled = envBool("PM_ENABLED", ps("modules.pm.enabled") == "true")
+	// PM feature gate (spec §2.9): env PM_ENABLED > profile modules.pm.enabled > default ON
+	// (owner-ruled 2026-07-21, ADR 0008 amendment: PM ships default-on for 1.0). The profile
+	// leg is THREE-STATE so it can still override the ON default: an explicit
+	// modules.pm.enabled renders "true"/"false" via profileScalar and decides; ABSENT (empty)
+	// falls through to the ON default. envBool keeps PM_ENABLED's exact prior semantics
+	// (ParseBool; unset or invalid falls through to that profile-or-default leg), so
+	// PM_ENABLED=false and modules.pm.enabled: false both still cleanly disable the module.
+	pmDefault := true
+	if v := ps("modules.pm.enabled"); v != "" {
+		pmDefault = v == "true"
+	}
+	c.PMEnabled = envBool("PM_ENABLED", pmDefault)
 	c.PMClaimTTL = envDuration("PM_CLAIM_TTL", 30*time.Minute)
 	// PM surface write gate (spec §5.1, §13 item 9): DEFAULT ON — PM tools write only the
 	// store (never desk files), and the real safety is transition_item's document gates; a

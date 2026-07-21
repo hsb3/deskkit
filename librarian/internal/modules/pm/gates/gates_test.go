@@ -8,19 +8,53 @@ import (
 	"github.com/hsb3/desk-standard/librarian/internal/core/schema"
 )
 
+// TestDefaultRulesYAML_Parses pins the SHIPPED default gate ruleset content precisely (spec
+// §4.2). Since the 1.0 default-on flip (ADR 0008 amendment 2026-07-21) this seed ships to
+// EVERY fresh desk — it is no longer a lone testbed's config — so it is blessed and pinned
+// byte-for-byte here: exactly two gates, each requiring exactly its one document with the
+// exact type/status/pointer the owner blessed, schema_version 1, and no traits. A drift in
+// the shipped seed must fail this test loudly, not slip out to every desk unnoticed.
 func TestDefaultRulesYAML_Parses(t *testing.T) {
 	cfg, err := DefaultConfig()
 	if err != nil {
 		t.Fatalf("the shipped default gate rules must parse: %v", err)
 	}
-	if len(cfg.Gates["decision"]["review->terminal"].Documents) != 1 {
-		t.Error("default rules should gate decision review->terminal on one document")
+	if cfg.SchemaVersion != 1 {
+		t.Errorf("shipped default schema_version = %d, want 1", cfg.SchemaVersion)
 	}
-	if len(cfg.Gates["task"]["work->review"].Documents) != 1 {
-		t.Error("default rules should gate task work->review on one document")
+	// Exactly the two blessed item types are gated, and nothing else.
+	if len(cfg.Gates) != 2 {
+		t.Errorf("shipped default gates %d item types, want exactly 2 (decision, task): %v", len(cfg.Gates), cfg.Gates)
 	}
+
+	// decision: review->terminal requires an accepted decision at the item pointer (§4.2 ex.1).
+	decGate := cfg.Gates["decision"]
+	if len(decGate) != 1 {
+		t.Errorf("decision gates %d transitions, want exactly 1 (review->terminal)", len(decGate))
+	}
+	decDocs := decGate["review->terminal"].Documents
+	if len(decDocs) != 1 {
+		t.Fatalf("decision review->terminal binds %d documents, want exactly 1", len(decDocs))
+	}
+	if got := decDocs[0]; got.Type != "decision" || got.Status != "accepted" || got.Pointer != "item" {
+		t.Errorf("decision review->terminal doc = %+v, want {Type:decision Status:accepted Pointer:item}", got)
+	}
+
+	// task: work->review requires an active task at the item pointer (§4.2 ex.2).
+	taskGate := cfg.Gates["task"]
+	if len(taskGate) != 1 {
+		t.Errorf("task gates %d transitions, want exactly 1 (work->review)", len(taskGate))
+	}
+	taskDocs := taskGate["work->review"].Documents
+	if len(taskDocs) != 1 {
+		t.Fatalf("task work->review binds %d documents, want exactly 1", len(taskDocs))
+	}
+	if got := taskDocs[0]; got.Type != "task" || got.Status != "active" || got.Pointer != "item" {
+		t.Errorf("task work->review doc = %+v, want {Type:task Status:active Pointer:item}", got)
+	}
+
 	if len(cfg.Traits) != 0 {
-		t.Error("the shipped default deliberately seeds no traits")
+		t.Errorf("the shipped default deliberately seeds no traits, got %d", len(cfg.Traits))
 	}
 }
 
