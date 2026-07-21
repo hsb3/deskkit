@@ -25,11 +25,33 @@ func prettyQuery(kind string, raw json.RawMessage) (string, bool) {
 		return prettySummary(doc), true
 	case "findings":
 		return prettyFindings(doc), true
+	case "search":
+		return prettySearch(doc), true
 	case "live_files", "recent", "orphans", "uncollapsed", "adoption":
 		return prettyList(kind, doc), true
 	default:
 		return "", false
 	}
+}
+
+// prettySearch renders a `search` result as one `path  snippet` line per match under a count
+// header. The snippet is single-lined (embedded newlines collapsed to spaces) so each match stays
+// on its own aligned row; the raw JSON remains the default/agent contract.
+func prettySearch(doc map[string]any) string {
+	matches, _ := doc["matches"].([]any)
+	var b strings.Builder
+	fmt.Fprintf(&b, "search %q: %s\n", str(doc["term"]), numStr(doc["count"]))
+	if len(matches) == 0 {
+		return strings.TrimRight(b.String(), "\n")
+	}
+	tw := tabwriter.NewWriter(&b, 0, 2, 2, ' ', 0)
+	for _, mrow := range matches {
+		obj, _ := mrow.(map[string]any)
+		snip := strings.Join(strings.Fields(str(obj["snippet"])), " ")
+		fmt.Fprintf(tw, "  %s\t%s\n", str(obj["path"]), snip)
+	}
+	_ = tw.Flush()
+	return strings.TrimRight(b.String(), "\n")
 }
 
 // arrayKey maps a list-kind to the JSON field holding its rows.

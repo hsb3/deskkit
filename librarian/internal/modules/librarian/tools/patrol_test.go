@@ -2,6 +2,8 @@ package tools
 
 import (
 	"context"
+	"os"
+	"os/exec"
 	"reflect"
 	"sort"
 	"strconv"
@@ -298,6 +300,93 @@ func TestR6CheckNoGitHistoryDegradesToNoFinding(t *testing.T) {
 	text := "no frontmatter\n"
 	if _, _, hit := r6Check(text, ""); hit {
 		t.Fatalf("empty newest (git yielded nothing) must never flag R6")
+	}
+}
+
+// TestPatrol_R6SelfClearsOnHandoffUpdateWithoutRebaseline is the end-to-end proof of the R6
+// staleness fix over a REAL temp git desk: patrol run 1 fires R6 (the handoff's `updated:` predates
+// the newest change it guards), then — after ONLY the handoff is bumped and committed, with no
+// re-baseline and no touch to any guarded file — patrol run 2 finds R6 no longer firing and resolves
+// the finding. Before the fix, the handoff's own refresh commit became the whole-tree "newest", so
+// R6 could never self-clear. The test is skipped when git is unavailable.
+func TestPatrol_R6SelfClearsOnHandoffUpdateWithoutRebaseline(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not installed")
+	}
+	app, cfg := newTestEnv(t)
+	root := cfg.DeskRoot
+
+	baseEnv := append(os.Environ(),
+		"GIT_CONFIG_GLOBAL=/dev/null", // hermetic: no global hooks/gpgsign/templates leak in
+		"GIT_CONFIG_SYSTEM=/dev/null",
+		"GIT_AUTHOR_NAME=Test", "GIT_AUTHOR_EMAIL=test@example.com",
+		"GIT_COMMITTER_NAME=Test", "GIT_COMMITTER_EMAIL=test@example.com",
+	)
+	git := func(extraEnv []string, args ...string) {
+		t.Helper()
+		cmd := exec.Command("git", append([]string{"-C", root}, args...)...)
+		cmd.Env = append(append([]string{}, baseEnv...), extraEnv...)
+		if out, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v\n%s", args, err, out)
+		}
+	}
+	commitAt := func(date string) []string {
+		stamp := date + "T12:00:00" // noon: no midnight/timezone date shift
+		return []string{"GIT_AUTHOR_DATE=" + stamp, "GIT_COMMITTER_DATE=" + stamp}
+	}
+	countFlaggedR6 := func() int {
+		recs, err := app.FindRecordsByFilter("patrol_findings", "rule = 'R6' && state = 'flagged'", "", 0, 0)
+		if err != nil {
+			t.Fatalf("load R6 findings: %v", err)
+		}
+		return len(recs)
+	}
+
+	git(nil, "init")
+
+	// A guarded desk change — the newest thing the handoff must stay current with.
+	mustWriteFile(t, root, "tasks/guarded.md", "guarded desk change\n")
+	git(nil, "add", "tasks/guarded.md")
+	git(commitAt("2026-07-15"), "commit", "-m", "guarded change")
+
+	// The handoff, whose `updated:` (2026-07-10) predates the guarded change → stale.
+	handoffRel := cfg.HandoffPath
+	mustWriteFile(t, root, handoffRel, "---\nupdated: 2026-07-10\n---\nHANDOFF body\n")
+	git(nil, "add", handoffRel)
+	git(commitAt("2026-07-15"), "commit", "-m", "add handoff (stale)")
+
+	// A `files` row for the handoff so R6 runs over it during patrol (R6 fires only for the handoff
+	// row in the swept set). R6 reads the handoff DATE from disk, not this row's checksum.
+	mustCreateFileRecord(t, app, handoffRel, "meta", "", "csum-handoff-v1")
+
+	// Patrol run 1: handoff (2026-07-10) < newest guarded change (2026-07-15) → R6 fires.
+	if _, err := Patrol(context.Background(), app, cfg, &PatrolInput{}); err != nil {
+		t.Fatalf("patrol run 1: %v", err)
+	}
+	if n := countFlaggedR6(); n != 1 {
+		t.Fatalf("after patrol run 1, flagged R6 findings = %d, want 1 (stale handoff)", n)
+	}
+
+	// Update ONLY the handoff to be current with the newest guarded change (dated 2026-07-15), and
+	// commit that refresh LATER (2026-07-16) — no re-baseline, no touch to any guarded file. The dates
+	// are chosen to DISTINGUISH the fix from the old behavior: the refresh's own commit (2026-07-16) is
+	// the newest commit over the WHOLE tree, so the old whole-tree rule would compare 2026-07-15 <
+	// 2026-07-16 and keep firing forever. Only excluding the handoff (newest guarded change = 2026-07-15)
+	// lets an updated handoff clear. This is the exact motion that could never clear R6 before the fix.
+	mustWriteFile(t, root, handoffRel, "---\nupdated: 2026-07-15\n---\nHANDOFF body refreshed\n")
+	git(nil, "add", handoffRel)
+	git(commitAt("2026-07-16"), "commit", "-m", "refresh handoff")
+
+	// Patrol run 2: the newest change the handoff GUARDS is still 2026-07-15 (its own 2026-07-16 commit
+	// is excluded), and the handoff is now dated 2026-07-15 ≥ 2026-07-15 → R6 does NOT fire, so the
+	// prior finding resolves. Self-clear WITHOUT a re-baseline. (Under the old whole-tree rule the
+	// handoff date 2026-07-15 < whole-tree-newest 2026-07-16 would keep R6 flagged — so this assertion
+	// is a genuine regression guard for the fix, not a case that also passed before.)
+	if _, err := Patrol(context.Background(), app, cfg, &PatrolInput{}); err != nil {
+		t.Fatalf("patrol run 2: %v", err)
+	}
+	if n := countFlaggedR6(); n != 0 {
+		t.Fatalf("after patrol run 2, flagged R6 findings = %d, want 0 (updated handoff must self-clear)", n)
 	}
 }
 

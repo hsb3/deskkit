@@ -3,6 +3,7 @@ package desklib
 import (
 	"bytes"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"reflect"
 	"testing"
@@ -100,6 +101,74 @@ func TestChecksumStable(t *testing.T) {
 	const emptySHA = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
 	if got := Checksum(nil); got != emptySHA {
 		t.Fatalf("Checksum(nil) = %s, want %s", got, emptySHA)
+	}
+}
+
+// TestGitNewestCommitExcluding proves the R6 core-computation fix: over a real temp git repo it
+// asserts GitNewestCommitExcluding ignores commits that touch ONLY the excluded (handoff) path, so
+// the handoff's own later update commit does not count as the "newest" change it guards. The plain
+// GitNewestCommit (whole tree) is asserted to return the handoff's own commit date to make the
+// difference explicit — that whole-tree value is exactly why R6 could never self-clear before.
+func TestGitNewestCommitExcluding(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not installed")
+	}
+	root := t.TempDir()
+
+	baseEnv := append(os.Environ(),
+		"GIT_CONFIG_GLOBAL=/dev/null", // hermetic: no global hooks/gpgsign/templates leak in
+		"GIT_CONFIG_SYSTEM=/dev/null",
+		"GIT_AUTHOR_NAME=Test", "GIT_AUTHOR_EMAIL=test@example.com",
+		"GIT_COMMITTER_NAME=Test", "GIT_COMMITTER_EMAIL=test@example.com",
+	)
+	git := func(extraEnv []string, args ...string) {
+		t.Helper()
+		cmd := exec.Command("git", append([]string{"-C", root}, args...)...)
+		cmd.Env = append(append([]string{}, baseEnv...), extraEnv...)
+		if out, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v\n%s", args, err, out)
+		}
+	}
+	commitAt := func(date string) []string {
+		stamp := date + "T12:00:00" // noon: no midnight/timezone date shift
+		return []string{"GIT_AUTHOR_DATE=" + stamp, "GIT_COMMITTER_DATE=" + stamp}
+	}
+
+	git(nil, "init")
+
+	// A guarded desk file committed on the EARLIER date — the newest change the handoff GUARDS.
+	if err := os.WriteFile(filepath.Join(root, "guarded.md"), []byte("desk content\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	git(nil, "add", "guarded.md")
+	git(commitAt("2026-07-10"), "commit", "-m", "add guarded file")
+
+	// The handoff, added and then refreshed on LATER dates — both commits touch ONLY the handoff.
+	handoffRel := "_meta/HANDOFF.md"
+	handoffAbs := filepath.Join(root, handoffRel)
+	if err := os.MkdirAll(filepath.Dir(handoffAbs), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(handoffAbs, []byte("updated: 2026-07-12\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	git(nil, "add", handoffRel)
+	git(commitAt("2026-07-12"), "commit", "-m", "add handoff")
+
+	if err := os.WriteFile(handoffAbs, []byte("updated: 2026-07-20\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	git(nil, "add", handoffRel)
+	git(commitAt("2026-07-20"), "commit", "-m", "refresh handoff")
+
+	// Whole-tree newest is the handoff's OWN refresh — the exact value that prevented self-clear.
+	if got := GitNewestCommit(root); got != "2026-07-20" {
+		t.Fatalf("GitNewestCommit(whole tree) = %q, want 2026-07-20 (the handoff's own commit)", got)
+	}
+	// Excluding the handoff, the newest change it GUARDS is the guarded-file commit; the handoff's
+	// own update commits (07-12, 07-20 — both touch only the excluded path) are filtered out.
+	if got := GitNewestCommitExcluding(root, handoffRel); got != "2026-07-10" {
+		t.Fatalf("GitNewestCommitExcluding = %q, want 2026-07-10 (handoff's own commit must be excluded)", got)
 	}
 }
 

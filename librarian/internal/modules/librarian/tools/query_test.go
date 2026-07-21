@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
@@ -76,6 +77,81 @@ func TestIsOrphan(t *testing.T) {
 		if got := isOrphan(c.row, c.secretsDir); got != c.want {
 			t.Errorf("isOrphan(%+v, %q) = %v, want %v", c.row, c.secretsDir, got, c.want)
 		}
+	}
+}
+
+func TestIsIndexEntryFile(t *testing.T) {
+	cases := map[string]bool{
+		"CLAUDE.md":             true,
+		"README.md":             true,
+		"INDEX.md":              true,
+		"docs/README.md":        true, // basename match, any directory
+		"_meta/INDEX.md":        true,
+		"claude.md":             true, // case-insensitive
+		"ReadMe.md":             true,
+		"index.MD":              true,
+		"feedback/loose.md":     false, // a genuine orphan
+		"tasks/readme-notes.md": false, // not exactly README.md
+		"NOTES.md":              false,
+		"docs/readme.txt":       false, // not .md
+	}
+	for path, want := range cases {
+		if got := isIndexEntryFile(path); got != want {
+			t.Errorf("isIndexEntryFile(%q) = %v, want %v", path, got, want)
+		}
+	}
+}
+
+// orphanPaths extracts the sorted path list from an orphansResult for comparison.
+func orphanPaths(r orphansResult) []string {
+	out := make([]string, len(r.Files))
+	for i, f := range r.Files {
+		out[i] = f.Path
+	}
+	return out
+}
+
+// TestQueryOrphansExcludesIndexEntryFilesByDefault seeds one genuine orphan plus the three
+// by-design-unreferenced index/entry files (all structurally orphans: empty-doctype .md outside
+// meta/memory/infra) and proves the default `orphans` view returns ONLY the genuine orphan, while
+// ShowIndex=true opts the index/entry files back in. It is store-backed (same test-app idiom as
+// TestQueryCountSurfacesAgreeOnMixedDisposition) so it exercises the real queryOrphans filter path,
+// not just the pure predicate.
+func TestQueryOrphansExcludesIndexEntryFilesByDefault(t *testing.T) {
+	app, cfg := newTestEnv(t)
+
+	// A genuine orphan: an empty-doctype .md in a non-infra dir — nothing special about its name.
+	mustCreateFileRecord(t, app, "feedback/loose-note.md", "other", "", "csum-orphan")
+	// Index/entry files: structurally orphans, but by-design unreferenced noise in the default view.
+	mustCreateFileRecord(t, app, "README.md", "root", "", "csum-readme")
+	mustCreateFileRecord(t, app, "CLAUDE.md", "root", "", "csum-claude")
+	mustCreateFileRecord(t, app, "docs/INDEX.md", "root", "", "csum-index")
+
+	// Default (ShowIndex=false): only the genuine orphan.
+	defaultRaw, err := queryOrphans(app, cfg, false)
+	if err != nil {
+		t.Fatalf("queryOrphans(default): %v", err)
+	}
+	var def orphansResult
+	if err := json.Unmarshal(defaultRaw, &def); err != nil {
+		t.Fatalf("unmarshal default orphans: %v", err)
+	}
+	if got, want := orphanPaths(def), []string{"feedback/loose-note.md"}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("default orphans = %v, want %v (index/entry files must be excluded)", got, want)
+	}
+
+	// ShowIndex=true: the index/entry files return alongside the genuine orphan (sorted by path).
+	showRaw, err := queryOrphans(app, cfg, true)
+	if err != nil {
+		t.Fatalf("queryOrphans(showIndex): %v", err)
+	}
+	var show orphansResult
+	if err := json.Unmarshal(showRaw, &show); err != nil {
+		t.Fatalf("unmarshal show-index orphans: %v", err)
+	}
+	want := []string{"CLAUDE.md", "README.md", "docs/INDEX.md", "feedback/loose-note.md"}
+	if got := orphanPaths(show); !reflect.DeepEqual(got, want) {
+		t.Fatalf("show-index orphans = %v, want %v (index files included)", got, want)
 	}
 }
 
@@ -305,5 +381,107 @@ func TestQueryCountSurfacesAgreeOnMixedDisposition(t *testing.T) {
 	}
 	if includeDisposed.Count != 2 {
 		t.Fatalf("queryFindings(true) count = %d, want 2 (--include-disposed widens to both findings)", includeDisposed.Count)
+	}
+}
+
+// --- content indexing / retrieval (§5.6 search + content kinds) ---
+
+// TestSnippet unit-tests the pure snippet helper: a match in the middle is bracketed by "…" and
+// carries the term; a match at position 0 has no leading "…"; an absent term falls back to the
+// leading window (position 0) without a crash.
+func TestSnippet(t *testing.T) {
+	// Match in the middle → leading + trailing "…", term present.
+	mid := snippet(strings.Repeat("a", 300)+"NEEDLE"+strings.Repeat("b", 300), "needle", 120)
+	if !strings.Contains(mid, "NEEDLE") {
+		t.Fatalf("a middle match must include the matched text, got %q", mid)
+	}
+	if !strings.HasPrefix(mid, "…") || !strings.HasSuffix(mid, "…") {
+		t.Fatalf("a clipped middle match must be bracketed by …, got %q", mid)
+	}
+
+	// Match at the start → no leading "…".
+	atStart := snippet("NEEDLE"+strings.Repeat("b", 300), "needle", 120)
+	if strings.HasPrefix(atStart, "…") {
+		t.Fatalf("a match at position 0 must have no leading …, got %q", atStart)
+	}
+	if !strings.Contains(atStart, "NEEDLE") {
+		t.Fatalf("a start match must include the matched text, got %q", atStart)
+	}
+
+	// Absent term → the leading window (position 0); a short body comes back whole, unbracketed.
+	absent := snippet("short body with no hit", "zzz-not-here", 120)
+	if absent != "short body with no hit" {
+		t.Fatalf("an absent term over a short body returns it whole, got %q", absent)
+	}
+}
+
+// TestQuerySearchAndContentOverStoredBody is the store-backed proof (same test-app idiom as
+// TestQueryCountSurfacesAgreeOnMixedDisposition): a token present ONLY in a file's stored body —
+// not its path or metadata — is found by `search`, and `content` returns that stored body by path.
+func TestQuerySearchAndContentOverStoredBody(t *testing.T) {
+	app, _ := newTestEnv(t)
+
+	// body carries a token that appears in NO path/metadata field, so a hit proves search reads the
+	// indexed body itself.
+	body := "This analysis discusses the quirk of the flux-capacitor calibration procedure.\n"
+	rec := mustCreateFileRecord(t, app, "analyses/flux.md", "analyses", "analysis", "csum-flux")
+	rec.Set("content", body)
+	if err := app.Save(rec); err != nil {
+		t.Fatalf("set content on flux.md: %v", err)
+	}
+	other := mustCreateFileRecord(t, app, "analyses/other.md", "analyses", "analysis", "csum-other")
+	other.Set("content", "an unrelated document about widgets\n")
+	if err := app.Save(other); err != nil {
+		t.Fatalf("set content on other.md: %v", err)
+	}
+
+	// search → exactly flux.md, with a snippet showing the term and the row's dir_kind.
+	searchRaw, err := querySearch(app, "flux-capacitor", 20)
+	if err != nil {
+		t.Fatalf("querySearch: %v", err)
+	}
+	var sr searchResult
+	if err := json.Unmarshal(searchRaw, &sr); err != nil {
+		t.Fatalf("unmarshal search result: %v", err)
+	}
+	if sr.Count != 1 || len(sr.Matches) != 1 || sr.Matches[0].Path != "analyses/flux.md" {
+		t.Fatalf("search must return exactly analyses/flux.md, got %+v", sr)
+	}
+	if !strings.Contains(sr.Matches[0].Snippet, "flux-capacitor") {
+		t.Fatalf("the match snippet must show the term in context, got %q", sr.Matches[0].Snippet)
+	}
+	if sr.Matches[0].DirKind != "analyses" {
+		t.Fatalf("the match must carry dir_kind, got %q", sr.Matches[0].DirKind)
+	}
+
+	// content → the stored body back, by path.
+	contentRaw, err := queryContent(app, "analyses/flux.md")
+	if err != nil {
+		t.Fatalf("queryContent: %v", err)
+	}
+	var cr contentResult
+	if err := json.Unmarshal(contentRaw, &cr); err != nil {
+		t.Fatalf("unmarshal content result: %v", err)
+	}
+	if !cr.Found || cr.Content != body {
+		t.Fatalf("content must return the stored body, got found=%v content=%q", cr.Found, cr.Content)
+	}
+
+	// content → a path with no live row is found=false.
+	missingRaw, err := queryContent(app, "analyses/nope.md")
+	if err != nil {
+		t.Fatalf("queryContent(missing): %v", err)
+	}
+	var mcr contentResult
+	if err := json.Unmarshal(missingRaw, &mcr); err != nil {
+		t.Fatalf("unmarshal missing content result: %v", err)
+	}
+	if mcr.Found {
+		t.Fatalf("a missing path must be found=false, got %+v", mcr)
+	}
+
+	// search → an empty term is a usage error.
+	if _, err := querySearch(app, "", 20); err == nil {
+		t.Fatalf("an empty search term must error")
 	}
 }

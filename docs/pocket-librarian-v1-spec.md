@@ -1050,7 +1050,7 @@ single-file patrol inspects just that file and only evaluates R6 if that file *i
 | R3 | mechanical | `expected_dir = TYPE_DIR_MAP[doctype]` — the configured entity-dir PATH for that type; if `expected_dir` is set AND `rel` is NOT under it (same prefix test as `dir_kind_for`, §5.1: `rel == expected_dir` or `rel` starts with `expected_dir + "/"`) → finding (keyed off frontmatter `type`). `TYPE_DIR_MAP = {decision:DECISIONS_DIR, task:TASKS_DIR, analysis:ANALYSES_DIR, journal:JOURNAL_DIR}` (paths, not `dir_kind` labels — a correctly-placed `_structure/decisions/…` decision doc is under `DECISIONS_DIR` and never flags). |
 | R4 | judgment (FLAG-ONLY) | `dir_kind == decisions` and `.md` (**excluding a basename `README.md`** — the decisions-dir index is not a decision record); `status ∉ DECISION_STATUSES = {proposed, accepted, rejected, superseded}`. Detection is mechanical but the fix — choosing WHICH valid status an invalid/empty one becomes — is a semantic call, so R4 is **judgment**, not mechanical, and has no fixer (reclassified 2026-07-17 from the dev-tooling-desk field evaluation, issue #18). |
 | R5 | judgment | entity docs **excluding** decisions (append-only); `lines > 40` AND the doc declares an EXPLICIT graduation marker (§5.1 *graduated_to precedence*: a frontmatter `graduated_to:` key, or a canonical inline `graduated to: <ref>` line matching `(?im)^\s*graduated to:?\s+(wb#\d+|#?\d+|https?://\S+)`). Flag only. A bare `#N` / `wb#N` / GH-URL merely quoted in prose does NOT fire R5 — only a deliberate marker does. |
-| R6 | judgment (handled separately) | Operates on the handoff record only (`HANDOFF_PATH`, default `_meta/HANDOFF.md` — configurable for identity-neutrality). `doc_date` = `fm.updated` (string) else regex `Last updated:\s*(\d{4}-\d{2}-\d{2})`; `newest` = `git -C root log -1 --format=%cs`; if `newest` empty → no finding; if `doc_date` empty OR `doc_date < newest` → finding. |
+| R6 | judgment (handled separately) | Operates on the handoff record only (`HANDOFF_PATH`, default `_meta/HANDOFF.md` — configurable for identity-neutrality). `doc_date` = `fm.updated` (string) else regex `Last updated:\s*(\d{4}-\d{2}-\d{2})`; `newest` = the newest commit date across the desk tree **EXCLUDING the handoff itself** (`git -C root log -1 --format=%cs -- . :(exclude)<HANDOFF_PATH>`) — staleness is measured against the newest change the handoff *guards*, so the handoff's OWN update commit must not count; if `newest` empty → no finding; if `doc_date` empty OR `doc_date < newest` → finding. Because the handoff's own commit is excluded, an updated handoff (dated on/after the newest change it guards) clears the finding at the next patrol **without a re-baseline** (before this, whole-tree `newest` included the handoff's own refresh commit, so R6 could never self-clear). |
 
 `FIXABLE_RULES = {R1, R2, R3}` (R4 detects mechanically but is flag-only judgment — its fix is a
 supervisor's status choice). Severity split: MECHANICAL = {R1,R2,R3}, JUDGMENT = {R4,R5}, R6
@@ -1367,8 +1367,12 @@ of parameterized queries (ported from `assistant.py`).
 
 ```go
 type QueryInput struct {
-    Kind string `json:"kind" jsonschema:"description=One of: live_files recent orphans uncollapsed findings summary adoption;required"`
-    Days int    `json:"days,omitempty" jsonschema:"description=Window for 'recent'; default 7"`
+    Kind  string `json:"kind" jsonschema:"description=One of: live_files recent orphans uncollapsed findings summary adoption feedback search content;required"`
+    Days  int    `json:"days,omitempty"  jsonschema:"description=Window for 'recent'; default 7"`
+    Term  string `json:"term,omitempty"  jsonschema:"description=Substring to search for in indexed file content; required for the search kind"`
+    Limit int    `json:"limit,omitempty" jsonschema:"description=Max results for the search kind; default 20"`
+    Path  string `json:"path,omitempty"  jsonschema:"description=Desk-relative file path for the content kind"`
+    ShowIndex bool `json:"show_index,omitempty" jsonschema:"description=For the orphans kind also show by-design-unreferenced index/entry files such as README and INDEX; default false"`
 }
 // Returns a JSON string whose shape depends on Kind (documented per kind below).
 ```
@@ -1379,11 +1383,19 @@ type QueryInput struct {
 |---|---|
 | `live_files` | Non-deleted `files` rows. |
 | `recent` | Files touched within `--days` (default 7), by `git_last_commit` date. |
-| `orphans` | `.md` files with empty `doctype` that could be misfiled desk content — i.e. `dir_kind ∉ {meta, memory, infra}` (non-entity infrastructure is excluded, not just the meta/secrets prefix set: the memory store and dotted infra dirs like `.claude`/`.agents` are legitimately outside the taxonomy). The `_meta/` / `SECRETS_DIR` prefix check remains as a belt-and-suspenders guard (configurable, not hardcoded). Excluding `infra`/`memory` added 2026-07-17 per issue #18. |
+| `orphans` | `.md` files with empty `doctype` that could be misfiled desk content — i.e. `dir_kind ∉ {meta, memory, infra}` (non-entity infrastructure is excluded, not just the meta/secrets prefix set: the memory store and dotted infra dirs like `.claude`/`.agents` are legitimately outside the taxonomy). The `_meta/` / `SECRETS_DIR` prefix check remains as a belt-and-suspenders guard (configurable, not hardcoded). Excluding `infra`/`memory` added 2026-07-17 per issue #18. **By default the by-design-unreferenced index/entry files — basename `CLAUDE.md`, `README.md`, `INDEX.md` (case-insensitive) — are ALSO excluded** (an entry/index doc is what other docs point *at*, so it is never a misfiled orphan); they are filtered as an ADDITIONAL step on top of the structural predicate, and `--show-index` (`show_index`) opts them back in (added per issue #100). |
 | `uncollapsed` | Open R5 findings (graduated-but-not-collapsed). |
 | `findings` | Open findings grouped by rule. |
 | `summary` | The aggregate the `/api/desk/summary` route returns: `{files_total, files_by_dir_kind, open_findings_total, open_findings_by_rule, open_findings_by_severity}`. |
 | `adoption` | `adoption_log` rows. |
+| `search` | Substring/keyword retrieval over the indexed file **body** (`files.content`, populated by sweep — §5.1). Uses PocketBase's LIKE-contains operator `~` (`content ~ term` → `content LIKE '%term%'`, ASCII-case-insensitive), **not** SQLite FTS5; embeddings/vector search are out of scope for v1. Requires `term`; `limit` defaults 20 (hard-capped at 200). Each match carries `path`, `dir_kind`, and a short context `snippet` around the first occurrence. |
+| `content` | The full stored body of one live file by desk-relative `path` (the retrieval companion to `search`). `found=false` when no live row exists at that path. |
+
+**Content indexing (sweep-side, §5.1).** `search`/`content` read the `files.content` column that
+`sweep` populates from each file's body. Sweep indexes **only UTF-8 text**, never a file under the
+desk's configured `SECRETS_DIR` (the secret-home boundary — mirrors the meta/secrets exclusion), and
+truncates rune-safe to the column cap (1,000,000 chars). The body is re-derivable by a fresh sweep,
+so the store stays disposable (files-are-truth).
 
 In the agentic version, `query` is the tool the model calls to ground answers over the index — it
 never writes.
@@ -1416,6 +1428,13 @@ a `count`, plus a kind-specific body. Examples:
 // adoption → adoption_log rows
 {"kind":"adoption","count":2,"rows":[
   {"date":"2026-07-15","event":"fix","detail":"run patrol-20260715T101010Z: applied=2 ignored=1"}]}
+
+// search → files whose indexed body contains term (LIKE-contains), each with a context snippet
+{"kind":"search","term":"calibration","count":1,"matches":[
+  {"path":"analyses/flux.md","dir_kind":"analyses","snippet":"…the flux-capacitor calibration procedure…"}]}
+
+// content → the full stored body of one file by path (found=false when no live row exists)
+{"kind":"content","path":"analyses/flux.md","found":true,"content":"---\ntype: analysis\n---\n…"}
 
 // summary → the /api/desk/summary aggregate
 {"kind":"summary","files_total":79,"files_by_dir_kind":{"root":4,"meta":40,"decisions":14},

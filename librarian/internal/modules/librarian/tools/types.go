@@ -94,9 +94,13 @@ type RestoreResult struct {
 // --- §5.6 query ---
 
 type QueryInput struct {
-	Kind            string `json:"kind" jsonschema:"description=One of: live_files recent orphans uncollapsed findings summary adoption feedback;required"`
+	Kind            string `json:"kind" jsonschema:"description=One of: live_files recent orphans uncollapsed findings summary adoption feedback search content;required"`
 	Days            int    `json:"days,omitempty" jsonschema:"description=Window for 'recent'; default 7"`
 	IncludeDisposed bool   `json:"include_disposed,omitempty" jsonschema:"description=Include disposed (acknowledged triaged wont_fix) findings; default false shows only open"`
+	Term            string `json:"term,omitempty" jsonschema:"description=Substring to search for in indexed file content; required for the search kind"`
+	Limit           int    `json:"limit,omitempty" jsonschema:"description=Max results for the search kind; default 20"`
+	Path            string `json:"path,omitempty" jsonschema:"description=Desk-relative file path for the content kind"`
+	ShowIndex       bool   `json:"show_index,omitempty" jsonschema:"description=For the orphans kind also show by-design-unreferenced index/entry files such as README and INDEX; default false"`
 }
 
 // --- record_feedback ---

@@ -15,6 +15,17 @@ for why this policy exists.
 
 ### Added
 
+- **Sweep-time content indexing + `query search`/`content` kinds** (#89). Sweep now stores each
+  file's body in a new `files.content` column (migration `0021`), so swept content is retrievable
+  and searchable through a tool surface for the first time — previously the raw bytes were used
+  only to compute a checksum and parse frontmatter, and nothing indexed was retrievable. Two new
+  `query` **kinds** carry it (no new tool, no new CLI subcommand — the count surfaces are
+  unchanged): `search` does substring/keyword retrieval over the indexed body via PocketBase's
+  LIKE-contains operator (`content ~ term`, not FTS5; embeddings/vector search are out of scope),
+  returning each match with a context snippet (`--term`, `--limit` default 20 / hard-capped 200);
+  `content` returns one file's stored body by desk-relative `--path`. Indexing is UTF-8-only,
+  never indexes a file under `SECRETS_DIR`, and is capped rune-safe at 1,000,000 chars; the body
+  is re-derivable by a fresh sweep, so the store stays disposable. Store schema version 20 → 21.
 - **Document identity + schema hygiene** (#123, ADR 0017). Three independent fixes shipped as
   one package. (A) **Frontmatter `id`** is now a recognized, OPTIONAL document-identity
   primitive: sweep reads it into a new `files.doc_id` column (migration `0018`) and matches an
@@ -152,6 +163,27 @@ for why this policy exists.
   - **`tests/` declared home** — `tests/README.md` documents that suites live with their products
     (`plugin/` bun, `librarian/` go, `librarian/verify.sh`), keeping `make test` / `make verify` as
     the canonical entries rather than hoisting suites to a root tree.
+
+### Changed
+
+- **`query orphans` hides by-design-unreferenced index/entry files by default** (#100). Basename
+  `CLAUDE.md`, `README.md`, and `INDEX.md` (case-insensitive) are structural orphans — empty-doctype
+  `.md` files outside `meta`/`memory`/`infra` — but an entry/index doc is what *other* docs point at,
+  so it is never a misfiled orphan. The default view now filters them out (an ADDITIONAL filter on
+  top of the unchanged structural `isOrphan` predicate) so `orphans` returns only genuine orphans;
+  the new `--show-index` flag (`show_index`) opts them back in. No new tool or CLI subcommand.
+
+### Fixed
+
+- **R6 handoff-staleness self-clears on a handoff update, without a re-baseline** (#100). Patrol now
+  measures the handoff against the newest change it GUARDS — the newest desk commit **excluding the
+  handoff file itself** (`git log -1 --format=%cs -- . :(exclude)<HANDOFF_PATH>`, new
+  `desklib.GitNewestCommitExcluding`). Previously `newest` was the whole-tree newest commit, which
+  included the handoff's own update commit: the moment a handoff refresh was committed, that commit
+  became the newest and the handoff could never be "current with" it, so the finding could only be
+  cleared by a re-baseline. An updated handoff dated on/after the newest guarded change now clears
+  R6 at the next patrol. The pure `r6Check(text, newest)` core is unchanged — only how `newest` is
+  computed at the caller.
 
 ## [0.7.0] — 2026-07-19
 
