@@ -1,6 +1,6 @@
 _ADR for porting the 23 headcase SOP kits into this repo and reconciling their doc types with
 schema v1 — what moved, what was neutralized, and the disposition of every kit-type schema gap._
-Status: Accepted (corrected 2026-07-18)
+Status: Accepted (corrected 2026-07-18, 2026-07-21)
 
 # 0006 — SOP kit port + schema-v1 doc-type reconciliation
 
@@ -13,6 +13,24 @@ Status: Accepted (corrected 2026-07-18)
 > scrubbed from every shipped surface. A static blocklist gate (`scripts/check-kits.mjs`, in
 > `make check` + CI) now enforces this over `kits/` + `schema/` so the class of leak cannot recur.
 > The false sentence is struck below.
+
+> **Correction (2026-07-21):** Two places overstated kit *consumption*. Decision item 1 called
+> `kits/` *"consumed by both lanes (plugin skills today; the PM module's document gates next)"* and
+> the first Alternative said *"Kits are consumed by the librarian/PM module too, not just the
+> plugin."* Both are FALSE as of v0.7.0: **no lane consumes `kits/` at runtime.** No shipped plugin
+> skill references kits — `plugin/claude-plugin/skills/` (the four skills `desk-setup`,
+> `conventions-standard`, `harvest-loop`, `brownfield-adoption`) has zero `kit` references, and no
+> file under `plugin/` references the `kits/` path at all. The librarian binary can't reach `kits/`
+> either (`go:embed` can't cross `..`; kits sit at repo root by design). Today's only consumers are
+> the **contract/guard layer**: the drift + origin-vault blocklist guard `scripts/check-kits.mjs`,
+> the neutrality scan surface (`scripts/check-neutrality.mjs` `SCAN_DIRS` includes `kits`), and the
+> render-**compatibility** guard `librarian/templates/kit_render_test.go` (reads
+> `kits/analysis/template.md`, renders it through the fixer's `Render()` — a compat check, not an
+> integration). Runtime consumption is deferred: librarian template-selection (needs a design
+> ruling) and the PM module's document gates (#55 D2/D3). Both false phrases are struck below.
+> Evidence: `plugin/claude-plugin/skills/` listing (four skills, no `kit` hit) ·
+> `scripts/check-neutrality.mjs:52` (`SCAN_DIRS = ["plugin", "librarian", "kits"]`) ·
+> `scripts/check-kits.mjs:18` (`KITS_DIR`) · `librarian/templates/kit_render_test.go`.
 
 ## Context
 
@@ -32,8 +50,10 @@ to make them compatible with database-backed workflows; flag refinements, don't 
 ## Decision
 
 **1. Kit home = top-level `kits/`.** One subdir per kit, the guide/template/example (G/T/E)
-structure preserved. `kits/` is a product-neutral shared surface, peer to `schema/`, consumed by
-both lanes (plugin skills today; the PM module's document gates next). Indexed by the root
+structure preserved. `kits/` is a product-neutral shared surface, peer to `schema/`,
+~~consumed by both lanes (plugin skills today; the PM module's document gates next)~~ (struck —
+see the **2026-07-21 Correction** above: no lane consumes `kits/` at runtime today; only the
+contract/guard layer references it, and lane consumption is deferred). Indexed by the root
 **`kits.yaml`** manifest (the 0013 S4(a) mechanism).
 
 **2. Neutralized per the identity-neutrality constraint (0013 item 9).** The vault examples were a
@@ -100,8 +120,11 @@ Every kit type reconciled against schema v1's doc-type model. **None dropped sil
 ## Alternatives considered
 
 - **Kits under `plugin/`** — rejected: `schema/` sets the precedent that shared, cross-lane,
-  product-neutral surfaces sit at the repo root, not inside one lane. Kits are consumed by the
-  librarian/PM module too, not just the plugin.
+  product-neutral surfaces sit at the repo root, not inside one lane. ~~Kits are consumed by the
+  librarian/PM module too, not just the plugin.~~ (struck — see the **2026-07-21 Correction**
+  above: kits are *designed* as a cross-lane surface but no lane consumes them at runtime yet;
+  the placement rationale — a shared surface belongs at the root, peer to `schema/` — stands
+  regardless.)
 - **Manifest as JSON (`kits.json`)** — rejected: 0013 S4(a) names `kits.yaml`; a flat YAML subset
   is parseable dependency-free by the guard (the same posture as the other `scripts/` guards).
 - **Add the `user-defined` types to canon** — rejected: they intentionally diverge from the schema
