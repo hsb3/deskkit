@@ -92,6 +92,45 @@ func toolCallStep(content, name, callID, args string) streamStep {
 	}
 }
 
+// contentStepUsage is contentStep with a TokenUsage attached to the step's FINAL chunk, modeling a
+// provider that reports per-request usage on the last streamed chunk (the live source stream.go
+// folds into the turn totals).
+func contentStepUsage(usage *schema.TokenUsage, pieces ...string) streamStep {
+	return func(_ context.Context) (*schema.StreamReader[*schema.Message], error) {
+		chunks := make([]*schema.Message, 0, len(pieces))
+		for i, p := range pieces {
+			msg := &schema.Message{Role: schema.Assistant, Content: p}
+			if i == len(pieces)-1 {
+				msg.ResponseMeta = &schema.ResponseMeta{Usage: usage}
+			}
+			chunks = append(chunks, msg)
+		}
+		return schema.StreamReaderFromArray(chunks), nil
+	}
+}
+
+// toolCallStepUsage is toolCallStep with a TokenUsage attached to the tool-call chunk (a step whose
+// generated output is the tool call, not prose), so a multi-step turn's usage accumulation can be
+// exercised through the real tool loop.
+func toolCallStepUsage(usage *schema.TokenUsage, content, name, callID, args string) streamStep {
+	return func(_ context.Context) (*schema.StreamReader[*schema.Message], error) {
+		var chunks []*schema.Message
+		if content != "" {
+			chunks = append(chunks, &schema.Message{Role: schema.Assistant, Content: content})
+		}
+		chunks = append(chunks, &schema.Message{
+			Role: schema.Assistant,
+			ToolCalls: []schema.ToolCall{{
+				ID:       callID,
+				Type:     "function",
+				Function: schema.FunctionCall{Name: name, Arguments: args},
+			}},
+			ResponseMeta: &schema.ResponseMeta{Usage: usage},
+		})
+		return schema.StreamReaderFromArray(chunks), nil
+	}
+}
+
 // blockingStep sends preChunks then blocks until `release` fires, then ends the stream with a
 // context.Canceled error — modeling a provider whose stream is interrupted mid-flight (with
 // preChunks) or before the first token (without). It keys off `release` (the test's own
@@ -235,6 +274,110 @@ func TestStreamTurn_TokenFinalOrdering(t *testing.T) {
 	}
 	if tokens.String() != "Hello, desk." {
 		t.Fatalf("token concatenation = %q, want %q", tokens.String(), "Hello, desk.")
+	}
+}
+
+// TestStreamTurn_UsageSingleStep: a one-step turn whose provider reports usage on the final chunk
+// surfaces those counts on the terminal EventFinal — prompt from the (only) step, completion from
+// the step, total = prompt + completion (stream.go recomputes total, not the provider's field).
+func TestStreamTurn_UsageSingleStep(t *testing.T) {
+	usage := &schema.TokenUsage{PromptTokens: 1200, CompletionTokens: 34, TotalTokens: 9999}
+	m := &scriptedModel{steps: []streamStep{contentStepUsage(usage, "Hello, ", "desk.")}}
+	installModel(t, m)
+	app, cfg := newSessionTestEnv(t)
+	ctx := context.Background()
+
+	sess, err := NewSession(ctx, app, cfg)
+	if err != nil {
+		t.Fatalf("NewSession: %v", err)
+	}
+	evs := drainAll(sess.StreamTurn(ctx, "hi"))
+
+	term := evs[len(evs)-1]
+	if term.Kind != EventFinal {
+		t.Fatalf("terminal event = %+v, want EventFinal", term)
+	}
+	if term.PromptTokens != 1200 {
+		t.Errorf("PromptTokens = %d, want 1200", term.PromptTokens)
+	}
+	if term.CompletionTokens != 34 {
+		t.Errorf("CompletionTokens = %d, want 34", term.CompletionTokens)
+	}
+	// total is the last-prompt + summed-completion, NOT the provider's raw TotalTokens field.
+	if term.TotalTokens != 1234 {
+		t.Errorf("TotalTokens = %d, want 1234 (prompt+completion)", term.TotalTokens)
+	}
+}
+
+// TestStreamTurn_UsageAccumulatesAcrossSteps: a tool-then-answer turn accumulates usage across the
+// two model steps — prompt = the LAST step's count (the current context size, which already
+// includes the replayed history + tool result), completion = the SUM across steps.
+func TestStreamTurn_UsageAccumulatesAcrossSteps(t *testing.T) {
+	m := &scriptedModel{steps: []streamStep{
+		toolCallStepUsage(&schema.TokenUsage{PromptTokens: 1000, CompletionTokens: 10}, "", "query", "c1", `{"kind":"live_files"}`),
+		contentStepUsage(&schema.TokenUsage{PromptTokens: 1500, CompletionTokens: 20}, "done"),
+	}}
+	installModel(t, m)
+	app, cfg := anthropicEnv(t)
+	ctx := context.Background()
+
+	sess, err := NewSession(ctx, app, cfg)
+	if err != nil {
+		t.Fatalf("NewSession: %v", err)
+	}
+	evs := drainAll(sess.StreamTurn(ctx, "what is live"))
+
+	term := evs[len(evs)-1]
+	if term.Kind != EventFinal {
+		t.Fatalf("terminal event = %+v, want EventFinal", term)
+	}
+	if term.PromptTokens != 1500 {
+		t.Errorf("PromptTokens = %d, want 1500 (last step's prompt = current context size)", term.PromptTokens)
+	}
+	if term.CompletionTokens != 30 {
+		t.Errorf("CompletionTokens = %d, want 30 (10+20 summed across steps)", term.CompletionTokens)
+	}
+	if term.TotalTokens != 1530 {
+		t.Errorf("TotalTokens = %d, want 1530 (1500+30)", term.TotalTokens)
+	}
+}
+
+// TestStreamTurn_UsageOnCancel: a canceled turn still reports whatever usage the completed step
+// counted on the terminal EventError (partial turns report what was counted).
+func TestStreamTurn_UsageOnCancel(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	m := &scriptedModel{steps: []streamStep{
+		// A first step that completes with usage, then a second that blocks until cancel.
+		toolCallStepUsage(&schema.TokenUsage{PromptTokens: 800, CompletionTokens: 5}, "", "query", "c1", `{"kind":"live_files"}`),
+		blockingStep(ctx, nil, "wait"),
+	}}
+	installModel(t, m)
+	app, cfg := anthropicEnv(t)
+
+	sess, err := NewSession(context.Background(), app, cfg)
+	if err != nil {
+		t.Fatalf("NewSession: %v", err)
+	}
+	ch := sess.StreamTurn(ctx, "start")
+	var evs []Event
+	for ev := range ch {
+		evs = append(evs, ev)
+		if ev.Kind == EventToken { // the second step streamed "wait" — cancel after it
+			cancel()
+		}
+	}
+	cancel()
+
+	term := evs[len(evs)-1]
+	if term.Kind != EventError || !term.Canceled {
+		t.Fatalf("terminal event = %+v, want canceled EventError", term)
+	}
+	// The completed first step's usage is reported even though the turn was canceled mid-second-step.
+	if term.CompletionTokens < 5 {
+		t.Errorf("CompletionTokens = %d, want >= 5 (the completed step's count survives cancel)", term.CompletionTokens)
+	}
+	if term.PromptTokens < 800 {
+		t.Errorf("PromptTokens = %d, want >= 800 (a counted step's prompt survives cancel)", term.PromptTokens)
 	}
 }
 

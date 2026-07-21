@@ -34,6 +34,7 @@ var userBorder = lipgloss.Border{Left: "▌"}
 type styleSet struct {
 	header          lipgloss.Style // "· provider/model" segment, on the header bar fill
 	headerAccent    lipgloss.Style // bold desk-name segment, on the header bar fill
+	headerToken     lipgloss.Style // trailing "NN% ctx · 12.3K tok" usage segment, on the header bar fill
 	headerBar       lipgloss.Style // header bar fill (Width applied at render)
 	footerBar       lipgloss.Style // footer/status bar fill (Width applied at render)
 	footerState     lipgloss.Style // live state segment, on the footer bar fill
@@ -53,6 +54,15 @@ type styleSet struct {
 	errText         lipgloss.Style // terminal error body (red)
 	interrupted     lipgloss.Style // dim "(interrupted)" badge
 	raw             lipgloss.Style // dim raw fallback for an unexpected event shape
+
+	// Sessions-surface (ctrl+o) chrome: the preview pane, the divider, the inline rename prompt,
+	// the delete-confirm prompt, and the keybinding hint line. All reuse the shared per-theme tones
+	// (body/muted/faint/accent/red) so no new tone split is introduced.
+	pickerPreview       lipgloss.Style // one compact preview transcript line (body foreground)
+	pickerDivider       lipgloss.Style // faint horizontal rule between the list and the preview
+	pickerHint          lipgloss.Style // faint keybinding hint line / empty-list message
+	pickerRenamePrompt  lipgloss.Style // accent "rename:" label before the inline text input
+	pickerDeleteConfirm lipgloss.Style // red bold delete-confirm prompt
 
 	help    help.Styles // bubbles/help styles for the ctrl+g overlay (no bar fill)
 	helpBar help.Styles // bubbles/help styles for the collapsed status bar (with bar fill)
@@ -118,32 +128,40 @@ func newStyles(theme string) styleSet {
 	return styleSet{
 		header:       lipgloss.NewStyle().Foreground(muted).Background(barBG).Bold(true),
 		headerAccent: lipgloss.NewStyle().Foreground(accent).Background(barBG).Bold(true),
-		headerBar:    lipgloss.NewStyle().Background(barBG),
-		footerBar:    lipgloss.NewStyle().Background(barBG),
-		footerState:  lipgloss.NewStyle().Foreground(accent).Background(barBG),
-		toast:        lipgloss.NewStyle().Foreground(accent).Background(barBG).Bold(true),
-		user:         lipgloss.NewStyle().Foreground(accent).Background(blockBG).Bold(true),
-		userLabel:    lipgloss.NewStyle().Foreground(muted).Background(blockBG).Bold(true),
+		// Usage segment: muted per-theme tone on the bar fill (non-bold), so it reads as secondary
+		// header chrome next to the bold desk name. Concrete tones only — no AdaptiveColor.
+		headerToken: lipgloss.NewStyle().Foreground(muted).Background(barBG),
+		headerBar:   lipgloss.NewStyle().Background(barBG),
+		footerBar:   lipgloss.NewStyle().Background(barBG),
+		footerState: lipgloss.NewStyle().Foreground(accent).Background(barBG),
+		toast:       lipgloss.NewStyle().Foreground(accent).Background(barBG).Bold(true),
+		user:        lipgloss.NewStyle().Foreground(accent).Background(blockBG).Bold(true),
+		userLabel:   lipgloss.NewStyle().Foreground(muted).Background(blockBG).Bold(true),
 		userBlock: lipgloss.NewStyle().
 			Border(userBorder, false, false, false, true).
 			BorderForeground(accent).
 			BorderBackground(blockBG).
 			PaddingLeft(1).
 			Background(blockBG),
-		assistant:       lipgloss.NewStyle().Foreground(body),
-		roleLabel:       lipgloss.NewStyle().Foreground(muted).Bold(true),
-		assistantGutter: lipgloss.NewStyle().Foreground(faint),
-		inputBorder:     lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(accent),
-		inputBorderBusy: lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(faint),
-		turnFooter:      lipgloss.NewStyle().Foreground(faint),
-		step:            lipgloss.NewStyle().Foreground(faint),
-		stepErr:         lipgloss.NewStyle().Foreground(red),
-		stepOK:          lipgloss.NewStyle().Foreground(green),
-		errText:         lipgloss.NewStyle().Foreground(red).Bold(true),
-		interrupted:     lipgloss.NewStyle().Foreground(faint).Italic(true),
-		raw:             lipgloss.NewStyle().Foreground(faint).Italic(true),
-		help:            helpStyles(muted, faint, nil),
-		helpBar:         helpStyles(muted, faint, barBG),
+		assistant:           lipgloss.NewStyle().Foreground(body),
+		roleLabel:           lipgloss.NewStyle().Foreground(muted).Bold(true),
+		assistantGutter:     lipgloss.NewStyle().Foreground(faint),
+		inputBorder:         lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(accent),
+		inputBorderBusy:     lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(faint),
+		turnFooter:          lipgloss.NewStyle().Foreground(faint),
+		step:                lipgloss.NewStyle().Foreground(faint),
+		stepErr:             lipgloss.NewStyle().Foreground(red),
+		stepOK:              lipgloss.NewStyle().Foreground(green),
+		errText:             lipgloss.NewStyle().Foreground(red).Bold(true),
+		interrupted:         lipgloss.NewStyle().Foreground(faint).Italic(true),
+		raw:                 lipgloss.NewStyle().Foreground(faint).Italic(true),
+		pickerPreview:       lipgloss.NewStyle().Foreground(body),
+		pickerDivider:       lipgloss.NewStyle().Foreground(faint),
+		pickerHint:          lipgloss.NewStyle().Foreground(faint),
+		pickerRenamePrompt:  lipgloss.NewStyle().Foreground(accent).Bold(true),
+		pickerDeleteConfirm: lipgloss.NewStyle().Foreground(red).Bold(true),
+		help:                helpStyles(muted, faint, nil),
+		helpBar:             helpStyles(muted, faint, barBG),
 	}
 }
 

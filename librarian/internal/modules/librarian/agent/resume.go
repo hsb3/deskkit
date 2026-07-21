@@ -41,12 +41,17 @@ import (
 const transcriptCap = 200
 
 // ConversationInfo is one row of the resume picker: a manual run and the fields needed to list
-// and identify it. Title prefers the input summary, falling back to the display label.
+// and identify it. Title prefers the input summary, falling back to the display label. MsgCount is
+// the count of persisted messages rows for the run; LastActivity is the most-recent message's
+// created timestamp (falling back to Started when the run has no messages) — the two the sessions
+// surface renders alongside the title so a reader can size and age a conversation before resuming.
 type ConversationInfo struct {
-	RunID   string
-	Title   string
-	Started types.DateTime
-	Status  string
+	RunID        string
+	Title        string
+	Started      types.DateTime
+	Status       string
+	MsgCount     int
+	LastActivity types.DateTime
 }
 
 // TranscriptEntry is one rendered line of a resumed conversation. ToolName is set for tool rows
@@ -78,11 +83,27 @@ func ListConversations(app core.App, limit int, excludeRunID string) ([]Conversa
 		if title == "" {
 			title = r.GetString("run_label")
 		}
+		// Per-run message count + last activity. pickerLimit is small (50) and both are fast local
+		// reads on the (run) index, so a per-run query is fine here rather than a grouped join.
+		count, err := app.CountRecords("messages", dbx.HashExp{"run": r.Id})
+		if err != nil {
+			return nil, err
+		}
+		last := r.GetDateTime("started") // fall back to the run's start when it has no messages
+		latest, err := app.FindRecordsByFilter("messages", "run = {:r}", "-created", 1, 0, dbx.Params{"r": r.Id})
+		if err != nil {
+			return nil, err
+		}
+		if len(latest) > 0 {
+			last = latest[0].GetDateTime("created")
+		}
 		out = append(out, ConversationInfo{
-			RunID:   r.Id,
-			Title:   title,
-			Started: r.GetDateTime("started"),
-			Status:  r.GetString("status"),
+			RunID:        r.Id,
+			Title:        title,
+			Started:      r.GetDateTime("started"),
+			Status:       r.GetString("status"),
+			MsgCount:     int(count),
+			LastActivity: last,
 		})
 	}
 	return out, nil
@@ -216,32 +237,50 @@ func lastAssistant(history []*schema.Message) *schema.Message {
 // the most recent transcriptCap rows. Tool steps are included so the human sees the full
 // exchange; ToolName is set on tool rows and tool-calling assistant rows.
 func buildTranscript(rows []*core.Record) []TranscriptEntry {
-	var visible []*core.Record
+	return renderTranscriptRows(nonSystemRows(rows), transcriptCap)
+}
+
+// nonSystemRows drops the system rows (never shown to the human), preserving order. System rows
+// are the model's own prompt scaffolding, not part of the readable exchange.
+func nonSystemRows(rows []*core.Record) []*core.Record {
+	visible := make([]*core.Record, 0, len(rows))
 	for _, r := range rows {
 		if r.GetString("role") == "system" {
 			continue
 		}
 		visible = append(visible, r)
 	}
-	if len(visible) > transcriptCap {
-		visible = visible[len(visible)-transcriptCap:]
-	}
+	return visible
+}
 
-	out := make([]TranscriptEntry, 0, len(visible))
-	for _, r := range visible {
-		role := r.GetString("role")
-		e := TranscriptEntry{Role: role, Text: r.GetString("content")}
-		switch role {
-		case "assistant":
-			if calls := toolCallsOf(r); len(calls) > 0 {
-				e.ToolName = calls[0].Function.Name
-			}
-		case "tool":
-			e.ToolName = r.GetString("tool_name")
-		}
-		out = append(out, e)
+// renderTranscriptRows renders the given rows as TranscriptEntry values, keeping only the most
+// recent maxRows when the slice is longer (maxRows <= 0 keeps all). Shared by buildTranscript
+// (resume) and PreviewConversation (the picker's preview pane) so the two render identically.
+func renderTranscriptRows(rows []*core.Record, maxRows int) []TranscriptEntry {
+	if maxRows > 0 && len(rows) > maxRows {
+		rows = rows[len(rows)-maxRows:]
+	}
+	out := make([]TranscriptEntry, 0, len(rows))
+	for _, r := range rows {
+		out = append(out, renderTranscriptRow(r))
 	}
 	return out
+}
+
+// renderTranscriptRow renders one message row as a TranscriptEntry. ToolName is set on a
+// tool-calling assistant row (the invoked tool) and on a tool row (its tool_name), empty otherwise.
+func renderTranscriptRow(r *core.Record) TranscriptEntry {
+	role := r.GetString("role")
+	e := TranscriptEntry{Role: role, Text: r.GetString("content")}
+	switch role {
+	case "assistant":
+		if calls := toolCallsOf(r); len(calls) > 0 {
+			e.ToolName = calls[0].Function.Name
+		}
+	case "tool":
+		e.ToolName = r.GetString("tool_name")
+	}
+	return e
 }
 
 // hasToolCalls reports whether a message row carries tool calls, judged by the raw field alone.

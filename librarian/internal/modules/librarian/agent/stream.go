@@ -57,6 +57,15 @@ type Event struct {
 	Err      string    `json:"err,omitempty"` // terminal error text; on tool_end, a failed call's error
 	Canceled bool      `json:"canceled,omitempty"`
 	Partial  string    `json:"partial,omitempty"`
+
+	// Token accounting, set on the terminal event only (final|error). PromptTokens is the LAST
+	// model step's prompt count — that step's prompt already includes the full replayed history +
+	// tool results, so it IS the live thread's current context size; CompletionTokens sums the
+	// generated tokens across the turn's model steps; TotalTokens is their sum. Zero (omitted)
+	// when the provider reported no usage. Serializable-only, so this rides the future SSE payload.
+	PromptTokens     int `json:"prompt_tokens,omitempty"`
+	CompletionTokens int `json:"completion_tokens,omitempty"`
+	TotalTokens      int `json:"total_tokens,omitempty"`
 }
 
 // errSessionBusy rejects an overlapping turn: a Session drives one turn at a time.
@@ -143,8 +152,10 @@ func (s *Session) runTurn(ctx context.Context, userInput string, ch chan<- Event
 		out, runErr = schema.ConcatMessageStream(sr)
 	}
 
-	// Ordering guarantee: all token/tool events are emitted before the terminal event.
+	// Ordering guarantee: all token/tool events are emitted before the terminal event. After the
+	// wait every step's token reader has folded its usage in, so the accumulated counts are final.
 	te.wg.Wait()
+	promptTok, completionTok, totalTok := te.usage()
 
 	if runErr == nil && out != nil {
 		// Step 5 — success.
@@ -154,7 +165,10 @@ func (s *Session) runTurn(ctx context.Context, userInput string, ch chan<- Event
 		s.history = append(s.history, out)
 		s.history = capHistory(s.history)
 		s.last = out
-		ch <- Event{Kind: EventFinal, Content: out.Content}
+		ch <- Event{
+			Kind: EventFinal, Content: out.Content,
+			PromptTokens: promptTok, CompletionTokens: completionTok, TotalTokens: totalTok,
+		}
 		return
 	}
 
@@ -192,7 +206,11 @@ func (s *Session) runTurn(ctx context.Context, userInput string, ch chan<- Event
 	if runErr != nil {
 		errText = runErr.Error()
 	}
-	ch <- Event{Kind: EventError, Err: errText, Canceled: canceled, Partial: partial}
+	// Report whatever usage was counted even on a partial/canceled turn (0 is omitted).
+	ch <- Event{
+		Kind: EventError, Err: errText, Canceled: canceled, Partial: partial,
+		PromptTokens: promptTok, CompletionTokens: completionTok, TotalTokens: totalTok,
+	}
 }
 
 // turnEvents fans the eino model/tool callbacks of one turn into Event values on ch. Token
@@ -207,6 +225,14 @@ type turnEvents struct {
 	step     int
 	lastText strings.Builder
 	stepDone chan struct{}
+
+	// Accumulated token usage across the turn's model steps (guarded by mu; folded in by each
+	// step's token reader as it drains). promptTokens holds the LAST step's prompt count (the
+	// current context size); completionTokens sums generated tokens across steps; totalTokens is
+	// their sum. Read once, after wg.Wait(), via usage().
+	promptTokens     int
+	completionTokens int
+	totalTokens      int
 }
 
 // partial returns the current/last step's accumulated text under the lock.
@@ -214,6 +240,14 @@ func (te *turnEvents) partial() string {
 	te.mu.Lock()
 	defer te.mu.Unlock()
 	return te.lastText.String()
+}
+
+// usage returns the turn's accumulated token counts under the lock. Call only after wg.Wait(),
+// once every step's token reader has folded its usage in.
+func (te *turnEvents) usage() (prompt, completion, total int) {
+	te.mu.Lock()
+	defer te.mu.Unlock()
+	return te.promptTokens, te.completionTokens, te.totalTokens
 }
 
 // handler builds the events callback (ChatModel stream output + Tool start/end/error).
@@ -233,12 +267,21 @@ func (te *turnEvents) handler() callbacks.Handler {
 				defer te.wg.Done()
 				defer close(done)
 				defer output.Close()
+				// Track the last non-nil usage this step reports (typically only the final chunk
+				// carries it; schema.ConcatMessageStream max-merges, but the live source is here).
+				var stepUsage *schema.TokenUsage
 				for {
 					chunk, err := output.Recv()
 					if err != nil {
-						return // io.EOF or a cancel/stream error ends this step's tokens.
+						break // io.EOF or a cancel/stream error ends this step's tokens.
 					}
-					if chunk == nil || chunk.Message == nil || chunk.Message.Content == "" {
+					if chunk == nil || chunk.Message == nil {
+						continue
+					}
+					if rm := chunk.Message.ResponseMeta; rm != nil && rm.Usage != nil {
+						stepUsage = rm.Usage // both pointers may be nil — checked above.
+					}
+					if chunk.Message.Content == "" {
 						continue
 					}
 					delta := chunk.Message.Content
@@ -246,6 +289,17 @@ func (te *turnEvents) handler() callbacks.Handler {
 					te.lastText.WriteString(delta)
 					te.mu.Unlock()
 					te.ch <- Event{Kind: EventToken, Step: myStep, Token: delta}
+				}
+				// Fold this step's usage into the turn totals under the lock. Steps fold in order —
+				// the tool callback waits on `done` (closed by this goroutine's defer), so step N's
+				// fold completes before step N+1's model call — so "last step's prompt wins" is
+				// deterministic even though folds happen on separate goroutines.
+				if stepUsage != nil {
+					te.mu.Lock()
+					te.promptTokens = stepUsage.PromptTokens
+					te.completionTokens += stepUsage.CompletionTokens
+					te.totalTokens = te.promptTokens + te.completionTokens
+					te.mu.Unlock()
 				}
 			}()
 			return ctx

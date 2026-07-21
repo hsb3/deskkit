@@ -79,6 +79,52 @@ func TestLoadEnvProvidesIdentity(t *testing.T) {
 	}
 }
 
+// TestLoadContextWindow covers LLMContextWindow: env LLM_CONTEXT_WINDOW > profile
+// models.context_window > 0 (0 = unset; the TUI's per-model table default applies).
+func TestLoadContextWindow(t *testing.T) {
+	dir := t.TempDir()
+	restore := chdir(t, dir)
+	defer restore()
+	t.Setenv("DESK_ROOT", dir)
+	t.Setenv("DESK_NAME", "example-desk")
+
+	// Default: 0 (unset).
+	os.Unsetenv("LLM_CONTEXT_WINDOW")
+	cfg, err := Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.LLMContextWindow != 0 {
+		t.Errorf("LLMContextWindow default = %d, want 0", cfg.LLMContextWindow)
+	}
+
+	// Profile supplies it when the env var is unset.
+	if err := os.MkdirAll(filepath.Join(dir, "_knowledge"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	profile := "desk:\n  name: example-desk\nmodels:\n  context_window: 128000\n"
+	if err := os.WriteFile(filepath.Join(dir, "_knowledge", "profile.yaml"), []byte(profile), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err = Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.LLMContextWindow != 128000 {
+		t.Errorf("profile models.context_window not honored: %d, want 128000", cfg.LLMContextWindow)
+	}
+
+	// Env wins over the profile.
+	t.Setenv("LLM_CONTEXT_WINDOW", "500000")
+	cfg, err = Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.LLMContextWindow != 500000 {
+		t.Errorf("LLM_CONTEXT_WINDOW env not honored: %d, want 500000", cfg.LLMContextWindow)
+	}
+}
+
 // chdir changes to dir and returns a restore func (helper — avoids leaking cwd between tests).
 func chdir(t *testing.T, dir string) func() {
 	t.Helper()
