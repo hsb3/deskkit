@@ -75,7 +75,7 @@ the exit code and has let a failing gate through before (incident, 2026-07-17).
 | `make setup` | `bun install` (plugin) + `lefthook install` (git hooks) |
 | `make build` | Build both lanes: plugin (`bun run build`) + librarian binary (version-stamped) |
 | `make test` | Fast unit tests: plugin `bun test` + librarian `go test ./...` |
-| `make check` | Repo gates: neutrality + self-test, kit-drift, prompt-drift, tool-surface drift + self-test, scaffold frontmatter, textfield-max, query-kind drift + self-test, plugin core-purity, shellcheck, actionlint, workflow SHA-pin drift + self-test |
+| `make check` | Repo gates: neutrality + self-test, kit-drift, prompt-drift, tool-surface drift + self-test, scaffold frontmatter, textfield-max, query-kind drift + self-test, plugin core-purity, shellcheck, actionlint, workflow SHA-pin drift + self-test, profile-root drift + self-test |
 | `make verify` | Librarian integration gate — `librarian/verify.sh` (55 checks, throwaway scratch desk) |
 | `make package` | Regenerate the marketplace bundle (`plugin/claude-plugin/` artifacts) |
 | `make install` | Build + install the `deskkit` binary to `~/.local/bin` (override `PREFIX=`) |
@@ -118,6 +118,7 @@ self-contained — that's why it's committed and drift-guarded.
 | Librarian Go tree stays gofmt-clean | `gofmt -l` via `make -C librarian fmt` (CI librarian lane) |
 | A tagged release has a CHANGELOG section | `scripts/check-changelog.mjs` (release gate) |
 | Every workflow `uses:` stays SHA-pinned (no mutable `@vN` tag) | `scripts/check-workflow-pins.mjs` (+ `--self-test`) |
+| Profile root (`_knowledge`) pinned identically across schema/TS/Go | `scripts/check-profile-root.mjs` (+ `--self-test`) |
 | Shell entry points stay lint-clean (install.sh, verify.sh, dogfood-*.sh, sandbox/*, record-media) | `shellcheck` (CI + `make check`) |
 
 ### Order-sensitive chains

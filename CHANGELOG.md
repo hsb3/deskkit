@@ -36,8 +36,8 @@ for why this policy exists.
 - **PM items carry a long-form `body`** (#90). New forward migration `0006_pm_items_body`
   (explicit 50,000,000-char cap per ADR 0017; PM store schema version 5 → 6) plus end-to-end
   threading: `create_item`/`update_item` tool params, `pm create`/`pm update --body` flags, and
-  `get_item` returns it (detail-only — list/context summaries stay lean). Empty on update means
-  unchanged; clearing a set body is engine-only for now.
+  `get_item` returns it (detail-only — list/context summaries stay lean). Omitting `body` on
+  update leaves it unchanged; an explicit empty `body` clears it (the #168 convention below).
 - **CI enforcement of the local-only gates** (#34, #97, #74, #35). Branch CI (and the release
   gate, as a strict superset) now runs shellcheck over the shell entry points, actionlint
   (version-pinned build via the Go toolchain), and a new SHA-pin drift guard
@@ -196,8 +196,37 @@ for why this policy exists.
     (`plugin/` bun, `librarian/` go, `librarian/verify.sh`), keeping `make test` / `make verify` as
     the canonical entries rather than hoisting suites to a root tree.
 
+- **Single authoritative profile-root constant** (first half of #84). The `_knowledge` directory
+  name now has one canonical definition (`schema/paths.yaml` `profile_root:`) with one constant
+  per lane (`plugin/core/profile.ts` `PROFILE_ROOT_DIR`, `librarian/internal/core/config`
+  `ProfileRootDir`) driving all path resolution, pinned identically by a new
+  `scripts/check-profile-root.mjs` drift guard (+ self-test) in `make check` and CI. Root
+  `_knowledge/README.md` added. The directory move itself stays gated on the #170 ruling.
+- **Hygiene gates** (#163 #164 #165 #166). A gofmt gate (`make -C librarian fmt`, run in the CI
+  librarian lane) after formatting three drifted files; the manual `dogfood-*.sh` harnesses are
+  shellcheck-clean and inside the lint gate (lint-only — still never executed in CI);
+  `librarian/verify.sh` grows 48 → 55 checks (standing coverage for `query search`/`content` and
+  orphans `--show-index`); a query-kind drift guard (`scripts/check-query-kinds.mjs` + self-test)
+  pins types.go ↔ spec §5.6 ↔ the query.go switch.
+- **PM manifest round-trip carries `body`** (#167). The importer forwards `body` end-to-end; a
+  round-trip test asserts byte-equality into a fresh store.
+- **Unset-vs-empty convention for optional string params** (#168). Presence, not value, signals
+  intent on both surfaces: an omitted param (or JSON `null`) leaves the stored field unchanged; a
+  present empty string (`--body ""`, `"body": ""`) deliberately clears it. MCP optional fields
+  move to `*string`, the CLI keys off `Flags().Changed()`; documented in `docs/pm-guide.md`.
+
 ### Changed
 
+- **Docs made true to the shipped product** (#85). The spec (`docs/pocket-librarian-v1-spec.md`,
+  path unchanged) is retitled to `deskkit` with `Status: active`; `docs/getting-started.md` leads
+  with the authenticated `gh release download` install path while the repo is private (the
+  `curl | bash` path is labeled post-public); stale `pocket-librarian` command/path references
+  swept across docs with naming-provenance mentions kept; stale spec prose corrected (query kinds
+  7 → 10, verify.sh count 48 → 55 where cited).
+- **PM spec §12 traceability** (#169) gains rows for ADR 0020 (authoritative claim semantics) and
+  the `body` field, each citing its verifying test.
+- **CI actions bumped a major** (Dependabot #106 #108 #109 #110): checkout v7, setup-node v7,
+  upload-artifact v7, claude-code-action 1.0.171 — all SHA-pinned as before.
 - **Go module renamed to its real hosting path** (#98). `librarian/go.mod` moves off the
   placeholder `github.com/example/pocket-librarian` to `github.com/hsb3/desk-standard/librarian`
   (78 importing files rewritten), unblocking the remote
