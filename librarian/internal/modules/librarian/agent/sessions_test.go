@@ -222,7 +222,7 @@ func TestListConversations_EnrichesCountAndActivity(t *testing.T) {
 		t.Fatalf("save empty run: %v", err)
 	}
 
-	convos, err := ListConversations(app, 10, "no-such-live-run")
+	convos, err := ListConversations(app, 10, "no-such-live-run", false)
 	if err != nil {
 		t.Fatalf("ListConversations: %v", err)
 	}
@@ -258,6 +258,96 @@ func TestListConversations_EnrichesCountAndActivity(t *testing.T) {
 	if !quiet.LastActivity.Equal(quiet.Started) {
 		t.Fatalf("LastActivity %v != Started %v for a run with no messages (must fall back)", quiet.LastActivity, quiet.Started)
 	}
+}
+
+// TestSetConversationArchived_SoftHideAndReveal proves archive is a soft, reversible hide: an
+// archived run drops out of the default ListConversations offers but is REVEALED with
+// includeArchived (carrying Archived=true), its messages are left intact (no cascade like delete),
+// and unarchiving returns it to the default list. A conversation is the user's own history — this
+// is not a record-original-first concern.
+func TestSetConversationArchived_SoftHideAndReveal(t *testing.T) {
+	app, cfg := newSessionTestEnv(t)
+
+	keep, err := createAgentRun(app, "manual", "keep visible", cfg)
+	if err != nil {
+		t.Fatalf("createAgentRun keep: %v", err)
+	}
+	arch, err := createAgentRun(app, "manual", "to archive", cfg)
+	if err != nil {
+		t.Fatalf("createAgentRun arch: %v", err)
+	}
+	seedMessage(t, app, arch.Id, 1, "user", "a question", nil, "")
+	seedMessage(t, app, arch.Id, 2, "assistant", "an answer", nil, "")
+
+	// Archive it.
+	if err := SetConversationArchived(app, arch.Id, true); err != nil {
+		t.Fatalf("SetConversationArchived(true): %v", err)
+	}
+
+	// Default view excludes the archived run.
+	def, err := ListConversations(app, 10, "no-live", false)
+	if err != nil {
+		t.Fatalf("ListConversations default: %v", err)
+	}
+	if idsContain(def, arch.Id) {
+		t.Error("archived run still offered in the default resume list")
+	}
+	if !idsContain(def, keep.Id) {
+		t.Error("non-archived run missing from the default list")
+	}
+
+	// Reveal includes it, marked Archived.
+	all, err := ListConversations(app, 10, "no-live", true)
+	if err != nil {
+		t.Fatalf("ListConversations reveal: %v", err)
+	}
+	var revealed *ConversationInfo
+	for i := range all {
+		if all[i].RunID == arch.Id {
+			revealed = &all[i]
+		}
+	}
+	if revealed == nil {
+		t.Fatal("archived run not revealed with includeArchived")
+	}
+	if !revealed.Archived {
+		t.Error("revealed run's Archived flag not set")
+	}
+
+	// Messages are untouched (soft, not a delete cascade).
+	if n, err := app.CountRecords("messages", dbxRun(arch.Id)); err != nil || n != 2 {
+		t.Fatalf("archived run's messages = %d (err %v), want 2 intact (archive must not cascade)", n, err)
+	}
+
+	// Unarchive returns it to the default list.
+	if err := SetConversationArchived(app, arch.Id, false); err != nil {
+		t.Fatalf("SetConversationArchived(false): %v", err)
+	}
+	back, err := ListConversations(app, 10, "no-live", false)
+	if err != nil {
+		t.Fatalf("ListConversations after unarchive: %v", err)
+	}
+	if !idsContain(back, arch.Id) {
+		t.Error("unarchived run not back in the default resume list")
+	}
+}
+
+// TestSetConversationArchived_MissingRun: archiving a nonexistent run surfaces a not-found error.
+func TestSetConversationArchived_MissingRun(t *testing.T) {
+	app, _ := newSessionTestEnv(t)
+	if err := SetConversationArchived(app, "nope-not-a-real-id", true); err == nil {
+		t.Fatal("SetConversationArchived on a missing run returned nil, want a not-found error")
+	}
+}
+
+// idsContain reports whether any listed conversation has the given run id.
+func idsContain(convos []ConversationInfo, runID string) bool {
+	for _, c := range convos {
+		if c.RunID == runID {
+			return true
+		}
+	}
+	return false
 }
 
 // dbxRun is a small test helper: the messages.run filter expression for CountRecords.

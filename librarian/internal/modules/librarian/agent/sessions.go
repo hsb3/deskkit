@@ -49,6 +49,21 @@ func DeleteConversation(app core.App, runID string) error {
 	return app.Delete(run)
 }
 
+// SetConversationArchived sets a run's archived flag. Archiving is a SOFT, reversible hide from the
+// default resume list (ListConversations excludes archived runs unless asked to include them); it
+// never removes the run or its messages — the opposite of DeleteConversation's hard cascade. A chat
+// conversation is the user's own history to organize, so toggling this flag is the user's to make
+// and is not a record-original-first boundary concern (see the file header). Toggling an
+// already-absent run surfaces the not-found error from FindRecordById.
+func SetConversationArchived(app core.App, runID string, archived bool) error {
+	run, err := app.FindRecordById("agent_runs", runID)
+	if err != nil {
+		return err
+	}
+	run.Set("archived", archived)
+	return app.Save(run)
+}
+
 // PreviewConversation returns the last maxRows non-system message rows of a run, in seq order,
 // rendered as TranscriptEntry — the recent-transcript preview the picker shows before a reader
 // commits to resuming. It reuses the same row-rendering path as the resume transcript, so the

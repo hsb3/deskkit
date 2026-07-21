@@ -156,6 +156,8 @@ footer. `ctrl+g` toggles the full keybind help below the short one. The keys:
 | `esc` | cancel an in-flight turn (badges it `(interrupted)`), or close the resume picker |
 | `ctrl+o` | resume a prior conversation |
 | `ctrl+n` | start a new conversation |
+| `a` (in the picker) | archive / unarchive the selected conversation |
+| `A` (in the picker) | show / hide archived conversations |
 | `ctrl+t` | toggle tool-step detail |
 | `ctrl+y` | copy the last answer's raw markdown (toasts a confirmation) |
 | `ctrl+g` | toggle the full keybind help |
@@ -165,7 +167,11 @@ footer. `ctrl+g` toggles the full keybind help below the short one. The keys:
 
 `ctrl+o` lists recent prior chat conversations — only ones that reached at least one
 turn — and resuming one restores the transcript and continues the model with full
-context. Conversations are not a separate store: they live in the same store as
+context. In the picker you can rename (`r`), delete (`d`, behind a confirm), or archive
+(`a`) a conversation. Archiving is a soft, reversible hide — the conversation and its
+messages are kept, just dropped from the default list; `A` reveals archived
+conversations so you can `a` again to unarchive one. Delete stays a distinct hard
+removal. Conversations are not a separate store: they live in the same store as
 everything else. When prior conversations exist, `chat` is resume-first: it opens on
 that same sessions list at launch, so you land on your history instead of a blank
 session — `esc` (or `ctrl+n`) drops into a fresh conversation. A first-run desk with no

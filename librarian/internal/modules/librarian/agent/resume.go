@@ -52,6 +52,7 @@ type ConversationInfo struct {
 	Status       string
 	MsgCount     int
 	LastActivity types.DateTime
+	Archived     bool // soft-archived (hidden from the default resume list; see SetConversationArchived)
 }
 
 // TranscriptEntry is one rendered line of a resumed conversation. ToolName is set for tool rows
@@ -63,17 +64,23 @@ type TranscriptEntry struct {
 }
 
 // ListConversations returns the most recent manual (chat) runs, newest started first, capped to
-// limit. Three kinds of runs are excluded because they are not resumable conversations:
+// limit. Kinds of runs excluded because they are not resumable conversations to offer:
 //   - non-manual runs (hook/cron/task);
 //   - the caller's own live run (excludeRunID) — a chat session creates its run row at launch,
 //     so without this the picker's newest (default-selected) row is always the current session
 //     itself, and "resuming" it replays an empty history;
 //   - runs with an empty input_summary — the summary is backfilled on a run's first turn, so an
-//     empty one means the run never had a turn and there is nothing to resume.
-func ListConversations(app core.App, limit int, excludeRunID string) ([]ConversationInfo, error) {
+//     empty one means the run never had a turn and there is nothing to resume;
+//   - archived runs, UNLESS includeArchived is set — a soft-archive hides a conversation from the
+//     default resume list; passing includeArchived reveals them (so the sessions manager can offer
+//     an unarchive). Archived runs come back with Archived set so the caller can mark them.
+func ListConversations(app core.App, limit int, excludeRunID string, includeArchived bool) ([]ConversationInfo, error) {
+	filter := "trigger = {:t} && id != {:x} && input_summary != ''"
+	if !includeArchived {
+		filter += " && archived != true"
+	}
 	runs, err := app.FindRecordsByFilter("agent_runs",
-		"trigger = {:t} && id != {:x} && input_summary != ''",
-		"-started", limit, 0, dbx.Params{"t": "manual", "x": excludeRunID})
+		filter, "-started", limit, 0, dbx.Params{"t": "manual", "x": excludeRunID})
 	if err != nil {
 		return nil, err
 	}
@@ -104,6 +111,7 @@ func ListConversations(app core.App, limit int, excludeRunID string) ([]Conversa
 			Status:       r.GetString("status"),
 			MsgCount:     int(count),
 			LastActivity: last,
+			Archived:     r.GetBool("archived"),
 		})
 	}
 	return out, nil

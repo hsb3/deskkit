@@ -29,8 +29,9 @@ type fakeProvider struct {
 	resumeSess streamer // the session handed back by the last resume (for identity assertions)
 	freshSess  streamer // the session handed back by the last fresh
 
-	listExcluded string // the excludeRunID the model passed on the last list call
-	listCalls    int    // how many times list was called (a reload after rename/delete calls it)
+	listExcluded        string // the excludeRunID the model passed on the last list call
+	listIncludeArchived bool   // the includeArchived flag the model passed on the last list call
+	listCalls           int    // how many times list was called (a reload after rename/delete calls it)
 
 	// Sessions-manager recording (rename/delete/preview), mirroring the resumeErr/freshErr pattern.
 	renamedID    string
@@ -38,15 +39,50 @@ type fakeProvider struct {
 	renameErr    error
 	deletedID    string
 	deleteErr    error
+	archivedID   string // last run passed to setArchived
+	archivedFlag bool   // last archived value passed to setArchived
+	archiveErr   error
 	previewedID  string
 	previewData  []agent.TranscriptEntry
 	previewErr   error
 }
 
-func (f *fakeProvider) list(limit int, excludeRunID string) ([]agent.ConversationInfo, error) {
+// list mimics the store: with includeArchived false it filters out convos whose Archived flag is
+// set (the default-hide behavior), else it returns them all — so the picker's archive/reveal round
+// trip is exercised against realistic list results.
+func (f *fakeProvider) list(limit int, excludeRunID string, includeArchived bool) ([]agent.ConversationInfo, error) {
 	f.listExcluded = excludeRunID
+	f.listIncludeArchived = includeArchived
 	f.listCalls++
-	return f.convos, f.listErr
+	if f.listErr != nil {
+		return nil, f.listErr
+	}
+	if includeArchived {
+		return f.convos, nil
+	}
+	out := make([]agent.ConversationInfo, 0, len(f.convos))
+	for _, c := range f.convos {
+		if !c.Archived {
+			out = append(out, c)
+		}
+	}
+	return out, nil
+}
+
+// setArchived records the toggle and mutates the fake's convo set so a subsequent list reflects it,
+// modelling the store's soft, reversible archive.
+func (f *fakeProvider) setArchived(runID string, archived bool) error {
+	if f.archiveErr != nil {
+		return f.archiveErr
+	}
+	f.archivedID = runID
+	f.archivedFlag = archived
+	for i := range f.convos {
+		if f.convos[i].RunID == runID {
+			f.convos[i].Archived = archived
+		}
+	}
+	return nil
 }
 
 func (f *fakeProvider) rename(runID, title string) error {
@@ -387,6 +423,14 @@ func filterKey(m model) model { return send(m, tea.KeyPressMsg{Code: '/'}) }
 func escKey(m model) model    { return send(m, tea.KeyPressMsg{Code: tea.KeyEscape}) }
 func enterKey(m model) model  { return send(m, tea.KeyPressMsg{Code: tea.KeyEnter}) }
 func downKey(m model) model   { return send(m, tea.KeyPressMsg{Code: tea.KeyDown}) }
+func archiveKey(m model) model {
+	return send(m, tea.KeyPressMsg{Code: 'a'})
+}
+func showArchivedKey(m model) model {
+	// A real shift+a arrives as Code 'a' + ModShift with Text "A"; String() (what key.Matches reads)
+	// falls back to the "A" text, matching the "A" binding.
+	return send(m, tea.KeyPressMsg{Code: 'a', Mod: tea.ModShift, Text: "A"})
+}
 
 // TestPicker_PreviewLoadsOnOpenAndMove: the preview pane loads the highlighted run on open and
 // re-loads it as the cursor moves — a fast local query per selection.
@@ -661,5 +705,127 @@ func TestPicker_FilterRoutesKeys(t *testing.T) {
 	}
 	if m.picker.settingFilter() {
 		t.Error("esc did not cancel the filtering state")
+	}
+}
+
+// TestPicker_OpensDefaultView: a fresh open lists with archived excluded and the reveal off.
+func TestPicker_OpensDefaultView(t *testing.T) {
+	m, fp := twoConvoModel(t)
+	if fp.listIncludeArchived {
+		t.Error("initial open listed with archived included; the default view must hide archived")
+	}
+	if m.picker.showArchived {
+		t.Error("a fresh picker must open with the archived reveal off")
+	}
+}
+
+// TestPicker_ArchiveHidesFromDefault: `a` soft-archives the highlighted conversation, which then
+// drops out of the default (archived-hidden) list on reload; the selection settles on the remaining
+// row. Archive is a store toggle, never a delete.
+func TestPicker_ArchiveHidesFromDefault(t *testing.T) {
+	m, fp := twoConvoModel(t) // run-1 (selected), run-2 — both active
+
+	m = archiveKey(m)
+
+	if fp.archivedID != "run-1" || fp.archivedFlag != true {
+		t.Fatalf("archive called with (%q, %v), want (run-1, true)", fp.archivedID, fp.archivedFlag)
+	}
+	if fp.deletedID != "" {
+		t.Errorf("archive triggered a delete (id = %q); archive must be soft, never a delete", fp.deletedID)
+	}
+	if got := len(m.picker.list.Items()); got != 1 {
+		t.Fatalf("after archiving run-1, default list = %d rows, want 1 (archived hidden)", got)
+	}
+	if m.picker.selectedRunID() != "run-2" {
+		t.Errorf("selection did not settle on the remaining run-2 (got %q)", m.picker.selectedRunID())
+	}
+	if m.picker == nil || m.picker.mode != pickerBrowse {
+		t.Error("picker did not return to browse mode after archiving")
+	}
+}
+
+// TestPicker_ShowArchivedAndUnarchive: the reveal key (`A`) exposes archived conversations (marked
+// in the view), and `a` on a revealed archived row unarchives it — the archive/unarchive round-trip.
+func TestPicker_ShowArchivedAndUnarchive(t *testing.T) {
+	m, fp := twoConvoModel(t)
+
+	// Archive run-1 out of the default view.
+	m = archiveKey(m)
+	if len(m.picker.list.Items()) != 1 {
+		t.Fatalf("run-1 not hidden after archive; list = %d rows", len(m.picker.list.Items()))
+	}
+
+	// Reveal archived conversations.
+	m = showArchivedKey(m)
+	if !m.picker.showArchived {
+		t.Fatal("A did not enable the archived reveal")
+	}
+	if !fp.listIncludeArchived {
+		t.Fatal("the reveal must re-list with archived included")
+	}
+	if got := len(m.picker.list.Items()); got != 2 {
+		t.Fatalf("revealed list = %d rows, want 2 (archived shown alongside active)", got)
+	}
+	if !strings.Contains(m.View().Content, "archived") {
+		t.Error("the revealed archived row is not marked 'archived' in the composed view")
+	}
+
+	// Select the archived run-1 (newest, index 0) and unarchive it.
+	m.picker.list.Select(0)
+	if m.picker.selectedRunID() != "run-1" {
+		t.Fatalf("expected run-1 selected at index 0, got %q", m.picker.selectedRunID())
+	}
+	if !m.picker.selectedArchived() {
+		t.Fatal("run-1 should read as archived before the unarchive toggle")
+	}
+
+	m = archiveKey(m) // toggle: run-1 is archived → unarchive
+
+	if fp.archivedID != "run-1" || fp.archivedFlag != false {
+		t.Fatalf("unarchive called with (%q, %v), want (run-1, false)", fp.archivedID, fp.archivedFlag)
+	}
+	// Still revealed, both rows present, run-1 no longer archived in the store.
+	if got := len(m.picker.list.Items()); got != 2 {
+		t.Errorf("list = %d rows after unarchive in the reveal view, want 2", got)
+	}
+	for _, c := range fp.convos {
+		if c.RunID == "run-1" && c.Archived {
+			t.Error("run-1 still archived in the store after the unarchive toggle")
+		}
+	}
+}
+
+// TestPicker_ArchiveEmpty_NoOp: with no selection (empty list), `a` does not call setArchived and
+// leaves the overlay open.
+func TestPicker_ArchiveEmpty_NoOp(t *testing.T) {
+	m, _, fp := newTestModelWithProvider(t, &fakeProvider{})
+	m = openPickerKey(m)
+	if m.picker == nil {
+		t.Fatal("picker not open")
+	}
+	m = archiveKey(m)
+	if fp.archivedID != "" {
+		t.Errorf("archive called on an empty selection (id = %q)", fp.archivedID)
+	}
+	if m.picker == nil {
+		t.Error("archive on an empty list closed the overlay; it must be a no-op")
+	}
+}
+
+// TestPicker_ArchiveErrorDismisses: a failed setArchived dismisses the overlay with a visible inline
+// error, mirroring the rename/delete degraded paths.
+func TestPicker_ArchiveErrorDismisses(t *testing.T) {
+	fp := &fakeProvider{
+		convos:     []agent.ConversationInfo{{RunID: "run-1", Title: "a chat", Status: "succeeded"}},
+		archiveErr: context.DeadlineExceeded,
+	}
+	m, _, _ := newTestModelWithProvider(t, fp)
+	m = openPickerKey(m)
+	m = archiveKey(m)
+	if m.picker != nil {
+		t.Error("a failed archive did not dismiss the overlay")
+	}
+	if len(m.entries) == 0 || !m.entries[len(m.entries)-1].isError {
+		t.Error("a failed archive did not append a visible inline error")
 	}
 }
