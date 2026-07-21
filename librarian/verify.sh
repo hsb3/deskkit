@@ -89,6 +89,8 @@ XDG2=""
 DESK2=""
 DIR3=""
 XDG4=""
+XDG5=""
+DESK5=""
 
 # shellcheck disable=SC2329,SC2317  # invoked indirectly via the `trap cleanup EXIT` below; SC2317 is the same finding under newer shellcheck (runner) versions
 cleanup() {
@@ -100,6 +102,8 @@ cleanup() {
   [ -n "$DESK2" ] && { chmod -R u+w "$DESK2" 2>/dev/null || true; rm -rf "$DESK2"; }
   [ -n "$DIR3" ] && { chmod -R u+w "$DIR3" 2>/dev/null || true; rm -rf "$DIR3"; }
   [ -n "$XDG4" ] && { chmod -R u+w "$XDG4" 2>/dev/null || true; rm -rf "$XDG4"; }
+  [ -n "$XDG5" ] && { chmod -R u+w "$XDG5" 2>/dev/null || true; rm -rf "$XDG5"; }
+  [ -n "$DESK5" ] && { chmod -R u+w "$DESK5" 2>/dev/null || true; rm -rf "$DESK5"; }
 }
 trap cleanup EXIT
 
@@ -397,6 +401,79 @@ RC=$?
   && [ "$(cat "$XDG4/deskkit/legacy-desk/marker.txt" 2>/dev/null)" = "legacy-marker" ] \
   && [ "$(echo "$MIG_OUT" | grep -c 'deskkit: migrated store')" -eq 1 ]
 check "legacy store auto-migrated to the deskkit home (one log line; contents intact)" $?
+
+# --- 15. content search + retrieval + orphans index/entry visibility (isolated scratch) ----
+# The query surfaces added in the recent content-index work — `query search` (keyword retrieval
+# over the swept file body), `query content` (fetch one file's stored body by path), and the
+# orphans `--show-index` flag (reveal the by-design-unreferenced index/entry files hidden from the
+# default view) — are exercised here against their OWN throwaway XDG home + desk, fully isolated
+# from the main run above: no propose-fix/apply-fix ever touches these fixtures, so the
+# record-original/restore reproducibility invariant (sections 9-10) is untouched. XDG5/DESK5 are
+# declared (empty) up top so the single EXIT trap removes them. The store self-initializes on the
+# first sweep (ADR 0003), so no explicit `migrate up` is needed here.
+XDG5=$(mktemp -d "${TMPDIR:-/tmp}/deskkit-xdg5.XXXXXX")
+DESK5=$(mktemp -d "${TMPDIR:-/tmp}/deskkit-desk5.XXXXXX")
+mkdir -p "$DESK5/tasks"
+
+# A fully-conformant task (no rule violations) carrying a distinctive token in its body, for the
+# search-hit and content-retrieval assertions.
+cat > "$DESK5/tasks/searchable.md" <<'EOF'
+---
+type: task
+created: 2026-07-20
+updated: 2026-07-20
+tags: []
+synopsis: "content-search fixture"
+---
+The librarian indexes this body so keyword search can locate the marker zephyrmarker7788 here.
+EOF
+
+# An index/entry file (basename README.md) with NO frontmatter -> empty doctype -> a structural
+# orphan that the DEFAULT orphans view hides (an index doc is what other docs point at, never a
+# misfiled orphan) and that --show-index opts back in.
+cat > "$DESK5/README.md" <<'EOF'
+Desk index page — deliberately frontmatter-free.
+EOF
+
+run5() { XDG_DATA_HOME="$XDG5" DESK_ROOT="$DESK5" DESK_NAME="verify-queries" ./"$BIN" "$@"; }
+
+run5 sweep > /dev/null 2>&1
+check "queries: sweep self-inits + indexes the isolated query desk" $?
+
+# search: a hit for the seeded token, no hit for an absent one.
+SEARCH_HIT=$(run5 query search --term zephyrmarker7788)
+HIT_COUNT=$(echo "$SEARCH_HIT" | jq -r '.count')
+echo "$SEARCH_HIT" | jq -e 'any(.matches[].path; . == "tasks/searchable.md")' > /dev/null
+HIT_HAS_FILE=$?
+[ "$HIT_COUNT" -ge 1 ] && [ "$HIT_HAS_FILE" -eq 0 ]
+check "query search: seeded token hits its file (count=$HIT_COUNT, matches tasks/searchable.md)" $?
+
+SEARCH_MISS=$(run5 query search --term absent_token_should_not_match_9999)
+MISS_COUNT=$(echo "$SEARCH_MISS" | jq -r '.count')
+[ "$MISS_COUNT" -eq 0 ]
+check "query search: an absent term returns no matches (count=$MISS_COUNT)" $?
+
+# content: retrieve the full stored body by path (found=true), and a missing path (found=false).
+CONTENT_HIT=$(run5 query content --path tasks/searchable.md)
+echo "$CONTENT_HIT" | jq -e '.found == true and (.content | contains("zephyrmarker7788"))' > /dev/null
+check "query content: retrieves the stored body for a live path (found=true, body present)" $?
+
+CONTENT_MISS=$(run5 query content --path tasks/does-not-exist.md)
+echo "$CONTENT_MISS" | jq -e '.found == false' > /dev/null
+check "query content: a path with no live row returns found=false" $?
+
+# orphans: the index/entry README is hidden by default, revealed by --show-index.
+ORPH_DEFAULT=$(run5 query orphans)
+ORPH_DEF_COUNT=$(echo "$ORPH_DEFAULT" | jq -r '.count')
+[ "$ORPH_DEF_COUNT" -eq 0 ]
+check "query orphans (default) hides the index/entry README (count=$ORPH_DEF_COUNT)" $?
+
+ORPH_SHOWN=$(run5 query orphans --show-index)
+ORPH_SHOWN_COUNT=$(echo "$ORPH_SHOWN" | jq -r '.count')
+echo "$ORPH_SHOWN" | jq -e 'any(.files[].path; . == "README.md")' > /dev/null
+SHOWN_HAS_README=$?
+[ "$ORPH_SHOWN_COUNT" -ge 1 ] && [ "$SHOWN_HAS_README" -eq 0 ]
+check "query orphans --show-index reveals the index/entry README (count=$ORPH_SHOWN_COUNT)" $?
 
 # --- done ----------------------------------------------------------------------------------
 echo
