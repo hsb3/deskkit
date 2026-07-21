@@ -1,7 +1,7 @@
 _Session-to-session bridge for desk-standard. Read this before working; update it at the end
 of any substantial session. Secret-free — live URLs/credentials belong in `_meta/operations/`
 (untracked) if that dir is ever created._
-Status: active (2026-07-21)
+Status: active (2026-07-21, post wave-v2 run)
 
 # HANDOFF
 
@@ -24,8 +24,34 @@ issue bodies, and the friction ledger live there.
 
 ## 1. Current standing + top priority
 
-**SESSION 2026-07-21 (delivery-wave run) — the ENTIRE #155 delivery plan, waves 0–3, executed
-and merged: 7 PRs (#156–#162), 20 issues closed, main at `001e0e6`, all gates green.**
+**SESSION 2026-07-21 late (triage + wave-v2 run) — pinned #155 refreshed with delivery plan v2
+and the plan executed the same session: 4 PRs (#172–#175) merged, 9 issues closed (#82 #85
+#163–#169), #84's first half shipped, main at `eca19d6`, `make check`/`make test`/`make verify`
+(55/55) green on the final union, main CI green.** Fable-led foreman session; 4 worktree-isolated
+opus-lead crews (each spawning its own builders), every branch gate-verified by the session
+before landing:
+- **#172** docs-accuracy (closed epic #85) — spec retitled `deskkit` + `Status: active`
+  (file path unchanged — load-bearing), getting-started leads with the authed `gh release
+  download` path, stale-ref sweep with a justified-survivals table.
+- **#174** hygiene gates (closed #163–#166) — gofmt gate (`make -C librarian fmt`, CI librarian
+  lane), dogfood-*.sh shellcheck-clean + in the lint set, verify.sh **48 → 55 checks**
+  (search/content/orphans coverage), query-kind drift guard `check-query-kinds.mjs` (+self-test).
+- **#175** PM polish (closed #167–#169) — manifest `body` round-trip; **unset-vs-empty ruled as
+  presence-not-value** (omission/`null` = unchanged; present `""`/`--body ""` = clear; MCP
+  optional fields → `*string`, CLI keys off `Flags().Changed()`; documented in pm-guide); spec
+  §12 rows for ADR 0020 + body.
+- **#173** profile-root constant (**first half of #84**) — canonical `schema/paths.yaml`
+  `profile_root:`, lane constants `PROFILE_ROOT_DIR` (TS) / `ProfileRootDir` (Go), drift guard
+  `check-profile-root.mjs` (+self-test) in `make check` + CI, root `_knowledge/README.md`.
+  **The move half is gated by #170** (triage found the epic's "decision 0021 F5" provenance
+  exists nowhere in-repo — the move TARGET was never ruled; move-day site checklist is a comment
+  on #84). Also merged: the 4 Dependabot action-major PRs (#106 #108 #109 #110 — checkout v7,
+  setup-node v7, upload-artifact v7, claude-code-action 1.0.171; their `claude-review` failures
+  are dependabot-can't-read-secrets, and it's not a required check). 9 new issues filed at
+  triage (#163–#171); #163–#169 closed same-day, #170 (owner) + #171 (TUI backlog) remain.
+
+**PREVIOUS SESSION 2026-07-21 (delivery-wave run) — the ENTIRE #155 delivery plan v1, waves 0–3,
+executed and merged: 7 PRs (#156–#162), 20 issues closed, all gates green.**
 Fable-led foreman session; each branch built by an isolated worktree crew (builders or
 lead-driven teams), every branch gate-verified independently by the session before landing,
 every claude-review thread dispositioned (applied or declined-with-reasoning):
@@ -67,8 +93,12 @@ bundle) — not repeated here.
 
 **NEXT, in order of consequence:**
 1. **Release cut (owner-gated)** — `[Unreleased]` now holds the v1 wave + 0.8.0 floor + #152 +
-   the ENTIRE delivery-wave run; `make version-status` will shout. Runbook
-   `docs/development/releasing.md`.
+   BOTH delivery-wave runs (v1: #156–#162; v2: #172–#175); `make version-status` will shout.
+   Runbook `docs/development/releasing.md`. Everything buildable without an owner ruling has
+   shipped — the owner-decision queue (see #155's "Decision gaps" section) is now the bottleneck:
+   ADR 0020 review · desk-pm fold · #170 move target · #81 K24 defaults · #83 seed re-blessing +
+   ADR-0008 amendment · #126 sims · #36 design · #88 scoping. Consider batching these through the
+   owner-signoff HTML form.
 2. **Owner review of ADR 0020** — accepted at PR #161 merge by the coordinating session per the
    delivery plan's mechanism; supersede if the advisory reading is preferred (revert set listed
    in the ADR).
@@ -106,8 +136,11 @@ test-hygiene; #12 stays ON HOLD (owner ruling above); #36 needs a design ruling 
 
 ## 2. Recent deliveries (newest first — full detail in the cited PRs / ADRs / issues)
 
-- **2026-07-21 — delivery-wave run: PRs #156–#162 merged, 20 issues closed.** See §1 top entry
-  and issue #155's "Delivery plan — EXECUTED" section.
+- **2026-07-21 late — triage + wave-v2 run: PRs #172–#175 merged, 9 issues closed, 9 filed,
+  Dependabot majors merged, #155 refreshed twice.** See §1 top entry and #155's "Delivery plan
+  v2 — EXECUTED" section.
+- **2026-07-21 — delivery-wave run: PRs #156–#162 merged, 20 issues closed.** See §1 second entry
+  and issue #155's "Delivery plan v1 — EXECUTED" section.
 - **2026-07-21 — PR #152 merged** (`bbfc1a8`, closed #148–#151): the 2026-07-20 agent-led
   integration-testing wave's 4 bug fixes (#148 $TMPDIR dev-mode stdout corruption, #149 MaxStep
   transcript drop, #150 pre-cobra flag guard, #151 skill prose); 12 review threads
@@ -187,6 +220,17 @@ session). Only what CLAUDE.md doesn't cover lives below._
 
 ## 5. Incident log
 
+- 2026-07-21 (wave-v2 run): the worker→root notification-routing quirk (next entry) recurred
+  three times; the documented relay pattern (root forwards the worker report to the lead via
+  SendMessage with "verify status yourself, don't wait") worked every time — treat it as the
+  standing playbook, not an anomaly. Also reconfirmed: two crews wiring gates into the same
+  root `Makefile`/`ci.yml` conflicted exactly as the collision-map lesson predicts; a lead-driven
+  union rebase (keep both crews' wiring, re-run full gates, `--force-with-lease`) resolved it
+  cleanly.
+- 2026-07-21 (wave-v2 run): zsh nuance on the "never pipe a gate" rule — `${PIPESTATUS[0]}` is
+  BASH; in zsh it's the lowercase `$pipestatus` array, so `${PIPESTATUS[0]:-$?}` silently falls
+  back to the pipe-tail's exit code and can mask a failing gate while LOOKING careful. Redirect
+  gate output to a file and check `$?` bare instead.
 - 2026-07-21 (delivery-wave run): a worker/lead task-notification routing quirk — a lead's
   spawned worker's completion notification routes to the ROOT session, not the waiting lead, so
   a lead that stops "awaiting the notification" can orphan forever. Pattern that worked: the
