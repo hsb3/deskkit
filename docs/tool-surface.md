@@ -79,7 +79,7 @@ The 12 PM tools (added only under `PM_ENABLED`, from the PM module's specs under
 | `list_items` | no | filtered graph query |
 | `get_item` | no | one item + notes/deps/transitions/ancestors, including its `body` (the list/summary shape omits it) |
 | `create_item` | yes | accepts an optional long-form `body`; carries the optional actor fields below |
-| `update_item` | yes | accepts an optional `body` (empty = unchanged); carries the optional actor fields below; refused by a live foreign claim ([ADR 0020](decisions/0020-pm-claim-semantics.md)) |
+| `update_item` | yes | accepts an optional `body` (omit to leave unchanged; pass an empty string to clear); carries the optional actor fields below; refused by a live foreign claim ([ADR 0020](decisions/0020-pm-claim-semantics.md)) |
 | `transition_item` | yes | carries the optional actor fields below; refused by a live foreign claim (ADR 0020) |
 | `block_item` / `unblock_item` | yes | carry the optional actor fields below; refused by a live foreign claim (ADR 0020) |
 | `add_note` | yes | carries the optional actor fields below |
