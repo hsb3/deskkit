@@ -78,37 +78,18 @@ func CreateItem(ctx context.Context, app core.App, cfg *cfgpkg.Config, v schema.
 	return &itemResult{Item: engine.Summarize(rec)}, nil
 }
 
-// UpdateItem — §5.1 edit first-class fields (empty = unchanged; see types.go).
+// UpdateItem — §5.1 edit first-class fields. Optionality is signaled by presence, not value
+// (see types.go): the optional string fields are already *string, so they pass straight through
+// to the engine — nil stays nil (unchanged), a non-nil pointer (including &"") writes verbatim, so
+// a present empty string clears the value. Priority keeps the value convention (0 = unchanged).
 func UpdateItem(ctx context.Context, app core.App, cfg *cfgpkg.Config, v schema.DocumentValidator, in *UpdateItemInput) (*itemResult, error) {
 	up := engine.UpdateItemInput{
 		ItemID: in.ItemID, Version: in.Version, Actor: actorOf(in.ActorFields),
-	}
-	if in.Title != "" {
-		up.Title = &in.Title
-	}
-	if in.Type != "" {
-		up.Type = &in.Type
-	}
-	if in.Court != "" {
-		up.Court = &in.Court
-	}
-	if in.Pointer != "" {
-		up.Pointer = &in.Pointer
-	}
-	if in.Body != "" {
-		up.Body = &in.Body
-	}
-	if in.Severity != "" {
-		up.Severity = &in.Severity
+		Title: in.Title, Type: in.Type, Court: in.Court, Pointer: in.Pointer,
+		Body: in.Body, Severity: in.Severity, Properties: in.Properties, StatusLabel: in.StatusLabel,
 	}
 	if in.Priority != 0 {
 		up.Priority = &in.Priority
-	}
-	if in.Properties != "" {
-		up.Properties = &in.Properties
-	}
-	if in.StatusLabel != "" {
-		up.StatusLabel = &in.StatusLabel
 	}
 	rec, err := newEngine(app, cfg, v).UpdateItem(ctx, up)
 	if err != nil {

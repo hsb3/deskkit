@@ -283,9 +283,14 @@ func inputSchemaMap(t reflect.Type) map[string]any {
 }
 
 // goTypeSchema maps a Go field type to its JSON-Schema fragment. Covers the kinds the frozen
-// input structs actually use (string, int, bool, []string); returns nil for anything else.
+// input structs actually use (string, int, bool, []string, and a pointer to any of those — an
+// optional field whose absence is meaningful); returns nil for anything else. A pointer reflects
+// to the SAME fragment as its element, so *string is JSON "string" exactly like string — the
+// pointer only carries the Go-level unset/set distinction, not a schema difference.
 func goTypeSchema(ft reflect.Type) map[string]any {
 	switch ft.Kind() {
+	case reflect.Ptr:
+		return goTypeSchema(ft.Elem())
 	case reflect.String:
 		return map[string]any{"type": "string"}
 	case reflect.Bool:

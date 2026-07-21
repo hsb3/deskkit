@@ -51,22 +51,25 @@ type CreateItemInput struct {
 	ActorFields
 }
 
-// UpdateItemInput — §5.1 edit first-class fields (version-checked, R2.6). An omitted/empty
-// field is left unchanged (priority 0 = unchanged); phase and blocked are NOT editable here —
-// use transition_item / block_item. A status_label naming a different phase is a transition
+// UpdateItemInput — §5.1 edit first-class fields (version-checked, R2.6). Optionality is signaled
+// by PRESENCE, not value: an omitted string field (nil pointer — an absent JSON key or null) is
+// left unchanged, while a present field (including an empty string) is written verbatim, so an
+// explicit empty string deliberately CLEARS a value (title excepted — the engine refuses an empty
+// title). Priority keeps the value convention (0 = unchanged). phase and blocked are NOT editable
+// here — use transition_item / block_item. A status_label naming a different phase is a transition
 // request routed through the machine + gates (§3.3).
 type UpdateItemInput struct {
-	ItemID      string `json:"item_id" jsonschema:"description=the item id"`
-	Version     int    `json:"version" jsonschema:"description=the version you read; refused on mismatch"`
-	Title       string `json:"title,omitempty" jsonschema:"description=new title; empty = unchanged"`
-	Type        string `json:"type,omitempty" jsonschema:"description=new schema-v1/kit type; empty = unchanged"`
-	Court       string `json:"court,omitempty" jsonschema:"description=new court; empty = unchanged"`
-	Pointer     string `json:"pointer,omitempty" jsonschema:"description=new document pointer; empty = unchanged"`
-	Body        string `json:"body,omitempty" jsonschema:"description=new body; empty = unchanged (clearing a set body is engine-only for now)"`
-	Severity    string `json:"severity,omitempty" jsonschema:"description=new severity; empty = unchanged"`
-	Priority    int    `json:"priority,omitempty" jsonschema:"description=new priority; 0 = unchanged"`
-	Properties  string `json:"properties,omitempty" jsonschema:"description=new properties JSON object; empty = unchanged"`
-	StatusLabel string `json:"status_label,omitempty" jsonschema:"description=new status label; a label of a different phase is a gated transition request"`
+	ItemID      string  `json:"item_id" jsonschema:"description=the item id"`
+	Version     int     `json:"version" jsonschema:"description=the version you read; refused on mismatch"`
+	Title       *string `json:"title,omitempty" jsonschema:"description=new title; omit to leave unchanged"`
+	Type        *string `json:"type,omitempty" jsonschema:"description=new schema-v1/kit type; omit to leave unchanged, pass an empty string to clear it"`
+	Court       *string `json:"court,omitempty" jsonschema:"description=new court; omit to leave unchanged, pass an empty string to clear it"`
+	Pointer     *string `json:"pointer,omitempty" jsonschema:"description=new document pointer; omit to leave unchanged, pass an empty string to clear it"`
+	Body        *string `json:"body,omitempty" jsonschema:"description=new body; omit to leave unchanged, pass an empty string to clear it"`
+	Severity    *string `json:"severity,omitempty" jsonschema:"description=new severity; omit to leave unchanged, pass an empty string to clear it"`
+	Priority    int     `json:"priority,omitempty" jsonschema:"description=new priority; 0 = unchanged"`
+	Properties  *string `json:"properties,omitempty" jsonschema:"description=new properties JSON object; omit to leave unchanged, pass an empty string to clear it"`
+	StatusLabel *string `json:"status_label,omitempty" jsonschema:"description=new status label; a label of a different phase is a gated transition request"`
 	ActorFields
 }
 
