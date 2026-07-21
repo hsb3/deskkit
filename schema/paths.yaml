@@ -1,0 +1,6 @@
+# schema v1 — filesystem path constants shared by both lanes.
+# profile_root: the single directory name that holds the personalization profile
+# (profile.{yaml,yml,json,md}). Each lane pins a per-lane constant to this value
+# (plugin/core PROFILE_ROOT_DIR, librarian config.ProfileRootDir); scripts/check-profile-root.mjs
+# fails if any of the three diverge. A rename becomes a one-definition change here + both consts.
+profile_root: _knowledge

@@ -9,6 +9,9 @@ import { parse as parseYAML } from "yaml";
 /** A parsed profile is a plain nested mapping of scalars, maps, and lists. */
 export type Profile = Record<string, unknown>;
 
+// The single profile-root directory name, pinned across both lanes by scripts/check-profile-root.mjs.
+export const PROFILE_ROOT_DIR = "_knowledge";
+
 // Extension precedence on a tie within one directory: yaml > yml > json > md
 // (mirrors DiscoverProfile's `names` order exactly).
 const PROFILE_NAMES = ["profile.yaml", "profile.yml", "profile.json", "profile.md"] as const;
@@ -22,7 +25,7 @@ export function discoverProfile(startDir: string): string | null {
   let dir = startDir;
   for (;;) {
     for (const name of PROFILE_NAMES) {
-      const p = join(dir, "_knowledge", name);
+      const p = join(dir, PROFILE_ROOT_DIR, name);
       try {
         if (existsSync(p) && !statSync(p).isDirectory()) return p;
       } catch {
@@ -43,7 +46,7 @@ export function discoverProfile(startDir: string): string | null {
 export function discoverKnowledgeDir(startDir: string): string | null {
   let dir = startDir;
   for (;;) {
-    const p = join(dir, "_knowledge");
+    const p = join(dir, PROFILE_ROOT_DIR);
     try {
       if (existsSync(p) && statSync(p).isDirectory()) return p;
     } catch {

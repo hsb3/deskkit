@@ -90,6 +90,14 @@ jobs:
           node scripts/check-query-kinds.mjs
           node scripts/check-query-kinds.mjs --self-test
 
+      # Profile-root drift: the canonical schema/paths.yaml value and both lanes' pinned constants
+      # (plugin PROFILE_ROOT_DIR, librarian config.ProfileRootDir) must stay identical — a rename is
+      # then a one-definition change. Self-test proves the guard still bites on a seeded divergence.
+      - name: Profile-root drift guard (+ self-test)
+        run: |
+          node scripts/check-profile-root.mjs
+          node scripts/check-profile-root.mjs --self-test
+
       # Advisory only (never fails the build): nudges when user-facing changes have piled up
       # under plugin/ or librarian/ since the last v* tag without a VERSION bump. The hard gate
       # (a documented CHANGELOG section for the tagged version) lives in release.yml.
