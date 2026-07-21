@@ -96,6 +96,12 @@ the target location under the standard. Ship this as a file the user can read �
   is **never retroactively exploded** into per-decision files — respect what was already ruled
   (K24 invariant). This is its own row so the decision is explicit.
 
+**Frozen / graduated source material carries an explicit disposition fork:** **declare it exempt**
+(mark it frozen-source, skip the frontmatter contract) or **retrofit it into conformance** (author
+the contract, fix naming). Retrofit-over-exempt is a supported disposition (K24) — surface the
+choice at the gate rather than defaulting silently, because a retrofit rewrites frontmatter and the
+user should approve that.
+
 ### 4. GATE — `inventoried → approved`
 
 **Mandatory user approval before ANY write, move, or delete (K24).** Package the gate exactly:
@@ -114,6 +120,17 @@ desk** via the `desk-setup` skill's greenfield runbook — the template scaffold
 Apply the **approved dispositions** from staging into the new structure, row by row. Every step
 stays **re-runnable from the locked zip**, and **the source stays intact** — the user deletes
 staging and the zip when satisfied; **this skill never deletes them** (K24).
+
+**Retrofitting a source file into conformance** applies the standard's ruled field-preservation
+defaults (the `conventions-standard` skill owns the rules — "Brownfield retrofit defaults", K24;
+this skill only applies them). When a retrofit overwrites a frontmatter field that held a real
+source value, **preserve the original under `custom.original_<field>`** so hand-classification is
+never silently lost: a conflicting `type` overwrites to the required value with the original under
+`custom.original_type`; `created` is derived from the source's own date fields in the fixed order
+(`date_created` → `last_updated` → prose "Last Updated" → file mtime), keeping those source fields
+under `custom` for audit; and `tags` **merge and dedupe** with the required set (required tags
+always present), never replace it. These preserve-not-discard defaults are the retrofit analogue of
+the runbook's own never-delete-source invariant.
 
 ### 7. Author instruments
 

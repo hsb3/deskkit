@@ -57,7 +57,7 @@ writes production code and never merges to a mainline branch.
 | K21 | Self-maintenance through one file, `_meta/improvement-log.md`: the maintenance backlog, a pass log, and the friction ledger. |
 | K22 | Communications lifecycle with an index ledger: markdown is canonical in `communications/outbound/`; inbound items are dated; `communications/INDEX.md` tracks status with audience-register discipline. |
 | K23 | Greenfield setup is an ordered runbook (owned by the `desk-setup` skill). |
-| K24 | Brownfield adoption is a distinct mode with its own status track and a user-approval gate before any write (owned by the `desk-setup` skill). |
+| K24 | Brownfield adoption is a distinct mode with its own status track and a user-approval gate before any write (owned by the `desk-setup` skill). Retrofitting frozen source material into conformance is a supported disposition (vs. declaring it exempt), governed by ruled field-preservation defaults (see "Brownfield retrofit defaults"). |
 | K25 | Template assets are deliberately standard-free: the copyable skeleton ships without the standard's prose baked in. |
 | K26 | App/project-instructions are a thin pointer only; substance lives in version-visible files. |
 | K27 | The harvest loop is the lifecycle mechanism that evolves the standard (owned by the `harvest-loop` skill). |
@@ -110,6 +110,34 @@ Status is a frontmatter field, never prose. Two families:
 A status value valid on the desk surface (e.g. `active`) is not necessarily valid on another
 surface (e.g. a knowledge vault). When a document moves between surfaces, its status is
 re-stamped to the destination surface's vocabulary — the tooling does this, not free-hand.
+
+## Brownfield retrofit defaults (K24)
+
+Frozen or graduated source material entering a desk under brownfield adoption (K24) has two
+sanctioned dispositions, chosen at the approval gate: **declare it exempt** (mark it frozen-source
+and skip the contract) or **retrofit it into conformance** (author the frontmatter contract, fix
+naming). **Retrofit-over-exempt is a supported disposition** — a desk may choose to bring real
+source material under the standard rather than fence it off, and when it does, these defaults make
+the retrofit reproducible instead of a per-adopter judgment call.
+
+**The preservation principle.** A retrofit that overwrites a frontmatter field which carried a
+real source value **preserves the original under `custom.original_<field>`** — symmetric across
+every overwritten field, so nothing an adopter classified by hand is silently lost. `custom` is
+the schema's open-ended escape (K3), so preserved originals never become new top-level fields.
+The three ruled defaults are instances of this one principle:
+
+- **`type` — overwrite, preserve the original.** A source `type` that conflicts with the retrofit's
+  required type is overwritten to the required value; the original is recorded under
+  `custom.original_type` (symmetric with `custom.original_status`, where a non-vocabulary source
+  `status` is preserved when the retrofit re-stamps it).
+- **`created` — derive from the source's own date fields, in a fixed order.** Take the first that
+  is present: explicit frontmatter `date_created` → frontmatter `last_updated` → a prose
+  "Last Updated" line → the file's modification time. The consulted source date fields are **also**
+  preserved under `custom` for audit, not just consumed.
+- **`tags` — merge and dedupe, never replace.** The required tags are merged with the source's own
+  tags and de-duplicated, with the required tags **always present**. Real source classification
+  (a domain tag, a severity marker) survives the retrofit rather than being overwritten by the
+  required set alone.
 
 ## Decision records (K5, K20)
 
