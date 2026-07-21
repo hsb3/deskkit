@@ -98,16 +98,13 @@ workaround; don't re-surface as a blocker); going public AND OpenCode #12 are pa
 2026-07-17) until ≥ v1.0.0 — focus is dogfooding shipped Claude Code, buildable follow-ups
 (#34/#35) can proceed.
 
-**Open backlog, ranked** (no ruling gates the buildable ones): **#12** dual-format
-Claude+OpenCode fan-out (architectural, needs an OpenCode-target ruling, ON HOLD above) ·
-**#34** CI hardening — shellcheck/actionlint/SHA-pin-drift exist locally, not yet in the CI
-pipeline · **#35** coverage — `requireConfig` self-init for non-`query` commands + a behavioral
-test for the TS MCP server · **#19** PB-served webapp chat (deferred; ADR 0001 option b —
-`StreamTurn`'s JSON-taggable events already give it a substrate) · **#36** template SOP library
-v-next major, needs a design ruling first (vendor-vs-sync, type↔dir_kind) — the "librarian
-knows ~20 SOPs" premise never existed, the 2-template boundary was intentional · **#153** the
-two transcript-gap follow-ups from the bug-fix wave (above) · **#154** test-hygiene cleanup
-(`printJSON` → `io.Writer`, drops the stdout pipe-swap in `pm` tests; filed from #152 review).
+**Open backlog: the live triaged view is pinned issue #155** ("meta: triaged open-issue
+backlog") — ranked Now / 1.0.0 lanes / schema-v2 / backlog / on-hold, with a maintenance
+protocol in its body. Refresh it (edit the issue body via `gh issue edit 155 --body-file`,
+bump its date) at session boundaries alongside this handoff — it lives as an issue, not a
+tracked file, precisely so refreshes never touch commit history. Headline ranking as of
+2026-07-21: Now = #153 transcript-gap follow-ups · #34 CI hardening · #35 coverage · #154
+test-hygiene; #12 stays ON HOLD (owner ruling above); #36 needs a design ruling first.
 
 ## 2. Recent deliveries (newest first — full detail in the cited PRs / ADRs / issues)
 
