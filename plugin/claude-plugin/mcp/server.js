@@ -21820,12 +21820,13 @@ var $visit = visit.visit;
 var $visitAsync = visit.visitAsync;
 
 // core/profile.ts
+var PROFILE_ROOT_DIR = "_knowledge";
 var PROFILE_NAMES = ["profile.yaml", "profile.yml", "profile.json", "profile.md"];
 function discoverProfile(startDir) {
   let dir = startDir;
   for (;; ) {
     for (const name of PROFILE_NAMES) {
-      const p = join(dir, "_knowledge", name);
+      const p = join(dir, PROFILE_ROOT_DIR, name);
       try {
         if (existsSync(p) && !statSync(p).isDirectory())
           return p;
@@ -21840,7 +21841,7 @@ function discoverProfile(startDir) {
 function discoverKnowledgeDir(startDir) {
   let dir = startDir;
   for (;; ) {
-    const p = join(dir, "_knowledge");
+    const p = join(dir, PROFILE_ROOT_DIR);
     try {
       if (existsSync(p) && statSync(p).isDirectory())
         return p;

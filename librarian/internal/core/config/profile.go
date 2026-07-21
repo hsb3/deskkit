@@ -13,6 +13,10 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// ProfileRootDir is the single profile-root directory name, pinned across both lanes by
+// scripts/check-profile-root.mjs; every functional path join to the personalization root flows from it.
+const ProfileRootDir = "_knowledge"
+
 // DiscoverProfile walks up from startDir looking for a single personalization root
 // `_knowledge/profile.{yaml,yml,json,md}` (M-05 surface (i); the same walk-up a .env or
 // .git gets). It returns the first match and true, or ("", false). Extension precedence
@@ -22,7 +26,7 @@ func DiscoverProfile(startDir string) (string, bool) {
 	dir := startDir
 	for {
 		for _, name := range names {
-			p := filepath.Join(dir, "_knowledge", name)
+			p := filepath.Join(dir, ProfileRootDir, name)
 			if fi, err := os.Stat(p); err == nil && !fi.IsDir() {
 				return p, true
 			}

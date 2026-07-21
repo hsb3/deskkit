@@ -129,7 +129,7 @@ func InitProfile(dir string, opts InitOptions, confirmNested func(deskName, ance
 	// --- writes ---
 
 	deskName := filepath.Base(abs)
-	knowledgeDir := filepath.Join(abs, "_knowledge")
+	knowledgeDir := filepath.Join(abs, config.ProfileRootDir)
 	if err := os.MkdirAll(knowledgeDir, 0o755); err != nil {
 		return nil, err
 	}
@@ -205,7 +205,7 @@ func ConfirmNested(r io.Reader, w io.Writer, isTTY bool, deskName, ancestorPath 
 // existingProfileIn reports the profile file THIS directory already owns, if any.
 func existingProfileIn(abs string) (string, bool) {
 	for _, name := range profileNames {
-		p := filepath.Join(abs, "_knowledge", name)
+		p := filepath.Join(abs, config.ProfileRootDir, name)
 		if fi, err := os.Stat(p); err == nil && !fi.IsDir() {
 			return p, true
 		}
