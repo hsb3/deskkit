@@ -10,26 +10,27 @@ import (
 	tea "charm.land/bubbletea/v2"
 )
 
-// TestEditorCommand_Resolution covers the env resolution of the compose-in-editor hatch: $EDITOR is
-// preferred, $VISUAL is the fallback, neither yields nil (no editor configured), a value with flags
-// splits into command + args, and a whitespace-only value is treated as unset so the fallback wins.
+// TestEditorCommand_Resolution covers the env resolution of the compose-in-editor hatch, in the
+// production argument order (model.go passes $VISUAL first): $VISUAL is preferred, $EDITOR is the
+// fallback, neither yields nil (no editor configured), a value with flags splits into command +
+// args, and a whitespace-only value is treated as unset so the fallback wins.
 func TestEditorCommand_Resolution(t *testing.T) {
 	cases := []struct {
 		name           string
-		editor, visual string
+		visual, editor string
 		want           []string
 	}{
-		{"editor set", "vim", "", []string{"vim"}},
-		{"visual fallback when editor empty", "", "nano", []string{"nano"}},
-		{"editor wins over visual", "vim", "nano", []string{"vim"}},
+		{"visual set", "vim", "", []string{"vim"}},
+		{"editor fallback when visual empty", "", "nano", []string{"nano"}},
+		{"visual wins over editor", "vim", "nano", []string{"vim"}},
 		{"neither set is nil", "", "", nil},
-		{"editor with flags splits", "code --wait", "", []string{"code", "--wait"}},
-		{"whitespace-only editor falls back", "   ", "emacsclient -nw", []string{"emacsclient", "-nw"}},
+		{"visual with flags splits", "code --wait", "", []string{"code", "--wait"}},
+		{"whitespace-only visual falls back", "   ", "emacsclient -nw", []string{"emacsclient", "-nw"}},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			if got := editorCommand(c.editor, c.visual); !reflect.DeepEqual(got, c.want) {
-				t.Errorf("editorCommand(%q, %q) = %v, want %v", c.editor, c.visual, got, c.want)
+			if got := editorCommand(c.visual, c.editor); !reflect.DeepEqual(got, c.want) {
+				t.Errorf("editorCommand(%q, %q) = %v, want %v", c.visual, c.editor, got, c.want)
 			}
 		})
 	}

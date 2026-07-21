@@ -651,7 +651,7 @@ func (m model) editInExternalEditor() (tea.Model, tea.Cmd) {
 		return m.showToast("could not open editor: " + err.Error())
 	}
 	// cmdline[0] is the editor; cmdline[1:] its configured flags; the draft path is the final arg.
-	args := append(append([]string{}, cmdline[1:]...), path)
+	args := append(cmdline[1:], path)
 	c := exec.Command(cmdline[0], args...)
 	return m, tea.ExecProcess(c, func(runErr error) tea.Msg {
 		return editorFinishedMsg{path: path, err: runErr}
@@ -751,6 +751,7 @@ func (m model) newConversation() (tea.Model, tea.Cmd) {
 	m.sess = fresh
 	m.entries = nil
 	m.inflightIdx = -1
+	m.ctxTokens = 0             // usage is live-only; don't show the previous session's gauge
 	m.history = newHistory(nil) // fresh conversation: no prior prompts to recall
 	m.picker = nil
 	m.refreshViewport()
@@ -845,6 +846,7 @@ func (m model) resumeSelected() (tea.Model, tea.Cmd) {
 	m.sess = newSess
 	m.entries = entriesFromTranscript(transcript)
 	m.inflightIdx = -1
+	m.ctxTokens = 0                                           // usage is live-only; reads 0 until the first resumed turn reports
 	m.history = newHistory(userPromptsNewestFirst(m.entries)) // resume seeds prompt recall
 	m.picker = nil
 	m.refreshViewport()
