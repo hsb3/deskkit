@@ -92,8 +92,8 @@ synopsis: "One-sentence scannable abstract."
 
 **Frontmatter-exemption classes.** A small allowlist is exempt from the contract: the entry
 file (`CLAUDE.md`), `_meta/HANDOFF.md`, `_meta/README.md`, a **directory-index `README.md`
-inside an entity dir** (`_structure/decisions/`, tasks, analyses, journal — the index orients
-the folder, it is not an entity record; the deskkit enforces this by basename, so
+inside an entity dir** (`_structure/decisions/`, tasks, analyses, journal, `_knowledge/` — the
+index orients the folder, it is not an entity record; the deskkit enforces this by basename, so
 patrol's R1/R4 never fire on it), template files (the standard-free scaffold), briefing sidecar
 files (e.g. `sources.md`), and drafted GitHub issue bodies (the desk drafts these for the owner
 to file; they follow the issue tracker's shape, not the desk contract).

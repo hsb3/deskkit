@@ -30,6 +30,8 @@ import (
 
 	"github.com/cloudwego/eino/callbacks"
 	"github.com/cloudwego/eino/components/model"
+	"github.com/cloudwego/eino/components/tool"
+	"github.com/cloudwego/eino/compose"
 	"github.com/cloudwego/eino/schema"
 	cbutils "github.com/cloudwego/eino/utils/callbacks"
 	"github.com/pocketbase/pocketbase/core"
@@ -51,6 +53,14 @@ type runCtx struct {
 	seq   int
 	hwm   int
 	steps int
+	// pending buffers the CURRENT round's messages (the model's assistant output and its tool
+	// result[s]) between model calls, for the one-shot Run() only. The input-side callback
+	// (persistHandler) flushes a round only on the NEXT model call — where those messages first
+	// appear in a model input — so a MaxStep abort right after a tool executes would lose the
+	// round from the transcript even though the tool really ran. Run()'s MaxStep path flushes
+	// this buffer (flushPending) to close that gap. Reset at each model OnStart (the prior round
+	// is persisted there by the delta), so it only ever holds the not-yet-persisted current round.
+	pending []*schema.Message
 }
 
 // persistLocked assigns the next seq and writes the message. Caller must hold rc.mu.
@@ -125,6 +135,74 @@ func deltaMessages(msgs []*schema.Message, hwm int) ([]*schema.Message, int) {
 		return nil, hwm
 	}
 	return msgs[hwm:], len(msgs)
+}
+
+// captureHandler builds a SECONDARY eino callback that mirrors the current round's messages into
+// rc.pending, in memory, WITHOUT persisting anything. It exists solely so the one-shot Run() can
+// recover the last round when the loop aborts on MaxStep: the input-side persistHandler only
+// flushes a round on the NEXT model call (that is when the round's assistant+tool messages first
+// appear in a model input), so if MaxStep cuts the loop right after a tool executes, that round
+// never reaches the transcript — even though the tool ran (e.g. propose_fix wrote a revisions
+// row). Run()'s MaxStep path flushes rc.pending to close that audit-trail gap.
+//
+// Model OnEnd captures the exact assistant message eino produced (content + all tool_calls);
+// Tool OnEnd reconstructs each tool result from the callback (call id, tool name, response). The
+// model OnStart resets the buffer because the delta on the same event persists the prior round,
+// so after a model call rc.pending only holds the not-yet-persisted current round. This handler
+// is registered ONLY by Run(); the streaming Session path does not use it and is unchanged.
+func (rc *runCtx) captureHandler() callbacks.Handler {
+	modelHandler := &cbutils.ModelCallbackHandler{
+		OnStart: func(ctx context.Context, _ *callbacks.RunInfo, _ *model.CallbackInput) context.Context {
+			rc.mu.Lock()
+			rc.pending = nil // the prior round is being persisted by the input-side delta now
+			rc.mu.Unlock()
+			return ctx
+		},
+		OnEnd: func(ctx context.Context, _ *callbacks.RunInfo, out *model.CallbackOutput) context.Context {
+			if out == nil || out.Message == nil {
+				return ctx
+			}
+			rc.mu.Lock()
+			rc.pending = append(rc.pending, out.Message)
+			rc.mu.Unlock()
+			return ctx
+		},
+	}
+	toolHandler := &cbutils.ToolCallbackHandler{
+		OnEnd: func(ctx context.Context, info *callbacks.RunInfo, out *tool.CallbackOutput) context.Context {
+			if out == nil {
+				return ctx
+			}
+			rc.mu.Lock()
+			rc.pending = append(rc.pending, &schema.Message{
+				Role:       schema.Tool,
+				Content:    out.Response,
+				ToolCallID: compose.GetToolCallID(ctx),
+				ToolName:   toolName(info),
+			})
+			rc.mu.Unlock()
+			return ctx
+		},
+	}
+	return cbutils.NewHandlerHelper().ChatModel(modelHandler).Tool(toolHandler).Handler()
+}
+
+// flushPending writes the buffered current-round messages (the assistant tool-call message and
+// its tool result[s]) that the input-side callback never flushed, assigning each the next run
+// seq. Run() calls this ONLY when the loop aborts on MaxStep — the one outcome where a round's
+// tool call really executed but no later model input carried it into the transcript. On every
+// other outcome the buffer is either empty (a fresh model OnStart reset it before returning) or
+// deliberately left unflushed (a successful final message is persisted by the caller instead),
+// so this is never a double-persist.
+func (rc *runCtx) flushPending() {
+	rc.mu.Lock()
+	defer rc.mu.Unlock()
+	for _, m := range rc.pending {
+		if err := rc.persistLocked(m); err != nil {
+			rc.app.Logger().Error("flush pending message", "run", rc.runID, "seq", rc.seq, "err", err)
+		}
+	}
+	rc.pending = nil
 }
 
 // newRunLabel is a HUMAN-READABLE display label only, never the relation target.
