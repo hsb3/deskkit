@@ -15,10 +15,12 @@
 # sha256 against checksums.txt and FAILS LOUDLY on mismatch, (3) installs it to a no-root path,
 # and (4) guides the Claude Code plugin install (marketplace add + install).
 #
-# NOTE (live e2e): no v* release is published yet, so the download/verify/install path cannot be
-# exercised end-to-end here. It is shellcheck-clean and the --dry-run plan is verified against the
-# exact artifact strings in release.yml. Real end-to-end verification is a post-first-release
-# foreman step (see the handoff note).
+# NOTE (live e2e): releases are published (through v0.7.0), but this repo stays PRIVATE until
+# v1.0.0 — so the public unauthenticated one-liner above 404s by design until then. Install today
+# with the authenticated `gh release download` path (README "Install the deskkit binary" /
+# docs/getting-started.md). This script is shellcheck-clean and its --dry-run plan is verified
+# against the exact artifact strings in release.yml; a full unauthenticated end-to-end run happens
+# once the repo is public.
 #
 set -euo pipefail
 

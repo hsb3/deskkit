@@ -4,9 +4,9 @@ Status: active
 # Getting started
 
 desk-standard gives you two things that share one schema and one personalization model: a
-**Claude Code plugin** that stands up and maintains an executive desk, and a **pocket-
-librarian** binary that indexes that desk and repairs convention violations under a
-byte-exact undo. Nothing you install carries a name, org, or repo — you personalize once, in
+**Claude Code plugin** that stands up and maintains an executive desk, and a **deskkit**
+binary that indexes that desk and repairs convention violations under a byte-exact undo.
+Nothing you install carries a name, org, or repo — you personalize once, in
 `_knowledge/profile.yaml`, and never by editing a shipped file.
 
 This page gets you productive in one sitting. Deeper guides: `plugin-guide.md` (the four
@@ -79,9 +79,25 @@ A `make`-built or release binary reports its release version via `--version`; a 
 prints `dev` was built with a bare `go build` (no version stamp) — pin such a build from its
 source commit instead.
 
-Prefer a prebuilt binary? Once a `v*` release is published, `install.sh` at the repo root
-downloads the release binary for your OS/arch, verifies its sha256 against the published
-checksums, and installs it to `~/.local/bin` (no root):
+Prefer a prebuilt binary? The release workflow publishes a `deskkit` binary for macOS and
+Linux (amd64 + arm64) on every `v*` tag — no Go toolchain needed to run it elsewhere.
+
+**While this repo is private** (it stays private until v1.0.0), download the release asset with
+an authenticated `gh`; the public `install.sh` one-liner below only works once the repo is public:
+
+```bash
+mkdir -p ~/.local/bin
+os=$(uname -s | tr '[:upper:]' '[:lower:]')                 # darwin | linux
+arch=$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/')   # amd64 | arm64
+gh release download --repo hsb3/desk-standard \
+  --pattern "deskkit_*_${os}_${arch}" \
+  --output ~/.local/bin/deskkit --clobber
+chmod +x ~/.local/bin/deskkit
+deskkit --version
+```
+
+**Once the repo is public,** `install.sh` at the repo root does download + sha256-verify +
+install in one step:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/hsb3/desk-standard/main/install.sh | bash
