@@ -396,7 +396,7 @@ into `propose-fix` and `apply-fix` (§5.3/§5.4, §11.2). The complete set:
 | `propose-fix` | Plan mechanical fixes, record originals to `revisions` | no |
 | `apply-fix` | Commit recorded revisions byte-exact (supervised) | **yes** |
 | `restore` | Reverse a change to the recorded original | yes (restores) |
-| `query` | Read-only queries (`live_files`/`recent`/`orphans`/`uncollapsed`/`findings`/`summary`/`adoption`) | no |
+| `query` | Read-only queries (`live_files`/`recent`/`orphans`/`uncollapsed`/`findings`/`summary`/`adoption`/`feedback`/`search`/`content`) | no |
 | `agent` | Run the agent loop once on an instruction (manual trigger, Phase 1) | via the gated agent only |
 | `mcp-serve` | Expose the six-tool core as an MCP stdio server (model-facing; §7.2) | via gated `apply_fix` only |
 | `migrate up` | Apply migrations explicitly | no (schema) |
@@ -2035,7 +2035,7 @@ and are tracked as future work.
 | `propose_fix` | Ignore/missing/stale/noop outcomes hit their branches; a `revisions` row is created only on `recorded`; **no filesystem write occurs**. |
 | `apply_fix` | R3 destination byte-identical to template expectation; pointer stub left at old path; `revisions.applied` flips true; `patrol_findings.state` → fixed; one `adoption_log` row. |
 | `restore` | Byte-identical original restored (`cmp`-clean); finding reopened to flagged; refuses when not-applied / already-restored / checksum-mismatch. |
-| `query` | Each of the seven kinds returns the expected shape; read-only (no writes). |
+| `query` | Each of the ten kinds returns the expected shape; read-only (no writes). |
 
 ### 9.2 Boundary tests (decision 0014 — must be proven)
 
