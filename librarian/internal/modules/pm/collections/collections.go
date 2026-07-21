@@ -42,6 +42,7 @@ func Migrations() []migrate.Migration {
 		{Basename: "0003_pm_transitions", Up: upTransitions, Down: downCollection("transitions")},
 		{Basename: "0004_pm_notes", Up: upNotes, Down: downCollection("notes")},
 		{Basename: "0005_pm_desk_config", Up: upDeskConfig, Down: downCollection("desk_config")},
+		{Basename: "0006_pm_items_body", Up: upItemsBody, Down: downItemsBody},
 	}
 }
 

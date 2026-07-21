@@ -56,13 +56,51 @@ first startup, with one logged line — no desk loses its store across the renam
   exactly what is missing, until that document validates. Gate rules are per-desk editable YAML in
   the `desk_config` collection — the shipped defaults are a seed the desk owner re-rules.
 - **Court** (who holds the item): `owner`, `desk`, `crew`, `vendor`, `external-session`.
+- **`body`** is a dedicated long-form text field on an item (narrative, acceptance criteria,
+  inline spec) — distinct from the `pointer` external-doc reference and from `notes`. Set it via
+  `create`/`update`; `get_item` returns it (the list/summary shape omits it).
 - **Dependencies** are typed edges: `blocks`, `is-blocked-by`, `relates-to`. A `blocks` edge
   carries an `unblock-at` phase (`work` / `review` / `terminal`) and a cascade mode (`auto`,
   `manual`, `auto-reopen`, `permanent`).
 - **Concurrency:** every mutation is version-checked (optimistic concurrency); `claim`/`release`
-  give an item a TTL'd claim so two agents never double-work it.
+  give an item a TTL'd claim. A live foreign claim is **authoritative over every direct mutation**
+  of the item — transition, block, unblock, and update are all refused for a non-holder while the
+  claim is live — until it lapses (default 30 min, `PM_CLAIM_TTL`) or the holder releases it; the
+  holder's own writes proceed as normal. Cascade/auto-unblock is derived graph state, not a direct
+  call, so it is unaffected by claims. See [ADR 0020](decisions/0020-pm-claim-semantics.md).
 - **Audit:** every transition appends an immutable row; a refusal lands as a `gate_refused` audit
-  entry.
+  entry. Every write records who acted via optional `actor`/`actor_kind`/`delegation_parent`
+  fields (unset → actor `agent`, kind `agent`); the CLI instead defaults `--actor` to `$USER`,
+  kind `human`.
+
+## Which transitions gate
+
+Gates are **transition-specific, not universal**: a transition gates only when the desk's
+`desk_config` rules name it, keyed by item **type** and the specific **edge**. The shipped
+default ruleset (a seed — a desk re-rules it) gates exactly two edges:
+
+| Item type | Edge | Requires |
+|---|---|---|
+| `decision` | `review→terminal` | a `decision` document, status `accepted`, resolved at the item's `pointer` |
+| `task` | `work→review` | a `task` document, status `active`, resolved at the item's `pointer` |
+
+**Every other transition is ungated by default — including `queue→work`.** Demote
+(`work→queue`, `review→work`) and reopen (`terminal→work`) gate only if the desk's config
+explicitly binds a rule to them.
+
+A gated transition demands a document that **resolves** at the required pointer (the item's own
+`pointer` by default, or a `note:<key>`), is of the required **doctype**, is at the required
+**status**, and carries **valid frontmatter**: every schema-v1 universal key present — `type`,
+`status`, `created`, `updated`, `tags` (`status` optional on lightweight types) — plus the
+doctype's own required fields (`schema/doctypes.yaml`). `updated` is a universal key like the
+rest: a gated document missing it is refused exactly as one missing a doctype-specific field.
+
+**Worked example.** A `task` item's `queue→work` transition is **ungated** — it always succeeds
+(subject only to the machine and any live claim). The same item's `work→review` transition **is**
+gated: it is refused until a `task` document exists at the item's pointer, validates (including
+carrying `updated`), and is at status `active`.
+
+Authoritative version: [`pm-system-v1-spec.md` §4](pm-system-v1-spec.md#4-gates--the-spine-r3).
 
 ## The `pm` CLI — the owner / script surface
 
@@ -76,8 +114,8 @@ and a gate/engine refusal prints its refusal line, never a usage dump. Audit ide
 | `pm context` | Single-call cold-start briefing: active, blocked, stalled, recent transitions | `--stalled-days N` |
 | `pm list` | Filtered work-graph query | `--phase` `--court` `--type` `--blocked true\|false` `--parent <id>` |
 | `pm get <id>` | One item with notes, dependencies, transitions, ancestors | — |
-| `pm create` | Add a work item (starts at `queue`) | `--title` (required) `--type` `--parent` `--court` `--pointer` `--severity low\|medium\|high` `--priority N` |
-| `pm update <id>` | Edit first-class fields (empty flag = unchanged; `--priority 0` also = unchanged — `0` is the zero-value sentinel, not a settable priority) | `--title` `--type` `--court` `--pointer` `--severity` `--priority` `--properties <json>` `--status-label` `--version N` |
+| `pm create` | Add a work item (starts at `queue`) | `--title` (required) `--type` `--parent` `--court` `--pointer` `--body` `--severity low\|medium\|high` `--priority N` |
+| `pm update <id>` | Edit first-class fields (empty flag = unchanged; `--priority 0` also = unchanged — `0` is the zero-value sentinel, not a settable priority) | `--title` `--type` `--court` `--pointer` `--body` `--severity` `--priority` `--properties <json>` `--status-label` `--version N` |
 | `pm transition <id>` | Request a phase transition; gates may refuse | `--to queue\|work\|review\|terminal` (required) `--version N` |
 | `pm block <id>` | Set the blocked side-state (preserves the phase) | `--reason` `--version N` |
 | `pm unblock <id>` | Clear the blocked side-state | `--reason` `--version N` |
@@ -115,6 +153,12 @@ store, never desk files** — `transition_item`'s document gate is the safety, n
 `get_context` is the cold-start briefing tool: one call returns the active / blocked / stalled sets
 and recent transitions for the desk, the same result reachable via `deskkit pm context` and the
 TUI landing view (one core, three surfaces).
+
+The nine write tools each carry optional `actor` / `actor_kind` / `delegation_parent` fields,
+recorded verbatim on the audit trail (§3.6 of the spec); left unset they default to actor
+`"agent"`, kind `"agent"`. `create_item` and `update_item` additionally accept an optional `body`
+— the item's long-form narrative, acceptance criteria, or spec, stored inline; `get_item` returns
+it (the `list_items` summary shape omits it).
 
 Wire it into a Claude Code project (or use the `desk-pm` plugin, below):
 

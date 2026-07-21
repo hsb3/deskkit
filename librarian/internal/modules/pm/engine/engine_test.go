@@ -632,6 +632,86 @@ func TestClaimTTLFromDeskConfig(t *testing.T) {
 	}
 }
 
+// TestClaimGatesBlockUnblock pins ADR 0020 (a live claim is authoritative over every direct
+// mutation) for the Block/Unblock paths: a non-holder is refused naming the holder — even on
+// the idempotent no-op paths, so the claim boundary wins — while the holder, and anyone acting
+// on an expired or absent claim, still proceed. The cascade/auto (un)block paths are unaffected
+// (they call setBlocked directly, not these public methods).
+func TestClaimGatesBlockUnblock(t *testing.T) {
+	e := newEngine(t, nil)
+	alice := Actor{Name: "agent-alice", Kind: "agent"}
+	bob := Actor{Name: "agent-bob", Kind: "agent"}
+
+	item := mustCreate(t, e, CreateItemInput{Title: "contested", Type: "analysis"})
+	item = mustTransition(t, e, item, "work")
+	item, err := e.Claim(context.Background(), item.Id, item.GetInt("version"), alice)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// A non-holder's Block is refused, naming the holder; nothing is mutated.
+	if _, err := e.Block(context.Background(), item.Id, item.GetInt("version"), bob, "trample"); !IsRefusal(err) || !strings.Contains(err.Error(), "agent-alice") {
+		t.Fatalf("foreign live claim must refuse Block naming the holder, got %v", err)
+	}
+	if item, _ = e.loadItem(item.Id); item.GetBool("blocked") {
+		t.Fatal("refused foreign Block must not set the blocked flag")
+	}
+
+	// The holder may Block.
+	item, err = e.Block(context.Background(), item.Id, item.GetInt("version"), alice, "waiting")
+	if err != nil || !item.GetBool("blocked") {
+		t.Fatalf("the claim holder must be able to Block, got %v (blocked=%v)", err, item.GetBool("blocked"))
+	}
+
+	// The claim owner boundary wins over the idempotent no-op: a non-holder's Block on the
+	// ALREADY-blocked item is still refused, not a silent success.
+	if _, err := e.Block(context.Background(), item.Id, item.GetInt("version"), bob, "trample again"); !IsRefusal(err) {
+		t.Fatalf("foreign Block on an already-blocked item must still refuse, got %v", err)
+	}
+
+	// A non-holder's Unblock is refused too; the item stays blocked.
+	if _, err := e.Unblock(context.Background(), item.Id, item.GetInt("version"), bob, ""); !IsRefusal(err) || !strings.Contains(err.Error(), "agent-alice") {
+		t.Fatalf("foreign live claim must refuse Unblock naming the holder, got %v", err)
+	}
+	if item, _ = e.loadItem(item.Id); !item.GetBool("blocked") {
+		t.Fatal("refused foreign Unblock must leave the item blocked")
+	}
+
+	// The holder may Unblock.
+	item, err = e.Unblock(context.Background(), item.Id, item.GetInt("version"), alice, "")
+	if err != nil || item.GetBool("blocked") {
+		t.Fatalf("the claim holder must be able to Unblock, got %v (blocked=%v)", err, item.GetBool("blocked"))
+	}
+
+	// Idempotent no-op the other way: a non-holder's Unblock on the NOT-blocked item is still refused.
+	if _, err := e.Unblock(context.Background(), item.Id, item.GetInt("version"), bob, ""); !IsRefusal(err) {
+		t.Fatalf("foreign Unblock on a not-blocked item must still refuse, got %v", err)
+	}
+
+	// An EXPIRED claim frees both paths for anyone (§3.6).
+	item.Set("claim_expires", time.Now().Add(-time.Minute))
+	if err := e.App.Save(item); err != nil {
+		t.Fatal(err)
+	}
+	item, _ = e.loadItem(item.Id)
+	if item, err = e.Block(context.Background(), item.Id, item.GetInt("version"), bob, "expired-free"); err != nil {
+		t.Fatalf("expired claim must let a non-holder Block, got %v", err)
+	}
+	if _, err := e.Unblock(context.Background(), item.Id, item.GetInt("version"), bob, ""); err != nil {
+		t.Fatalf("expired claim must let a non-holder Unblock, got %v", err)
+	}
+
+	// An ABSENT claim (never claimed) lets anyone Block/Unblock.
+	fresh := mustCreate(t, e, CreateItemInput{Title: "unclaimed", Type: "analysis"})
+	fresh = mustTransition(t, e, fresh, "work")
+	if fresh, err = e.Block(context.Background(), fresh.Id, fresh.GetInt("version"), bob, ""); err != nil {
+		t.Fatalf("absent claim must let anyone Block, got %v", err)
+	}
+	if _, err := e.Unblock(context.Background(), fresh.Id, fresh.GetInt("version"), bob, ""); err != nil {
+		t.Fatalf("absent claim must let anyone Unblock, got %v", err)
+	}
+}
+
 // --- §3.3 label routing ---
 
 func TestSetStatusLabelRoutesThroughMachine(t *testing.T) {
@@ -824,5 +904,21 @@ gates:
 	item = mustTransition(t, e, item, "work") // reopen: unbound => ungated
 	if item.GetString("phase") != "work" {
 		t.Fatalf("unbound reopen must stay ungated, got %s", item.GetString("phase"))
+	}
+}
+
+// TestCreateItemBody proves CreateItem persists the inline long-form body (spec §3.1): the
+// value is written to the items row and reads back byte-for-byte after reload.
+func TestCreateItemBody(t *testing.T) {
+	e := newEngine(t, &stubValidator{})
+	const body = "## Acceptance\n- items.body stores narrative + acceptance criteria inline\n- reads back verbatim"
+	item := mustCreate(t, e, CreateItemInput{Title: "with body", Type: "task", Body: body})
+
+	reloaded, err := e.loadItem(item.Id)
+	if err != nil {
+		t.Fatalf("loadItem: %v", err)
+	}
+	if got := reloaded.GetString("body"); got != body {
+		t.Fatalf("CreateItem body round-trip: got %q, want %q", got, body)
 	}
 }

@@ -119,6 +119,7 @@ type CreateItemInput struct {
 	Parent   string // parent item id; "" = a root
 	Court    string
 	Pointer  string
+	Body     string // long-form body: narrative, acceptance criteria, or spec, stored inline (§3.1)
 	Severity string
 	Priority int
 	Actor    Actor
@@ -161,6 +162,7 @@ func (e *Engine) CreateItem(ctx context.Context, in CreateItemInput) (*core.Reco
 		rec.Set("status_label", statemachine.DefaultLabelFor(statemachine.Queue))
 		rec.Set("court", in.Court)
 		rec.Set("pointer", in.Pointer)
+		rec.Set("body", in.Body)
 		rec.Set("severity", in.Severity)
 		rec.Set("priority", in.Priority)
 		rec.Set("version", 1)
@@ -469,6 +471,13 @@ func (e *Engine) Block(ctx context.Context, itemID string, version int, actor Ac
 		if err := checkVersion(item, version); err != nil {
 			return err
 		}
+		// A live foreign claim is authoritative over every direct mutation (ADR 0020): a
+		// non-holder is refused BEFORE the idempotent/terminal shortcuts, so the claim boundary
+		// wins even on a no-op block of an already-blocked item.
+		if holder := liveForeignClaim(item, actor, time.Now()); holder != "" {
+			return refuse("item %q is claimed by %q until %s", item.Id, holder,
+				item.GetDateTime("claim_expires").Time().Format(time.RFC3339))
+		}
 		if statemachine.Phase(item.GetString("phase")) == statemachine.Terminal {
 			return refuse("item %q is terminal; a terminal item cannot be blocked", item.Id)
 		}
@@ -505,6 +514,13 @@ func (e *Engine) Unblock(ctx context.Context, itemID string, version int, actor 
 		}
 		if err := checkVersion(item, version); err != nil {
 			return err
+		}
+		// A live foreign claim is authoritative over every direct mutation (ADR 0020): a
+		// non-holder is refused BEFORE the idempotent shortcut, so the claim boundary wins even
+		// on a no-op unblock of an item that is not blocked.
+		if holder := liveForeignClaim(item, actor, time.Now()); holder != "" {
+			return refuse("item %q is claimed by %q until %s", item.Id, holder,
+				item.GetDateTime("claim_expires").Time().Format(time.RFC3339))
 		}
 		if !item.GetBool("blocked") {
 			out = item // not blocked: idempotent

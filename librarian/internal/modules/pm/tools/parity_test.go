@@ -260,3 +260,59 @@ func TestToolBodies_EndToEnd(t *testing.T) {
 		t.Error("no audit row records the agent actor")
 	}
 }
+
+// TestItemBody_ToolRoundTrip drives the inline long-form body (spec §3.1) through the tool
+// adapter layer the model-facing and CLI surfaces share: create_item stores it, get_item
+// projects it, and update_item edits it (empty = unchanged, mirroring the other update fields).
+func TestItemBody_ToolRoundTrip(t *testing.T) {
+	app, cfg := newPMApp(t)
+	ctx := context.Background()
+	me := ActorFields{Actor: "crew-1", ActorKind: "agent"}
+
+	const body = "## Acceptance\n- body stored inline via create_item\n- surfaced by get_item"
+	created, err := CreateItem(ctx, app, cfg, nil, &CreateItemInput{
+		Title: "bodied", Body: body, ActorFields: me,
+	})
+	if err != nil {
+		t.Fatalf("CreateItem: %v", err)
+	}
+	id := created.Item.ID
+
+	detail, err := GetItem(ctx, app, cfg, nil, &GetItemInput{ItemID: id})
+	if err != nil {
+		t.Fatalf("GetItem: %v", err)
+	}
+	if detail.Body != body {
+		t.Fatalf("get_item body projection: got %q, want %q", detail.Body, body)
+	}
+
+	// An UpdateItem with an empty body leaves it unchanged (tool-layer empty = unchanged).
+	unchanged, err := UpdateItem(ctx, app, cfg, nil, &UpdateItemInput{
+		ItemID: id, Version: detail.Version, Priority: 2, ActorFields: me,
+	})
+	if err != nil {
+		t.Fatalf("UpdateItem(no body): %v", err)
+	}
+	afterNoop, err := GetItem(ctx, app, cfg, nil, &GetItemInput{ItemID: id})
+	if err != nil {
+		t.Fatalf("GetItem after no-op body update: %v", err)
+	}
+	if afterNoop.Body != body {
+		t.Fatalf("empty body must leave it unchanged: got %q, want %q", afterNoop.Body, body)
+	}
+
+	// A non-empty body edits it.
+	const revised = "revised inline spec"
+	if _, err := UpdateItem(ctx, app, cfg, nil, &UpdateItemInput{
+		ItemID: id, Version: unchanged.Item.Version, Body: revised, ActorFields: me,
+	}); err != nil {
+		t.Fatalf("UpdateItem(body): %v", err)
+	}
+	final, err := GetItem(ctx, app, cfg, nil, &GetItemInput{ItemID: id})
+	if err != nil {
+		t.Fatalf("GetItem after body update: %v", err)
+	}
+	if final.Body != revised {
+		t.Fatalf("update_item body edit: got %q, want %q", final.Body, revised)
+	}
+}

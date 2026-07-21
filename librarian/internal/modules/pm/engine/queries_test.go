@@ -274,3 +274,115 @@ func TestUpdateItem(t *testing.T) {
 		t.Fatalf("work->terminal via label should refuse, got %v", err)
 	}
 }
+
+// TestUpdateItemGatedByClaim pins ADR 0020 (a live claim is authoritative over every direct
+// mutation) for update_item: a live foreign claim refuses a non-holder's field edit AND its
+// status_label path (which delegates to SetStatusLabel), naming the holder, while the holder
+// and an expired claim proceed. The absent-claim success path is already covered by
+// TestUpdateItem (an unclaimed item edited by `human`).
+func TestUpdateItemGatedByClaim(t *testing.T) {
+	e := newEngine(t, &stubValidator{})
+	alice := Actor{Name: "agent-alice", Kind: "agent"}
+	bob := Actor{Name: "agent-bob", Kind: "agent"}
+
+	item := mustCreate(t, e, CreateItemInput{Title: "contested", Type: "analysis", Court: "desk"})
+	item, err := e.Claim(context.Background(), item.Id, item.GetInt("version"), alice)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// A non-holder's field edit is refused, naming the holder; nothing is written.
+	newTitle := "hijacked"
+	if _, err := e.UpdateItem(context.Background(), UpdateItemInput{
+		ItemID: item.Id, Version: item.GetInt("version"), Title: &newTitle, Actor: bob,
+	}); !IsRefusal(err) || !strings.Contains(err.Error(), "agent-alice") {
+		t.Fatalf("foreign live claim must refuse UpdateItem naming the holder, got %v", err)
+	}
+	if item, _ = e.loadItem(item.Id); item.GetString("title") != "contested" {
+		t.Fatalf("refused foreign UpdateItem must not edit the field, got title %q", item.GetString("title"))
+	}
+
+	// The status_label path is gated the same way (it delegates to SetStatusLabel): a
+	// non-holder's label change is refused up front, before any transition.
+	label := "active"
+	if _, err := e.UpdateItem(context.Background(), UpdateItemInput{
+		ItemID: item.Id, Version: item.GetInt("version"), StatusLabel: &label, Actor: bob,
+	}); !IsRefusal(err) || !strings.Contains(err.Error(), "agent-alice") {
+		t.Fatalf("foreign live claim must refuse a status_label UpdateItem, got %v", err)
+	}
+	if item, _ = e.loadItem(item.Id); item.GetString("phase") != "queue" {
+		t.Fatalf("refused foreign status_label UpdateItem must not transition, got phase %q", item.GetString("phase"))
+	}
+
+	// The holder may edit.
+	holderTitle := "renamed by holder"
+	item, err = e.UpdateItem(context.Background(), UpdateItemInput{
+		ItemID: item.Id, Version: item.GetInt("version"), Title: &holderTitle, Actor: alice,
+	})
+	if err != nil || item.GetString("title") != "renamed by holder" {
+		t.Fatalf("the claim holder must be able to UpdateItem, got %v (title %q)", err, item.GetString("title"))
+	}
+
+	// An EXPIRED claim frees the path for a non-holder (§3.6).
+	item.Set("claim_expires", time.Now().Add(-time.Minute))
+	if err := e.App.Save(item); err != nil {
+		t.Fatal(err)
+	}
+	item, _ = e.loadItem(item.Id)
+	freeTitle := "edited after expiry"
+	if _, err := e.UpdateItem(context.Background(), UpdateItemInput{
+		ItemID: item.Id, Version: item.GetInt("version"), Title: &freeTitle, Actor: bob,
+	}); err != nil {
+		t.Fatalf("expired claim must let a non-holder UpdateItem, got %v", err)
+	}
+}
+
+// TestItemBody_UpdateAndProjection covers the §5.1 body surface end-to-end at the engine layer:
+// GetItem projects items.body into ItemDetail.Body, UpdateItem edits it, and a non-nil pointer to
+// an empty string is a deliberate clear (mirroring the other *string fields).
+func TestItemBody_UpdateAndProjection(t *testing.T) {
+	e := newEngine(t, &stubValidator{})
+	const initial = "initial narrative + acceptance criteria"
+	item := mustCreate(t, e, CreateItemInput{Title: "body item", Type: "task", Body: initial})
+
+	// GetItem projects the stored body.
+	d, err := e.GetItem(context.Background(), item.Id)
+	if err != nil {
+		t.Fatalf("GetItem: %v", err)
+	}
+	if d.Body != initial {
+		t.Fatalf("GetItem body projection: got %q, want %q", d.Body, initial)
+	}
+
+	// UpdateItem edits the body.
+	const revised = "revised spec text stored inline on the item"
+	body := revised
+	updated, err := e.UpdateItem(context.Background(), UpdateItemInput{
+		ItemID: item.Id, Version: item.GetInt("version"), Body: &body, Actor: human,
+	})
+	if err != nil {
+		t.Fatalf("UpdateItem(body): %v", err)
+	}
+	if updated.GetString("body") != revised {
+		t.Fatalf("UpdateItem body edit: got %q, want %q", updated.GetString("body"), revised)
+	}
+	d, err = e.GetItem(context.Background(), item.Id)
+	if err != nil {
+		t.Fatalf("GetItem after update: %v", err)
+	}
+	if d.Body != revised {
+		t.Fatalf("GetItem body after update: got %q, want %q", d.Body, revised)
+	}
+
+	// A non-nil empty string clears the body deliberately (omitempty then drops it from JSON).
+	empty := ""
+	cleared, err := e.UpdateItem(context.Background(), UpdateItemInput{
+		ItemID: item.Id, Version: updated.GetInt("version"), Body: &empty, Actor: human,
+	})
+	if err != nil {
+		t.Fatalf("UpdateItem(clear body): %v", err)
+	}
+	if cleared.GetString("body") != "" {
+		t.Fatalf("UpdateItem body clear: got %q, want empty", cleared.GetString("body"))
+	}
+}

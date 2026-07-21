@@ -63,6 +63,14 @@ If you are going to actually work an item (not just report), **`claim_item`** it
 second agent on the same desk never double-works it — the claim carries a TTL (default 30 min,
 `PM_CLAIM_TTL`). Release it with **`release_item`** when you stop, or let the TTL lapse.
 
+A live foreign claim is distinct from — and stronger than — a version conflict: it refuses
+**every** direct mutation of the item (transition, block, unblock, update) for anyone but the
+holder, until the TTL lapses or the holder releases. Claim before you plan to mutate, not after.
+
+Pass your agent id as `actor` (and `delegation_parent` if you are acting under delegation) on
+every write tool call — `claim_item` included — so the audit trail and any later claim-refusal
+message name who actually holds the item. Unset, writes are attributed to a generic `"agent"`.
+
 - If `claim_item` / `release_item` and the other write tools are absent while the read tools
   are present, the desk has set `PM_AUTONOMOUS_WRITES=false`: you are **read-only** over the
   graph. Brief and recommend, but the owner drives the mutations via `deskkit pm ...`.

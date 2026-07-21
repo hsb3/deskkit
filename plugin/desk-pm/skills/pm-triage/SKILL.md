@@ -25,12 +25,13 @@ never a code repo.
 | `type` | a schema-v1 / kit item type (e.g. `decision`, `task`) — this is what the gate rules key on |
 | `court` | who holds it: `owner`, `desk`, `crew`, `vendor`, `external-session` |
 | `pointer` | the doc path / issue URL / other locus it tracks (a plain string) |
+| `body` | inline narrative / acceptance criteria — long-form prose stored directly on the item, distinct from `pointer` (an external doc) and `notes` (phase-scoped keyed snippets) |
 | `severity` | `low` / `medium` / `high` |
 | `priority` | ordinal within its court/queue (lower = sooner) |
 | `parent` | a parent item id (omit for a root item) |
 
 CLI: `deskkit pm create --title ... --type ... --court ... [--parent ...] [--pointer ...]
-[--severity ...] [--priority N]`.
+[--body ...] [--severity ...] [--priority N]`.
 
 Pick the **type** deliberately: it determines which document gate applies when the item is later
 advanced (see pm-advance-item). Pick the **court** so the item lands in the right queue —

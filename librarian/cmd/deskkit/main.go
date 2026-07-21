@@ -12,6 +12,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"os/exec"
@@ -756,7 +757,8 @@ func registerToolCommands(app *pocketbase.PocketBase, cfg *config.Config, cfgErr
 			if err != nil {
 				return err
 			}
-			return printJSON(tools.Sweep(cmd.Context(), app, c, &tools.SweepInput{}))
+			res, serr := tools.Sweep(cmd.Context(), app, c, &tools.SweepInput{})
+			return printJSON(cmd.OutOrStdout(), res, serr)
 		},
 	})
 
@@ -770,7 +772,8 @@ func registerToolCommands(app *pocketbase.PocketBase, cfg *config.Config, cfgErr
 			if err != nil {
 				return err
 			}
-			return printJSON(tools.Patrol(cmd.Context(), app, c, &tools.PatrolInput{Path: patrolPath}))
+			res, serr := tools.Patrol(cmd.Context(), app, c, &tools.PatrolInput{Path: patrolPath})
+			return printJSON(cmd.OutOrStdout(), res, serr)
 		},
 	}
 	patrolCmd.Flags().StringVar(&patrolPath, "path", "", "restrict patrol to this file/subtree")
@@ -787,7 +790,8 @@ func registerToolCommands(app *pocketbase.PocketBase, cfg *config.Config, cfgErr
 			if err != nil {
 				return err
 			}
-			return printJSON(tools.ProposeFix(cmd.Context(), app, c, &tools.ProposeFixInput{RunID: proposeRun, Rules: proposeRules}))
+			res, serr := tools.ProposeFix(cmd.Context(), app, c, &tools.ProposeFixInput{RunID: proposeRun, Rules: proposeRules})
+			return printJSON(cmd.OutOrStdout(), res, serr)
 		},
 	}
 	proposeCmd.Flags().StringVar(&proposeRun, "run", "", "scope to a patrol run id")
@@ -805,7 +809,8 @@ func registerToolCommands(app *pocketbase.PocketBase, cfg *config.Config, cfgErr
 			if err != nil {
 				return err
 			}
-			return printJSON(tools.ApplyFix(cmd.Context(), app, c, &tools.ApplyFixInput{RunID: applyRun, RevisionIDs: applyRevs}))
+			res, serr := tools.ApplyFix(cmd.Context(), app, c, &tools.ApplyFixInput{RunID: applyRun, RevisionIDs: applyRevs})
+			return printJSON(cmd.OutOrStdout(), res, serr)
 		},
 	}
 	applyCmd.Flags().StringVar(&applyRun, "run", "", "apply this run's recorded, un-applied revisions")
@@ -822,7 +827,8 @@ func registerToolCommands(app *pocketbase.PocketBase, cfg *config.Config, cfgErr
 			if err != nil {
 				return err
 			}
-			return printJSON(tools.Restore(cmd.Context(), app, c, &tools.RestoreInput{RevisionID: restoreRev, Path: restorePath}))
+			res, serr := tools.Restore(cmd.Context(), app, c, &tools.RestoreInput{RevisionID: restoreRev, Path: restorePath})
+			return printJSON(cmd.OutOrStdout(), res, serr)
 		},
 	}
 	restoreCmd.Flags().StringVar(&restoreRev, "revision", "", "the revisions row id to reverse")
@@ -891,7 +897,8 @@ func registerToolCommands(app *pocketbase.PocketBase, cfg *config.Config, cfgErr
 			if err != nil {
 				return err
 			}
-			return printJSON(tools.DisposeFinding(cmd.Context(), app, c, args[0], disposeAs, disposeBy, disposeReason))
+			res, serr := tools.DisposeFinding(cmd.Context(), app, c, args[0], disposeAs, disposeBy, disposeReason)
+			return printJSON(cmd.OutOrStdout(), res, serr)
 		},
 	}
 	disposeCmd.Flags().StringVar(&disposeAs, "as", "", "disposition to set: open, acknowledged, triaged, or wont-fix (required)")
@@ -913,13 +920,14 @@ func registerToolCommands(app *pocketbase.PocketBase, cfg *config.Config, cfgErr
 			if err != nil {
 				return err
 			}
-			return printJSON(tools.RecordFeedback(cmd.Context(), app, c, &tools.RecordFeedbackInput{
+			res, serr := tools.RecordFeedback(cmd.Context(), app, c, &tools.RecordFeedbackInput{
 				Kind:    fbKind,
 				Summary: fbSummary,
 				Detail:  fbDetail,
 				Context: fbContext,
 				Source:  fbSource,
-			}))
+			})
+			return printJSON(cmd.OutOrStdout(), res, serr)
 		},
 	}
 	recordFeedbackCmd.Flags().StringVar(&fbKind, "kind", "", "entry type: problem or feedback")
@@ -1115,8 +1123,12 @@ func runChat(ctx context.Context, app core.App, cfg *config.Config) error {
 	return sc.Err()
 }
 
-// printJSON marshals a tool's typed result (or returns its error) to stdout.
-func printJSON[T any](res T, err error) error {
+// printJSON marshals a tool's typed result (or returns its error) to w. Every cobra caller
+// passes cmd.OutOrStdout() so a test can redirect a leaf command's output via cmd.SetOut/
+// RootCmd.SetOut without touching the process-global os.Stdout (cmd.OutOrStdout() on a
+// subcommand walks up to the root's configured writer, defaulting to os.Stdout only when
+// nothing was set).
+func printJSON[T any](w io.Writer, res T, err error) error {
 	if err != nil {
 		return err
 	}
@@ -1124,7 +1136,7 @@ func printJSON[T any](res T, err error) error {
 	if merr != nil {
 		return merr
 	}
-	fmt.Println(string(b))
+	fmt.Fprintln(w, string(b))
 	return nil
 }
 

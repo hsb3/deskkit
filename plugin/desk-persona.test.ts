@@ -116,7 +116,7 @@ test("every one of the 17 exposed tools is referenced by name somewhere in the c
 // or a real-but-unexposed tool in prose, add it here — otherwise the ToolNames-anchored guard
 // below will (correctly) flag it as an unrecognized identifier.
 const NON_TOOL_FIELDS = new Set([
-  "by_court", "by_phase", "desk_config", "recent_transitions", "status_label", "apply_fix",
+  "by_court", "by_phase", "desk_config", "recent_transitions", "status_label", "apply_fix", "delegation_parent",
 ]);
 
 // The guard, as a pure function so it can be proven red on an injected fake. Returns the list
