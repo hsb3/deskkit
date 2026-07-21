@@ -132,7 +132,7 @@ func TestInputSchemaMap_MatchesStructs(t *testing.T) {
 		"patrol":          {"path"},
 		"propose_fix":     {"run_id", "rules"},
 		"apply_fix":       {"run_id", "revision_ids"},
-		"query":           {"kind", "days", "include_disposed"},
+		"query":           {"kind", "days", "include_disposed", "term", "limit", "path", "show_index"},
 		"record_feedback": {"kind", "summary", "detail", "context", "source"},
 	}
 	wantRequired := map[string][]string{

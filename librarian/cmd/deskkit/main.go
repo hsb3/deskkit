@@ -839,16 +839,23 @@ func registerToolCommands(app *pocketbase.PocketBase, cfg *config.Config, cfgErr
 	var queryDays int
 	var queryPretty bool
 	var queryIncludeDisposed bool
+	var queryTerm string
+	var queryLimit int
+	var queryPath string
+	var queryShowIndex bool
 	queryCmd := &cobra.Command{
 		Use:   "query <kind>",
-		Short: "Read-only queries: live_files recent orphans uncollapsed findings summary adoption feedback",
+		Short: "Read-only queries: live_files recent orphans uncollapsed findings summary adoption feedback search content",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := requireConfig(app, cfg, cfgErr)
 			if err != nil {
 				return err
 			}
-			raw, qerr := tools.Query(cmd.Context(), app, c, &tools.QueryInput{Kind: args[0], Days: queryDays, IncludeDisposed: queryIncludeDisposed})
+			raw, qerr := tools.Query(cmd.Context(), app, c, &tools.QueryInput{
+				Kind: args[0], Days: queryDays, IncludeDisposed: queryIncludeDisposed,
+				Term: queryTerm, Limit: queryLimit, Path: queryPath, ShowIndex: queryShowIndex,
+			})
 			if qerr != nil {
 				return qerr
 			}
@@ -870,6 +877,15 @@ func registerToolCommands(app *pocketbase.PocketBase, cfg *config.Config, cfgErr
 	// --include-disposed widens the `findings` query from the live-only default (open findings)
 	// to include acknowledged/triaged/wont_fix history; no effect on other query kinds.
 	queryCmd.Flags().BoolVar(&queryIncludeDisposed, "include-disposed", false, "for `query findings`: also show disposed (acknowledged/triaged/wont-fix) findings, not just open ones")
+	// --term/--limit drive `query search` (substring retrieval over indexed content); --path drives
+	// `query content` (fetch one file's stored body). Inert for the other kinds.
+	queryCmd.Flags().StringVar(&queryTerm, "term", "", "for `query search`: substring to find in indexed file content")
+	queryCmd.Flags().IntVar(&queryLimit, "limit", 20, "for `query search`: max results (hard-capped at 200)")
+	queryCmd.Flags().StringVar(&queryPath, "path", "", "for `query content`: desk-relative file path whose stored body to return")
+	// --show-index opts the by-design-unreferenced index/entry files (CLAUDE.md, READMEs, INDEX.md)
+	// back into `query orphans`; they are hidden by default as noise (an entry/index doc is what
+	// other docs point at, so nothing references it). No effect on other query kinds.
+	queryCmd.Flags().BoolVar(&queryShowIndex, "show-index", false, "for `query orphans`: also show by-design-unreferenced index/entry files (CLAUDE.md, READMEs, INDEX.md)")
 	app.RootCmd.AddCommand(queryCmd)
 
 	// findings — supervised disposition lifecycle for patrol findings. `dispose` sets a

@@ -146,10 +146,13 @@ func Patrol(ctx context.Context, app core.App, cfg *config.Config, in *PatrolInp
 			}
 		}
 
-		// R6 runs only when HANDOFF_PATH is a member of the filtered set (spec §5.2).
+		// R6 runs only when HANDOFF_PATH is a member of the filtered set (spec §5.2). The handoff
+		// path is threaded into checkR6 so `newest` can be computed EXCLUDING the handoff itself
+		// (see checkR6's comment) — the staleness rule measures the handoff against the newest
+		// change it GUARDS.
 		for _, row := range filtered {
 			if row.Path == cfg.HandoffPath {
-				if detail, fix, hit := checkR6(root, row); hit {
+				if detail, fix, hit := checkR6(root, cfg.HandoffPath, row); hit {
 					if err := fileFinding(row, "R6", "judgment", detail, fix); err != nil {
 						return err
 					}
@@ -464,14 +467,20 @@ func r6Check(text, newest string) (string, string, bool) {
 	return "", "", false
 }
 
-func checkR6(root string, row fileRow) (string, string, bool) {
+func checkR6(root, handoffPath string, row fileRow) (string, string, bool) {
 	text, ok := readText(filepath.Join(root, row.Path))
 	if !ok {
 		return "", "", false
 	}
-	// A git failure degrades to "no R6 finding" (desklib.GitNewestCommit returns "" on any
-	// git error), matching the PoC's `newest` empty -> None (spec §5.2 Errors).
-	newest := desklib.GitNewestCommit(root)
+	// `newest` is the newest commit date of everything the handoff GUARDS — i.e. the whole desk
+	// tree EXCLUDING the handoff file itself. This is deliberate: GitNewestCommit over the WHOLE
+	// tree includes the handoff's own update commit, so the moment a handoff refresh is committed
+	// that commit becomes the newest and the handoff can never be "current with" it — the finding
+	// could then never self-clear at the next patrol without a full re-baseline. Excluding the
+	// handoff lets an updated handoff (dated on/after the newest change it guards) clear the finding
+	// on the next patrol. A git failure degrades to "no R6 finding" (GitNewestCommitExcluding returns
+	// "" on any git error), matching the PoC's `newest` empty -> None (spec §5.2 Errors).
+	newest := desklib.GitNewestCommitExcluding(root, handoffPath)
 	return r6Check(text, newest)
 }
 

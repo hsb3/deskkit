@@ -354,6 +354,63 @@ func firstFileRow(t *testing.T, app core.App, path string) *core.Record {
 	return r
 }
 
+// --- content indexing (§5.6 retrieval/search) ---
+
+// TestScanFileContentUTF8Text: a UTF-8 text file has its body stored verbatim in Content, so a
+// session can later retrieve/search it.
+func TestScanFileContentUTF8Text(t *testing.T) {
+	body := "---\ntype: analysis\ncreated: 2026-07-20\nupdated: 2026-07-20\ntags: []\n---\nsalient unique-token-xyzzy body prose\n"
+	row := scanTempMD(t, "analyses/has-content.md", body)
+	if row.Content != body {
+		t.Fatalf("Content not stored verbatim for a UTF-8 file:\n got %q\nwant %q", row.Content, body)
+	}
+}
+
+// TestScanFileContentSecretHomeExcluded: a file under SECRETS_DIR is a secret home and is NEVER
+// indexed — Content stays empty (mirrors the meta/secrets exclusion boundary).
+func TestScanFileContentSecretHomeExcluded(t *testing.T) {
+	row := scanTempMD(t, "_meta/secrets/creds.md", "API_TOKEN=super-secret-value\n")
+	if row.Content != "" {
+		t.Fatalf("a file under SECRETS_DIR must not be indexed, got Content %q", row.Content)
+	}
+}
+
+// TestScanFileContentBinaryExcluded: a non-UTF-8 (binary) file is not indexed — Content is empty.
+func TestScanFileContentBinaryExcluded(t *testing.T) {
+	root := t.TempDir()
+	rel := "assets/blob.bin"
+	abs := filepath.Join(root, filepath.FromSlash(rel))
+	if err := os.MkdirAll(filepath.Dir(abs), 0o755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+	// A lone 0xff never begins a valid UTF-8 sequence, so these bytes are non-UTF-8.
+	if err := os.WriteFile(abs, []byte{0xff, 0xfe, 0x00, 0x01, 0xff}, 0o644); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+	dirMap := map[string]string{"decision": "_structure/decisions", "task": "tasks", "analysis": "analyses", "journal": "journal"}
+	row, err := scanFile(root, rel, dirMap, "_meta/secrets", "testdesk")
+	if err != nil {
+		t.Fatalf("scanFile: %v", err)
+	}
+	if row.Content != "" {
+		t.Fatalf("a non-UTF-8 binary file must not be indexed, got Content %q", row.Content)
+	}
+}
+
+// TestTruncateRunes pins the rune-safe content cap: under-cap is unchanged, over-cap is clipped,
+// and a multi-byte rune is never split.
+func TestTruncateRunes(t *testing.T) {
+	if got := truncateRunes("hello", 10); got != "hello" {
+		t.Fatalf("under cap must be unchanged, got %q", got)
+	}
+	if got := truncateRunes("hello", 3); got != "hel" {
+		t.Fatalf("over cap must clip to max runes, got %q", got)
+	}
+	if got := truncateRunes("héllo", 2); got != "hé" {
+		t.Fatalf("truncation must not split a multi-byte rune, got %q", got)
+	}
+}
+
 // TestSweep_RenameWithIDKeepsSameRecord — a doc carrying a frontmatter `id`, renamed on disk
 // between two sweeps, keeps the SAME files record at its new path (identity survives the rename);
 // the old path has no row (moved, not soft-deleted-and-orphaned). RED against path-only matching,

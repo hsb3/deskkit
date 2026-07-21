@@ -9,6 +9,7 @@ import (
 	"sort"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/pocketbase/dbx"
 	"github.com/pocketbase/pocketbase/core"
@@ -44,7 +45,7 @@ func Query(ctx context.Context, app core.App, cfg *config.Config, in *QueryInput
 		}
 		raw, err = queryRecent(app, days)
 	case "orphans":
-		raw, err = queryOrphans(app, cfg)
+		raw, err = queryOrphans(app, cfg, in.ShowIndex)
 	case "uncollapsed":
 		raw, err = queryUncollapsed(app)
 	case "findings":
@@ -55,8 +56,12 @@ func Query(ctx context.Context, app core.App, cfg *config.Config, in *QueryInput
 		raw, err = queryAdoption(app)
 	case "feedback":
 		raw, err = queryFeedback(app)
+	case "search":
+		raw, err = querySearch(app, in.Term, in.Limit)
+	case "content":
+		raw, err = queryContent(app, in.Path)
 	default:
-		return nil, fmt.Errorf("query: unknown kind %q (one of: live_files recent orphans uncollapsed findings summary adoption feedback)", in.Kind)
+		return nil, fmt.Errorf("query: unknown kind %q (one of: live_files recent orphans uncollapsed findings summary adoption feedback search content)", in.Kind)
 	}
 	if err != nil {
 		return nil, translateUninitializedStoreError(err)
@@ -175,6 +180,30 @@ type feedbackResult struct {
 	Entries []feedbackBrief `json:"entries"`
 }
 
+// searchMatch is one hit of the `search` query: the file's path + dir_kind and a short snippet of
+// context around the first case-insensitive occurrence of the term in that file's indexed body.
+type searchMatch struct {
+	Path    string `json:"path"`
+	DirKind string `json:"dir_kind"`
+	Snippet string `json:"snippet"`
+}
+
+type searchResult struct {
+	Kind    string        `json:"kind"`
+	Term    string        `json:"term"`
+	Count   int           `json:"count"`
+	Matches []searchMatch `json:"matches"`
+}
+
+// contentResult is the `content` query: the full stored body for one desk-relative path, or
+// found=false when no live row exists at that path.
+type contentResult struct {
+	Kind    string `json:"kind"`
+	Path    string `json:"path"`
+	Found   bool   `json:"found"`
+	Content string `json:"content"`
+}
+
 // --- pure helpers (unit-testable with hand-built fileRow/findingRow fixtures) ---
 
 func toFileBrief(row fileRow) fileBrief {
@@ -233,6 +262,20 @@ func isOrphan(row fileRow, secretsDir string) bool {
 	return !isMetaPath(row.Path, secretsDir)
 }
 
+// isIndexEntryFile reports whether path's basename (case-insensitive) is one of the by-design
+// unreferenced index/entry files: CLAUDE.md, README.md, INDEX.md. These are structurally
+// unreferenced on purpose — an entry/index doc is what other docs point AT, not the other way
+// round — so they are noise in the default `orphans` view even though the structural isOrphan
+// predicate (empty doctype .md outside meta/memory/infra) would otherwise surface them. They are
+// filtered from default orphans and opted back in with the query's ShowIndex flag (--show-index).
+func isIndexEntryFile(path string) bool {
+	switch strings.ToLower(basename(path)) {
+	case "claude.md", "readme.md", "index.md":
+		return true
+	}
+	return false
+}
+
 func sortOrphanBriefs(files []orphanBrief) {
 	sort.Slice(files, func(i, j int) bool { return files[i].Path < files[j].Path })
 }
@@ -286,6 +329,56 @@ func adoptionDate(raw string) string {
 		return raw[:10]
 	}
 	return raw
+}
+
+// snippetWindow is the context radius (bytes, snapped outward to a rune boundary) shown on each
+// side of a `search` match.
+const snippetWindow = 120
+
+// snippet returns a short excerpt of content centered on the FIRST case-insensitive occurrence of
+// term, with up to `window` bytes of context on each side and a leading/trailing "…" whenever the
+// excerpt is clipped from the full body. An empty term — or a term that does not occur — yields the
+// leading window of the body (match position 0). Clip boundaries are snapped outward to rune
+// boundaries so the excerpt is always valid UTF-8. Pure and allocation-light: it slices the body
+// rather than rune-copying the whole thing. Case-insensitive match location assumes ASCII-stable
+// lowering (true for desk markdown); the rune-boundary snap keeps the output valid regardless.
+func snippet(content, term string, window int) string {
+	if window < 0 {
+		window = 0
+	}
+	start, matchLen := 0, 0
+	if term != "" {
+		if i := strings.Index(strings.ToLower(content), strings.ToLower(term)); i >= 0 {
+			start = i
+			// Byte length, deliberately: for a multi-byte term this overshoots the rune count,
+			// biasing the window a little right of the match end. Harmless — the boundaries are
+			// rune-snapped below — and cheaper than a rune count per snippet.
+			matchLen = len(term)
+		}
+	}
+	lo := start - window
+	if lo < 0 {
+		lo = 0
+	}
+	hi := start + matchLen + window
+	if hi > len(content) {
+		hi = len(content)
+	}
+	for lo > 0 && !utf8.RuneStart(content[lo]) {
+		lo--
+	}
+	for hi < len(content) && !utf8.RuneStart(content[hi]) {
+		hi++
+	}
+	var b strings.Builder
+	if lo > 0 {
+		b.WriteString("…")
+	}
+	b.WriteString(content[lo:hi])
+	if hi < len(content) {
+		b.WriteString("…")
+	}
+	return b.String()
 }
 
 // --- DB-touching query implementations ---
@@ -363,16 +456,24 @@ func queryRecent(app core.App, days int) (json.RawMessage, error) {
 	return json.Marshal(recentResult{Kind: "recent", Days: days, Count: len(files), Files: files})
 }
 
-func queryOrphans(app core.App, cfg *config.Config) (json.RawMessage, error) {
+func queryOrphans(app core.App, cfg *config.Config, showIndex bool) (json.RawMessage, error) {
 	rows, err := liveFileRecords(app)
 	if err != nil {
 		return nil, err
 	}
 	var files []orphanBrief
 	for _, row := range rows {
-		if isOrphan(row, cfg.SecretsDir) {
-			files = append(files, orphanBrief{Path: row.Path, DirKind: row.DirKind})
+		if !isOrphan(row, cfg.SecretsDir) {
+			continue
 		}
+		// Index/entry files (CLAUDE.md, READMEs, INDEX.md) are by-design unreferenced, so they are
+		// hidden from default orphans as an ADDITIONAL filter layered on top of the structural
+		// isOrphan predicate (which is left unchanged so its unit tests keep passing); --show-index
+		// (ShowIndex=true) opts them back in.
+		if !showIndex && isIndexEntryFile(row.Path) {
+			continue
+		}
+		files = append(files, orphanBrief{Path: row.Path, DirKind: row.DirKind})
 	}
 	sortOrphanBriefs(files)
 	return json.Marshal(orphansResult{Kind: "orphans", Count: len(files), Files: files})
@@ -462,4 +563,70 @@ func queryAdoption(app core.App) (json.RawMessage, error) {
 		}
 	}
 	return json.Marshal(adoptionResult{Kind: "adoption", Count: len(rows), Rows: rows})
+}
+
+// querySearch — the `search` kind: substring/keyword retrieval over indexed file content (§5.6).
+// v1 deliberately uses PocketBase's LIKE-contains operator `~` — `content ~ {:term}` compiles to
+// `content LIKE '%term%'` (ASCII-case-insensitive in SQLite) — and NOT SQLite FTS5: plain keyword
+// contains is sufficient here, and embeddings / vector search are out of scope. Results are ordered
+// by path and capped (default 20, hard max 200); each match carries a short context snippet around
+// the first occurrence. The FindRecordsByFilter error is returned so Query routes it through
+// translateUninitializedStoreError, exactly like the other kinds (an uninitialized store yields the
+// actionable "run migrate up" message, not a spuriously empty result).
+func querySearch(app core.App, term string, limit int) (json.RawMessage, error) {
+	if term == "" {
+		return nil, errors.New("query search: term is required")
+	}
+	if limit <= 0 {
+		limit = 20
+	}
+	if limit > 200 {
+		limit = 200
+	}
+	// The `~` operator compiles to SQLite LIKE, whose `%`/`_` metacharacters are NOT escaped by
+	// the param binding — a term containing them widens the match (`_` = any one char). Desk
+	// prose rarely searches on bare `%`/`_`, so this is accepted v1 behavior, stated here so a
+	// surprised future caller finds the explanation at the query site.
+	recs, err := app.FindRecordsByFilter(
+		"files",
+		"deleted = false && content ~ {:term}",
+		"path", limit, 0,
+		dbx.Params{"term": term},
+	)
+	if err != nil {
+		return nil, err
+	}
+	matches := make([]searchMatch, len(recs))
+	for i, r := range recs {
+		matches[i] = searchMatch{
+			Path:    r.GetString("path"),
+			DirKind: r.GetString("dir_kind"),
+			Snippet: snippet(r.GetString("content"), term, snippetWindow),
+		}
+	}
+	return json.Marshal(searchResult{Kind: "search", Term: term, Count: len(matches), Matches: matches})
+}
+
+// queryContent — the `content` kind: return the full stored body of one live desk file by its
+// desk-relative path (the retrieval companion to search). found=false when no live row exists at
+// that path. The lookup error routes through translateUninitializedStoreError like every other kind.
+func queryContent(app core.App, p string) (json.RawMessage, error) {
+	if p == "" {
+		// Mirror the search kind's empty-term error: a missing --path/path is a usage error, not
+		// a "file not found" — a silent found=false here would mask the caller's mistake.
+		return nil, errors.New("query content: path is required")
+	}
+	recs, err := app.FindRecordsByFilter(
+		"files",
+		"path = {:path} && deleted = false",
+		"", 1, 0,
+		dbx.Params{"path": p},
+	)
+	if err != nil {
+		return nil, err
+	}
+	if len(recs) == 0 {
+		return json.Marshal(contentResult{Kind: "content", Path: p, Found: false})
+	}
+	return json.Marshal(contentResult{Kind: "content", Path: p, Found: true, Content: recs[0].GetString("content")})
 }

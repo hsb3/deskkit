@@ -123,6 +123,21 @@ func GitNewestCommit(root string) string {
 	return firstLine(strings.TrimSpace(string(out)))
 }
 
+// GitNewestCommitExcluding returns the newest commit date (yyyy-mm-dd) across the desk tree
+// EXCLUDING excludeRel, via a git exclude pathspec. R6 staleness measures the handoff against the
+// newest change it GUARDS, so the handoff's OWN update commit must not count in `newest` — otherwise
+// committing a handoff refresh would always make that commit the newest, and the finding could never
+// self-clear without a re-baseline. excludeRel is a DESK_ROOT-relative, "/"-joined path. Same
+// failure semantics as GitNewestCommit: "" on any git error or empty output (a git failure degrades
+// to "no R6 finding").
+func GitNewestCommitExcluding(root, excludeRel string) string {
+	out, err := exec.Command("git", "-C", root, "log", "-1", "--format=%cs", "--", ".", ":(exclude)"+excludeRel).Output()
+	if err != nil {
+		return ""
+	}
+	return firstLine(strings.TrimSpace(string(out)))
+}
+
 func gitMeta(root, rel string, firstAdd bool) string {
 	args := []string{"-C", root, "log", "--format=%H|%cs", "-1"}
 	if firstAdd {

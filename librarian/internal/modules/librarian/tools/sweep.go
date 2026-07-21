@@ -76,6 +76,9 @@ func Sweep(ctx context.Context, app core.App, cfg *config.Config, in *SweepInput
 				continue
 			}
 			seen[rel] = true
+			if row.Truncated {
+				result.Truncated++
+			}
 
 			// Identity match: doc_id first (rename survival), path fallback. A frontmatter id
 			// already claimed by an earlier doc THIS sweep is a duplicate — never merge two files
@@ -211,6 +214,8 @@ type fileRow struct {
 	FMCreated     string
 	FMUpdated     string
 	Deleted       bool
+	Content       string // swept file body, indexed for retrieval/search (§5.6 content/search kinds)
+	Truncated     bool   // transient scan flag: Content was clipped at maxContentRunes (never persisted)
 }
 
 // fileRowFromRecord reads a `files` collection *core.Record into the plain fileRow shape.
@@ -231,6 +236,7 @@ func fileRowFromRecord(r *core.Record) fileRow {
 		FMCreated:     r.GetString("fm_created"),
 		FMUpdated:     r.GetString("fm_updated"),
 		Deleted:       r.GetBool("deleted"),
+		Content:       r.GetString("content"),
 	}
 }
 
@@ -260,6 +266,7 @@ func applyFileRow(rec *core.Record, row fileRow) {
 	rec.Set("fm_created", row.FMCreated)
 	rec.Set("fm_updated", row.FMUpdated)
 	rec.Set("deleted", row.Deleted)
+	rec.Set("content", row.Content)
 }
 
 // fileRowDiffers implements COMPARE_FIELDS (spec §5.1): doc_id, desk, doctype, dir_kind, status,
@@ -267,8 +274,16 @@ func applyFileRow(rec *core.Record, row fileRow) {
 // "path" and "last_seen" are excluded — a rename that carries a frontmatter `id` is matched by
 // doc_id and its new path is applied explicitly in Sweep (a pure path change is otherwise "no
 // diff" here). doc_id IS compared so a doc that gains or changes its `id` re-persists.
+//
+// content IS compared, but it newly MATTERS only to backfill: a normal content edit already
+// changes the checksum (which is compared), so an edited file diffs on checksum alone. The content
+// comparison exists so a store created BEFORE the content field existed (empty content on every
+// row) re-persists the body on the next sweep (empty content -> populated) without needing a
+// content change. Sweep stays idempotent: an unchanged file whose content is already stored
+// produces no diff here.
 func fileRowDiffers(rec *core.Record, row fileRow) bool {
 	return rec.GetString("doc_id") != row.DocID ||
+		rec.GetString("content") != row.Content ||
 		rec.GetString("desk") != row.Desk ||
 		rec.GetString("doctype") != row.Doctype ||
 		rec.GetString("dir_kind") != row.DirKind ||
@@ -357,7 +372,40 @@ func scanFile(root, rel string, dirMap map[string]string, secretsDir, deskName s
 		// exactly the >40-line case R5 flags).
 		row.GraduatedTo = graduationMarker(text)
 	}
+	// Content indexing (§5.6 retrieval/search). A file under the desk's configured SECRETS_DIR is a
+	// secret home and is NEVER indexed — mirrors the meta/secrets exclusion boundary (isMetaPath's
+	// secrets clause). Otherwise, only UTF-8 text is stored (a binary/non-UTF-8 file indexes to ""),
+	// truncated rune-safe to the collection's content cap so a very large file never overflows the
+	// TextField Max. content is re-derivable by a fresh sweep (store is disposable; files-are-truth).
+	switch {
+	case secretsDir != "" && pathOrSubtree(rel, secretsDir):
+		row.Content = ""
+	case utf8.Valid(raw):
+		body := string(raw)
+		row.Content = truncateRunes(body, maxContentRunes)
+		row.Truncated = len(row.Content) < len(body)
+	default:
+		row.Content = ""
+	}
 	return row, nil
+}
+
+// maxContentRunes is the files.content cap (see collections/0021_files_content.go). PocketBase's
+// TextField Max counts runes, so truncating to this many runes keeps a body at or under the Max.
+const maxContentRunes = 1000000
+
+// truncateRunes returns s unchanged when it holds at most max runes, else the first max runes of s
+// (never splitting a multi-byte rune). Single pass: the range loop yields rune-start byte offsets,
+// so the cutoff is found without a separate RuneCountInString traversal.
+func truncateRunes(s string, max int) string {
+	n := 0
+	for i := range s {
+		if n == max {
+			return s[:i]
+		}
+		n++
+	}
+	return s
 }
 
 func fmStr(fm map[string]any, key string) string {
