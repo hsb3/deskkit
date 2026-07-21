@@ -90,7 +90,7 @@ DESK2=""
 DIR3=""
 XDG4=""
 
-# shellcheck disable=SC2329  # invoked indirectly via the `trap cleanup EXIT` below
+# shellcheck disable=SC2329,SC2317  # invoked indirectly via the `trap cleanup EXIT` below; SC2317 is the same finding under newer shellcheck (runner) versions
 cleanup() {
   chmod -R u+w "$WORK" 2>/dev/null || true
   rm -rf "$WORK"
