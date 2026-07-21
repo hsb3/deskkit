@@ -149,7 +149,15 @@ func deltaMessages(msgs []*schema.Message, hwm int) ([]*schema.Message, int) {
 // Tool OnEnd reconstructs each tool result from the callback (call id, tool name, response). The
 // model OnStart resets the buffer because the delta on the same event persists the prior round,
 // so after a model call rc.pending only holds the not-yet-persisted current round. This handler
-// is registered ONLY by Run(); the streaming Session path does not use it and is unchanged.
+// is registered ONLY by Run(); the streaming Session path does not use it and is unchanged (it
+// has the same MaxStep transcript gap, tracked separately, not fixed here).
+//
+// Ordering invariant this relies on: every tool OnEnd for round N must complete before round
+// N+1's model OnStart resets rc.pending — true for eino's ReAct loop today (rc.mu only
+// serializes individual appends, it doesn't order them). If a future change dispatches tool
+// calls in a way that lets one straggle past the next model call's OnStart, that tool's result
+// would be silently dropped from the buffer — the same class of risk persistHandler's own
+// delta-based capture already has, not a new one introduced here.
 func (rc *runCtx) captureHandler() callbacks.Handler {
 	modelHandler := &cbutils.ModelCallbackHandler{
 		OnStart: func(ctx context.Context, _ *callbacks.RunInfo, _ *model.CallbackInput) context.Context {

@@ -448,6 +448,15 @@ func buildKnownCommandSet(root *cobra.Command) knownCommandSet {
 // those already belong to some other group's own set) that requires an explicit value, i.e.
 // mirrors cobra's own hasNoOptDefVal check (unset NoOptDefVal = the flag is not a boolean-style
 // "presence is enough" flag, so the very next token is its value, never a subcommand name).
+//
+// Deliberately visits c.Flags() AND c.PersistentFlags() separately, even though the former would
+// normally already contain the latter after cobra merges them — because this runs from
+// buildKnownCommandSet in main(), BEFORE app.Start() calls RootCmd.Execute(), and cobra only
+// performs that merge lazily during Execute() (mergePersistentFlags). At this call site,
+// c.Flags() alone does NOT yet contain a persistent flag declared directly on c (confirmed:
+// TestBuildKnownCommandSet_GroupValueFlags calls this with no Execute() in between, exactly this
+// codepath's real ordering). The double-visit only ever sets the same map key twice when a merge
+// HAS already happened elsewhere — harmless — so do not "simplify" this to c.Flags() alone.
 func groupCommandValueFlags(c *cobra.Command) map[string]bool {
 	vf := map[string]bool{}
 	collect := func(fs *pflag.FlagSet) {

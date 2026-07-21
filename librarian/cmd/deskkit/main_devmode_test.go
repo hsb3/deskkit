@@ -44,7 +44,10 @@ func TestDevModeDefaultOff_BinaryUnderTempDir(t *testing.T) {
 	}
 	binPath := filepath.Join(buildDir, binName)
 
-	if !strings.HasPrefix(binPath, os.TempDir()) {
+	// filepath.Clean + a trailing separator guards against a same-prefix-different-directory
+	// false pass (os.TempDir() "/tmp" would otherwise HasPrefix-match a binPath under "/tmp2").
+	tempDirWithSep := filepath.Clean(os.TempDir()) + string(filepath.Separator)
+	if !strings.HasPrefix(filepath.Clean(binPath)+string(filepath.Separator), tempDirWithSep) {
 		t.Fatalf("test setup bug: built binary path %q is not under os.TempDir() %q", binPath, os.TempDir())
 	}
 

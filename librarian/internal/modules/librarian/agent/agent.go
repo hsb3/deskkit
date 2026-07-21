@@ -188,8 +188,12 @@ func Run(ctx context.Context, app core.App, cfg *config.Config, trigger, input s
 		// round only on the NEXT model call, which never came, so the assistant tool-call message
 		// and its tool result are still buffered in rc.pending. Flush them so the transcript
 		// records the tool call whose effect (e.g. a revisions row) really landed — the
-		// audit-trail integrity fix. Every other error leaves the transcript as the callback wrote
-		// it (rc.pending was reset by the last model OnStart, so this branch is not reached).
+		// audit-trail integrity fix.
+		//
+		// Scope: this branch only covers the MaxStep case. A different abort right after a tool
+		// executed (e.g. ctx cancellation between the tool's OnEnd and the next model's OnStart)
+		// leaves rc.pending unflushed too, and isn't handled here — that gap is real but tracked
+		// separately, not silently assumed away.
 		rc.flushPending()
 	}
 	final := ""
