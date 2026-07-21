@@ -148,7 +148,7 @@ jobs:
           echo "built ${out}"
 
       - name: Upload binary artifact
-        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: deskkit_${{ matrix.goos }}_${{ matrix.goarch }}
           path: librarian/deskkit_*_${{ matrix.goos }}_${{ matrix.goarch }}
@@ -176,7 +176,7 @@ jobs:
           echo "built desk-standard-plugin_${version}.tar.gz"
 
       - name: Upload bundle artifact
-        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: desk-standard-plugin-bundle
           path: desk-standard-plugin_*.tar.gz
