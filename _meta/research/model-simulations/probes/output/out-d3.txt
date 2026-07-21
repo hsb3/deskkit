@@ -1,0 +1,10 @@
+### Control: a correctly-typed 'task' item is gated at work->review (no doc -> refused)
+task rc=1  :: Error: required document (type=task) at "tasks/g.md" does not exist
+
+### D3: a typo'd type 'tsak' (should be 'task') accepted verbatim, gate does NOT bind -> advances UNGATED
+jq: parse error: Invalid numeric literal at line 1, column 6
+jq: parse error: Invalid numeric literal at line 1, column 6
+created item type field: 
+tsak rc=1  :: Error: no item "" on desk "d3"
+(no doc on disk exists at tasks/g.md, yet the typo'd item reached review)
+confirmed: tasks/g.md does NOT exist

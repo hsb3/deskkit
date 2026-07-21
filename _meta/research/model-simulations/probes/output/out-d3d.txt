@@ -1,0 +1,4 @@
+create --type task -> type is now: task
+create --type tsak (rejected):
+Error: unknown item type "tsak" (known types: analysis, conventions, decision, engineering-spec, entity, feature-spec, home, idea, journal, meeting-notes, mockup, model, one-pager, product-spec, project, project-brief, raid, readme, release-notes, research-synthesis, retro, roadmap, runbook, schema, sop, sow, task, technical-design, test-plan, user-journey, user-story, ux-spec, weekly-checkin; see schema/doctypes.yaml)
+update the valid item --type tsak -> type is now: tsak
