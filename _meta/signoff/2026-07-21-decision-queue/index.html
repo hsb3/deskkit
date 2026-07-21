@@ -1,0 +1,251 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>desk-standard — owner decision queue</title>
+<style>
+  :root {
+    --bg: #f7f6f3; --card: #ffffff; --ink: #1a1a1a; --muted: #6b6b6b;
+    --line: #e2e0da; --accent: #0f62fe; --ok: #1a7f37; --warn: #9a6700;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #161616; --card: #1f1f1f; --ink: #eaeaea; --muted: #9a9a9a;
+            --line: #333; --accent: #78a9ff; --ok: #56d364; --warn: #d4a72c; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 16px/1.55 -apple-system, "Segoe UI", sans-serif;
+         background: var(--bg); color: var(--ink); }
+  main { max-width: 860px; margin: 0 auto; padding: 2.5rem 1.25rem 5rem; }
+  h1 { font-size: 1.5rem; margin: 0 0 .25rem; }
+  .sub { color: var(--muted); margin-bottom: 1.5rem; }
+  section { background: var(--card); border: 1px solid var(--line);
+            border-radius: 10px; padding: 1.25rem 1.5rem; margin-bottom: 1.25rem; }
+  section h2 { font-size: 1.05rem; margin: 0 0 .35rem; }
+  .summary h2 { font-size: 1.15rem; }
+  .summary ul { margin: .4rem 0 .9rem 1.1rem; padding: 0; }
+  .summary li { margin: .25rem 0; font-size: .95rem; }
+  .summary .done::marker { content: "✓ "; color: var(--ok); }
+  .summary .wait::marker { content: "→ "; color: var(--warn); }
+  .rec { margin: .5rem 0 .75rem; padding: .6rem .8rem; border-left: 3px solid var(--accent);
+         background: color-mix(in srgb, var(--accent) 7%, transparent);
+         border-radius: 0 6px 6px 0; font-size: .95rem; }
+  .rec b { color: var(--accent); }
+  .ctx { color: var(--muted); font-size: .92rem; margin: 0 0 .5rem; }
+  .choices { display: flex; gap: 1.1rem; flex-wrap: wrap; margin: .5rem 0; }
+  .choices label { display: flex; gap: .4rem; align-items: center; cursor: pointer; }
+  textarea, input[type=text] { width: 100%; border: 1px solid var(--line); border-radius: 6px;
+    background: var(--bg); color: var(--ink); padding: .5rem .65rem; font: inherit;
+    font-size: .92rem; margin-top: .4rem; }
+  textarea { min-height: 2.6rem; resize: vertical; }
+  .actions { position: sticky; bottom: 0; background: var(--bg); padding: 1rem 0;
+             border-top: 1px solid var(--line); display: flex; gap: 1rem; align-items: center; }
+  button { font: inherit; font-weight: 600; padding: .6rem 1.4rem; border-radius: 8px;
+           border: 1px solid var(--accent); background: var(--accent); color: #fff; cursor: pointer; }
+  button:hover { filter: brightness(1.08); }
+  #status { font-size: .95rem; }
+  #status.ok { color: var(--ok); font-weight: 600; }
+  #status.warn { color: var(--warn); }
+  .pill { display: inline-block; font-size: .75rem; font-weight: 700; letter-spacing: .04em;
+          text-transform: uppercase; color: var(--muted); }
+  code { font-size: .88em; }
+</style>
+</head>
+<body>
+<main>
+  <h1>desk-standard — owner decision queue</h1>
+  <p class="sub">2026-07-21 · desk-standard · Pick a choice per item; add inline notes anywhere.
+  <b>Submit once at the bottom</b> — answers land in a file and the session is notified.
+  Every recommendation is preselected, so if you agree with all of them, one click on Submit is a complete answer.</p>
+
+  <section class="summary">
+    <h2>Where things stand</h2>
+    <ul>
+      <li class="done"><b>Both delivery plans are fully executed.</b> The v1 run merged 7 pull requests and closed about 20 issues; the v2 run merged 4 more and closed 9. Main is green.</li>
+      <li class="done"><b>The last two buildable issues are being built right now</b> by two isolated crews: the local webapp session page (issue 19) and the TUI polish backlog (issue 171). They open pull requests; I verify and merge.</li>
+      <li class="wait"><b>Everything else open is waiting on a decision from you</b> — the ten items below. Nothing on this list is buildable until its item is answered.</li>
+    </ul>
+  </section>
+
+  <section data-id="rel">
+    <span class="pill">Release</span>
+    <h2>1 · Cut an interim 0.8.0 release now, or hold everything for 1.0.0?</h2>
+    <p class="ctx">The changelog's Unreleased section now holds ~34 entries across two big delivery runs — chat TUI improvements, the PM body field, CI gates, content search, and more — all sitting unshipped on top of v0.7.0. The 1.0.0 release is a maturity milestone that is still blocked by several lanes below, so it is not imminent.</p>
+    <div class="rec"><b>Recommendation:</b> cut 0.8.0 now. It drains the backlog into a documented release, resets the version-drift warning, and costs one low-risk release cycle. If you approve, I prepare everything per the release runbook and hand you the final tag-and-push commands — the process never auto-tags.</div>
+    <div class="choices">
+      <label><input type="radio" name="rel" value="cut-0.8.0" checked> Cut 0.8.0 now</label>
+      <label><input type="radio" name="rel" value="hold-for-1.0.0"> Hold everything for 1.0.0</label>
+      <label><input type="radio" name="rel" value="modify"> Modify (note below)</label>
+    </div>
+    <textarea name="rel_notes" placeholder="Inline notes…"></textarea>
+  </section>
+
+  <section data-id="adr20">
+    <span class="pill">PM semantics</span>
+    <h2>2 · ADR 0020: keep the strict claim rule, or soften it back to advisory?</h2>
+    <p class="ctx">When one actor (a person or agent) holds a claim on a work item, the shipped behavior refuses <em>every</em> direct change to that item by anyone else — not just status transitions, but also block/unblock and field edits. This was accepted at pull-request merge under the delivery plan's "PR review is the ruling" mechanism; you reserved the right to overrule. The alternative reading gates only transitions and leaves field edits open, which re-creates the silent-overwrite problem the finding flagged. Stale claims expire after 30 minutes, and a manual release command exists.</p>
+    <div class="rec"><b>Recommendation:</b> confirm the strict rule. It is one uniform, already-tested behavior. If you prefer advisory, the ADR lists the exact three code checks to revert, byte-for-byte.</div>
+    <div class="choices">
+      <label><input type="radio" name="adr20" value="confirm-authoritative" checked> Confirm the strict rule (no action needed)</label>
+      <label><input type="radio" name="adr20" value="supersede-to-advisory"> Supersede to advisory — revert the three checks</label>
+      <label><input type="radio" name="adr20" value="modify"> Modify (note below)</label>
+    </div>
+    <textarea name="adr20_notes" placeholder="Inline notes…"></textarea>
+  </section>
+
+  <section data-id="fold">
+    <span class="pill">Plugin packaging</span>
+    <h2>3 · Fold the desk-pm plugin into desk-persona, or ship both?</h2>
+    <p class="ctx">Today two plugin bundles overlap: <code>desk-pm</code> (PM agent + 3 skills + a session-start briefing hook) and <code>desk-persona</code> (the composed librarian + PM bundle, currently without that hook). Both define an agent named <code>pm-operator</code>, which collides if someone installs both. The design ruling (ADR 0014) already leans toward one composed bundle; the build deliberately stayed additive so nothing was destroyed ahead of your call.</p>
+    <div class="rec"><b>Recommendation:</b> fold. I port the session-start briefing hook into desk-persona, retire the standalone desk-pm bundle, and the name collision disappears.</div>
+    <div class="choices">
+      <label><input type="radio" name="fold" value="fold" checked> Fold desk-pm into desk-persona</label>
+      <label><input type="radio" name="fold" value="ship-both"> Ship both (I then de-conflict the duplicate agent name)</label>
+      <label><input type="radio" name="fold" value="modify"> Modify (note below)</label>
+    </div>
+    <textarea name="fold_notes" placeholder="Inline notes…"></textarea>
+  </section>
+
+  <section data-id="k24">
+    <span class="pill">Standard</span>
+    <h2>4 · Make the three brownfield-retrofit defaults official standard behavior?</h2>
+    <p class="ctx">During the real adoption of your product exec desk, three situations came up that the standard doesn't rule, and sensible defaults were invented on the spot: (1) when a source file's <code>type</code> conflicts, preserve the original under <code>custom.original_type</code>; (2) derive the <code>created</code> date from the source's date fields in a fixed order, preserving originals for audit; (3) merge-and-dedupe the source's tags with the required ones rather than replacing them. Ruling these makes retrofit reproducible for any adopter instead of a one-off judgment call.</p>
+    <div class="rec"><b>Recommendation:</b> approve all three as ruled defaults (and record retrofit-over-exempt as a supported disposition). I amend the conventions standard and the brownfield skill accordingly.</div>
+    <div class="choices">
+      <label><input type="radio" name="k24" value="approve-all-three" checked> Approve all three as standard defaults</label>
+      <label><input type="radio" name="k24" value="leave-to-adopter"> Leave them to per-adopter judgment (close the issue as won't-rule)</label>
+      <label><input type="radio" name="k24" value="modify"> Modify (note below)</label>
+    </div>
+    <textarea name="k24_notes" placeholder="Inline notes…"></textarea>
+  </section>
+
+  <section data-id="move">
+    <span class="pill">Rename</span>
+    <h2>5 · The <code>_knowledge/</code> folder move: name the target, or cancel the move?</h2>
+    <p class="ctx">The epic for renaming the personalization folder cites an off-repo decision ("0021 fork F5") that names no target — investigation found the move destination was never actually ruled anywhere. The groundwork is done (a single canonical constant now controls the folder name in all three places, guarded by a drift check), so the rename itself is now a one-day, low-risk sweep — but only you can say what the folder should be called, or whether <code>_knowledge/</code> should simply stay.</p>
+    <div class="rec"><b>Recommendation:</b> none preselected on the name — this is genuinely yours. If you give a target below, I graduate the ruling into a proper repo decision record and execute the move-day checklist. If you pick "keep", the epic's second half closes as not-needed.</div>
+    <div class="choices">
+      <label><input type="radio" name="move" value="move-to-target" checked> Move it — target name/location below</label>
+      <label><input type="radio" name="move" value="keep-knowledge"> Keep <code>_knowledge/</code> as-is (close the move half)</label>
+      <label><input type="radio" name="move" value="modify"> Modify (note below)</label>
+    </div>
+    <input type="text" name="move_target" placeholder="Target folder name (and location, if not repo root)…">
+    <textarea name="move_notes" placeholder="Inline notes…"></textarea>
+  </section>
+
+  <section data-id="sims">
+    <span class="pill">Schema v2 gate</span>
+    <h2>6 · Model simulations: bless the four proposed defaults so the gate can run?</h2>
+    <p class="ctx">The schema-v2 track is parked until realistic scenarios are walked through against both the current and the proposed element model. The issue proposes concrete defaults for all four open items: the scenario set (four flows drawn from real workflows and the spec walkthroughs), the method (paper walkthrough first, scripted where cheap), where the deficiency report lives (<code>_meta/research/model-simulations/</code>), and the pass bar (every deficiency filed or accepted before the element model finalizes).</p>
+    <div class="rec"><b>Recommendation:</b> bless the four defaults. The v1-side simulations can then run without further input; the v2 side follows once the element-model revision exists to test against.</div>
+    <div class="choices">
+      <label><input type="radio" name="sims" value="bless-defaults" checked> Bless the four defaults as written</label>
+      <label><input type="radio" name="sims" value="modify"> Modify some of them (note below)</label>
+    </div>
+    <textarea name="sims_notes" placeholder="Inline notes…"></textarea>
+  </section>
+
+  <section data-id="sop">
+    <span class="pill">SOP library</span>
+    <h2>7 · The ~20-type SOP template library: defer to post-1.0, or start the design ruling now?</h2>
+    <p class="ctx">Expanding the two embedded fixer templates into a full SOP library is targeted at the next major version after 1.0 and touches six design questions (chief among them: embed the templates in the binary vs read them from the desk, and how a template type maps to the classification system). Nothing in the 1.0.0 milestone depends on it.</p>
+    <div class="rec"><b>Recommendation:</b> defer — leave it in the backlog until after 1.0.0 ships, then rule the design in one sitting. Alternatively I can draft the design record now for your review, at the cost of attention taken from 1.0 lanes.</div>
+    <div class="choices">
+      <label><input type="radio" name="sop" value="defer-post-1.0" checked> Defer until after 1.0.0</label>
+      <label><input type="radio" name="sop" value="draft-adr-now"> Draft the design record now for my review</label>
+      <label><input type="radio" name="sop" value="modify"> Modify (note below)</label>
+    </div>
+    <textarea name="sop_notes" placeholder="Inline notes…"></textarea>
+  </section>
+
+  <section data-id="cohesion">
+    <span class="pill">Value evaluation</span>
+    <h2>8 · The cohesion + value evaluation lane: approve the proposed scoping?</h2>
+    <p class="ctx">This pre-1.0 lane runs the whole system end-to-end and then honestly answers "does this beat the alternatives?" It needs three inputs fixed at the start: the baselines, the off-the-shelf comparator, and the rubric. Proposed: baseline = a hand-maintained markdown folder with manual hygiene (the naive approach); comparator = Notion (docs + databases + templates, the closest mainstream analogue — name a different one below if you prefer); rubric = the three dimensions already in the issue (session continuity, gate-enforced work state, safe automated hygiene) each scored win / tie / lose, honestly.</p>
+    <div class="rec"><b>Recommendation:</b> approve this scoping. A losing or tied dimension becomes a finding that feeds back into scope before 1.0 — that is the lane working as intended, not a failure.</div>
+    <div class="choices">
+      <label><input type="radio" name="cohesion" value="approve-scoping" checked> Approve — markdown baseline, Notion comparator, 3-dimension rubric</label>
+      <label><input type="radio" name="cohesion" value="different-scoping"> Different scoping (comparator below / notes)</label>
+      <label><input type="radio" name="cohesion" value="modify"> Modify (note below)</label>
+    </div>
+    <input type="text" name="cohesion_comparator" placeholder="Different comparator product(s), if any…">
+    <textarea name="cohesion_notes" placeholder="Inline notes…"></textarea>
+  </section>
+
+  <section data-id="pm">
+    <span class="pill">PM default</span>
+    <h2>9 · Turn the PM module on by default for 1.0, and bless the shipped defaults?</h2>
+    <p class="ctx">The PM module currently ships dark (off unless opted in). The direction you set says every desk gets it at 1.0. Its former blocker (the loud-failure guarantee) is closed. Flipping it means every fresh desk boots with PM on, using the shipped defaults: two gate rules (a decision needs review before terminal; a task needs review before done) and the status vocabulary (backlog/next → active → in-review → done/dropped/superseded, plus blocked/waiting flags). "Blessing" these means you confirm this exact seed ships to every desk, not just the testbed it was designed on. The decision record that ruled ship-dark gets a dated amendment either way.</p>
+    <div class="rec"><b>Recommendation:</b> flip it on and bless the shipped seed as-is — it survived a real adoption dry-run. If you want different gate rules or label words, pick the second option and write the changes in the notes.</div>
+    <div class="choices">
+      <label><input type="radio" name="pm" value="flip-on-bless-defaults" checked> Flip on + bless the shipped defaults</label>
+      <label><input type="radio" name="pm" value="flip-on-reword-seed"> Flip on, but change the seed (notes below)</label>
+      <label><input type="radio" name="pm" value="stay-ship-dark"> Stay off-by-default for now</label>
+      <label><input type="radio" name="pm" value="modify"> Modify (note below)</label>
+    </div>
+    <textarea name="pm_notes" placeholder="Inline notes…"></textarea>
+  </section>
+
+  <section data-id="g0021">
+    <span class="pill">Provenance</span>
+    <h2>10 · Graduate the off-repo "decision 0021" into a real repo decision record?</h2>
+    <p class="ctx">Six of the items above trace their authority to a decision numbered 0021 that lives only on your executive desk — the repo's decision records stop at 0020, so several 1.0.0 lanes currently cite a ruling that a fresh reader (or agent) cannot find. The repo's own rule is that decisions bind from <code>docs/decisions/</code>, not off-repo process documents.</p>
+    <div class="rec"><b>Recommendation:</b> graduate it wholesale — I write one repo decision record capturing the 0021 forks with their provenance (your answers to items 5, 8, and 9 above supply the still-missing pieces), and fix the dangling citations.</div>
+    <div class="choices">
+      <label><input type="radio" name="g0021" value="graduate-wholesale" checked> Graduate it wholesale into a repo decision record</label>
+      <label><input type="radio" name="g0021" value="graduate-piecemeal"> Only graduate pieces as each decision is made</label>
+      <label><input type="radio" name="g0021" value="modify"> Modify (note below)</label>
+    </div>
+    <textarea name="g0021_notes" placeholder="Inline notes…"></textarea>
+  </section>
+
+  <section data-id="Z">
+    <span class="pill">Anything else</span>
+    <h2>General notes</h2>
+    <textarea name="Z_notes" placeholder="Anything missed or to reprioritize…" style="min-height:5rem"></textarea>
+  </section>
+
+  <div class="actions">
+    <button id="submit">Submit answers</button>
+    <span id="status"></span>
+  </div>
+</main>
+<script>
+const $ = s => document.querySelector(s);
+function collect() {
+  const out = { submitted_at: new Date().toISOString(), items: {} };
+  document.querySelectorAll('section[data-id]').forEach(sec => {
+    const id = sec.dataset.id;
+    const choice = sec.querySelector('input[type=radio]:checked');
+    const notes = sec.querySelector('textarea');
+    const text = sec.querySelector('input[type=text]');
+    out.items[id] = { choice: choice ? choice.value : null,
+                      text: text ? text.value.trim() : undefined,
+                      notes: notes ? notes.value.trim() : "" };
+  });
+  return out;
+}
+$('#submit').addEventListener('click', async () => {
+  const data = collect();
+  const status = $('#status');
+  status.className = ''; status.textContent = 'Saving…';
+  try {
+    const r = await fetch('/save', { method: 'POST',
+      headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+    if (!r.ok) throw new Error('server ' + r.status);
+    status.className = 'ok';
+    status.textContent = '✓ Saved — the session has been notified. You can close this tab.';
+    $('#submit').disabled = true;
+  } catch (e) {
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'signoff-answers-' + new Date().toISOString().slice(0,10) + '.json';
+    a.click();
+    status.className = 'warn';
+    status.textContent = 'Local server was gone — answers downloaded to ~/Downloads; tell the session to pick them up there.';
+  }
+});
+</script>
+</body>
+</html>
