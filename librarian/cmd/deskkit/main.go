@@ -38,6 +38,7 @@ import (
 	"github.com/hsb3/desk-standard/librarian/internal/modules/librarian/tools"
 	"github.com/hsb3/desk-standard/librarian/internal/modules/librarian/trigger"
 	"github.com/hsb3/desk-standard/librarian/internal/modules/librarian/tui"
+	"github.com/hsb3/desk-standard/librarian/internal/modules/librarian/web"
 
 	"github.com/hsb3/desk-standard/librarian/internal/modules/librarian"
 	"github.com/hsb3/desk-standard/librarian/internal/modules/pm"
@@ -295,6 +296,24 @@ func main() {
 				}
 			}
 			trigger.StartClaimer(context.Background(), e.App, cfg, agentAction)
+
+			// Browser session surface (ADR 0001 option b): a custom Go route serving a
+			// self-contained page that drives the SAME multi-turn stewardship session the `chat`
+			// REPL exposes — the same *agent.Session, the same gated tool slice, the same write
+			// boundary. Serve-only, like the wake layer above; gated on cfgErr because the session
+			// factory needs resolved config. Unauthenticated by design (loopback-bound, on-demand,
+			// single operator) — not wired to superuser auth. See internal/.../web.
+			webCleanup := web.Register(e.Router, func(ctx context.Context) (web.Streamer, error) {
+				s, serr := agent.NewSession(ctx, app, cfg)
+				if serr != nil {
+					return nil, serr // return a nil interface on error, never a typed-nil session
+				}
+				return s, nil
+			})
+			e.App.OnTerminate().BindFunc(func(te *core.TerminateEvent) error {
+				webCleanup(context.Background())
+				return te.Next()
+			})
 		} else {
 			app.Logger().Warn("config not resolved; wake layer (hooks/cron/claimer) not started", "err", cfgErr)
 		}
