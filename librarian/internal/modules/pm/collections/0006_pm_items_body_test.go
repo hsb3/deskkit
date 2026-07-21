@@ -72,11 +72,20 @@ func TestMigration0006_AddsItemsBody_ExistingStore(t *testing.T) {
 	}
 	t.Cleanup(app.Cleanup)
 
-	// Stand up the v5 store: apply 0001..0005 only (no body field yet).
-	for _, mig := range Migrations()[:5] {
+	// Stand up the pre-body store: apply every migration BEFORE 0006, located by basename so an
+	// insertion earlier in the slice can never silently shift the boundary this test exercises.
+	found := false
+	for _, mig := range Migrations() {
+		if mig.Basename == "0006_pm_items_body" {
+			found = true
+			break
+		}
 		if err := mig.Up(app); err != nil {
 			t.Fatalf("apply pm migration %q: %v", mig.Basename, err)
 		}
+	}
+	if !found {
+		t.Fatal("0006_pm_items_body missing from Migrations()")
 	}
 	if _, ok := bodyField(t, app); ok {
 		t.Fatal("v5 store must NOT yet have items.body")

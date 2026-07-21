@@ -20,7 +20,7 @@ const realtimeQueueSize = 64
 // client's queue on the NEXT broadcast, which is the common teardown path; this periodic
 // recheck is the belt-and-suspenders that lets an idle goroutine exit when its client is
 // discarded during a lull with no further broadcasts, so no goroutine outlives its client.
-const drainIdleRecheck = 250 * time.Millisecond
+const drainIdleRecheck = 5 * time.Second
 
 // realtimeManager fans transitions rows out to subscribed clients with a bounded, per-client
 // ORDERED dispatch. Each client is served by exactly ONE serialized sender — a single drain

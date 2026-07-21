@@ -62,7 +62,7 @@ type UpdateItemInput struct {
 	Type        string `json:"type,omitempty" jsonschema:"description=new schema-v1/kit type; empty = unchanged"`
 	Court       string `json:"court,omitempty" jsonschema:"description=new court; empty = unchanged"`
 	Pointer     string `json:"pointer,omitempty" jsonschema:"description=new document pointer; empty = unchanged"`
-	Body        string `json:"body,omitempty" jsonschema:"description=new body; empty = unchanged"`
+	Body        string `json:"body,omitempty" jsonschema:"description=new body; empty = unchanged (clearing a set body is engine-only for now)"`
 	Severity    string `json:"severity,omitempty" jsonschema:"description=new severity; empty = unchanged"`
 	Priority    int    `json:"priority,omitempty" jsonschema:"description=new priority; 0 = unchanged"`
 	Properties  string `json:"properties,omitempty" jsonschema:"description=new properties JSON object; empty = unchanged"`

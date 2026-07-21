@@ -39,6 +39,9 @@ func upItemsBody(app core.App) error {
 func downItemsBody(app core.App) error {
 	c, err := app.FindCollectionByNameOrId("items")
 	if err != nil {
+		// Collection absent (never migrated up, or dropped by a whole-collection down) or the
+		// store is unreadable — in either case there is nothing to remove, so the rollback is a
+		// deliberate no-op rather than an error the migration runner would halt on.
 		return nil
 	}
 	if c.Fields.GetByName("body") != nil {
