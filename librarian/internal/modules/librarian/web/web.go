@@ -74,14 +74,28 @@ type NewSessionFunc func(ctx context.Context) (Streamer, error)
 // is multi-turn (the model sees prior turns) exactly like a single REPL invocation. The session
 // carries its own history bound (maxHistoryMessages) and its own overlapping-turn guard, so a
 // second concurrent turn is serialized by the session, not by a second session here.
+//
+// Concurrency note: an *agent.Session was designed for a single sequential driver (the REPL/TUI).
+// Its Close() reads s.last and StreamTurn's runTurn writes s.last/s.history OUTSIDE the session's
+// own mutex (which guards only busy/termErr). Exposing the session to concurrent HTTP callers
+// makes "reset (Close) during an in-flight turn" reachable, which would race those fields. turnMu
+// closes that gap WITHOUT reaching into the session: a turn holds it for read for its whole
+// duration; reset/close take it for write, so a Close can never overlap a running turn.
 type sessionHolder struct {
-	mu      sync.Mutex
+	turnMu  sync.RWMutex // a turn holds RLock; reset/close hold Lock — Close never overlaps a turn
+	mu      sync.Mutex   // guards sess/newSess
 	sess    Streamer
 	newSess NewSessionFunc
 }
 
+// beginTurn marks a turn in progress; endTurn ends it. Between them a reset/close blocks rather
+// than closing the session mid-turn. Held by the stream handler around get()+StreamTurn().
+func (h *sessionHolder) beginTurn() { h.turnMu.RLock() }
+func (h *sessionHolder) endTurn()   { h.turnMu.RUnlock() }
+
 // get returns the held session, creating it on first use. A creation failure is returned to the
-// caller (surfaced as an HTTP error BEFORE the SSE headers are written), never cached.
+// caller (surfaced as an HTTP error BEFORE the SSE headers are written), never cached. Called
+// while the caller holds the turn read-lock, so the session it returns cannot be closed under it.
 func (h *sessionHolder) get(ctx context.Context) (Streamer, error) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
@@ -96,9 +110,14 @@ func (h *sessionHolder) get(ctx context.Context) (Streamer, error) {
 	return s, nil
 }
 
-// reset closes and drops the held session so the next turn starts a fresh conversation. Close
-// errors are non-fatal (the run row finalize is best-effort).
+// reset closes and drops the held session so the next turn starts a fresh conversation. It takes
+// the turn write-lock first, so it waits for any in-flight turn to finish before Close reads the
+// session's fields (the data-race fix). Close errors are non-fatal (run-row finalize is
+// best-effort). Lock order is always turnMu-before-mu; get/reset never take mu first, so no
+// deadlock.
 func (h *sessionHolder) reset(ctx context.Context) {
+	h.turnMu.Lock()
+	defer h.turnMu.Unlock()
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	if h.sess != nil {
@@ -107,7 +126,8 @@ func (h *sessionHolder) reset(ctx context.Context) {
 	}
 }
 
-// close finalizes the held session at server shutdown (best-effort).
+// close finalizes the held session at server shutdown (best-effort); like reset it waits for any
+// in-flight turn.
 func (h *sessionHolder) close(ctx context.Context) {
 	h.reset(ctx)
 }
@@ -153,6 +173,12 @@ func (h *handler) stream(e *core.RequestEvent) error {
 	if req.Message == "" {
 		return e.JSON(http.StatusBadRequest, map[string]string{"error": "message must not be empty"})
 	}
+
+	// Hold the turn read-lock for the whole turn (session build + drain), so a concurrent reset or
+	// a shutdown cannot Close the session while runTurn is still writing to it. Acquired only after
+	// the request is validated, so a bad request takes no lock.
+	h.holder.beginTurn()
+	defer h.holder.endTurn()
 
 	ctx := e.Request.Context()
 	sess, err := h.holder.get(ctx)

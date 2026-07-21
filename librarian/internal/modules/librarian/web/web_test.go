@@ -10,6 +10,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/pocketbase/pocketbase/apis"
 	"github.com/pocketbase/pocketbase/tests"
@@ -312,6 +313,46 @@ func TestResetRoute_ClosesAndRebuilds(t *testing.T) {
 	}
 	if fakes[1].isClosed() {
 		t.Fatalf("the second session must still be live")
+	}
+}
+
+// TestSessionHolder_ResetWaitsForInFlightTurn: reset (and shutdown close) must never Close the
+// held session while a turn is still writing to it. An *agent.Session guards only busy/termErr
+// with its mutex — Close reads s.last while runTurn writes s.last/s.history unguarded — so a
+// concurrent reset would race those fields. The holder's turn-lock closes that gap: reset blocks
+// until the in-flight turn ends. (Run the package under -race to catch a regression here.)
+func TestSessionHolder_ResetWaitsForInFlightTurn(t *testing.T) {
+	fake := &fakeStreamer{events: scriptedTurn()}
+	h := &sessionHolder{newSess: func(context.Context) (Streamer, error) { return fake, nil }}
+
+	// Materialize the held session and mark a turn in progress (as the stream handler does).
+	h.beginTurn()
+	if _, err := h.get(context.Background()); err != nil {
+		t.Fatalf("get: %v", err)
+	}
+
+	resetReturned := make(chan struct{})
+	go func() { h.reset(context.Background()); close(resetReturned) }()
+
+	// While the turn is held, reset must block and the session must NOT be Closed.
+	select {
+	case <-resetReturned:
+		t.Fatal("reset returned while a turn was in flight — Close could race the turn")
+	case <-time.After(50 * time.Millisecond):
+	}
+	if fake.isClosed() {
+		t.Fatal("session was Closed while a turn was in flight")
+	}
+
+	// End the turn; reset must now proceed and Close the session.
+	h.endTurn()
+	select {
+	case <-resetReturned:
+	case <-time.After(2 * time.Second):
+		t.Fatal("reset did not return after the turn ended")
+	}
+	if !fake.isClosed() {
+		t.Fatal("session was not Closed after the turn ended")
 	}
 }
 
