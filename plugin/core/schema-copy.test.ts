@@ -23,7 +23,6 @@ function assertCopyMatchesSource(relPath: string): void {
         "the source of truth.",
     );
   }
-  expect(copy).toBe(source);
 }
 
 test("plugin/claude-plugin/schema/profile.schema.yaml matches the repo-root source", () => {

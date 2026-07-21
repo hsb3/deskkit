@@ -6,7 +6,7 @@
 // not just the core tool registry.
 
 import { test, expect } from "bun:test";
-import { mkdtempSync } from "node:fs";
+import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
@@ -72,5 +72,6 @@ test("callTool round-trips knowledge_index to a non-error result (hermetic cwd, 
   } finally {
     await client.close();
     await server.close();
+    rmSync(cwd, { recursive: true, force: true });
   }
 });

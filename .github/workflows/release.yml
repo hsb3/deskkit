@@ -65,6 +65,21 @@ jobs:
       - name: Changelog — this version is documented
         run: node scripts/check-changelog.mjs
 
+      # Mirror the branch-CI lint gates so the release gate stays a strict superset of CI's
+      # blocking checks (a tag cut from a stale local main must not skip them).
+      - name: Shellcheck — shell entry points
+        run: shellcheck install.sh librarian/verify.sh librarian/sandbox/*.sh scripts/record-media.sh
+
+      - name: Actionlint — workflow lint
+        run: |
+          go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.12
+          "$(go env GOPATH)/bin/actionlint"
+
+      - name: Workflow SHA-pin drift guard (+ self-test)
+        run: |
+          node scripts/check-workflow-pins.mjs
+          node scripts/check-workflow-pins.mjs --self-test
+
       - name: Install plugin deps
         working-directory: plugin
         run: bun install --frozen-lockfile
