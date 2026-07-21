@@ -4,11 +4,12 @@
 // transition path every surface routes through (engine/), and — since D4 — the surfaces:
 // the twelve-tool family (tools/) contributed to the shared tool core, the TUI views (tui/)
 // mounted into the shared chat TUI, and the serve-only realtime emitter (§5.4).
-// Feature-gated OFF by default (spec §2.9): Enabled reads cfg.PMEnabled (env PM_ENABLED /
-// profile modules.pm.enabled), and its migrations are PROGRAMMATIC — registered by
-// core/migrate only when enabled — so a librarian-only desk gets NO PM collections,
-// physically (§2.8a), and (because only enabled modules register) no PM tools, views, hooks,
-// or realtime on any surface.
+// Feature-gated ON by default (spec §2.9; owner-ruled 2026-07-21, ADR 0008 amendment — PM
+// ships default-on for 1.0): Enabled reads cfg.PMEnabled (env PM_ENABLED > profile
+// modules.pm.enabled > default ON), and its migrations are PROGRAMMATIC — registered by
+// core/migrate only when enabled. A desk that opts OUT (PM_ENABLED=false / profile
+// modules.pm.enabled: false) gets NO PM collections, physically (§2.8a), and — because only
+// enabled modules register — no PM tools, views, hooks, or realtime on any surface.
 package pm
 
 import (
@@ -33,7 +34,8 @@ import (
 // gate_refused — cascades included, since cascades append their own audit rows).
 const RealtimeTopic = "pm/transitions"
 
-// New constructs the pm module (disabled unless cfg.PMEnabled; §2.9).
+// New constructs the pm module (enabled by default; disabled only when cfg.PMEnabled is
+// false — env PM_ENABLED=false / profile modules.pm.enabled: false; §2.9).
 func New() module.Module { return &Mod{} }
 
 // Mod implements module.Module (+ module.Configurable, module.ValidatorConsumer, and
@@ -58,7 +60,8 @@ func (*Mod) Name() string { return "pm" }
 func (*Mod) SchemaVersion() int { return 6 }
 
 // Enabled is the per-desk feature gate (R5.5c): env PM_ENABLED > profile modules.pm.enabled >
-// off. A nil cfg (config.Load failed) is off — fail closed.
+// default ON (1.0 flip; ADR 0008 amendment). A nil cfg (config.Load failed) is off — fail
+// closed. config.Load resolves the ON default into cfg.PMEnabled, so this stays a pure read.
 func (*Mod) Enabled(cfg *config.Config) bool { return cfg != nil && cfg.PMEnabled }
 
 // OwnedCollections lists the five PM collections (§3; ownership guard §2.4).

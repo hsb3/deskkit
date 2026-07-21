@@ -44,8 +44,9 @@ These are decided; open build detail lives in the roadmap and issues, not here.
 - **1.0.0 is a maturity milestone, not a breaking-contract change.** The MAJOR bump signals the
   system is dogfooded and stable — a deliberate, documented deviation from strict SemVer,
   recorded when the release is cut (a note against ADR-0005).
-- **The PM module ships default-on at 1.0.0.** It is feature-gated **OFF by default** today
-  (`PM_ENABLED` / profile `modules.pm.enabled`); 1.0 flips the default on.
+- **The PM module ships default-on.** The 1.0 maturity flip (owner-ruled 2026-07-21; ADR-0008
+  amendment) turns it on for every fresh desk; a desk opts out with `PM_ENABLED=false` or profile
+  `modules.pm.enabled: false`.
 - **The PocketBase-served webapp is in 1.0.0 scope.** The deferred chat surface moves out of
   post-1.0 deferral into a pre-1.0 build lane, amending
   [ADR-0001](decisions/0001-interactive-surface-tui-first.md)'s TUI-first deferral; the

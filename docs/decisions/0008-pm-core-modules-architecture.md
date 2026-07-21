@@ -1,9 +1,23 @@
 _ADR for the core + modules architecture (ruling R5.5) the PM system introduces: one binary/store
 per desk, split into a shared core and compile-time Go modules bound by three disciplines — a
 narrow validation seam, module-scoped migrations, and per-desk feature gating._
-Status: Accepted — 2026-07-19
+Status: Accepted — 2026-07-19 (amended 2026-07-21 — PM default-on; see Amendments)
 
 # 0008 — PM system architecture: core + compile-time modules (R5.5)
+
+> **Amendment (2026-07-21) — PM ships default-on for 1.0.** Decision leg §5 ("Per-desk feature
+> gating") originally set the config-layering default to **off**: `PM_ENABLED` env > profile
+> `modules.pm.enabled` > default off — the PM module rode dark in the binary so v1 could prove out
+> on one desk before any desk adopted it (R1.3, spec §2.9). Having proved out, the **owner ruled
+> the default leg flipped ON** for the 1.0 maturity milestone (decision-queue sign-off batch,
+> item `pm` = `flip-on-bless-defaults`, `_meta/signoff/2026-07-21-decision-queue/answers.json`).
+> The same ruling blessed the shipped gate-rule seed (spec §4.2) and `status_label` vocabulary
+> (spec §3.3) as the defaults every fresh desk now receives. **What changed:** only the default
+> leg — env and profile still override, so `PM_ENABLED=false` or `modules.pm.enabled: false`
+> cleanly runs a desk librarian-only. Everything else in this ADR (the seam, module-scoped
+> migrations, physical-omission-when-disabled, the versioning discipline) stands unchanged; the
+> feature gate's machinery is exactly as designed — only its default answer moved. The original §5
+> reasoning is retained below for provenance.
 
 ## Context
 
@@ -74,8 +88,9 @@ independent of the PM's, so a desk can lag one module's schema without the other
 
 **5. Per-desk feature gating (R5.5c).** The PM module is inert unless enabled.
 `pm.Mod.Enabled(cfg)` returns `cfg.PMEnabled` (`internal/modules/pm/module.go`), resolved by
-config layering `PM_ENABLED` env > profile `modules.pm.enabled` > default **off**
-(`internal/core/config/config.go`). When disabled: PM migrations are not registered (the
+config layering `PM_ENABLED` env > profile `modules.pm.enabled` > default ~~**off**~~ **ON since
+1.0** (`internal/core/config/config.go`; the default leg was flipped on 2026-07-21 — see the
+Amendment at the top). When disabled: PM migrations are not registered (the
 collections physically do not exist — not inert tables), PM tools are absent from every surface,
 PM hooks/realtime are not bound, and PM TUI views are not mounted. The librarian is wholly
 unaffected. Flipping the gate on runs the PM migrations and stamps the meta row.

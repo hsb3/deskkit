@@ -282,7 +282,7 @@ customization belongs in `_knowledge/` (the profile), never a DB prompt edit.
 }
 ```
 
-## The PM work graph (optional, off by default)
+## The PM work graph (on by default)
 
 `deskkit` carries a second capability alongside the librarian: the **PM module**, a
 document-gated work graph. Work items move through a rigid `queue → work → review → terminal`
@@ -290,15 +290,17 @@ phase machine, and a phase advance is **refused until the document that phase re
 validates** against schema v1 — the same schema-v1 engine the librarian uses, reached through a
 narrow in-process seam (`docs/decisions/0008-pm-core-modules-architecture.md`).
 
-It is **feature-gated OFF by default**. On a fresh desk there is no `pm` command, no PM tools, and
-no PM collections in the store. Enable it per desk:
+It is **on by default** (since 1.0; ADR 0008 amendment 2026-07-21). A fresh desk boots with the
+`pm` command group, the twelve PM MCP tools, and the five PM collections all present. To run a
+desk **librarian-only**, opt out:
 
 ```bash
-export PM_ENABLED=true        # or set modules.pm.enabled: true in _knowledge/profile.yaml
-./deskkit migrate up          # runs the PM migrations, creates the five PM collections
+export PM_ENABLED=false        # or set modules.pm.enabled: false in _knowledge/profile.yaml
 ```
 
-With it on, the `pm` command group and the twelve PM MCP tools appear:
+With it off there is no `pm` command, no PM tools, and no PM collections in the store — physical
+omission, not inert tables. On (the default), the `pm` command group and the twelve PM MCP tools
+appear:
 
 ```bash
 ./deskkit pm create --title "Ship the widget" --type task --court crew
