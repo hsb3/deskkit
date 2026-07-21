@@ -166,7 +166,10 @@ footer. `ctrl+g` toggles the full keybind help below the short one. The keys:
 `ctrl+o` lists recent prior chat conversations — only ones that reached at least one
 turn — and resuming one restores the transcript and continues the model with full
 context. Conversations are not a separate store: they live in the same store as
-everything else.
+everything else. When prior conversations exist, `chat` is resume-first: it opens on
+that same sessions list at launch, so you land on your history instead of a blank
+session — `esc` (or `ctrl+n`) drops into a fresh conversation. A first-run desk with no
+prior conversations skips the list and opens straight into a new session.
 
 The color theme resolves once, before the TUI starts: `chat --theme light|dark|auto`
 (default `auto`, a single terminal-background probe at startup) or the `LIBRARIAN_THEME`

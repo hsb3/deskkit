@@ -2,10 +2,12 @@ package tui
 
 import (
 	"context"
+	"image/color"
 	"strings"
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 
 	"github.com/hsb3/desk-standard/librarian/internal/modules/librarian/agent"
 )
@@ -541,6 +543,94 @@ func TestPicker_DeleteCancelWithEsc(t *testing.T) {
 	}
 	if m.picker.mode != pickerBrowse {
 		t.Errorf("esc did not return to browse mode (mode = %d)", m.picker.mode)
+	}
+}
+
+// TestPickerDelegate_ThemedColors guards the sessions-list delegate theming: the
+// list rows must follow the resolved theme and the surface's cyan accent, not the bubbles
+// DefaultDelegate's hardcoded-dark defaults (a light-gray title invisible on a light terminal and a
+// magenta selected row that ignores the app palette). Concrete per-theme colors only — the
+// no-runtime-query invariant (ADR 0004) forbids AdaptiveColor here as everywhere else.
+func TestPickerDelegate_ThemedColors(t *testing.T) {
+	accent := lipgloss.Color("6") // cyan — the surface accent
+	cases := []struct {
+		theme    string
+		wantBody color.Color
+	}{
+		{themeDark, lipgloss.Color("15")}, // bright white — legible on a dark terminal
+		{themeLight, lipgloss.Color("0")}, // black — legible on a light terminal
+	}
+	for _, tc := range cases {
+		d := newStyles(tc.theme).pickerDelegate
+		if got := d.NormalTitle.GetForeground(); got != tc.wantBody {
+			t.Errorf("%s: normal row foreground = %v, want %v (rows must follow the theme body tone, not the delegate's hardcoded dark)", tc.theme, got, tc.wantBody)
+		}
+		if got := d.SelectedTitle.GetForeground(); got != accent {
+			t.Errorf("%s: selected row foreground = %v, want the cyan accent %v", tc.theme, got, accent)
+		}
+		if got := d.SelectedTitle.GetBorderLeftForeground(); got != accent {
+			t.Errorf("%s: selected row left border = %v, want the cyan accent %v", tc.theme, got, accent)
+		}
+		if d.NormalTitle.GetForeground() == d.SelectedTitle.GetForeground() {
+			t.Errorf("%s: normal and selected rows share a foreground; the selected row must stand out", tc.theme)
+		}
+	}
+}
+
+// TestResumeFirst_OpensPickerWhenConvosExist guards resume-first launch: when
+// prior resumable conversations exist, arming resume-first (as Run does) and delivering the first
+// sizing WindowSizeMsg opens the sessions overlay at launch. It is one-shot — a later terminal
+// resize must never reopen it once dismissed.
+func TestResumeFirst_OpensPickerWhenConvosExist(t *testing.T) {
+	m, _, fp := newTestModelWithProvider(t, &fakeProvider{
+		convos: []agent.ConversationInfo{{RunID: "run-1", Title: "prior chat", Status: "succeeded"}},
+	})
+	// The pure-Update constructor does NOT arm resume-first, so the picker is closed after the
+	// initial WindowSizeMsg even with prior conversations — the default the existing tests rely on.
+	if m.picker != nil {
+		t.Fatal("picker unexpectedly open before resume-first was armed (default launch must stay fresh)")
+	}
+
+	m.enableResumeFirst()
+	m = send(m, tea.WindowSizeMsg{Width: 80, Height: 24})
+	if m.picker == nil {
+		t.Fatal("resume-first did not open the sessions overlay at launch with prior conversations")
+	}
+	if fp.listExcluded != "live-run" {
+		t.Errorf("launch list excludeRunID = %q, want the live run %q (the just-created session must not offer itself)", fp.listExcluded, "live-run")
+	}
+
+	// Dismiss, then resize: resume-first is one-shot and must not reopen.
+	m = escKey(m)
+	if m.picker != nil {
+		t.Fatal("esc did not dismiss the launch picker")
+	}
+	m = send(m, tea.WindowSizeMsg{Width: 100, Height: 30})
+	if m.picker != nil {
+		t.Error("a later resize reopened the launch picker; resume-first must fire exactly once")
+	}
+}
+
+// TestResumeFirst_NoConvos_StartsFresh: with no prior resumable conversations, resume-first is a
+// no-op — the surface drops straight into the fresh session rather than showing an empty overlay.
+func TestResumeFirst_NoConvos_StartsFresh(t *testing.T) {
+	m, _, _ := newTestModelWithProvider(t, &fakeProvider{}) // empty conversation list
+	m.enableResumeFirst()
+	m = send(m, tea.WindowSizeMsg{Width: 80, Height: 24})
+	if m.picker != nil {
+		t.Error("resume-first opened an empty overlay; with no prior conversations it must start fresh")
+	}
+}
+
+// TestResumeFirst_ListError_StartsFresh: a failed launch listing must degrade to a fresh session
+// (no overlay), not crash or leave dead chrome — the user can retry via ctrl+o, which surfaces the
+// error on its own path.
+func TestResumeFirst_ListError_StartsFresh(t *testing.T) {
+	m, _, _ := newTestModelWithProvider(t, &fakeProvider{listErr: context.DeadlineExceeded})
+	m.enableResumeFirst()
+	m = send(m, tea.WindowSizeMsg{Width: 80, Height: 24})
+	if m.picker != nil {
+		t.Error("resume-first opened an overlay despite a list error; it must degrade to a fresh session")
 	}
 }
 

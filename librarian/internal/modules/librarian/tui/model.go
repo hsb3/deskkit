@@ -341,6 +341,12 @@ type model struct {
 
 	picker *pickerModel // conversation-resume overlay (ctrl+o); nil when closed.
 
+	// resumeFirst requests the sessions overlay be opened once at launch when prior resumable
+	// conversations exist (resume-first launch). Set by Run via enableResumeFirst; consumed
+	// (cleared) on the first sizing WindowSizeMsg so a later terminal resize never reopens it. It
+	// defaults false, so the pure-Update tests — which never set it — keep their launch behavior.
+	resumeFirst bool
+
 	// Module-contributed views (spec §5.3; host_views.go): views is the mounted set (empty on
 	// a librarian-only desk), activeView the index of the one occupying the body region, or
 	// -1 when the chat transcript is showing.
@@ -423,6 +429,13 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.resize(msg.Width, msg.Height)
+		if m.resumeFirst {
+			// One-shot: the overlay needs a sized viewport (only known after this first
+			// WindowSizeMsg), so resume-first fires here rather than in Init/newModel. Clear the
+			// flag first so a later resize can never reopen it.
+			m.resumeFirst = false
+			m.openLaunchPicker()
+		}
 		return m, nil
 
 	case tea.KeyPressMsg:
@@ -717,6 +730,29 @@ func (m model) openPicker() (tea.Model, tea.Cmd) {
 	m.picker = newPicker(convos, m.styles, m.vp.Width(), m.vp.Height())
 	m.refreshPreview()
 	return m, nil
+}
+
+// enableResumeFirst arms the resume-first launch behavior: when prior resumable conversations
+// exist, the surface opens on the sessions list at startup instead of dropping straight into a
+// fresh conversation. Called once by Run before the program starts.
+func (m *model) enableResumeFirst() { m.resumeFirst = true }
+
+// openLaunchPicker opens the sessions overlay at startup when prior resumable conversations exist
+// (resume-first launch): the reader lands on the list to pick one, or esc / ctrl+n to start
+// fresh in the session Run already created. With NO prior conversations — or a list error — it is a
+// no-op and the surface drops straight into the fresh conversation. This deliberately differs from
+// openPicker, which opens even on an empty list (an explicit ctrl+o earns visible feedback): an
+// empty overlay the user never asked for would just be dead chrome to esc past on first run.
+func (m *model) openLaunchPicker() {
+	if m.streaming || m.picker != nil {
+		return
+	}
+	convos, err := m.provider.list(pickerLimit, m.sess.RunID())
+	if err != nil || len(convos) == 0 {
+		return
+	}
+	m.picker = newPicker(convos, m.styles, m.vp.Width(), m.vp.Height())
+	m.refreshPreview()
 }
 
 // appendError appends an inline red assistant entry — the visible-feedback path for a degraded

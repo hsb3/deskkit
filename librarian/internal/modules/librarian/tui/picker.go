@@ -79,7 +79,10 @@ type pickerModel struct {
 // never eats a bare enter/esc while browsing — the model owns those.
 func newPicker(convos []agent.ConversationInfo, styles styleSet, width, height int) *pickerModel {
 	delegate := list.NewDefaultDelegate()
-	delegate.ShowDescription = false // single-line rows: the whole label lives on Title
+	delegate.ShowDescription = false        // single-line rows: the whole label lives on Title
+	delegate.Styles = styles.pickerDelegate // theme the rows to the app palette (styles.go), not the
+	// delegate's hardcoded-dark defaults — so the title is legible on a light terminal and the
+	// selected row carries the surface's cyan accent instead of bubbles' magenta.
 
 	l := list.New(pickerItemsOf(convos), delegate, width, height)
 	l.Title = "sessions"
