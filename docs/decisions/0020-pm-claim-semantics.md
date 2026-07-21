@@ -6,9 +6,15 @@ claimed item, and records why the authoritative reading is implemented. **This A
 (a) at PR merge (2026-07-21). If the owner prefers the advisory reading, supersede per the
 "if the reviewer prefers (b)" consequence below.**_
 
-- **Status:** Accepted
+- **Status:** Accepted — owner-confirmed 2026-07-21
 - **Date:** 2026-07-21
 - **Raised by:** issue #96 (R-7, deep-dive review 2026-07-19, product-exec-desk); finding I-3 (CONFIRMED)
+
+> **Owner confirmation (2026-07-21):** the authoritative reading (option (a) — a live foreign claim
+> refuses **every** direct mutation) is confirmed by the owner via the sign-off batch
+> `_meta/signoff/2026-07-21-decision-queue/` (item `adr20` = `confirm-authoritative`). The
+> "PR review is the ruling; owner may supersede" window is now **closed**: the option-(b) advisory
+> supersession path in the Consequences below is no longer available without a new, superseding ADR.
 
 ## Context
 
