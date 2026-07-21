@@ -22,18 +22,18 @@ jobs:
   ci:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
           fetch-depth: 0 # full history + tags so the version-status advisory can diff since the last release
 
       - name: Set up Go
-        uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
         with:
           go-version-file: librarian/go.mod
           cache-dependency-path: librarian/go.sum
 
       - name: Set up Node
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
         with:
           node-version: '22'
 
@@ -87,6 +87,29 @@ jobs:
       # (a documented CHANGELOG section for the tagged version) lives in release.yml.
       - name: Version-status advisory (non-blocking)
         run: node scripts/check-version-status.mjs
+
+      # ---- repo-wide shell/workflow lint gates (mirror lefthook + `make check`, now enforced
+      # server-side so a --no-verify push can't bypass them) ----
+
+      # shellcheck: the shell entry points (public installer, the verify gate, the sandbox helpers,
+      # the media recorder) were never linted in any workflow — a broken install.sh could ship. The
+      # ubuntu-latest runner image ships shellcheck, so no install step is needed.
+      - name: Shellcheck — shell entry points
+        run: shellcheck install.sh librarian/verify.sh librarian/sandbox/*.sh scripts/record-media.sh
+
+      # actionlint: previously pre-commit / `make check` only, so a bypassed push escaped it. Built
+      # with the Go toolchain already set up above (no new third-party action to pin and maintain).
+      - name: Actionlint — workflow lint
+        run: |
+          go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.12
+          "$(go env GOPATH)/bin/actionlint"
+
+      # SHA-pin drift: every `uses:` must stay pinned to a full 40-hex commit SHA — nothing else
+      # stops a later PR reintroducing a mutable @vN tag. Self-test proves the guard still bites.
+      - name: Workflow SHA-pin drift guard (+ self-test)
+        run: |
+          node scripts/check-workflow-pins.mjs
+          node scripts/check-workflow-pins.mjs --self-test
 
       # ---- plugin lane ----
       - name: Install plugin deps

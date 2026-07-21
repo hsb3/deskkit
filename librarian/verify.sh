@@ -21,6 +21,12 @@
 #     "per-path checksum set" reproducibility check (§9.4 check 7) is therefore proven by an
 #     independent shasum snapshot of the scratch desk tree (mirroring sweep's own file-walk
 #     pruning), not by reading checksums back out of the CLI.
+# The idiom `<condition>; check "<desc>" $?` recurs throughout this harness: a test condition is
+# evaluated purely for its exit status, which is then fed to check() as pass/fail. SC2319 ("$? after
+# a condition usually means you wanted the command before it") structurally misfires on that
+# intentional pattern at every call site, so it is disabled file-wide below; every OTHER lint rule
+# stays enforced.
+# shellcheck disable=SC2319
 set -uo pipefail
 cd "$(dirname "$0")" || exit 1
 
@@ -84,6 +90,7 @@ DESK2=""
 DIR3=""
 XDG4=""
 
+# shellcheck disable=SC2329  # invoked indirectly via the `trap cleanup EXIT` below
 cleanup() {
   chmod -R u+w "$WORK" 2>/dev/null || true
   rm -rf "$WORK"
