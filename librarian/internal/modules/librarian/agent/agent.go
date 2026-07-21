@@ -12,6 +12,7 @@ package agent
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"strings"
@@ -171,17 +172,29 @@ func Run(ctx context.Context, app core.App, cfg *config.Config, trigger, input s
 	}
 
 	handler := rc.persistHandler() // the ONE persistence mechanism (persist.go)
+	capture := rc.captureHandler() // in-memory current-round buffer, flushed only on MaxStep
 	out, genErr := ag.Generate(ctx, []*schema.Message{schema.UserMessage(input)},
-		einoagent.WithComposeOptions(compose.WithCallbacks(handler)))
+		einoagent.WithComposeOptions(compose.WithCallbacks(handler, capture)))
 
 	// The final assistant message (out) is the loop's output; it never appears in a
 	// subsequent model INPUT, so it is not captured by the input-side callback. Persist it
-	// here on success. On error/blocked, the transcript up to the last model call is already
-	// persisted by the callback.
+	// here on success.
 	if genErr == nil && out != nil {
 		if perr := rc.persist(out); perr != nil {
 			app.Logger().Error("persist final message", "run", run.Id, "err", perr)
 		}
+	} else if errors.Is(genErr, compose.ErrExceedMaxSteps) {
+		// MaxStep aborted the loop right after a tool executed. The input-side callback flushes a
+		// round only on the NEXT model call, which never came, so the assistant tool-call message
+		// and its tool result are still buffered in rc.pending. Flush them so the transcript
+		// records the tool call whose effect (e.g. a revisions row) really landed — the
+		// audit-trail integrity fix.
+		//
+		// Scope: this branch only covers the MaxStep case. A different abort right after a tool
+		// executed (e.g. ctx cancellation between the tool's OnEnd and the next model's OnStart)
+		// leaves rc.pending unflushed too, and isn't handled here — that gap is real but tracked
+		// separately, not silently assumed away.
+		rc.flushPending()
 	}
 	final := ""
 	if genErr == nil && out != nil {

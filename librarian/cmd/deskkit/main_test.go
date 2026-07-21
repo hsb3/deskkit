@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"os"
 	"testing"
+
+	"github.com/spf13/cobra"
 )
 
 // TestNoStaleSevenToolClaim guards against the return of the false "seven-tool core" help string:
@@ -195,6 +197,11 @@ func TestUnknownSubcommand(t *testing.T) {
 			"completion": {"bash": true, "zsh": true},
 			"migrate":    {"up": true, "down": true},
 		},
+		// pm's own persistent --actor flag: the group's OWN value-taking flags,
+		// as buildKnownCommandSet would derive them from the live pm command's flag set.
+		groupValueFlags: map[string]map[string]bool{
+			"pm": {"--actor": true},
+		},
 	}
 	cases := []struct {
 		name     string
@@ -215,6 +222,16 @@ func TestUnknownSubcommand(t *testing.T) {
 		{"pocketbase-late superuser", []string{"superuser"}, "", false},
 		{"known leaf with an arg is not a nested lookup", []string{"query", "findings"}, "", false},
 		{"known nested pm command", []string{"pm", "create"}, "", false},
+		// Regression: a group's OWN persistent flag (pm's --actor), passed with its
+		// value BEFORE the leaf subcommand, must not have that value mistaken for the
+		// subcommand name. Before the fix this reported ("pm alice", true) — an exit-1 false
+		// positive on a perfectly valid invocation.
+		{"pm --actor VALUE before a known leaf", []string{"pm", "--actor", "alice", "create"}, "", false},
+		{"pm --actor=VALUE (equals form) before a known leaf", []string{"pm", "--actor=alice", "create"}, "", false},
+		{"pm --actor VALUE after a known leaf (already worked)", []string{"pm", "create", "--actor", "alice"}, "", false},
+		// A GENUINE unknown nested command must still be caught even with --actor's value
+		// correctly skipped first — the fix must not blanket-suppress real unknowns.
+		{"pm --actor VALUE before a REAL unknown nested command", []string{"pm", "--actor", "alice", "frobnicate"}, "pm frobnicate", true},
 		{"known findings dispose with id and flags", []string{"findings", "dispose", "abc123", "--as", "wont-fix"}, "", false},
 		{"known migrate subcommand", []string{"migrate", "up"}, "", false},
 		{"known completion subcommand", []string{"completion", "bash"}, "", false},
@@ -270,5 +287,68 @@ func TestIsStoreTouchingInvocation(t *testing.T) {
 				t.Errorf("isStoreTouchingInvocation(%v) = %v, want %v", c.args, got, c.want)
 			}
 		})
+	}
+}
+
+// TestGroupCommandValueFlags pins the live-cobra-introspection half of the group-value-flag fix:
+// groupCommandValueFlags must find a group command's OWN persistent flag (declared via
+// PersistentFlags(), the shape pm's --actor uses) as well as one declared via Flags() (a local
+// flag directly on the group command itself), and must NOT report a boolean-style flag (whose
+// mere presence is a complete value, NoOptDefVal set) as value-taking.
+func TestGroupCommandValueFlags(t *testing.T) {
+	group := &cobra.Command{Use: "widget"}
+	var actor, localOnly string
+	var verbose bool
+	group.PersistentFlags().StringVar(&actor, "actor", "", "audit actor")
+	group.Flags().StringVar(&localOnly, "local-only", "", "a flag declared directly on the group, not persistent")
+	group.Flags().BoolVar(&verbose, "verbose", false, "presence alone is a complete value")
+
+	got := groupCommandValueFlags(group)
+	if !got["--actor"] {
+		t.Error("groupCommandValueFlags must include the group's own PERSISTENT value-taking flag (--actor)")
+	}
+	if !got["--local-only"] {
+		t.Error("groupCommandValueFlags must include the group's own LOCAL value-taking flag (--local-only)")
+	}
+	if got["--verbose"] {
+		t.Error("groupCommandValueFlags must NOT include a boolean flag (--verbose): its presence alone is a complete value, never followed by a separate value token")
+	}
+}
+
+// TestBuildKnownCommandSet_GroupValueFlags proves buildKnownCommandSet wires a real, registered
+// group command's persistent flags into groupValueFlags automatically — no manual enumeration
+// (unlike globalValueFlags) — so a future persistent flag on pm (or any other group) is picked
+// up without touching this guard again.
+func TestBuildKnownCommandSet_GroupValueFlags(t *testing.T) {
+	root := &cobra.Command{Use: "deskkit"}
+	pmGroup := &cobra.Command{Use: "pm"}
+	var actor string
+	pmGroup.PersistentFlags().StringVar(&actor, "actor", "operator", "audit actor")
+	pmGroup.AddCommand(&cobra.Command{Use: "create"})
+	root.AddCommand(pmGroup)
+
+	ks := buildKnownCommandSet(root)
+	if !ks.groupValueFlags["pm"]["--actor"] {
+		t.Fatalf("buildKnownCommandSet did not capture pm's --actor as a value flag: %+v", ks.groupValueFlags)
+	}
+}
+
+// TestUnknownSubcommand_PMActorBeforeLeaf is the focused --actor-before-leaf regression, isolated from
+// the broader TestUnknownSubcommand table: before the fix, unknownSubcommand had no way to know
+// that pm's --actor takes a value, so nextNonFlagToken(args, idx+1) saw "alice" (--actor's
+// value) as the first bare token and reported it as an attempted (unknown) nested pm
+// subcommand — exactly the reported symptom, `deskkit: unknown command "pm alice"`, printed by
+// main() right before os.Exit(1) (see the guard call site in main()).
+func TestUnknownSubcommand_PMActorBeforeLeaf(t *testing.T) {
+	known := knownCommandSet{
+		top:    map[string]bool{"pm": true},
+		groups: map[string]map[string]bool{"pm": {"create": true}},
+		groupValueFlags: map[string]map[string]bool{
+			"pm": {"--actor": true},
+		},
+	}
+	name, bad := unknownSubcommand([]string{"pm", "--actor", "alice", "create", "--title", "x", "--type", "task"}, known)
+	if bad {
+		t.Fatalf("pm --actor alice create ... (flag before the leaf) flagged as unknown: %q", name)
 	}
 }

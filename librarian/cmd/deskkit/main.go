@@ -22,8 +22,8 @@ import (
 	"github.com/pocketbase/pocketbase"
 	"github.com/pocketbase/pocketbase/core"
 	"github.com/pocketbase/pocketbase/plugins/migratecmd"
-	"github.com/pocketbase/pocketbase/tools/osutils"
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 
 	"github.com/example/pocket-librarian/internal/core/config"
 	"github.com/example/pocket-librarian/internal/core/mcp"
@@ -174,8 +174,18 @@ func main() {
 
 	// DefaultDataDir seeds the --dir flag default (override-if---dir-passed-else-XDG); empty
 	// falls back to PocketBase's exe-relative pb_data, reached only when --dir is passed (and
-	// overrides it) or for non-store commands. DefaultDev mirrors pocketbase.New()'s go-run
-	// detection so `go run` still defaults to dev mode.
+	// overrides it) or for non-store commands. DefaultDev is deliberately always false — NOT
+	// pocketbase.New()'s own osutils.IsProbablyGoRun() go-run heuristic, which fires whenever
+	// os.Args[0] is prefixed by os.TempDir() (or the Go build-cache dir). That is not unique to
+	// `go run`: any release binary invoked from a path under the OS temp dir (e.g. built via
+	// `go build -o "$(mktemp -d)/deskkit"`, or a CI/packaging step that stages the binary there)
+	// silently lands in dev mode too, which dumps raw SQL debug lines to stdout (PocketBase's
+	// dev-mode QueryLogFunc/ExecLogFunc print via color.HiBlack, which writes to stdout, not
+	// stderr) — corrupting mcp-serve's JSON-RPC stdio stream and any tool command's printJSON
+	// output. `--dev` remains a real, independently registered PocketBase root flag
+	// (pocketbase.go's eagerParseFlags always adds --dev bool-vars against this default), so an
+	// operator doing real interactive development still opts in explicitly with `--dev`; only the
+	// implicit, path-based default is removed.
 	// Core + module wiring (spec §2.7): build the enabled module set and merge each module's
 	// tools into the shared toolcore registry BEFORE any surface (agent/mcp) builds and before
 	// the migration runner executes (RegisterProgrammatic wires any non-self-registered module
@@ -190,7 +200,7 @@ func main() {
 	moduleReg = reg
 
 	app := pocketbase.NewWithConfig(pocketbase.Config{
-		DefaultDev:     osutils.IsProbablyGoRun(),
+		DefaultDev:     false,
 		DefaultDataDir: defaultDataDir,
 	})
 
@@ -379,9 +389,12 @@ func isStoreTouchingInvocation(args []string) bool {
 // top is every top-level command + alias name; groups maps a command that HAS subcommands (pm,
 // findings, completion, migrate …) to the set of its child (+alias) names, so a nested unknown
 // like `pm frobnicate` or `findings frobnicate` is caught as well as a bare `frobnicate`.
+// groupValueFlags maps that same group name to the set of the GROUP COMMAND'S OWN value-taking
+// flags (its persistent flags, e.g. pm's --actor, plus any local ones) — see nextNonFlagToken.
 type knownCommandSet struct {
-	top    map[string]bool
-	groups map[string]map[string]bool
+	top             map[string]bool
+	groups          map[string]map[string]bool
+	groupValueFlags map[string]map[string]bool
 }
 
 // pbLateCommands are the subcommands PocketBase registers INSIDE app.Start() (after the guard
@@ -395,7 +408,10 @@ var pbLateCommands = []string{"serve", "superuser"}
 // buildKnownCommandSet snapshots app.RootCmd (fully populated except for pbLateCommands) into the
 // lookup the guard needs. Called once in main() after all registration and before app.Start().
 func buildKnownCommandSet(root *cobra.Command) knownCommandSet {
-	ks := knownCommandSet{top: map[string]bool{}, groups: map[string]map[string]bool{}}
+	ks := knownCommandSet{
+		top: map[string]bool{}, groups: map[string]map[string]bool{},
+		groupValueFlags: map[string]map[string]bool{},
+	}
 	for _, name := range pbLateCommands {
 		ks.top[name] = true
 	}
@@ -412,25 +428,69 @@ func buildKnownCommandSet(root *cobra.Command) knownCommandSet {
 					children[a] = true
 				}
 			}
+			// groupCommandValueFlags (unlike globalValueFlags below) does not need an enumerated
+			// whitelist: by the time this runs (after registerToolCommands has populated
+			// app.RootCmd — see main()'s call order), the group command's own flag definitions
+			// already exist and can be consulted directly, so a future persistent flag on pm (or
+			// any other group) is picked up automatically.
+			vf := groupCommandValueFlags(c)
 			for _, n := range names {
 				ks.groups[n] = children
+				ks.groupValueFlags[n] = vf
 			}
 		}
 	}
 	return ks
 }
 
+// groupCommandValueFlags returns the "--name" form of every flag REGISTERED DIRECTLY ON c (its
+// own local flags plus its own persistent flags — not flags merged down from an ancestor, since
+// those already belong to some other group's own set) that requires an explicit value, i.e.
+// mirrors cobra's own hasNoOptDefVal check (unset NoOptDefVal = the flag is not a boolean-style
+// "presence is enough" flag, so the very next token is its value, never a subcommand name).
+//
+// Deliberately visits c.Flags() AND c.PersistentFlags() separately, even though the former would
+// normally already contain the latter after cobra merges them — because this runs from
+// buildKnownCommandSet in main(), BEFORE app.Start() calls RootCmd.Execute(), and cobra only
+// performs that merge lazily during Execute() (mergePersistentFlags). At this call site,
+// c.Flags() alone does NOT yet contain a persistent flag declared directly on c (confirmed:
+// TestBuildKnownCommandSet_GroupValueFlags calls this with no Execute() in between, exactly this
+// codepath's real ordering). The double-visit only ever sets the same map key twice when a merge
+// HAS already happened elsewhere — harmless — so do not "simplify" this to c.Flags() alone.
+func groupCommandValueFlags(c *cobra.Command) map[string]bool {
+	vf := map[string]bool{}
+	collect := func(fs *pflag.FlagSet) {
+		fs.VisitAll(func(f *pflag.Flag) {
+			if f.NoOptDefVal == "" {
+				vf["--"+f.Name] = true
+			}
+		})
+	}
+	collect(c.Flags())
+	collect(c.PersistentFlags())
+	return vf
+}
+
 // nextNonFlagToken returns the first non-flag token in args at/after start (a group's nested
-// subcommand name), or ("", false) when only flags/nothing remain. A group's own subcommand
-// flags follow the subcommand token, so the first bare token after the group name is the
-// subcommand. (Shares the residual value-flag-shadowing gap noted on globalValueFlags, but that
-// only affects a group invoked with an unrecognized value flag BEFORE its subcommand — rare, and
-// no worse than mis-selecting an already-flagged path.)
-func nextNonFlagToken(args []string, start int) (string, bool) {
+// subcommand name), or ("", false) when only flags/nothing remain. valueFlags is that specific
+// group's OWN value-taking flags (groupCommandValueFlags via knownCommandSet.groupValueFlags):
+// a recognized "--flag value" pair (space form, not "--flag=value") skips the value token too,
+// so the group's OWN persistent flag (e.g. pm's --actor) passed BEFORE the leaf subcommand is
+// never mistaken for the nested subcommand name — the exact bug this closes: `pm --actor alice
+// create ...` used to report `unknown command "pm alice"` because "alice" (--actor's value) was
+// the first bare token this scan saw. A flag this group does NOT know about is unaffected and
+// keeps the prior (documented) shadowing behavior — see globalValueFlags's comment for why an
+// enumerated fallback can never be fully closed for genuinely unregistered flags.
+func nextNonFlagToken(args []string, start int, valueFlags map[string]bool) (string, bool) {
 	for i := start; i < len(args); i++ {
-		if !strings.HasPrefix(args[i], "-") {
-			return args[i], true
+		a := args[i]
+		if strings.HasPrefix(a, "-") {
+			if !strings.Contains(a, "=") && valueFlags[a] {
+				i++ // the next token is this flag's value, not a subcommand name
+			}
+			continue
 		}
+		return a, true
 	}
 	return "", false
 }
@@ -461,7 +521,7 @@ func unknownSubcommand(args []string, known knownCommandSet) (string, bool) {
 	if !isGroup {
 		return "", false // known leaf command; its own args/flags are cobra's business
 	}
-	sub, ok := nextNonFlagToken(args, idx+1)
+	sub, ok := nextNonFlagToken(args, idx+1, known.groupValueFlags[top])
 	if !ok {
 		return "", false // group invoked bare -> cobra prints the group usage (exit 0)
 	}
