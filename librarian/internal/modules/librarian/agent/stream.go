@@ -42,9 +42,9 @@ const (
 
 // Event is a flat, JSON-taggable record of one streaming occurrence. It is deliberately
 // serializable-only (no error values, no channels): the actual terminal error is preserved for
-// in-process callers via the Session's unexported termErr field, keeping this type reusable as
-// the SSE payload for the deferred webapp. Exactly one terminal event (final|error) is emitted
-// per turn, after which the channel closes.
+// in-process callers via the Session's unexported termErr field, so this type serializes cleanly
+// as the SSE payload for the browser session surface (internal/modules/librarian/web). Exactly
+// one terminal event (final|error) is emitted per turn, after which the channel closes.
 type Event struct {
 	Kind     EventKind `json:"kind"`
 	Step     int       `json:"step,omitempty"`

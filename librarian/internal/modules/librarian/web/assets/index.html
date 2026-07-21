@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>deskkit — librarian session</title>
+<style>
+  :root { color-scheme: light dark; --fg:#1d2126; --bg:#f6f7f9; --panel:#fff; --border:#d8dce1; --accent:#2a5cdb; --muted:#6b7280; }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+         color: var(--fg); background: var(--bg); display: flex; flex-direction: column; min-height: 100vh; }
+  header { padding: 0.9rem 1.2rem 0.6rem; border-bottom: 1px solid var(--border); background: var(--panel); }
+  header h1 { font-size: 1.05rem; margin: 0 0 0.15rem; }
+  header .note { margin: 0; font-size: 0.8rem; color: var(--muted); }
+  main { flex: 1; overflow-y: auto; padding: 1rem; }
+  #messages { display: flex; flex-direction: column; gap: 0.6rem; max-width: 46rem; margin: 0 auto; }
+  .msg { padding: 0.55rem 0.8rem; border-radius: 0.6rem; line-height: 1.4; white-space: pre-wrap; word-break: break-word; }
+  .msg.user { align-self: flex-end; background: var(--accent); color: #fff; }
+  .msg.assistant { align-self: flex-start; background: var(--panel); border: 1px solid var(--border); }
+  .msg.system { align-self: center; background: transparent; color: var(--muted); font-size: 0.8rem; }
+  .steps { margin-top: 0.4rem; display: flex; flex-direction: column; gap: 0.25rem; }
+  .step { font-size: 0.78rem; color: var(--muted); border-left: 2px solid var(--border); padding-left: 0.5rem; }
+  .step.running { color: var(--accent); }
+  .step.error { color: #b00020; }
+  .meta { margin-top: 0.3rem; font-size: 0.72rem; color: var(--muted); }
+  footer { border-top: 1px solid var(--border); background: var(--panel); padding: 0.75rem 1rem 1rem; }
+  #composer { max-width: 46rem; margin: 0 auto; display: flex; flex-direction: column; gap: 0.4rem; }
+  #composer label { font-size: 0.78rem; color: var(--muted); }
+  #input { resize: vertical; min-height: 2.4rem; font: inherit; padding: 0.5rem 0.6rem; border: 1px solid var(--border); border-radius: 0.5rem; }
+  .actions { display: flex; gap: 0.5rem; justify-content: flex-end; }
+  button { font: inherit; padding: 0.45rem 0.9rem; border-radius: 0.5rem; border: 1px solid var(--border); background: var(--panel); cursor: pointer; }
+  button#send { background: var(--accent); color: #fff; border-color: var(--accent); }
+  button:disabled { opacity: 0.55; cursor: not-allowed; }
+</style>
+</head>
+<body>
+<header>
+  <h1>deskkit librarian session</h1>
+  <p class="note">Local, loopback-only stewardship session for this desk — not a general-purpose chat.</p>
+</header>
+<main>
+  <div id="messages" aria-live="polite"></div>
+</main>
+<footer>
+  <form id="composer">
+    <label for="input">Message to the librarian</label>
+    <textarea id="input" rows="2" placeholder="Ask about this desk…" required></textarea>
+    <div class="actions">
+      <button type="button" id="reset">New conversation</button>
+      <button type="submit" id="send">Send</button>
+    </div>
+  </form>
+</footer>
+<script>
+(function () {
+  "use strict";
+  var messagesEl = document.getElementById("messages");
+  var formEl = document.getElementById("composer");
+  var inputEl = document.getElementById("input");
+  var sendEl = document.getElementById("send");
+  var resetEl = document.getElementById("reset");
+  var busy = false;
+
+  function scrollToEnd() { messagesEl.scrollTop = messagesEl.scrollHeight; }
+
+  function addBubble(role, text) {
+    var el = document.createElement("div");
+    el.className = "msg " + role;
+    el.textContent = text || "";
+    messagesEl.appendChild(el);
+    scrollToEnd();
+    return el;
+  }
+
+  function addAssistantBubble() {
+    var wrapper = document.createElement("div");
+    wrapper.className = "msg assistant";
+    var textEl = document.createElement("div");
+    textEl.className = "text";
+    var stepsEl = document.createElement("div");
+    stepsEl.className = "steps";
+    var metaEl = document.createElement("div");
+    metaEl.className = "meta";
+    wrapper.appendChild(textEl);
+    wrapper.appendChild(stepsEl);
+    wrapper.appendChild(metaEl);
+    messagesEl.appendChild(wrapper);
+    scrollToEnd();
+    return { wrapper: wrapper, textEl: textEl, stepsEl: stepsEl, metaEl: metaEl };
+  }
+
+  function setBusy(next) {
+    busy = next;
+    sendEl.disabled = busy;
+    resetEl.disabled = busy;
+    inputEl.disabled = busy;
+  }
+
+  function stepLine(container, callId, label, cls) {
+    var found = null;
+    for (var i = 0; i < container.children.length; i++) {
+      if (container.children[i].dataset.callId === callId) { found = container.children[i]; break; }
+    }
+    if (!found) {
+      found = document.createElement("div");
+      found.className = "step";
+      found.dataset.callId = callId || "";
+      container.appendChild(found);
+    }
+    found.className = "step" + (cls ? " " + cls : "");
+    found.textContent = label;
+    scrollToEnd();
+  }
+
+  // Handles the event kinds emitted by /desk/chat/stream: token, tool_start,
+  // tool_end, final, error. Returns true when the turn is complete.
+  function handleEvent(evt, ui) {
+    switch (evt.kind) {
+      case "token":
+        ui.textEl.textContent += evt.token || "";
+        scrollToEnd();
+        return false;
+      case "tool_start":
+        stepLine(ui.stepsEl, evt.call_id, "running tool " + evt.tool + "…", "running");
+        return false;
+      case "tool_end":
+        if (evt.err) {
+          stepLine(ui.stepsEl, evt.call_id, "tool " + evt.tool + " failed: " + evt.err, "error");
+        } else {
+          stepLine(ui.stepsEl, evt.call_id, "tool " + evt.tool + " done", "");
+        }
+        return false;
+      case "final":
+        ui.textEl.textContent = evt.content || ui.textEl.textContent;
+        if (typeof evt.total_tokens === "number") ui.metaEl.textContent = "tokens: " + evt.total_tokens;
+        return true;
+      case "error":
+        ui.textEl.textContent = evt.partial || ui.textEl.textContent;
+        var errLine = document.createElement("div");
+        errLine.className = "step error";
+        errLine.textContent = (evt.canceled ? "canceled: " : "error: ") + evt.err;
+        ui.stepsEl.appendChild(errLine);
+        return true;
+      default:
+        return false;
+    }
+  }
+
+  function sendMessage(text) {
+    var ui = addAssistantBubble();
+    setBusy(true);
+    fetch("/desk/chat/stream", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message: text }),
+    })
+      .then(function (resp) {
+        var reader = resp.body.getReader();
+        var decoder = new TextDecoder();
+        var buffer = "";
+
+        // SSE frames are separated by a blank line ("\n\n"); each complete
+        // frame is "data: <json>". Read the stream incrementally and split
+        // on that boundary, keeping any trailing partial frame in buffer.
+        function pump() {
+          return reader.read().then(function (chunk) {
+            if (chunk.done) { setBusy(false); return; }
+            buffer += decoder.decode(chunk.value, { stream: true });
+            var frames = buffer.split("\n\n");
+            buffer = frames.pop();
+            for (var i = 0; i < frames.length; i++) {
+              var frame = frames[i];
+              if (frame.indexOf("data: ") !== 0) continue;
+              var payload = frame.slice(6);
+              if (!payload) continue;
+              var evt;
+              try { evt = JSON.parse(payload); } catch (e) { continue; }
+              if (handleEvent(evt, ui)) { setBusy(false); return; }
+            }
+            return pump();
+          });
+        }
+        return pump();
+      })
+      .catch(function (err) {
+        var errLine = document.createElement("div");
+        errLine.className = "step error";
+        errLine.textContent = "connection error: " + err;
+        ui.stepsEl.appendChild(errLine);
+        setBusy(false);
+      });
+  }
+
+  formEl.addEventListener("submit", function (evt) {
+    evt.preventDefault();
+    if (busy) return;
+    var text = inputEl.value.trim();
+    if (!text) return;
+    addBubble("user", text);
+    inputEl.value = "";
+    sendMessage(text);
+  });
+
+  inputEl.addEventListener("keydown", function (evt) {
+    if (evt.key === "Enter" && !evt.shiftKey) { evt.preventDefault(); formEl.requestSubmit(); }
+  });
+
+  resetEl.addEventListener("click", function () {
+    if (busy) return;
+    setBusy(true);
+    fetch("/desk/chat/reset", { method: "POST" })
+      .then(function () {
+        messagesEl.innerHTML = "";
+        addBubble("system", "New conversation started.");
+      })
+      .catch(function (err) { addBubble("system", "reset failed: " + err); })
+      .finally(function () { setBusy(false); });
+  });
+})();
+</script>
+</body>
+</html>

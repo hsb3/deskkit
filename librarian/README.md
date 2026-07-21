@@ -198,9 +198,39 @@ session stays cheap rather than growing unbounded. Exit with `exit`, `quit`, or 
 The session inherits the same gated tool set and boundaries as everything else in this
 README: `restore` is never exposed, `apply-fix` only runs when
 `LIBRARIAN_AUTONOMOUS_WRITES=true`, and the system prompt is the same data-backed one
-`agent` uses. It is desk stewardship, not a general chat assistant — there is no webapp
-or browser chat surface built yet; a PocketBase-served browser UI is a recorded, deferred
-follow-on (see the ADRs above).
+`agent` uses. It is desk stewardship, not a general chat assistant.
+
+### Browser session
+
+`serve` also mounts a self-contained session page at `http://127.0.0.1:8090/desk/chat` — a
+custom Go route serving a page embedded in the binary via `go:embed`, so there is no
+separate frontend build or toolchain needed at runtime (design origin:
+`../docs/decisions/0001-interactive-surface-tui-first.md`, option b). One visit is enough:
+
+```bash
+./deskkit serve       # then open http://127.0.0.1:8090/desk/chat
+```
+
+It drives the same multi-turn session and agent loop as `chat` — the same gated tool set
+and the same write boundary: `restore` is never reachable from this surface either, and
+`apply-fix` only runs when `LIBRARIAN_AUTONOMOUS_WRITES` is set (checked at execution
+time). History is bounded the same way as the REPL — the recent conversation is capped at
+40 messages — so a long session stays cheap rather than growing unbounded. Answers stream
+to the browser live, token by token, with tool steps shown, over Server-Sent Events, and a
+"New conversation" control resets the session.
+
+The route is unauthenticated, exactly like the TUI/REPL — its safety comes from `serve`'s
+loopback binding (`127.0.0.1`), not a login. It is a local, on-demand, single-operator
+surface, not a hosted service, and it deliberately sits outside the PocketBase superuser
+admin login below (that gating would disqualify it as a general session surface). Don't
+put `serve` on a public interface.
+
+As a second layer (defense against a page on another site quietly driving your local
+session from your browser), the state-changing endpoints — the turn/stream and the reset —
+reject any request whose browser `Origin` is not a loopback origin (`127.0.0.1`,
+`localhost`, or `[::1]`, any port) with a `403`. Requests with no `Origin` header (curl and
+other non-browser tools) are unaffected. This is not authentication — it only closes the
+cross-origin browser vector.
 
 ## The admin console
 
