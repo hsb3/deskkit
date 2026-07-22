@@ -43,3 +43,4 @@ _meta/plans/_utils/__pycache__/
 **/.claude/agent-memory/
 .claude/*.lock
 .claude/**/.DS_Store
+CLAUDE.local.md
