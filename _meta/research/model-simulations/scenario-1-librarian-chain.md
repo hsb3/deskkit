@@ -2,7 +2,7 @@
 type: analysis
 status: active
 created: 2026-07-21
-updated: 2026-07-21
+updated: 2026-07-22
 tags: [model-simulations, librarian]
 synopsis: Scenario 1 walkthrough — the librarian write-boundary chain (sweep→patrol→propose_fix→apply_fix→restore) plus the findings-disposition lifecycle, traced against the v1 model with scripted probes.
 ---
@@ -28,9 +28,9 @@ result is the actual probe output.
 
 ## Step-by-step trace
 
-| # | Operator action | Surface behavior (observed) | Store entities / fields | v1 verdict | v2 (deferred) |
+| # | Operator action | Surface behavior (observed) | Store entities / fields | v1 verdict | v2 delta |
 |---|---|---|---|---|---|
-| 1 | `migrate up` (or any first tool call) | Store self-initializes; `migrate up` idempotent | app migrations apply at the `requireConfig` choke point | **OK** [scripted] | — (blocked by #125) |
+| 1 | `migrate up` (or any first tool call) | Store self-initializes; `migrate up` idempotent | app migrations apply at the `requireConfig` choke point | **OK** [scripted] | — |
 | 2 | `sweep` | `{"total":3,"created":3}` — walks the tree, upserts one row per file | `files` (create/update/soft-delete); `checksum`, `dir_kind`, `entity_type`, frontmatter fields | **OK** [scripted] | — |
 | 3 | `patrol` | `{"by_rule":{"R1":1,"R3":1}}` — R1 (missing FM) + R3 (type/dir mismatch) flagged, one `patrol_log` row | `patrol_findings` (flagged, severity=mechanical), `patrol_log` | **OK** [scripted] | — |
 | 4 | `query findings` | `{"by_rule":{"R1":[{"path":..,"detail":..}]}}` — grouped by rule, **{path, detail} only, no finding id** | reads `patrol_findings` where `disposition='open'` | **DEFICIENCY (D1)** [scripted] | — |
@@ -60,6 +60,27 @@ universal frontmatter: ..."}],"R3":[...]}}` — no id field anywhere. The engine
 
 Severity **medium** — a shipped 0.8.0 feature is not operable from its own intended surface.
 Disposition: **file-as-issue** (draft in `deficiency-report.md`).
+
+## v2 assessment (this scenario against `docs/element-model-v2-draft.md`)
+
+The `v2 delta` column reads "—" at every step: **the librarian write-boundary chain is model-agnostic
+infrastructure the v2 element model does not touch.** The v2 model is a content/knowledge reframe
+(three planes over a beefed spine, §3–§9) that explicitly *consumes* the shipped mechanisms rather
+than redefining them (§11: ADR 0011/0012/0013/0017); `sweep`/`patrol`/`propose_fix`/`apply_fix`/
+`restore` and the collections they drive (`files`, `patrol_findings`, `revisions`, `patrol_log`,
+`adoption_log`) are unchanged. So this chain runs identically under v2 — what changes is the *content
+vocabulary* patrol classifies, not the chain.
+
+Two v2 deficiencies do implicate this scenario, recorded in `deficiency-report.md`:
+
+- **V2-D3 (Low)** — the ~15 net-new v2 document/entity types (`engineering-spec`, `literature-note`,
+  `change`, `deliverable`, …) have **no directory-placement (`dir_kind`) or patrol/`entity_type`
+  classification named** in the model. This chain's patrol step (3) classifies docs by type/dir, so a
+  new v2 type would surface as a `query orphans` hit or an R3 misfile until the librarian taxonomy is
+  extended. Disposition: amendment-needed (a §13 deferred-list line).
+- **V2-D4 (Low)** — the v2 `claim` status axis (§5.3/§11) is modeled on the same findings-disposition
+  pattern whose read surface this scenario found id-less (**D1/#184**), so the claim-status surface
+  risks inheriting that gap. Disposition: amendment-needed (rides #184).
 
 ## Notes (OK-with-caveat, not gate-bearing)
 

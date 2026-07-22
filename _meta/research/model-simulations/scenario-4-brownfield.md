@@ -2,7 +2,7 @@
 type: analysis
 status: active
 created: 2026-07-21
-updated: 2026-07-21
+updated: 2026-07-22
 tags: [model-simulations, brownfield, adoption]
 synopsis: Scenario 4 walkthrough — a messy existing folder through the 9-phase brownfield adoption runbook, traced against the v1 model; judgment phases tabletop, the Phase 8 librarian baseline scripted.
 ---
@@ -31,9 +31,9 @@ authors + validates the profile, and runs the librarian baseline as the final ga
 
 ## Step-by-step trace
 
-| # | Phase (K24 track) | Operator action | Surface behavior | v1 verdict | v2 (deferred) |
+| # | Phase (K24 track) | Operator action | Surface behavior | v1 verdict | v2 delta |
 |---|---|---|---|---|---|
-| 1 | Lock | Zip the intact desk incl. `.git/`, verify entry count | procedural; re-runnable archive | **OK** (tabletop) | — (blocked by #125) |
+| 1 | Lock | Zip the intact desk incl. `.git/`, verify entry count | procedural; re-runnable archive | **OK** (tabletop) | — |
 | 2 | Inventory (`untouched→inventoried`) | Disk enumeration (`ls -A`) + `git status --ignored`; status from repo evidence | read-only; never author from memory | **OK** (tabletop) | — |
 | 3 | Disposition table as a file | one row per top-level item; mandatory `.gitignore`-flip + ratified-decisions rows | proposal only | **OK** (tabletop) | — |
 | 4 | GATE (`inventoried→approved`) | user approves the table + 2–3 residual questions | **no write until approval** | **OK** (tabletop) | — |
@@ -65,3 +65,20 @@ three-way triage (template noise / genuine debt / judgment calls). Observations:
 - **`patrol` does not resolve an open finding that merely stops firing** (rule change, hand-fix,
   deletion) — the runbook already warns to re-baseline into a fresh store after upgrading. Not a
   new finding; the fresh-store baseline in Phase 8 is exactly the mitigation.
+
+## v2 assessment (this scenario against `docs/element-model-v2-draft.md`)
+
+The `v2 delta` column reads "—": the adoption *runbook* (lock → inventory → disposition → GATE →
+init → migrate → author → baseline → take stock) is a human-judgment procedure over model-agnostic
+tooling; the Phase 8 librarian baseline is the same chain as Scenario 1. v2 changes only the
+*targets* a disposition can map an old doc to.
+
+- **V2-D3 (Low)** — the v2 model's richer vocabulary gives brownfield adoption *more* places to file
+  content (e.g. an old "research notes" file → `literature-note`/`source`/`research-synthesis`), which
+  is a net improvement — but the model names no `dir_kind`/patrol classification for those new types,
+  so the Phase 8 baseline (step 8c–8d) could not yet triage them by rule the way it triages v1
+  doctypes today. Disposition: amendment-needed (§13 librarian-taxonomy line). Not blocking; the
+  research/software plane *builds* are already deferred (§13).
+
+No brownfield-specific v2 deficiency beyond V2-D3. The 9-phase *flow* is unchanged by v2 — the model
+would simply extend the disposition target vocabulary once its build slice lands.
