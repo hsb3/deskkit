@@ -154,6 +154,17 @@ guard and `init` do exactly this). Fail-closed behavior in `serve` paths needs a
   `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` / `GEMINI_API_KEY`
 - `LIBRARIAN_AUTONOMOUS_WRITES=true` gates `apply_fix` (checked at execution time)
 
+### Dogfooding wiring (this repo's own agent config)
+
+Root `.mcp.json` registers both lanes' MCP servers off the **working tree**, not the marketplace
+bundle: `desk-standard-dev` (`bun plugin/mcp/server.ts`, live TS core) and `desk-persona-dev`
+(`deskkit mcp-serve`, the binary installed by `make install` — re-run it after librarian changes
+or you're dogfooding a stale build). Both need a desk to operate on: create a local, gitignored
+`_knowledge/` at the repo root (e.g. `deskkit init`) or the servers fail config resolution at
+startup. The `-dev` suffix keeps their tool names distinct from the marketplace-installed plugin's.
+`deskkit apply-fix` / `restore` are `ask`-gated in `.claude/settings.json` — supervised-only,
+matching the librarian's boundary.
+
 ## Cross-cutting gotchas
 
 - **Store self-initializes** at the `requireConfig` choke point — a fresh store needs no manual

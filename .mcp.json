@@ -1,3 +1,16 @@
 {
-  "mcpServers": {}
+  "mcpServers": {
+    "desk-standard-dev": {
+      "command": "bun",
+      "args": ["plugin/mcp/server.ts"]
+    },
+    "desk-persona-dev": {
+      "command": "deskkit",
+      "args": ["mcp-serve"],
+      "env": {
+        "PM_ENABLED": "true",
+        "MCP_MODULES": "librarian,pm"
+      }
+    }
+  }
 }
