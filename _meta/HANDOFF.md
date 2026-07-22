@@ -1,7 +1,7 @@
 _Session-to-session bridge for desk-standard. Read this before working; update it at the end
 of any substantial session. Secret-free — live URLs/credentials belong in `_meta/operations/`
 (untracked) if that dir is ever created._
-Status: active (2026-07-21, post wave-v3 + owner sign-off run)
+Status: active (2026-07-21, post wave-v3 + sign-off + v0.8.0 released + _knowledge ruling executed)
 
 # HANDOFF
 
@@ -49,9 +49,9 @@ before landing; final union green incl. the NEW `make e2e` gate (45 checks). Del
   under the owner-approved scoping (markdown baseline, Notion comparator, 3-dim rubric):
   **wins all three dimensions**, honest caveats recorded in
   `_meta/research/2026-07-cohesion-value-evaluation/value-evaluation.md`.
-The signoff trail is `_meta/signoff/2026-07-21-decision-queue/` (form + answers.json). The ONE
-unresolved sign-off field: the `_knowledge/` move TARGET NAME (#170 — approved in principle,
-name never supplied).
+The signoff trail is `_meta/signoff/2026-07-21-decision-queue/` (form + answers.json). The one
+field left blank on the form (the `_knowledge/` move target) was ruled in-session later the same
+day and executed — see the entry above this one. **The owner decision queue is EMPTY.**
 
 **PREVIOUS SESSION 2026-07-21 late (triage + wave-v2 run) — pinned #155 refreshed with delivery plan v2
 and the plan executed the same session: 4 PRs (#172–#175) merged, 9 issues closed (#82 #85
@@ -120,24 +120,27 @@ children (#114–#123) shipped as PRs #136–#147 (main HEAD `cd22b9f` pre-this-
 verify` 48/48. Highlights live in CLAUDE.md (guard families, tool-surface counts, desk-persona
 bundle) — not repeated here.
 
+**BOTH former owner gates cleared same-day:** **v0.8.0 is RELEASED** (owner-tagged; workflow
+success; binary + checksum verified by the session) — update local PATH binaries via `make
+install` / `gh release download`. And the `_knowledge/` question was RULED and EXECUTED (owner,
+in-session): the repo is not an exec desk, so the repo-root `_knowledge/` instance was REMOVED —
+**no rename**; the desk-side convention, `profile_root` constant, and `check-profile-root` guard
+are untouched; the example profile's single home is now the desk-setup scaffold template
+(PR #188 closed #170 + #84; ADR 0021 §F5 updated in place).
+
 **NEXT, in order of consequence:**
-1. **Owner: tag 0.8.0** — everything is staged and green; the go/no-go is
-   `git tag v0.8.0 && git push --tags` (then update the PATH binary separately — `make install`
-   or `gh release download`).
-2. **Owner: name the `_knowledge/` move target** (#170) — the one blank sign-off field; a
-   one-line answer unblocks #84's second half (constant + drift guard + move-day checklist all
-   ready).
-3. **Schema-v2 arc (#130) — now UNBLOCKED, next session's work**: #124 (version the schema
+1. **Schema-v2 arc (#130) — now UNBLOCKED, next session's work**: #124 (version the schema
    contract) → #125 (element model revision under ADR 0018; the v1 sims walkthroughs carry a
    ready `v2 (deferred)` column) → #126 v2 half. Design-heavy; deliberately not started at this
    session's depth.
-4. **Small buildables from this run's findings**: #184 (finding id missing from query surfaces),
+2. **Small buildables from this run's findings**: #184 (finding id missing from query surfaces),
    #185 (update_item type-validation gate bypass), #182 (subprocess-test store collision),
    #181 + #187 (coupled label/doc passes — one PR could take both).
-5. **1.0.0 gate after the above**: only #84's move half (#170) and the #87 release-cut epic
-   itself remain on the milestone; the value-evaluation verdict (wins all 3 dimensions) is on
-   file for the 1.0 claim.
-6. **ts-proxy implementation** — `docs/development/ts-proxy-design.md` §5 slices; slice 0 (host
+3. **1.0.0 gate**: the milestone now holds ONLY the #87 release-cut epic itself — every lane is
+   closed; the value-evaluation verdict (wins all 3 dimensions) is on file for the 1.0 claim.
+   The remaining 1.0 substance is the owner's maturity call plus whatever the schema-v2 arc and
+   small buildables above feed in.
+4. **ts-proxy implementation** — `docs/development/ts-proxy-design.md` §5 slices; slice 0 (host
    spawn-capability probe) is the go/no-go before anything else.
 
 **Design session (2026-07-20) is RULED — ADRs 0009–0018 bind** (`docs/decisions/README.md` has
@@ -165,6 +168,10 @@ test-hygiene; #12 stays ON HOLD (owner ruling above); #36 needs a design ruling 
 
 ## 2. Recent deliveries (newest first — full detail in the cited PRs / ADRs / issues)
 
+- **2026-07-21 latest+1 — v0.8.0 RELEASED (owner-tagged, workflow success, binary+checksum
+  verified) and the `_knowledge/` ruling executed: PR #188 removed the repo-root instance
+  (no rename; example profile now single-homed in the desk-setup scaffold template), closing
+  #170 + #84 — the 1.0.0 milestone now holds only the #87 release-cut epic.**
 - **2026-07-21 latest — wave-v3 + owner sign-off run: PRs #176–#180, #183, #186 merged; #19 #81
   #83 #88 #171 closed; ADRs 0020 confirmed / 0021 graduated / 0008 amended; PM default-on;
   desk-pm folded; `make e2e` gate added; 0.8.0 staged awaiting the owner tag.** See §1 top entry
