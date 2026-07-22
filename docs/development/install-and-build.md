@@ -72,6 +72,9 @@ The two env vars are the **override**, not the requirement, and they win over th
 export DESK_ROOT=/path/to/desk DESK_NAME=my-desk    # only when outside a profiled desk
 ```
 
+Note: `deskkit init` always names the desk from the folder's basename, not from any `DESK_NAME`
+you already exported — the two agree only if the folder happens to be named accordingly.
+
 The store lives **outside** the desk tree, at `$XDG_DATA_HOME/deskkit/<DESK_NAME>/` (falling back
 to `~/.local/share/deskkit/<DESK_NAME>/`), so the librarian never indexes its own database and a
 cloud-synced desk folder never corrupts a live SQLite file. See

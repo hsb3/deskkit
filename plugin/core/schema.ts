@@ -67,16 +67,35 @@ export function loadSchemaObject(path: string): Record<string, unknown> {
 }
 
 /**
+ * KNOWN_CONTRACT_VERSIONS is the set of profile.schema.yaml `x-contract-version` values this
+ * build understands (ADR 0009's shared-contract versioning). A schema file declaring anything
+ * else is refused loud in compileValidator rather than silently misread. This is the CONTRACT
+ * file's own version — distinct from a profile INSTANCE's `schema_version` (which const-1 pins
+ * a _knowledge/profile.yaml to schema v1) and from the store-side module_schema_versions
+ * migration mechanism (pm-system spec §8.3 / R7.1).
+ */
+export const KNOWN_CONTRACT_VERSIONS: readonly number[] = [1];
+
+/**
  * compileValidator builds an ajv draft-2020-12 validator (allErrors so AC8 can name every
- * violation; strict off because the schema carries $schema/$id/format metadata). Memoized by
- * schema path.
+ * violation; strict off because the schema carries $schema/$id/format metadata). It first
+ * reads the schema's `x-contract-version` marker and THROWS on an unrecognized value, then
+ * strips that schema-meta key so ajv never sees it. Memoized by schema path.
  */
 const validatorCache = new Map<string, ValidateFunction>();
 
 export function compileValidator(schemaObj: Record<string, unknown>): ValidateFunction {
+  const version = schemaObj["x-contract-version"];
+  if (typeof version !== "number" || !KNOWN_CONTRACT_VERSIONS.includes(version)) {
+    throw new Error(
+      `schema contract version ${JSON.stringify(version)} is not recognized ` +
+        `(known versions: [${KNOWN_CONTRACT_VERSIONS.join(", ")}])`,
+    );
+  }
+  const { "x-contract-version": _cv, ...schemaForAjv } = schemaObj;
   const ajv = new Ajv2020({ allErrors: true, strict: false });
   addFormats(ajv);
-  return ajv.compile(schemaObj);
+  return ajv.compile(schemaForAjv);
 }
 
 export function getValidator(schemaPath: string): ValidateFunction {

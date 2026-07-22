@@ -124,8 +124,8 @@ each tool's `ToolSpec.Module` (`internal/core/mcp/server.go` → `toolcore.Selec
 - **`MCP_MODULES` unset** → no module filter; every tool the §5.4 gate exposes is served. **The
   5 / 6 / 17 / 18 counts in the table above are all the unset case** — unchanged behavior.
 - **`MCP_MODULES` set, non-empty** (e.g. `pm`, or `librarian,pm`) → the exposed set is filtered to
-  tools whose owning module is in the declared set. The **desk-pm mount** shape — a mount that
-  declares `MCP_MODULES=pm` alongside `PM_ENABLED=true` — exposes
+  tools whose owning module is in the declared set. The **pm-only mount** (`MCP_MODULES=pm`) shape
+  — a mount that declares `MCP_MODULES=pm` alongside `PM_ENABLED=true` — exposes
   **exactly the 12 PM tools** and **none** of the 5 librarian ride-alongs (`sweep`, `patrol`,
   `propose_fix`, `query`, `record_feedback`). A partially-matching set (`librarian,bogus`) keeps the
   matched subset and serves.
@@ -138,8 +138,8 @@ each tool's `ToolSpec.Module` (`internal/core/mcp/server.go` → `toolcore.Selec
 
 | Mount | Env | Tool count | Tools |
 |---|---|---:|---|
-| Librarian MCP (default) | *(none)* | 5 | the 5 librarian defaults |
-| **desk-pm mount** | `PM_ENABLED=true`, `MCP_MODULES=pm` | **12** | the 12 PM tools only (no ride-alongs) |
+| Librarian MCP (default; PM_ENABLED implicit) | *(none)* | 17 | the 5 librarian + 12 PM defaults |
+| **pm-only mount** (`MCP_MODULES=pm`) | `PM_ENABLED=true`, `MCP_MODULES=pm` | **12** | the 12 PM tools only (no ride-alongs) |
 
 The mount signal names the gated set, so the axis is legible in the host's log:
 `deskkit mcp-serve: mounted "deskkit" v1; modules: pm; 12 tool(s) exposed: get_context, list_items,
@@ -213,7 +213,7 @@ DESKDIR=$(mktemp -d); STORE=$(mktemp -d)
   | DESK_ROOT="$DESKDIR" DESK_NAME=probe PM_ENABLED=true MCP_MODULES=pm /tmp/deskkit --dir "$STORE" mcp-serve
 ```
 
-The desk-pm mount variant (`PM_ENABLED=true MCP_MODULES=pm`) returns **exactly 12** — the PM tools
+The pm-only mount variant (`PM_ENABLED=true MCP_MODULES=pm`) returns **exactly 12** — the PM tools
 and no librarian ride-alongs — and its stderr reads `modules: pm; 12 tool(s) exposed: …`. Drop
 `MCP_MODULES` and the same env yields 17 (unset = all). Set `MCP_MODULES=""` (or an unresolvable
 name) on a resolved desk and the process **exits 1** with an actionable stderr line — proving the
@@ -223,7 +223,7 @@ fail-loud contract rather than a silent fallback.
 > drift guard's current framing is
 > **two axes / four combinations** (`LIBRARIAN_AUTONOMOUS_WRITES` × `PM_ENABLED` → 5/6/17/18); that
 > framing **predates module gating** and models only the `MCP_MODULES`-unset baseline. `MCP_MODULES`
-> is a genuine **third axis** — the guard must be extended to model it (at minimum the desk-pm
+> is a genuine **third axis** — the guard must be extended to model it (at minimum the pm-only
 > `MCP_MODULES=pm` → 12 mount) so the count table above stays enforced, not just documented.
 
 **Librarian CLI (surface 1)** — `deskkit --help` (and again with `PM_ENABLED=true`).

@@ -40,7 +40,7 @@ type docSurfaceCounts struct {
 	writes []int // LIBRARIAN_AUTONOMOUS_WRITES=true
 	pm     []int // PM_ENABLED=true
 	both   []int // both flags
-	deskPM []int // desk-pm mount (PM_ENABLED=true, MCP_MODULES=pm)
+	deskPM []int // pm-only mount (PM_ENABLED=true, MCP_MODULES=pm)
 }
 
 // TestToolSurfaceDoc_MCPCounts is the drift guard: every Librarian-MCP count docs/tool-surface.md
@@ -62,7 +62,7 @@ func TestToolSurfaceDoc_MCPCounts(t *testing.T) {
 		"LIBRARIAN_AUTONOMOUS_WRITES=true": doc.writes,
 		"PM_ENABLED=true":                  doc.pm,
 		"both flags":                       doc.both,
-		"desk-pm mount (MCP_MODULES=pm)":   doc.deskPM,
+		"pm-only mount (MCP_MODULES=pm)":   doc.deskPM,
 	} {
 		if len(vals) == 0 {
 			t.Fatalf("docs/tool-surface.md: found no documented count for %q — the doc's table shape "+
@@ -90,14 +90,14 @@ func TestToolSurfaceDoc_MCPCounts(t *testing.T) {
 
 	src17 := len(toolcore.ExposedTools(&config.Config{AutonomousWrites: false}))
 	src18 := len(toolcore.ExposedTools(&config.Config{AutonomousWrites: true}))
-	// desk-pm mount: the exposed set filtered to the pm module (MCP_MODULES=pm) — the same
+	// pm-only mount: the exposed set filtered to the pm module (MCP_MODULES=pm) — the same
 	// SelectByModules over ExposedSpecs the Serve module gate uses. PM count is 12 regardless of
 	// the librarian write gate, so AutonomousWrites here does not change it.
 	src12 := len(toolcore.SelectByModules(toolcore.ExposedSpecs(&config.Config{AutonomousWrites: true}), "pm"))
 
 	assertCounts(t, "PM_ENABLED=true", doc.pm, src17)
 	assertCounts(t, "both flags (AUTONOMOUS_WRITES + PM_ENABLED)", doc.both, src18)
-	assertCounts(t, "desk-pm mount (MCP_MODULES=pm)", doc.deskPM, src12)
+	assertCounts(t, "pm-only mount (MCP_MODULES=pm)", doc.deskPM, src12)
 }
 
 // assertCounts fails when any documented occurrence of a surface's count disagrees with the
@@ -132,7 +132,9 @@ func parseDocSurfaceCounts(md string) docSurfaceCounts {
 		}
 		switch {
 		// Summary + §2.1-mount rows: "Librarian MCP — default" / "…+LIBRARIAN_AUTONOMOUS_WRITES"
-		// / "…+PM_ENABLED" / "…both", and the §2.1 "Librarian MCP (default)" mount row.
+		// / "…+PM_ENABLED" / "…both". The §2.1 "Librarian MCP (default; PM_ENABLED implicit)" mount
+		// row (MCP_MODULES unset) matches THIS PM_ENABLED case, not the plain "default" case below
+		// — since 1.0 PM_ENABLED defaults on, so the live unset-mount count is 17, not 5.
 		case strings.Contains(label, "Librarian MCP") && strings.Contains(label, "both"):
 			out.both = append(out.both, n)
 		case strings.Contains(label, "Librarian MCP") && strings.Contains(label, "PM_ENABLED"):
@@ -150,8 +152,8 @@ func parseDocSurfaceCounts(md string) docSurfaceCounts {
 			out.pm = append(out.pm, n)
 		case strings.Contains(label, "both flags"):
 			out.both = append(out.both, n)
-		// §2.1 module-gating table: the desk-pm mount row.
-		case strings.Contains(label, "desk-pm mount"):
+		// §2.1 module-gating table: the pm-only mount row.
+		case strings.Contains(label, "pm-only mount"):
 			out.deskPM = append(out.deskPM, n)
 		}
 	}
