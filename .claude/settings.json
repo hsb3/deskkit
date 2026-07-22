@@ -1,13 +1,7 @@
 {
   "enabledPlugins": {
-    "desk-standard@desk-standard": true,
-    "code-desk@dotfiles-agents": true,
-    "exec-desk@dotfiles-agents": true
+    "code-desk@dotfiles-agents": true
   },
-  "enabledMcpjsonServers": [
-    "desk-standard-dev",
-    "desk-persona-dev"
-  ],
   "permissions": {
     "allow": [
       "Bash(make:*)",
@@ -22,10 +16,6 @@
       "Bash(shellcheck:*)",
       "Bash(actionlint:*)",
       "Bash(deskkit:*)"
-    ],
-    "ask": [
-      "Bash(deskkit apply-fix:*)",
-      "Bash(deskkit restore:*)"
     ]
   }
 }
