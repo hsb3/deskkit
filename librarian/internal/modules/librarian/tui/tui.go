@@ -52,6 +52,11 @@ func Run(ctx context.Context, app core.App, cfg *config.Config, theme string, vi
 	// exist, so `chat` lands on the list instead of a blank fresh session. Consumed once, on the
 	// first WindowSizeMsg (the overlay needs a sized viewport); a no-op on a first-run desk.
 	mdl.enableResumeFirst()
+	// One-time launch nudge: on a desk with module views mounted, seed a faint transcript line naming
+	// them and the ?/ctrl+p keys, so a new operator is oriented on first launch. A no-op on a
+	// librarian-only desk. Fires on the first WindowSizeMsg, before the resume overlay, so it stays
+	// visible once the picker is dismissed.
+	mdl.enableLaunchHint()
 	p := tea.NewProgram(mdl, tea.WithContext(ctx))
 	final, runErr := p.Run()
 

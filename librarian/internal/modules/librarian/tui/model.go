@@ -138,6 +138,7 @@ const (
 	footerHeight      = 1
 	inputHeight       = 3
 	inputBorderHeight = 2 // rounded input box: top + bottom border rows added around the textarea
+	tabStripHeight    = 1 // view-switcher strip: one full-width row, present ONLY when views are mounted
 )
 
 // maxMeasure caps the transcript's readable text width. Wide terminals keep a comfortable measure
@@ -167,6 +168,7 @@ type role int
 const (
 	roleUser role = iota
 	roleAssistant
+	roleInfo // ambient host guidance (the one-time launch nudge), not a conversation turn
 )
 
 // entry is one transcript item. For an assistant turn, text is the streaming/answer bubble
@@ -211,8 +213,9 @@ func (e *entry) matchStep(callID string) int {
 // no-ops while a turn is streaming (like send), so no in-flight turn is ever disturbed. historyPrev
 // (up) / historyNext (down) walk prior prompts only at the textarea's edge rows; copyLast (ctrl+y)
 // copies the last answer's raw markdown; editExternal (ctrl+e) composes the draft in $EDITOR; help
-// (ctrl+g) toggles the expanded help. Bare "?" is deliberately NOT bound — the textarea is always
-// focused and must type it.
+// (ctrl+g, or "?") toggles the expanded help. "?" is bound to help only when the chat draft is empty
+// or a module view is active, so a "?" typed mid-message still inserts literally (the empty-draft
+// guard lives in handleKey); ctrl+g always toggles help regardless of the draft.
 type keymap struct {
 	send            key.Binding
 	newline         key.Binding
@@ -246,7 +249,7 @@ func defaultKeymap() keymap {
 		historyPrev:     key.NewBinding(key.WithKeys("up"), key.WithHelp("↑", "prev prompt")),
 		historyNext:     key.NewBinding(key.WithKeys("down"), key.WithHelp("↓", "next prompt")),
 		copyLast:        key.NewBinding(key.WithKeys("ctrl+y"), key.WithHelp("ctrl+y", "copy answer")),
-		help:            key.NewBinding(key.WithKeys("ctrl+g"), key.WithHelp("ctrl+g", "help")),
+		help:            key.NewBinding(key.WithKeys("ctrl+g", "?"), key.WithHelp("?", "help")),
 		quit:            key.NewBinding(key.WithKeys("ctrl+c"), key.WithHelp("ctrl+c", "quit")),
 		openPicker:      key.NewBinding(key.WithKeys("ctrl+o"), key.WithHelp("ctrl+o", "resume")),
 		newConversation: key.NewBinding(key.WithKeys("ctrl+n"), key.WithHelp("ctrl+n", "new")),
@@ -358,6 +361,12 @@ type model struct {
 	// defaults false, so the pure-Update tests — which never set it — keep their launch behavior.
 	resumeFirst bool
 
+	// launchHint arms a one-time transcript nudge (seedLaunchHint) naming the mounted module views
+	// and the ?/ctrl+p keys that reach them. Set by Run via enableLaunchHint, consumed on the first
+	// WindowSizeMsg (like resumeFirst) and only when views are mounted. Defaults false, so the
+	// pure-Update tests — which never arm it — keep their launch behavior and entry counts.
+	launchHint bool
+
 	// Module-contributed views (spec §5.3; host_views.go): views is the mounted set (empty on
 	// a librarian-only desk), activeView the index of the one occupying the body region, or
 	// -1 when the chat transcript is showing.
@@ -440,6 +449,16 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.resize(msg.Width, msg.Height)
+		if m.launchHint {
+			// One-shot, BEFORE the resume overlay: the nudge is seeded into the transcript so it is
+			// still there once the picker (if any) is dismissed. Clear the flag first so a later
+			// terminal resize never reseeds it; seed only when views are actually mounted.
+			m.launchHint = false
+			if len(m.views) > 0 {
+				m.seedLaunchHint()
+				m.refreshViewport()
+			}
+		}
 		if m.resumeFirst {
 			// One-shot: the overlay needs a sized viewport (only known after this first
 			// WindowSizeMsg), so resume-first fires here rather than in Init/newModel. Clear the
@@ -559,11 +578,15 @@ func (m model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case key.Matches(msg, m.keymap.cycleViews):
-		// Enter the mounted module views (first view); a no-op when none are mounted.
-		if len(m.views) == 0 {
-			return m, nil
-		}
+		// Enter the mounted module views (first view). The binding is enabled only once views are
+		// mounted (attachViews), so this branch is only reachable on a desk that has them.
 		return m.activateView(0)
+
+	case msg.String() == "ctrl+p":
+		// ctrl+p reached here only because the switcher binding is DISABLED — no module views are
+		// mounted. Explain rather than no-op so the key never reads as dead; the chat stays active
+		// (activeView unchanged at -1).
+		return m.showToast("no module views on this desk — PM is off")
 
 	case key.Matches(msg, m.keymap.openPicker):
 		return m.openPicker()
@@ -578,6 +601,14 @@ func (m model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m.editInExternalEditor()
 
 	case key.Matches(msg, m.keymap.help):
+		// ctrl+g always toggles the full-help overlay. "?" is also bound to help, but only opens it
+		// when the draft is empty — a "?" typed into a message-in-progress inserts literally instead
+		// of hijacking the key.
+		if msg.String() == "?" && m.ta.Value() != "" {
+			var cmd tea.Cmd
+			m.ta, cmd = m.ta.Update(msg)
+			return m, cmd
+		}
 		m.hlp.ShowAll = !m.hlp.ShowAll
 		return m, nil
 
@@ -747,6 +778,25 @@ func (m model) openPicker() (tea.Model, tea.Cmd) {
 // exist, the surface opens on the sessions list at startup instead of dropping straight into a
 // fresh conversation. Called once by Run before the program starts.
 func (m *model) enableResumeFirst() { m.resumeFirst = true }
+
+// enableLaunchHint arms the one-time launch nudge (seedLaunchHint), fired on the first WindowSizeMsg
+// like resume-first. Called once by Run before the program starts; a no-op on a librarian-only desk
+// (the consume guard only seeds when views are mounted).
+func (m *model) enableLaunchHint() { m.launchHint = true }
+
+// seedLaunchHint appends the one-time launch nudge to the transcript: a faint line naming the mounted
+// module views and the keys that reach them (ctrl+p) and the help overlay (?). Called once, only when
+// views are mounted, so a librarian-only desk's transcript is unchanged. The view names come from the
+// modules (view.Name()), never hardcoded here, so this carries no deployment identity.
+func (m *model) seedLaunchHint() {
+	names := make([]string, 0, len(m.views))
+	for _, v := range m.views {
+		names = append(names, v.Name())
+	}
+	text := "module views mounted: " + strings.Join(names, ", ") +
+		"  ·  ctrl+p switches views  ·  ? opens help"
+	m.entries = append(m.entries, entry{role: roleInfo, text: text, finalized: true})
+}
 
 // openLaunchPicker opens the sessions overlay at startup when prior resumable conversations exist
 // (resume-first launch): the reader lands on the list to pick one, or esc / ctrl+n to start
@@ -1190,7 +1240,13 @@ func (m *model) resize(w, h int) {
 	m.contentW = measureWidth(w)
 	m.ready = true
 
-	vpHeight := h - headerHeight - footerHeight - inputHeight - inputBorderHeight
+	// The view-switcher strip claims one row below the header, but only on a desk that mounted
+	// module views — a librarian-only desk keeps the original body height (and no strip).
+	tabH := 0
+	if len(m.views) > 0 {
+		tabH = tabStripHeight
+	}
+	vpHeight := h - headerHeight - tabH - footerHeight - inputHeight - inputBorderHeight
 	if vpHeight < 1 {
 		vpHeight = 1
 	}
@@ -1256,6 +1312,11 @@ func (m model) renderEntry(e entry) string {
 		// Width sets only a MINIMUM; MaxWidth caps it so an unbreakable long token (a URL, a
 		// pasted path) wraps inside the measure instead of stretching the block past it.
 		return m.styles.userBlock.Width(m.contentW).MaxWidth(m.contentW).Render(inner)
+
+	case roleInfo:
+		// Ambient host guidance (the one-time launch nudge): a faint italic single line with no role
+		// label or gutter, so it reads as chrome rather than a conversation turn.
+		return m.styles.infoLine.Render(e.text)
 
 	default: // roleAssistant
 		var b strings.Builder
@@ -1354,12 +1415,16 @@ func (m model) View() tea.View {
 	} else if m.activeView >= 0 && m.activeView < len(m.views) {
 		body = padToHeight(m.views[m.activeView].Render(), m.vp.Height())
 	}
-	content := lipgloss.JoinVertical(lipgloss.Left,
-		m.renderHeader(),
-		body,
-		m.renderInput(),
-		m.renderFooter(),
-	)
+	// The view-switcher strip sits directly under the header, but only on a desk that mounted module
+	// views — so a librarian-only surface is byte-identical to before. resize reserves its row in the
+	// body-height math, so the input box and footer never get pushed off-screen.
+	parts := make([]string, 0, 5)
+	parts = append(parts, m.renderHeader())
+	if len(m.views) > 0 {
+		parts = append(parts, m.renderTabs())
+	}
+	parts = append(parts, body, m.renderInput(), m.renderFooter())
+	content := lipgloss.JoinVertical(lipgloss.Left, parts...)
 	v := tea.NewView(content)
 	v.AltScreen = true
 	return v
@@ -1389,6 +1454,29 @@ func (m model) renderHeader() string {
 	return m.styles.headerBar.Width(m.width).MaxWidth(m.width).Render(seg)
 }
 
+// renderTabs renders the persistent view-switcher strip — `chat · <view1> · <view2> · …` — as a
+// full-width bar directly under the header, with the ACTIVE segment highlighted (chat is active when
+// activeView == -1; otherwise views[activeView]). It is the always-visible affordance that makes
+// every mounted module view discoverable on sight, without pressing ctrl+p. Only ever rendered when
+// views are mounted (View gates it), so a librarian-only desk never shows it. The segments each carry
+// the bar fill so the tint is continuous behind the text; the outer bar truncates to width so the
+// one-line strip never wraps.
+func (m model) renderTabs() string {
+	seg := func(label string, active bool) string {
+		if active {
+			return m.styles.tabActive.Render(label)
+		}
+		return m.styles.tabInactive.Render(label)
+	}
+	parts := make([]string, 0, len(m.views)+1)
+	parts = append(parts, seg("chat", m.activeView == -1))
+	for i, v := range m.views {
+		parts = append(parts, seg(v.Name(), i == m.activeView))
+	}
+	strip := strings.Join(parts, m.styles.tabSep.Render(" · "))
+	return m.styles.tabBar.Width(m.width).MaxWidth(m.width).Render(strip)
+}
+
 // renderInput renders the textarea wrapped in a rounded, full-width border box. The border color
 // is a state cue, not a lock: accent when ready for input, faint while a turn is streaming (typing
 // still works throughout). The textarea was sized to width-2 in resize so the box spans the full
@@ -1410,15 +1498,16 @@ func (m model) renderInput() string {
 // reader has scrolled up mid-stream. Under reduced motion the animated spinner is replaced by
 // static "working…" text. The bar segments carry the fill so it is continuous behind the text.
 func (m model) renderFooter() string {
-	// An active module view gets its own footer (name + switcher hints; host_views.go).
-	if m.activeView >= 0 {
-		return m.viewFooter()
-	}
-	// ctrl+g expansion: a grouped overlay list on the terminal background, not a bar.
+	// ctrl+g / ? expansion: a grouped overlay list on the terminal background, not a bar. Checked
+	// first so the overlay surfaces in BOTH chat and view mode (? opens the same help everywhere).
 	if m.hlp.ShowAll {
 		hlp := m.hlp
 		hlp.Styles = m.styles.help
 		return hlp.View(m.keymap)
+	}
+	// An active module view gets its own footer (name + switcher hints; host_views.go).
+	if m.activeView >= 0 {
+		return m.viewFooter()
 	}
 
 	var state string
