@@ -1,7 +1,7 @@
 _Session-to-session bridge for desk-standard. Read this before working; update it at the end
 of any substantial session. Secret-free — live URLs/credentials belong in `_meta/operations/`
 (untracked) if that dir is ever created._
-Status: active (2026-07-21, post wave-v2 run)
+Status: active (2026-07-21, post wave-v3 + owner sign-off run)
 
 # HANDOFF
 
@@ -24,7 +24,36 @@ issue bodies, and the friction ledger live there.
 
 ## 1. Current standing + top priority
 
-**SESSION 2026-07-21 late (triage + wave-v2 run) — pinned #155 refreshed with delivery plan v2
+**SESSION 2026-07-21 latest (wave-v3 + owner sign-off) — the nine-item owner decision queue was
+batched into ONE signoff form, ALL recommendations approved, and everything executable was
+executed same-session: 7 PRs merged (#176–#180, #183, #186), 5 issues closed (#19 #81 #83 #88
+#171), 5 filed (#181 #182 #184 #185 #187), release 0.8.0 STAGED (release-prep + CI
+green — awaiting only the owner's `git tag v0.8.0 && git push --tags`), main at `340a480`.**
+Fable-led foreman session; 7 worktree-isolated crews, every branch gate-verified by the session
+before landing; final union green incl. the NEW `make e2e` gate (45 checks). Delivered:
+- **#177** browser session surface `/desk/chat` (closed #19) — same agent session + gated
+  registry as the REPL, SSE over StreamTurn events, ≤40 bound, loopback-origin guard.
+- **#176** TUI polish (closed #171) — themed picker, resume-first, archive lifecycle
+  (migration 0022).
+- **#178** records (closed #81) — **ADR 0020 owner-confirmed** (supersession window closed),
+  **ADR 0021 graduates the off-repo "decision 0021"** (the dangling F-fork citations across
+  #83/#84/#88/#170 + this file are resolved by that ADR), K24 retrofit defaults ruled into
+  conventions-standard + brownfield-adoption.
+- **#179** PM default-on (closed #83) — env > profile > default-ON three-state; ADR 0008
+  amended in place; all docs at the on-by-default posture.
+- **#180** desk-pm folded into desk-persona (hook + 3 skills ported; bundle retired;
+  version-sync set 7→5; persona-drift now generates librarian-operator only).
+- **#183** #126 v1-half sims — 4 walkthroughs + scripted probes, deficiency report (pass bar
+  met): D1→#184, D2→#185 filed; stale data-model dossier corrected in place (O1–O3).
+- **#186** Lane 8 (closed #88) — `make e2e` suite + cohesion assessment + value evaluation
+  under the owner-approved scoping (markdown baseline, Notion comparator, 3-dim rubric):
+  **wins all three dimensions**, honest caveats recorded in
+  `_meta/research/2026-07-cohesion-value-evaluation/value-evaluation.md`.
+The signoff trail is `_meta/signoff/2026-07-21-decision-queue/` (form + answers.json). The ONE
+unresolved sign-off field: the `_knowledge/` move TARGET NAME (#170 — approved in principle,
+name never supplied).
+
+**PREVIOUS SESSION 2026-07-21 late (triage + wave-v2 run) — pinned #155 refreshed with delivery plan v2
 and the plan executed the same session: 4 PRs (#172–#175) merged, 9 issues closed (#82 #85
 #163–#169), #84's first half shipped, main at `eca19d6`, `make check`/`make test`/`make verify`
 (55/55) green on the final union, main CI green.** Fable-led foreman session; 4 worktree-isolated
@@ -92,24 +121,24 @@ verify` 48/48. Highlights live in CLAUDE.md (guard families, tool-surface counts
 bundle) — not repeated here.
 
 **NEXT, in order of consequence:**
-1. **Release cut (owner-gated)** — `[Unreleased]` now holds the v1 wave + 0.8.0 floor + #152 +
-   BOTH delivery-wave runs (v1: #156–#162; v2: #172–#175); `make version-status` will shout.
-   Runbook `docs/development/releasing.md`. Everything buildable without an owner ruling has
-   shipped — the owner-decision queue (see #155's "Decision gaps" section) is now the bottleneck:
-   ADR 0020 review · desk-pm fold · #170 move target · #81 K24 defaults · #83 seed re-blessing +
-   ADR-0008 amendment · #126 sims · #36 design · #88 scoping. Consider batching these through the
-   owner-signoff HTML form.
-2. **Owner review of ADR 0020** — accepted at PR #161 merge by the coordinating session per the
-   delivery plan's mechanism; supersede if the advisory reading is preferred (revert set listed
-   in the ADR).
-3. **Owner ruling: fold `desk-pm` into `desk-persona`, or ship both?** Deliberately additive for
-   now (duplicate `pm-operator` agent name if both installed; PR #143's body has the facets).
-4. **Epic #130 (schema-v2, #124–#128)** — blocked on #126 (owner's desk-side v1+v2 simulations)
-   before the arc starts; see the Wave 4 note above.
-5. **ts-proxy implementation** — `docs/development/ts-proxy-design.md` §5 slices; slice 0 (host
+1. **Owner: tag 0.8.0** — everything is staged and green; the go/no-go is
+   `git tag v0.8.0 && git push --tags` (then update the PATH binary separately — `make install`
+   or `gh release download`).
+2. **Owner: name the `_knowledge/` move target** (#170) — the one blank sign-off field; a
+   one-line answer unblocks #84's second half (constant + drift guard + move-day checklist all
+   ready).
+3. **Schema-v2 arc (#130) — now UNBLOCKED, next session's work**: #124 (version the schema
+   contract) → #125 (element model revision under ADR 0018; the v1 sims walkthroughs carry a
+   ready `v2 (deferred)` column) → #126 v2 half. Design-heavy; deliberately not started at this
+   session's depth.
+4. **Small buildables from this run's findings**: #184 (finding id missing from query surfaces),
+   #185 (update_item type-validation gate bypass), #182 (subprocess-test store collision),
+   #181 + #187 (coupled label/doc passes — one PR could take both).
+5. **1.0.0 gate after the above**: only #84's move half (#170) and the #87 release-cut epic
+   itself remain on the milestone; the value-evaluation verdict (wins all 3 dimensions) is on
+   file for the 1.0 claim.
+6. **ts-proxy implementation** — `docs/development/ts-proxy-design.md` §5 slices; slice 0 (host
    spawn-capability probe) is the go/no-go before anything else.
-6. **Dependabot action-major PRs** (checkout v7 / setup-node v7 / upload-artifact v7) supersede
-   #158's v5/v6 SHA bumps — cheap merges once their CI is green.
 
 **Design session (2026-07-20) is RULED — ADRs 0009–0018 bind** (`docs/decisions/README.md` has
 the index). The build plan derived from those ADRs is live as epic #129 (v1, closed above) +
@@ -136,6 +165,10 @@ test-hygiene; #12 stays ON HOLD (owner ruling above); #36 needs a design ruling 
 
 ## 2. Recent deliveries (newest first — full detail in the cited PRs / ADRs / issues)
 
+- **2026-07-21 latest — wave-v3 + owner sign-off run: PRs #176–#180, #183, #186 merged; #19 #81
+  #83 #88 #171 closed; ADRs 0020 confirmed / 0021 graduated / 0008 amended; PM default-on;
+  desk-pm folded; `make e2e` gate added; 0.8.0 staged awaiting the owner tag.** See §1 top entry
+  and #155's "Delivery plan v3 — EXECUTED" section.
 - **2026-07-21 late — triage + wave-v2 run: PRs #172–#175 merged, 9 issues closed, 9 filed,
   Dependabot majors merged, #155 refreshed twice.** See §1 top entry and #155's "Delivery plan
   v2 — EXECUTED" section.
@@ -169,14 +202,11 @@ test-hygiene; #12 stays ON HOLD (owner ruling above); #36 needs a design ruling 
 
 ## 3. Where to start next
 
-- **The delivery plan in #155 is EXECUTED through wave 3** (§1): the buildable backlog is now
-  the small-items list in #155's "New small backlog" section plus the lane epics' residue —
-  re-check each epic (#82–#88) for closability before opening new work.
-- **Cut the next release** when `[Unreleased]` warrants — `docs/development/releasing.md`
-  (bump VERSION + 3 manifests → dated CHANGELOG section → `make release-prep` → tag).
+- **All delivery plans (v1, v2, v3) are EXECUTED** — the buildable backlog is the small-items
+  list in #155's "Now" section (#181/#182/#184/#185/#187); the big arc is schema-v2 (§1 NEXT-3).
+- **0.8.0 is staged** — only the owner tag remains (§1 NEXT-1). The next release after that cuts
+  per `docs/development/releasing.md` (bump VERSION + 5 manifests — the guard is authoritative).
 - **Repo-visibility decision** (§1) gates the public `curl|bash` path — Henry's call, on hold.
-- **#19 webapp**: substrate ready (`StreamTurn`'s JSON-taggable events marshal onto a
-  PB-served SSE route with no new frontend toolchain).
 
 ## 4. Conventions & gotchas
 
@@ -220,6 +250,20 @@ session). Only what CLAUDE.md doesn't cover lives below._
 
 ## 5. Incident log
 
+- 2026-07-21 (wave-v3 run): **an isolation-worktree agent got an ORPHAN directory** (not a
+  registered git worktree) — its cwd silently resolved to the MAIN checkout, where it created
+  and left the tree sitting on its research branch. Hazard realized-but-caught: the owner's
+  staged `git tag v0.8.0` command would have tagged the wrong commit. Lessons: (a) after ANY
+  crew reports, check `git branch --show-current` in the main tree before handing the owner
+  ref-sensitive commands; (b) an agent reporting "worktree anomaly" means audit the main tree
+  immediately.
+- 2026-07-21 (wave-v3 run): **background crews stopped mid-task ~6 times** (ending a turn on
+  "now let me…" instead of the deliverable). The nudge playbook worked every time: SendMessage
+  the same agent "continue to completion without pausing between steps" + restate the remaining
+  checklist. Treat mid-flight stop notifications as a normal beat, not failure; never re-brief.
+- 2026-07-21 (wave-v3 run): the fixed-DESK_NAME subprocess-test store collision bit two crews
+  (schema v21 binary vs v22-stamped shared store at `~/.local/share/deskkit/
+  pm-actor-subprocess-test`) — playbook: delete the throwaway store, re-run; filed as #182.
 - 2026-07-21 (wave-v2 run): the worker→root notification-routing quirk (next entry) recurred
   three times; the documented relay pattern (root forwards the worker report to the lead via
   SendMessage with "verify status yourself, don't wait") worked every time — treat it as the
