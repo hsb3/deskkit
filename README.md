@@ -57,22 +57,22 @@ claude plugin marketplace add hsb3/desk-standard
 claude plugin install desk-standard@desk-standard
 ```
 
-The install copies only `plugin/claude-plugin/` into the plugin cache, so the plugin is
+The install copies only `plugins/desk-standard/` into the plugin cache, so the plugin is
 self-contained: `bun run package` (in `plugin/`) bundles the MCP server and its npm + `plugin/core`
-dependencies into the committed `plugin/claude-plugin/mcp/server.js` and copies the schema to
-`plugin/claude-plugin/schema/profile.schema.yaml`. Both are generated artifacts — never
+dependencies into the committed `plugins/desk-standard/mcp/server.js` and copies the schema to
+`plugins/desk-standard/schema/profile.schema.yaml`. Both are generated artifacts — never
 hand-edited; a CI drift guard regenerates and fails on any diff. For an installed plugin the
 schema ships inside it (found by the same walk-up from the server module); running from source is
 unchanged (walk-up to the repo `schema/`, overridable via `DESK_SCHEMA_PATH`).
 
 For local development you can still point Claude Code straight at the source tree with
-`claude --plugin-dir ./plugin/claude-plugin`.
+`claude --plugin-dir ./plugins/desk-standard`.
 
 ## Quick start
 
 ```bash
 # Point Claude Code at the plugin (local dev; or install from the marketplace, above)
-claude --plugin-dir ./plugin/claude-plugin
+claude --plugin-dir ./plugins/desk-standard
 ```
 
 Inside that session, the `desk-setup` skill scaffolds a new desk **outside this repo**. The
@@ -152,7 +152,9 @@ plugin/
   core/             harness-pure TypeScript domain library
   mcp/              stdio MCP server (profile_get, profile_validate, template_render, knowledge_index)
   opencode/         frozen spike — not shipped in v1
-  claude-plugin/    Claude Code adapter: manifest, .mcp.json, skills/
+plugins/            marketplace-distributed bundles (a marketplace install copies only these)
+  desk-standard/    Claude Code adapter: manifest, .mcp.json, skills/, generated mcp/server.js
+  desk-persona/     composed librarian+PM bundle: agents, PM skills, SessionStart hook
 librarian/          deskkit: Go binary, embedded PocketBase, MCP server + CLI
 schema/             schema v1 — shared by plugin/ and librarian/
 docs/               product specs, ADRs, and the getting-started / plugin / librarian guides
@@ -171,7 +173,7 @@ for the full index.
 - **[docs/plugin-guide.md](docs/plugin-guide.md)** — the four skills as user journeys: when to reach for each, what you get.
 - **[docs/librarian-guide.md](docs/librarian-guide.md)** — the daily loop: sweep → patrol → fix → byte-exact restore.
 - **[docs/pm-guide.md](docs/pm-guide.md)** — the PM work graph: enable it, the phase machine + gates, and the CLI / MCP / TUI / `desk-persona` plugin surfaces.
-- `plugin/README.md`, `plugin/desk-persona/README.md`, `schema/README.md`, `librarian/README.md` — per-product operator detail.
+- `plugin/README.md`, `plugins/desk-persona/README.md`, `schema/README.md`, `librarian/README.md` — per-product operator detail.
 
 **Developing it** — build, test, release:
 

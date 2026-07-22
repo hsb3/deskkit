@@ -13,7 +13,7 @@
 
 # Scaffold boilerplate: the desk-setup skill ships a sample desk tree a consumer overwrites on
 # init. It legitimately contains instance-shaped sample content (foreman ruling, W3a).
-plugin/claude-plugin/skills/desk-setup/assets/template/**
+plugins/desk-standard/skills/desk-setup/assets/template/**
 
 # Librarian extraction tests: these fixtures MUST contain sample "#N" refs and a github URL to
 # exercise the issue-ref / github-URL extractors (pocket-librarian-v1-spec.md §11.2).

@@ -64,7 +64,7 @@ verify: ## Run the librarian Phase-1 verify gate (throwaway scratch desk; never 
 e2e: ## Run the end-to-end system-behaviour suite (whole system, throwaway desk; offline, no LLM key)
 	@bash librarian/e2e/e2e.sh
 
-package: ## Regenerate the marketplace-distribution plugin bundle (claude-plugin/ artifacts)
+package: ## Regenerate the marketplace-distribution plugin bundle (plugins/desk-standard/ artifacts)
 	@cd plugin && bun run package
 
 media: ## Record the demo media assets (scripts/record-media.sh)

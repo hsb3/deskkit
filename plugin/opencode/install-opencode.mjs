@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // D4 / W2a — the OpenCode install path. Copies this plugin's three skills from their canonical
-// home (plugin/claude-plugin/skills/, the foreman ruling) into the OpenCode skills directory, and
+// home (plugins/desk-standard/skills/, the foreman ruling) into the OpenCode skills directory, and
 // prints the config snippet that registers the shared MCP server. It never moves or edits the
 // source skills, and never re-implements the MCP tools — the OpenCode plugin module
 // (opencode/plugin.ts) registers the same server programmatically; this snippet is the manual
@@ -14,14 +14,14 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { homedir } from "node:os";
 
-/** The three skills this plugin ships, in a stable order. Source of truth: claude-plugin/skills/. */
+/** The three skills this plugin ships, in a stable order. Source of truth: plugins/desk-standard/skills/. */
 export const SKILL_NAMES = ["desk-setup", "conventions-standard", "harvest-loop"];
 
 const HERE = dirname(fileURLToPath(import.meta.url)); // plugin/scripts
 
-/** The canonical skills source: plugin/claude-plugin/skills (skills live here once — foreman ruling). */
+/** The canonical skills source: plugins/desk-standard/skills (skills live here once — foreman ruling). */
 export function defaultSkillsSrc() {
-  return join(HERE, "..", "claude-plugin", "skills");
+  return join(HERE, "..", "..", "plugins", "desk-standard", "skills");
 }
 
 /**

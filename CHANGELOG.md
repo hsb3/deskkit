@@ -15,6 +15,14 @@ for why this policy exists.
 
 ### Changed
 
+- **Plugin distribution bundles extracted to a top-level `plugins/` tree.** The two marketplace
+  bundles moved out of the TS lane's directory: `plugin/claude-plugin/` → `plugins/desk-standard/`
+  and `plugin/desk-persona/` → `plugins/desk-persona/`, leaving `plugin/` as purely the TS lane
+  (core, MCP server entry, opencode spike). The marketplace `source` paths in
+  `.claude-plugin/marketplace.json` changed accordingly — existing installs pick the new paths up
+  on the next marketplace refresh; plugin names, versions, and contents are unchanged. All gates
+  follow the move (`check-neutrality` now scans `plugins/` too; packaging, drift guards, e2e, and
+  docs re-pointed). Local dev flag is now `claude --plugin-dir ./plugins/desk-standard`.
 - **Repo-root `_knowledge/` instance removed** (#170, #84 second half; ADR 0021 §F5). Per the
   owner ruling on issue #170 (2026-07-21), the repo itself is not an exec desk, so it no longer
   ships a repo-root `_knowledge/` — the `_knowledge/` convention belongs only to the desks the
@@ -23,7 +31,7 @@ for why this policy exists.
   the `check-profile-root` drift guard, and every product string naming `_knowledge/profile.yaml`
   all stay exactly as they were). The canonical placeholder example profile now has a single home
   **with the desk-setup scaffold template**
-  (`plugin/claude-plugin/skills/desk-setup/assets/template/_knowledge/profile.example.yaml`), so
+  (`plugins/desk-standard/skills/desk-setup/assets/template/_knowledge/profile.example.yaml`), so
   copying the scaffold brings it into a new desk; the repo-facing docs (README, CLAUDE.md,
   getting-started) re-point there, and the repo-root `.gitignore` now ignores any local `_knowledge/`
   wholesale as a dogfooding artifact.

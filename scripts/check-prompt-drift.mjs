@@ -8,7 +8,7 @@
 // six-tool spec quote shipped against a five-tool embed with nothing to catch it).
 //
 // It mirrors the existing packaged-artifacts drift guard (.github/workflows/ci.yml "Plugin —
-// packaged artifacts drift guard": `bun run package` then `git diff --exit-code -- claude-plugin/`)
+// packaged artifacts drift guard": `bun run package` then `git diff --exit-code -- ../plugins/desk-standard/`)
 // — fail red naming the file, don't reinvent a diff format. One governed mechanism per
 // version-controlled prompt copy. Runs under plain Node (no deps), like the other scripts/
 // guards (check-kits.mjs, check-scaffold-frontmatter.mjs).

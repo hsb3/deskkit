@@ -217,7 +217,7 @@ documents or writes a repo; and a `SessionStart` hook that injects `deskkit pm c
 start (silent no-op when PM is off or `deskkit` is absent). It mounts these alongside the librarian
 surfaces on one MCP server (`MCP_MODULES=librarian,pm`). The data and runtime stay in the one
 binary — the plugin is the surface, not a second store. Details:
-`../plugin/desk-persona/README.md`.
+`../plugins/desk-persona/README.md`.
 
 ## Adopting the PM graph on a real desk
 

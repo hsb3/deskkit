@@ -4,7 +4,7 @@
 // of exactly one authored source, so it cannot silently diverge from that source. This guard is
 // the repo's generated-artifact pattern (regenerate + compare) applied to that agent:
 //
-//   plugin/desk-persona/agents/librarian-operator.md   ← librarian/templates/librarian-system-prompt.txt
+//   plugins/desk-persona/agents/librarian-operator.md   ← librarian/templates/librarian-system-prompt.txt
 //                                                          (the canonical librarian instruction; ADR 0015)
 //
 // The librarian agent is derived from the corrected 5-tool eino system prompt: its `tools:`
@@ -16,7 +16,7 @@
 // ADR 0014(a) one-bundle), those files stopped being copies of an upstream desk-pm source and
 // became the ONE authored PM source per surface themselves (ADR 0014(d)). With no second copy to
 // diverge from, a copy/compare guard for them would guard nothing; they are authored-in-place in
-// plugin/desk-persona/, alongside the bundle's other authored artifacts (.mcp.json, plugin.json,
+// plugins/desk-persona/, alongside the bundle's other authored artifacts (.mcp.json, plugin.json,
 // hooks/, README.md). The plugin/desk-persona.test.ts bundle guard still holds them to the real
 // tool surface (no phantom / un-namespaced tool names).
 //
@@ -89,7 +89,7 @@ function buildLibrarianAgent() {
 // The derived-file manifest: each target and how to (re)build its expected content from source.
 const DERIVED = [
   {
-    target: "plugin/desk-persona/agents/librarian-operator.md",
+    target: "plugins/desk-persona/agents/librarian-operator.md",
     build: buildLibrarianAgent,
   },
 ];
@@ -102,7 +102,7 @@ if (write) {
     mkdirSync(dirname(abs), { recursive: true });
     writeFileSync(abs, build());
   }
-  console.log(`persona-drift: wrote ${DERIVED.length} generated file(s) under plugin/desk-persona/.`);
+  console.log(`persona-drift: wrote ${DERIVED.length} generated file(s) under plugins/desk-persona/.`);
   process.exit(0);
 }
 

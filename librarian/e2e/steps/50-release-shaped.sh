@@ -4,7 +4,7 @@
 # come from lib.sh. Proves the repo's release invariants hold: VERSION stays the single
 # source of truth across shipped manifests and the changelog, the release ldflags stamp
 # actually reaches the binary, and the marketplace bundle stays self-contained (the
-# marketplace install copies only plugin/claude-plugin/, so its committed artifacts must
+# marketplace install copies only plugins/desk-standard/, so its committed artifacts must
 # already carry everything a fresh install needs).
 
 section "50 · release-shaped checks"
@@ -28,10 +28,10 @@ printf '%s' "$OUT" | grep -qF "$V"
 check "stamped binary --version reports the release VERSION ($V)" $?
 note "unstamped suite binary reports dev (dk --version -> deskkit version dev); the ldflags stamp is what carries the release version"
 
-# --- marketplace bundle self-containment: only plugin/claude-plugin/ is copied on install ---
-SERVER_JS="$E2E_REPO/plugin/claude-plugin/mcp/server.js"
-PROFILE_SCHEMA="$E2E_REPO/plugin/claude-plugin/schema/profile.schema.yaml"
-REFERENCES_YAML="$E2E_REPO/plugin/claude-plugin/schema/references.yaml"
+# --- marketplace bundle self-containment: only plugins/desk-standard/ is copied on install ---
+SERVER_JS="$E2E_REPO/plugins/desk-standard/mcp/server.js"
+PROFILE_SCHEMA="$E2E_REPO/plugins/desk-standard/schema/profile.schema.yaml"
+REFERENCES_YAML="$E2E_REPO/plugins/desk-standard/schema/references.yaml"
 
 [ -f "$SERVER_JS" ] \
   && [ "$(wc -c < "$SERVER_JS")" -gt 1000 ] \

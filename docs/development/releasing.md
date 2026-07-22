@@ -21,8 +21,8 @@ GitHub release with `checksums.txt`.
 
 1. **Bump `VERSION`** and the shipped manifests so they agree:
    - `VERSION`
-   - `plugin/claude-plugin/.claude-plugin/plugin.json`
-   - `plugin/desk-persona/.claude-plugin/plugin.json`
+   - `plugins/desk-standard/.claude-plugin/plugin.json`
+   - `plugins/desk-persona/.claude-plugin/plugin.json`
    - `plugin/package.json`
    - `.claude-plugin/marketplace.json` (both `plugins[].version` entries)
 

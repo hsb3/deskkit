@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Manual stdio JSON-RPC harness for the desk-standard plugin's MCP server
-# (plugin/claude-plugin/mcp/server.js). Written for a manual protocol pass when a live
+# (plugins/desk-standard/mcp/server.js). Written for a manual protocol pass when a live
 # Claude Code session does not have this plugin's MCP tools natively connected (verify with
 # ToolSearch first — see docs/tool-surface.md "How the counts were derived" for the sibling
 # pattern this mirrors against the librarian's MCP server).
@@ -23,7 +23,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-SERVER="$SCRIPT_DIR/claude-plugin/mcp/server.js"
+SERVER="$SCRIPT_DIR/../plugins/desk-standard/mcp/server.js"
 
 DESK_ROOT="${1:-$(pwd)}"
 

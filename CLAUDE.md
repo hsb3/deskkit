@@ -16,7 +16,8 @@ no repo-root `_knowledge/`; the `_knowledge/` convention belongs to the desks th
 
 - **`plugin/`** — a harness-pure TypeScript core behind a **stdio MCP server**
   (`plugin/mcp/server.ts`; tools `profile_get`, `profile_validate`, `template_render`,
-  `knowledge_index`), wrapped as a Claude Code plugin with four skills (`desk-setup`,
+  `knowledge_index`), distributed as the `desk-standard` Claude Code plugin (bundle at
+  `plugins/desk-standard/`) with four skills (`desk-setup`,
   `conventions-standard`, `harvest-loop`, `brownfield-adoption`). "Harness-pure" = the core imports
   no harness/runtime APIs (enforced — see the critical rule).
 - **`librarian/`** — **deskkit**, a single Go binary with an **embedded PocketBase** store. Indexes
@@ -31,12 +32,13 @@ no repo-root `_knowledge/`; the `_knowledge/` convention belongs to the desks th
 **Project structure** (every top-level entry annotated):
 
 ```
-plugin/            TS lane — harness-pure core + MCP server, packaged as a Claude Code plugin
+plugin/            TS lane — harness-pure core + stdio MCP server (the desk-standard plugin's engine)
   core/            harness-pure domain library (profile, schema validation, templating, indexing)
   mcp/             stdio MCP server entry (server.ts)
-  claude-plugin/   marketplace adapter: manifest, skills/, GENERATED mcp/server.js + schema copy
-  desk-persona/    the composed librarian+PM bundle: librarian-operator + pm-operator agents, 3 PM skills, SessionStart hook
   opencode/        frozen, unwired OpenCode spike — ships nothing in v1
+plugins/           the marketplace-distributed bundles (a marketplace install copies ONLY these)
+  desk-standard/   marketplace adapter: manifest, skills/, GENERATED mcp/server.js + schema copy
+  desk-persona/    the composed librarian+PM bundle: librarian-operator + pm-operator agents, 3 PM skills, SessionStart hook
 librarian/         Go lane — the deskkit binary; embedded PocketBase; CLI/MCP/TUI; verify.sh gate
 schema/            schema v1 — shared rule/structure source for both lanes
 docs/              specs, ADRs (docs/decisions/), the CHARTER, and using/developing guides
@@ -80,7 +82,7 @@ the exit code and has let a failing gate through before (incident, 2026-07-17).
 | `make check` | Repo gates: neutrality + self-test, kit-drift, prompt-drift, tool-surface drift + self-test, scaffold frontmatter, textfield-max, query-kind drift + self-test, plugin core-purity, shellcheck, actionlint, workflow SHA-pin drift + self-test, profile-root drift + self-test |
 | `make verify` | Librarian integration gate — `librarian/verify.sh` (55 checks, throwaway scratch desk) |
 | `make e2e` | End-to-end system-behaviour suite — whole system (cold-start → profile → librarian → PM → surfaces → release-shaped) on a throwaway desk; offline, no LLM key (`librarian/e2e/e2e.sh`) |
-| `make package` | Regenerate the marketplace bundle (`plugin/claude-plugin/` artifacts) |
+| `make package` | Regenerate the marketplace bundle (`plugins/desk-standard/` artifacts) |
 | `make install` | Build + install the `deskkit` binary to `~/.local/bin` (override `PREFIX=`) |
 | `node scripts/check-version-sync.mjs` | Assert root `VERSION` matches the shipped plugin manifests |
 | `make version-status` | Advisory (non-blocking): unreleased product changes since the last tag |
@@ -96,12 +98,12 @@ reversible with `deskkit restore --by-path <path>`.
 
 | File | Regenerate with | Guard |
 |---|---|---|
-| `plugin/claude-plugin/mcp/server.js` | `cd plugin && bun run package` (`make package`) | CI `git diff --exit-code` |
-| `plugin/claude-plugin/schema/profile.schema.yaml` | same (copied from `schema/`) | CI `git diff --exit-code` |
-| `plugin/claude-plugin/schema/references.yaml` | same (copied from `schema/`) | CI `git diff --exit-code` |
+| `plugins/desk-standard/mcp/server.js` | `cd plugin && bun run package` (`make package`) | CI `git diff --exit-code` |
+| `plugins/desk-standard/schema/profile.schema.yaml` | same (copied from `schema/`) | CI `git diff --exit-code` |
+| `plugins/desk-standard/schema/references.yaml` | same (copied from `schema/`) | CI `git diff --exit-code` |
 | `kits/` tree | authored, but `kits.yaml` must match it | `node scripts/check-kits.mjs` |
 
-The marketplace install copies **only** `plugin/claude-plugin/`, so the bundled `server.js` must be
+The marketplace install copies **only** `plugins/desk-standard/`, so the bundled `server.js` must be
 self-contained — that's why it's committed and drift-guarded.
 
 ### Architectural rules and their enforcing checks

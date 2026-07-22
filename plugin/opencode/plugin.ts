@@ -1,7 +1,7 @@
 // D4 / W2a — the thin OpenCode adapter. This plugin's capability is a shared MCP tool surface
 // (four tools: profile_get / profile_validate / template_render / knowledge_index, defined once
 // in plugin/core and served by plugin/mcp/server.ts) plus three skills. The Claude Code adapter
-// (plugin/claude-plugin) ships ZERO lifecycle hooks — it registers the MCP server via .mcp.json
+// (plugins/desk-standard) ships ZERO lifecycle hooks — it registers the MCP server via .mcp.json
 // and auto-discovers skills. Porting the capability (not the implementation) therefore means the
 // OpenCode adapter ALSO ships no behaviour-changing hooks: it registers the SAME MCP server via
 // OpenCode's `config` hook (the in-process equivalent of .mcp.json — "translate registration
