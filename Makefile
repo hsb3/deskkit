@@ -14,7 +14,7 @@ SHELL := /bin/bash
 
 VERSION := $(shell cat VERSION 2>/dev/null || echo dev)
 
-.PHONY: help setup build install test check verify package media clean version-status release-prep
+.PHONY: help setup build install test check verify e2e package media clean version-status release-prep
 
 PREFIX ?= $(HOME)/.local
 
@@ -51,7 +51,7 @@ check: ## Repo gates: neutrality lint + self-test, kit-manifest drift, prompt-co
 	@node scripts/check-query-kinds.mjs
 	@node scripts/check-query-kinds.mjs --self-test
 	@cd plugin && bun run check:purity
-	@shellcheck install.sh librarian/verify.sh librarian/dogfood-agent.sh librarian/dogfood-pm.sh librarian/sandbox/*.sh scripts/record-media.sh
+	@shellcheck install.sh librarian/verify.sh librarian/dogfood-agent.sh librarian/dogfood-pm.sh librarian/sandbox/*.sh scripts/record-media.sh librarian/e2e/e2e.sh librarian/e2e/lib.sh librarian/e2e/steps/*.sh
 	@actionlint
 	@node scripts/check-workflow-pins.mjs
 	@node scripts/check-workflow-pins.mjs --self-test
@@ -60,6 +60,9 @@ check: ## Repo gates: neutrality lint + self-test, kit-manifest drift, prompt-co
 
 verify: ## Run the librarian Phase-1 verify gate (throwaway scratch desk; never a real store)
 	@bash librarian/verify.sh
+
+e2e: ## Run the end-to-end system-behaviour suite (whole system, throwaway desk; offline, no LLM key)
+	@bash librarian/e2e/e2e.sh
 
 package: ## Regenerate the marketplace-distribution plugin bundle (claude-plugin/ artifacts)
 	@cd plugin && bun run package
