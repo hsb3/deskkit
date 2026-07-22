@@ -96,7 +96,11 @@ type orphanBrief struct {
 	DirKind string `json:"dir_kind"`
 }
 
+// findingBrief is one open (or, with --include-disposed, any) patrol finding as the
+// `findings`/`uncollapsed` queries return it: the record id (so a caller can act on it via
+// `findings dispose <id>`, matching feedbackBrief below) plus path + detail.
 type findingBrief struct {
+	ID     string `json:"id"`
 	Path   string `json:"path"`
 	Detail string `json:"detail"`
 }
@@ -109,6 +113,7 @@ type adoptionRow struct {
 
 // findingRow is the plain shape a patrol_findings record is reduced to for query purposes.
 type findingRow struct {
+	ID       string
 	Path     string
 	Rule     string
 	Detail   string
@@ -294,7 +299,7 @@ func sortFindingBriefs(findings []findingBrief) {
 func groupFindingsByRule(findings []findingRow) map[string][]findingBrief {
 	byRule := map[string][]findingBrief{}
 	for _, f := range findings {
-		byRule[f.Rule] = append(byRule[f.Rule], findingBrief{Path: f.Path, Detail: f.Detail})
+		byRule[f.Rule] = append(byRule[f.Rule], findingBrief{ID: f.ID, Path: f.Path, Detail: f.Detail})
 	}
 	for rule := range byRule {
 		sortFindingBriefs(byRule[rule])
@@ -419,6 +424,7 @@ func openFindingRows(app core.App, extraFilter string) ([]findingRow, error) {
 	rows := make([]findingRow, len(recs))
 	for i, f := range recs {
 		rows[i] = findingRow{
+			ID:       f.Id,
 			Path:     paths[f.GetString("file")],
 			Rule:     f.GetString("rule"),
 			Detail:   f.GetString("detail"),
@@ -486,7 +492,7 @@ func queryUncollapsed(app core.App) (json.RawMessage, error) {
 	}
 	findings := make([]findingBrief, len(rows))
 	for i, f := range rows {
-		findings[i] = findingBrief{Path: f.Path, Detail: f.Detail}
+		findings[i] = findingBrief{ID: f.ID, Path: f.Path, Detail: f.Detail}
 	}
 	sortFindingBriefs(findings)
 	return json.Marshal(uncollapsedResult{Kind: "uncollapsed", Count: len(findings), Findings: findings})
