@@ -289,11 +289,24 @@ func TestPMActorBeforeLeaf_Subprocess(t *testing.T) {
 		t.Fatalf("write profile.yaml: %v", err)
 	}
 
+	// The store this subprocess writes to resolves off DESK_NAME alone
+	// ($XDG_DATA_HOME/deskkit/<DESK_NAME>/, store/storedir.go StoreDir) — NOT off deskDir, even
+	// though the profile's `root: "."` is what lets the binary find DESK_NAME without an env
+	// var. A fixed DESK_NAME ("pm-actor-subprocess-test") plus the ambient, machine-global
+	// XDG_DATA_HOME (unset here => ~/.local/share) previously put every run of this test, on
+	// every desk-standard worktree, at the exact same on-disk store path — a real collision
+	// between parallel worktrees, worse across a librarian schema-version skew (one binary's
+	// migration refuses to open the other's already-upgraded store). A private, per-test
+	// XDG_DATA_HOME (t.TempDir(), unique per `go test` process/run) gives this run its own
+	// store home regardless of DESK_NAME, closing the collision without touching the profile
+	// or the store-resolution logic itself.
+	xdgHome := t.TempDir()
+
 	runIn := func(args ...string) (stdout, stderr string, exitCode int) {
 		t.Helper()
 		cmd := exec.Command(binPath, args...)
 		cmd.Dir = deskDir
-		cmd.Env = append(os.Environ(), "PM_ENABLED=true")
+		cmd.Env = append(os.Environ(), "PM_ENABLED=true", "XDG_DATA_HOME="+xdgHome)
 		var outBuf, errBuf bytes.Buffer
 		cmd.Stdout = &outBuf
 		cmd.Stderr = &errBuf

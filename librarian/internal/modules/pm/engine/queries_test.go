@@ -5,6 +5,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/hsb3/desk-standard/librarian/internal/core/schema"
 )
 
 // backdate rewrites an item's created timestamp via raw SQL — autodate fields ignore explicit
@@ -44,9 +46,13 @@ func TestGetContext_FourSets(t *testing.T) {
 	old := mustCreate(t, e, CreateItemInput{Title: "the stale one", Type: "task", Court: "desk"})
 	backdate(t, e, "items", old.Id, 30*24*time.Hour)
 
-	// A terminal item: counted by phase, surfaced nowhere. Untyped, so the shipped default
-	// gate rules (task work->review) bind nothing and it can walk to terminal ungated.
-	done := mustCreate(t, e, CreateItemInput{Title: "the done one"})
+	// A terminal item: counted by phase, surfaced nowhere. Typed "analysis" (a type the
+	// shipped default gate rules never bind), so it can walk to terminal ungated. An
+	// UNTYPED item can no longer walk a document-gated edge like task's work->review — see
+	// engine_test.go TestEmptyTypeCannotSkipDocumentGate — so this fixture must carry a real,
+	// ungated type rather than none, to keep testing "an ungated item walks freely" and not
+	// the now-closed empty-type loophole.)
+	done := mustCreate(t, e, CreateItemInput{Title: "the done one", Type: "analysis"})
 	done = mustTransition(t, e, done, "work")
 	done = mustTransition(t, e, done, "review")
 	done = mustTransition(t, e, done, "terminal")
@@ -273,6 +279,77 @@ func TestUpdateItem(t *testing.T) {
 	}); !IsRefusal(err) {
 		t.Fatalf("work->terminal via label should refuse, got %v", err)
 	}
+}
+
+// TestUpdateItemRejectsUnknownType: update_item must refuse an unknown
+// items.type with the exact same schema-v1 vocabulary check create_item already applies
+// (TestCreateItemRejectsUnknownType), closing the one remaining write path that previously
+// accepted any string unchecked into a field gates.Effective binds on. Clearing the type back
+// to "" stays legal (mirrors create_item's "absent type stays legal" scope call, ADR 0012).
+func TestUpdateItemRejectsUnknownType(t *testing.T) {
+	t.Run("unknown type is refused and leaves the field unchanged", func(t *testing.T) {
+		e := newEngine(t, &stubValidator{})
+		item := mustCreate(t, e, CreateItemInput{Title: "x", Type: "task"})
+
+		bogus := "no-such-type"
+		_, err := e.UpdateItem(context.Background(), UpdateItemInput{
+			ItemID: item.Id, Version: item.GetInt("version"), Type: &bogus, Actor: human,
+		})
+		if err == nil {
+			t.Fatal("expected a refusal for an unknown item type, got nil error")
+		}
+		if !IsRefusal(err) {
+			t.Fatalf("expected a Refusal, got %T: %v", err, err)
+		}
+		if !strings.Contains(err.Error(), "no-such-type") {
+			t.Fatalf("refusal should name the offending type, got %v", err)
+		}
+		if !strings.Contains(err.Error(), "doctypes.yaml") {
+			t.Fatalf("refusal should point at the vocabulary source, got %v", err)
+		}
+		if reloaded, lerr := e.loadItem(item.Id); lerr != nil || reloaded.GetString("type") != "task" {
+			t.Fatalf("a refused type update must not touch the stored type, got %v (err %v)",
+				reloaded, lerr)
+		}
+	})
+
+	t.Run("clearing the type back to empty stays legal", func(t *testing.T) {
+		e := newEngine(t, &stubValidator{})
+		item := mustCreate(t, e, CreateItemInput{Title: "x", Type: "task"})
+		empty := ""
+		updated, err := e.UpdateItem(context.Background(), UpdateItemInput{
+			ItemID: item.Id, Version: item.GetInt("version"), Type: &empty, Actor: human,
+		})
+		if err != nil {
+			t.Fatalf("clearing type should be legal, got %v", err)
+		}
+		if updated.GetString("type") != "" {
+			t.Fatalf("expected type cleared, got %q", updated.GetString("type"))
+		}
+	})
+
+	t.Run("every known vocabulary type is still accepted", func(t *testing.T) {
+		vocab, err := schema.Vocab()
+		if err != nil {
+			t.Fatalf("schema.Vocab(): %v", err)
+		}
+		e := newEngine(t, &stubValidator{})
+		item := mustCreate(t, e, CreateItemInput{Title: "x"})
+		for _, typ := range vocab.TypeNames() {
+			typ := typ
+			t.Run(typ, func(t *testing.T) {
+				current, lerr := e.loadItem(item.Id)
+				if lerr != nil {
+					t.Fatal(lerr)
+				}
+				if _, err := e.UpdateItem(context.Background(), UpdateItemInput{
+					ItemID: item.Id, Version: current.GetInt("version"), Type: &typ, Actor: human,
+				}); err != nil {
+					t.Fatalf("UpdateItem(type=%s): %v", typ, err)
+				}
+			})
+		}
+	})
 }
 
 // TestUpdateItemGatedByClaim pins ADR 0020 (a live claim is authoritative over every direct

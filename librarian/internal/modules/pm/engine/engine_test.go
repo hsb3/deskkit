@@ -234,6 +234,53 @@ func TestCreateItemRejectsUnknownType(t *testing.T) {
 	})
 }
 
+// TestEmptyTypeCannotSkipDocumentGate (engine policy decision): an untyped item
+// must be refused — not silently waved through — on an edge the desk's config gates for at
+// least one known item type. Under the shipped default rules (gates/defaults.go), "task" gates
+// work->review; an item created with NO type reaches that same edge and, before this fix, would
+// advance with no document present at all. Once ANY recognized type
+// is assigned (even "analysis", which this desk never gates on this edge), the edge opens up
+// again — the fix targets undetectable typelessness, not the assigned type's own gate rules.
+func TestEmptyTypeCannotSkipDocumentGate(t *testing.T) {
+	e := newEngine(t, nil)
+	item := mustCreate(t, e, CreateItemInput{Title: "untyped"}) // no Type set
+	// queue->work is not gated for any type under the default rules, so this is unaffected.
+	item = mustTransition(t, e, item, "work")
+
+	err := transitionErr(e, item, "review")
+	if !IsRefusal(err) || !strings.Contains(err.Error(), "no type set") {
+		t.Fatalf("untyped item must be refused on a document-gated edge, got %v", err)
+	}
+	if reloaded, lerr := e.loadItem(item.Id); lerr != nil || reloaded.GetString("phase") != "work" {
+		t.Fatalf("refused transition must not move the item, got %v (err %v)", reloaded, lerr)
+	}
+	// The refusal is recorded as an observable gate_refused audit row, same as an ordinary
+	// gate refusal (§4.1) — this is philosophically the same category of "no" even though no
+	// DocumentValidator was consulted.
+	rows, rerr := e.App.FindRecordsByFilter("transitions",
+		"item = {:i} && event = 'gate_refused'", "", 0, 0, map[string]any{"i": item.Id})
+	if rerr != nil {
+		t.Fatal(rerr)
+	}
+	if len(rows) != 1 {
+		t.Fatalf("expected exactly one gate_refused audit row, got %d", len(rows))
+	}
+
+	// Assigning ANY recognized type — even "analysis", which this desk's default config never
+	// gates on work->review — unblocks the edge.
+	typ := "analysis"
+	item, uerr := e.UpdateItem(context.Background(), UpdateItemInput{
+		ItemID: item.Id, Version: item.GetInt("version"), Type: &typ, Actor: human,
+	})
+	if uerr != nil {
+		t.Fatalf("UpdateItem(type=analysis): %v", uerr)
+	}
+	item = mustTransition(t, e, item, "review")
+	if item.GetString("phase") != "review" {
+		t.Fatalf("expected review after assigning a type, got %s", item.GetString("phase"))
+	}
+}
+
 // TestDeskConfigOverridesDefaults: a stored desk_config rules YAML replaces the shipped
 // default (here: analysis becomes gated), and an INVALID stored config is a loud error, not a
 // silent fallback (§4.2).

@@ -236,6 +236,39 @@ done
 
 N_UNCOLLAPSED_BEFORE=$(run_lib query uncollapsed | jq -r '.count')
 
+# --- 5b. finding id round-trips through query -> findings dispose (issue: finding briefs must
+# carry the record id, so `findings dispose <id>` is reachable from the CLI alone) -------------
+FINDINGS_JSON=$(run_lib query findings)
+FIRST_FINDING_ID=$(echo "$FINDINGS_JSON" | jq -r '[.by_rule[][] | .id] | .[0] // empty')
+[ -n "$FIRST_FINDING_ID" ]
+check "query findings: each finding brief carries a non-empty id" $?
+
+UNCOLLAPSED_JSON=$(run_lib query uncollapsed)
+UNCOLLAPSED_COUNT=$(echo "$UNCOLLAPSED_JSON" | jq -r '.count')
+UNCOLLAPSED_WITH_ID=$(echo "$UNCOLLAPSED_JSON" | jq -r '[.findings[] | select((.id // "") != "")] | length')
+[ "$UNCOLLAPSED_WITH_ID" -eq "$UNCOLLAPSED_COUNT" ]
+check "query uncollapsed: every finding brief carries an id ($UNCOLLAPSED_WITH_ID/$UNCOLLAPSED_COUNT)" $?
+
+DISPOSE_OUT=$(run_lib findings dispose "$FIRST_FINDING_ID" --as acknowledged --reason "verify.sh id round-trip")
+RC=$?
+echo "$DISPOSE_OUT" | jq -e --arg id "$FIRST_FINDING_ID" '.id == $id and .disposition == "acknowledged"' > /dev/null
+DISPOSE_SHAPE_OK=$?
+[ "$RC" -eq 0 ] && [ "$DISPOSE_SHAPE_OK" -eq 0 ]
+check "findings dispose <id-from-query> acknowledges the finding, echoing the same id" $?
+
+FINDINGS_AFTER=$(run_lib query findings)
+echo "$FINDINGS_AFTER" | jq -e --arg id "$FIRST_FINDING_ID" '([.by_rule[][] | .id] | index($id)) == null' > /dev/null
+check "query findings (default) stops listing the disposed id" $?
+
+FINDINGS_INCLUDE_DISPOSED=$(run_lib query findings --include-disposed)
+echo "$FINDINGS_INCLUDE_DISPOSED" | jq -e --arg id "$FIRST_FINDING_ID" '([.by_rule[][] | .id] | index($id)) != null' > /dev/null
+check "query findings --include-disposed still lists the disposed id" $?
+
+# Restore to 'open' so the mechanical-vs-judgment uncollapsed-count comparison later in this
+# gate (§8, "F-R5's judgment finding is untouched by apply-fix") is unaffected by this detour.
+run_lib findings dispose "$FIRST_FINDING_ID" --as open > /dev/null
+check "findings dispose <id> --as open restores it (keeps later uncollapsed counts stable)" $?
+
 # --- 6. dead-store refusal (spec §9.2/§9.4 check 10 — see the header note: the documented
 # LIBRARIAN_FAULT_INJECT env flag is not implemented, so a filesystem-permission fault stands
 # in for it) --------------------------------------------------------------------------------

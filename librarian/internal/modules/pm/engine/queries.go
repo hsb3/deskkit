@@ -12,6 +12,8 @@ import (
 	"time"
 
 	"github.com/pocketbase/pocketbase/core"
+
+	"github.com/hsb3/desk-standard/librarian/internal/core/schema"
 )
 
 // ItemSummary is the shared surface shape for one work item (§5.2 "item summary").
@@ -519,6 +521,23 @@ func (e *Engine) UpdateItem(ctx context.Context, in UpdateItemInput) (*core.Reco
 		case "owner", "desk", "crew", "vendor", "external-session":
 		default:
 			return nil, refuse("unknown court %q (owner, desk, crew, vendor, external-session)", *in.Court)
+		}
+	}
+	// update_item must reject an unknown items.type with the exact same
+	// schema-v1 vocabulary check create_item already applies (engine.go CreateItem) — before
+	// this fix, update_item was the one write path that let a caller silently move a gated
+	// item onto a bogus type string, and gates bind on this same field (engine.go
+	// transitionCore's dc.rules.Effective(item.GetString("type"), ...) below). Clearing the
+	// type ("") stays legal, mirroring create_item's "absent type stays legal" scope call
+	// (ADR 0012); only a non-empty, unrecognized type is refused.
+	if in.Type != nil && *in.Type != "" {
+		vocab, verr := schema.Vocab()
+		if verr != nil {
+			return nil, verr
+		}
+		if !vocab.KnownType(*in.Type) {
+			return nil, refuse("unknown item type %q (known types: %s; see schema/doctypes.yaml)",
+				*in.Type, strings.Join(vocab.TypeNames(), ", "))
 		}
 	}
 	if in.Title != nil {
