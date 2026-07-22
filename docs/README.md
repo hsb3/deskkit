@@ -34,6 +34,7 @@ Read these to build, test, release, or change the products.
 | [development/ts-proxy-design.md](development/ts-proxy-design.md) | The TS→deskkit proxy design (ADR 0016 Option B implementation design). |
 | [pocket-librarian-v1-spec.md](pocket-librarian-v1-spec.md) | The librarian's product + technical build spec. |
 | [pm-system-v1-spec.md](pm-system-v1-spec.md) | The PM-system (document-gated work graph) product + technical build spec — the core+modules refactor, PM module, gates, surfaces, and plugin. |
+| [element-model-v2-draft.md](element-model-v2-draft.md) | The schema-v2 element model (three planes over a beefed spine) — reviewed **draft**, gated on model-simulations (ADR 0009/0018). Not a finalized spec. |
 | [tool-surface.md](tool-surface.md) | The authoritative map of every tool/command across all three surfaces (librarian CLI, librarian MCP by gate, plugin TS server) with empirically-verified counts. |
 | [decisions/](decisions/) | Architecture Decision Records (append-only; cited from code and docs). |
 | [../CHANGELOG.md](../CHANGELOG.md) | What changed in each release. |
