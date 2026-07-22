@@ -2,7 +2,7 @@
 type: analysis
 status: active
 created: 2026-07-21
-updated: 2026-07-21
+updated: 2026-07-22
 tags: [model-simulations, greenfield, desk-setup]
 synopsis: Scenario 3 walkthrough — a greenfield desk from scaffold through first sweep/patrol/PM-item, traced against the v1 model; scaffold+template_render steps tabletop, the store tail scripted.
 ---
@@ -32,9 +32,9 @@ the entry brief, then runs the desk's first librarian baseline and creates its f
 
 ## Step-by-step trace
 
-| # | Operator action | Surface behavior | Store entities / fields | v1 verdict | v2 (deferred) |
+| # | Operator action | Surface behavior | Store entities / fields | v1 verdict | v2 delta |
 |---|---|---|---|---|---|
-| 1 | Name + place the desk outside overseen repos (K23.1) | procedural — desk on a cloud drive, never nested in a watched repo | none | **OK** (tabletop) | — (blocked by #125) |
+| 1 | Name + place the desk outside overseen repos (K23.1) | procedural — desk on a cloud drive, never nested in a watched repo | none | **OK** (tabletop) | — |
 | 2 | Fix goal + role; critical rule "desk drafts, owner applies" (K23.2) | procedural | none | **OK** (tabletop) | — |
 | 3 | Copy the standard-free scaffold (K23.3) | `assets/template/` skeleton copied; no conventions prose baked in (K25) | none | **OK** (tabletop) | — |
 | 4 | Create + fill `_knowledge/profile.yaml` (K23.4) | identifiers live only here | validated against `schema/profile.schema.yaml` (TS lane) | **OK** (tabletop) | — |
@@ -61,3 +61,22 @@ gate-bearing:
   baseline (Go binary) is a separate step requiring `deskkit` on PATH and — for the PM tools over
   MCP — a fresh session. The runbooks state this; noted so the v2 model's setup story accounts
   for the lane boundary.
+
+## v2 assessment (this scenario against `docs/element-model-v2-draft.md`)
+
+The `v2 delta` column reads "—": greenfield setup mechanics (scaffold copy, `template_render`, the
+first sweep/patrol/PM-item) are model-agnostic. But the greenfield path is where the v2 model's
+**content vocabulary** would first bite:
+
+- **V2-D3 (Low)** — a v2 desk holds ~15 net-new element/doc types (`goal`, `source`, `deliverable`,
+  `engineering-spec`, …). The greenfield runbook produces a *conformant* scaffold with **zero patrol
+  findings** (step 10) precisely because every scaffold doc has a known `dir_kind` + type. The v2
+  model names no directory-placement or patrol/`entity_type` classification for its new types, so a
+  v2 scaffold cannot yet be made conformant the same way. Disposition: amendment-needed (§13
+  librarian-taxonomy line); build-time work §13 already defers, but the model should *name* it. Not
+  blocking.
+- **Default gate set (pre-existing).** The greenfield desk starts with no `desk_config`, falling back
+  to the minimal shipped gate set — the same "KNOWN UNAUTHORED DESIGN GAP" **V2-D1 (#197)** asks the
+  v2 model to settle. No new finding here; folded into #197.
+
+No greenfield-specific v2 deficiency beyond these. The setup *flow* is unchanged by v2.

@@ -2,7 +2,7 @@
 type: analysis
 status: active
 created: 2026-07-21
-updated: 2026-07-21
+updated: 2026-07-22
 tags: [model-simulations, pm]
 synopsis: Scenario 2 walkthrough — a PM item through queue→work→review→terminal with two real gate refusals and a cascaded block/unblock, traced against the v1 model with scripted probes.
 ---
@@ -32,9 +32,9 @@ store (`module.go` `Verdict`).
 
 ## Step-by-step trace — Part A: gated transition + refusals
 
-| # | Operator action | Surface behavior (observed) | Store entities / fields | v1 verdict | v2 (deferred) |
+| # | Operator action | Surface behavior (observed) | Store entities / fields | v1 verdict | v2 delta |
 |---|---|---|---|---|---|
-| A0 | `pm list` (confirm PM default-on) | `[]` (empty JSON array) — PM tools present with no env flag | reads `items` | **OK** [scripted] | — (blocked by #125) |
+| A0 | `pm list` (confirm PM default-on) | `[]` (empty JSON array) — PM tools present with no env flag | reads `items` | **OK** [scripted] | — |
 | A1 | `pm create --type task --pointer tasks/t1.md` | `{"item":{"phase":"queue","version":1,...}}` | `items` (phase=queue, version=1); `type` validated against schema vocab | **OK** [scripted] | — |
 | A2 | `pm transition T --to work` | `{"phase":"work","version":2}` — ungated forward edge | `items.phase/version`, `transitions` (event=advance) | **OK** [scripted] | — |
 | A3 | `pm transition T --to review` (no doc on disk) | `rc=1 Error: required document (type=task) at "tasks/t1.md" does not exist` — **gate refuses; item unchanged** | `transitions` (event=gate_refused) written post-tx; item rolls back | **OK** [scripted] | — |
@@ -45,7 +45,7 @@ store (`module.go` `Verdict`).
 
 ## Step-by-step trace — Part B: block/unblock cascade
 
-| # | Operator action | Surface behavior (observed) | Store entities / fields | v1 verdict | v2 (deferred) |
+| # | Operator action | Surface behavior (observed) | Store entities / fields | v1 verdict | v2 delta |
 |---|---|---|---|---|---|
 | B1 | `pm create` blocker B, target G | two `queue` items | `items` | **OK** [scripted] | — |
 | B2 | `pm link B G --kind blocks --unblock-at work --cascade auto` | edge stored; **G initial-blocks** (B in queue < work) | `dependencies` (kind=blocks); `items(G).blocked=true`, `restore_phase`; `transitions` (event=block) | **OK** [scripted] | — |
@@ -97,6 +97,29 @@ operations (an update, or an omitted type) silently remove the gate. Disposition
 > validates** (`engine.go:134-144`). The real residual is the create/update asymmetry + empty
 > type above, not create. The dossier predates the type-check landing; correcting it is an
 > out-of-scope follow-up (recorded in the deficiency report).
+
+## v2 assessment (this scenario against `docs/element-model-v2-draft.md`)
+
+The `v2 delta` column reads "—" at every step: **the PM gate engine and its cascade are
+model-agnostic infrastructure the v2 element model consumes, not redefines** (§11). The transition
+machinery (phases, gated edges, `dependencies`/`transitions`, the block/unblock cascade) is
+unchanged; what v2 changes is the *content vocabulary* (`items.type` values) flowing through it.
+
+Two v2 deficiencies surface exactly here, recorded in `deficiency-report.md`:
+
+- **V2-D1 (Medium, filed #197)** — the v2 model's software lifecycle (§6.1
+  `draft→in-review→approved→building→shipped`) is a **different phase vocabulary** from this
+  scenario's live PM machine (`queue→work→review→terminal`), and §6.4's "`test-run` gates
+  `building→shipped`" names no gate rule and no gated edge in the PM vocab. The two lifecycles are
+  never reconciled. This scenario is the ground truth the reconciliation must land against.
+- **V2-D2 (Medium, rides #185)** — §11 claims each new v2 `items.type` "inherits the type check for
+  free," but **D2 (this scenario, filed #185)** proved the check is *create-only*: `update_item` is
+  unvalidated and an empty-type item advances through gates ungated. So a new v2 element type does
+  **not** get complete gate-binding safety for free — the very property §6.4's verification gate
+  would rely on. Disposition: amendment-needed (scope §11 to create; rides #185).
+
+The shipped default gate set being minimal (a self-documented "KNOWN UNAUTHORED DESIGN GAP") is the
+same gap V2-D1 asks the v2 model to settle — folded into #197's scope.
 
 ## Notes (OK, verified expectations)
 
