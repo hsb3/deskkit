@@ -40,6 +40,11 @@ type styleSet struct {
 	footerBar       lipgloss.Style // footer/status bar fill (Width applied at render)
 	footerState     lipgloss.Style // live state segment, on the footer bar fill
 	toast           lipgloss.Style // transient copy/status toast, on the footer bar fill
+	tabBar          lipgloss.Style // view-switcher strip fill (Width applied at render), shown only when views are mounted
+	tabActive       lipgloss.Style // the active segment (chat or a view) on the strip — accent + bold
+	tabInactive     lipgloss.Style // an inactive segment on the strip — muted
+	tabSep          lipgloss.Style // faint "·" separator between strip segments
+	infoLine        lipgloss.Style // one-time launch-nudge transcript line (faint italic, no role chrome)
 	user            lipgloss.Style // user text, on the user block fill
 	userLabel       lipgloss.Style // "you" label, on the user block fill
 	userBlock       lipgloss.Style // thick ▌ accent border + padding + block fill (Width at render)
@@ -141,6 +146,15 @@ func newStyles(theme string) styleSet {
 		footerBar:   lipgloss.NewStyle().Background(barBG),
 		footerState: lipgloss.NewStyle().Foreground(accent).Background(barBG),
 		toast:       lipgloss.NewStyle().Foreground(accent).Background(barBG).Bold(true),
+		// View-switcher strip: same per-theme bar fill as the header/footer so it reads as chrome.
+		// The active segment carries the cyan accent + bold (a highlight that also survives NO_COLOR
+		// as the bold weight), inactive segments the muted tone; the separator is faint. Concrete
+		// per-theme colors only — no AdaptiveColor (ADR 0004).
+		tabBar:      lipgloss.NewStyle().Background(barBG),
+		tabActive:   lipgloss.NewStyle().Foreground(accent).Background(barBG).Bold(true),
+		tabInactive: lipgloss.NewStyle().Foreground(muted).Background(barBG),
+		tabSep:      lipgloss.NewStyle().Foreground(faint).Background(barBG),
+		infoLine:    lipgloss.NewStyle().Foreground(faint).Italic(true),
 		user:        lipgloss.NewStyle().Foreground(accent).Background(blockBG).Bold(true),
 		userLabel:   lipgloss.NewStyle().Foreground(muted).Background(blockBG).Bold(true),
 		userBlock: lipgloss.NewStyle().

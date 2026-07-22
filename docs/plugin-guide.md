@@ -1,5 +1,8 @@
 _The four desk-standard skills as user journeys: when to reach for each, what it does to your desk, and what you get — grounded in the shipped skill contracts and the MCP tools behind them._
 Status: active
+Audience: **desk owners** — you run a desk; you are not building the products. Assumes no build
+toolchain and only a minimal terminal: the plugin's skills run inside a Claude Code session, with
+no tool JSON to type yourself.
 
 # The desk-standard plugin — four skills
 
@@ -9,11 +12,14 @@ analyses, status, and drafts out of the repos it watches. The payoff: a desk tha
 to one shared standard, personalized entirely from your `_knowledge/profile.yaml`, with
 **no identity ever hand-typed into a shipped file.**
 
-Under the skills sits a harness-pure core exposed as four MCP tools — `profile_get`,
-`profile_validate`, `template_render`, `knowledge_index`. The skills call these to resolve
-your profile and materialize scaffolding. This guide shows real tool output so you can see
-what a skill actually does before you run it. For install, see `getting-started.md`; for the
-rules the skills enforce, the `conventions-standard` skill is the reference.
+Your actual path is a **Claude Code session**: you ask for a skill by name (or Claude reaches
+for one on its own), and Claude drives the rest — you never type a tool call yourself. Under the
+skills sits a harness-pure core exposed as four MCP tools — `profile_get`, `profile_validate`,
+`template_render`, `knowledge_index` — that the skills call, behind the scenes, to resolve your
+profile and materialize scaffolding. This guide quotes their real output so you can see what a
+skill actually does before you run it; treat every transcript below as **what Claude sees**, not
+as something you type. For install, see `getting-started.md`; for the rules the skills enforce,
+the `conventions-standard` skill is the reference.
 
 <!-- A recording of desk-setup running inside a Claude Code session would fit here; it
 requires an interactive harness, so it is left for a manual capture. -->
@@ -29,9 +35,10 @@ requires an interactive harness, so it is left for a manual capture. -->
 
 ## The engine underneath: the four MCP tools
 
-Every skill personalizes from your profile through these tools. The transcripts below are
-real invocations against an `example-desk` whose `_knowledge/profile.yaml` is filled with
-placeholder identifiers.
+Every skill personalizes from your profile through these tools — Claude calls them for you
+inside the session, in the course of running a skill; the transcripts below illustrate what
+each call returns, not a command you run. They are real invocations against an `example-desk`
+whose `_knowledge/profile.yaml` is filled with placeholder identifiers.
 
 **`profile_get`** resolves a dotted key to its scalar, and **fails loud** if the key is
 absent — there is no silent empty default:

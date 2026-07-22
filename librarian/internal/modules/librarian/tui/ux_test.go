@@ -192,7 +192,7 @@ func TestPerTurnFooter_AfterFinalize(t *testing.T) {
 }
 
 // TestHelpToggle_CtrlG: ctrl+g flips the help component into its full (grouped) view and back,
-// and never quits. Bare "?" must NOT toggle help (the textarea types it).
+// and never quits — regardless of the draft.
 func TestHelpToggle_CtrlG(t *testing.T) {
 	m, _ := newTestModel(t)
 	if m.hlp.ShowAll {
@@ -206,14 +206,31 @@ func TestHelpToggle_CtrlG(t *testing.T) {
 	if m.hlp.ShowAll {
 		t.Error("second ctrl+g did not collapse help")
 	}
-	// "?" is a literal keypress: it must reach the textarea, not toggle help.
+}
+
+// TestHelpToggle_QuestionMark: "?" opens the help overlay ONLY when the chat draft is empty (so it is
+// a discoverable help key); a "?" typed into a message-in-progress inserts literally instead.
+func TestHelpToggle_QuestionMark(t *testing.T) {
+	// Empty draft: ? opens help and is NOT typed into the textarea.
+	m, _ := newTestModel(t)
+	m = send(m, tea.KeyPressMsg{Text: "?", Code: '?'})
+	if !m.hlp.ShowAll {
+		t.Error("? on an empty draft did not open the help overlay")
+	}
+	if m.ta.Value() != "" {
+		t.Errorf("? on an empty draft leaked into the textarea: %q", m.ta.Value())
+	}
+
+	// Non-empty draft: ? inserts literally and does NOT toggle help.
 	m2, _ := newTestModel(t)
+	m2.ta.SetValue("what")
+	m2.ta.CursorEnd()
 	m2 = send(m2, tea.KeyPressMsg{Text: "?", Code: '?'})
 	if m2.hlp.ShowAll {
-		t.Error("bare ? toggled help; it must be typed into the textarea")
+		t.Error("? mid-message toggled help; it must type literally into a non-empty draft")
 	}
-	if m2.ta.Value() != "?" {
-		t.Errorf("bare ? not typed into textarea, value = %q", m2.ta.Value())
+	if m2.ta.Value() != "what?" {
+		t.Errorf("? not appended to the draft, value = %q", m2.ta.Value())
 	}
 }
 

@@ -1,5 +1,12 @@
-_From zero to a personalized, self-patrolled desk in one sitting: install the plugin, fill your profile, build the librarian, run your first sweep and patrol._
+_From zero to a personalized, self-patrolled desk in one sitting: install the plugin, stand up your
+desk, run your first sweep and patrol, and meet the TUI — all from an install command and `deskkit`
+launched inside your desk._
 Status: active
+Audience: **desk owners** — you run a desk; you are not building the products. Assumes no build
+toolchain and only a minimal terminal: one install command and `deskkit` launched inside your desk,
+with the TUI and the Claude-session skills carrying the rest. Building from source, release-asset
+downloads, and environment-variable lore live in the developer track
+([`development/install-and-build.md`](development/install-and-build.md)).
 
 # Getting started
 
@@ -9,185 +16,120 @@ binary that indexes that desk and repairs convention violations under a byte-exa
 Nothing you install carries a name, org, or repo — you personalize once, in
 `_knowledge/profile.yaml`, and never by editing a shipped file.
 
-This page gets you productive in one sitting. Deeper guides: `plugin-guide.md` (the four
-skills), `librarian-guide.md` (the daily loop), and `../librarian/README.md` (operator
-reference).
+This page gets you productive in one sitting, with **no build toolchain**: an install command, a
+guided desk setup, and `deskkit` run from inside your desk. Deeper guides: `plugin-guide.md` (the
+four skills) and `pm-guide.md` (the PM work graph). Everything terminal-heavy — building from
+source, environment overrides, JSON output — is the developer track, linked where it belongs.
 
 ![First sweep: index the desk, then see findings and orphans](media/sweep-and-findings.gif)
 
-## 1. Install the plugin
+## 1. Install `deskkit`
 
-This repo is its own Claude Code plugin marketplace. From any project, add the marketplace
-and install the plugin:
+`deskkit` installs from one command, no toolchain:
 
 ```bash
-# documented-not-run here: these require an interactive Claude Code session
+curl -fsSL https://raw.githubusercontent.com/hsb3/desk-standard/main/install.sh | bash
+deskkit --version
+```
+
+> **Pre-public interim.** The repo is private until v1.0.0, so the one-liner above will work once
+> it goes public. In the meantime, pull the prebuilt binary with an authenticated `gh` (or build
+> from source) as described in
+> [`development/install-and-build.md`](development/install-and-build.md) — a one-time step; the
+> rest of this page is unchanged.
+
+## 2. Install the plugin
+
+This repo is its own Claude Code plugin marketplace. In a Claude Code session, add the marketplace
+and install the plugin:
+
+```
 claude plugin marketplace add hsb3/desk-standard
 claude plugin install desk-standard@desk-standard
 ```
 
-The install copies only `plugins/desk-standard/` into the plugin cache, so the plugin is
-self-contained (its MCP server and schema ship inside it). For local development, point
-Claude Code straight at the source tree instead:
+The install copies only the plugin bundle into the plugin cache, so the plugin is self-contained
+(its MCP server and schema ship inside it). Inside that session you now have the `desk-setup`,
+`conventions-standard`, and `harvest-loop` skills. See `plugin-guide.md` for when to reach for each.
+
+## 3. Stand up your desk
+
+The simplest path is guided: in your Claude Code session, ask for the **`desk-setup`** skill. It
+scaffolds a conformant desk, creates your `_knowledge/profile.yaml`, and fills in your identifiers
+— handles, repos, board, machines, preferences — resolving every placeholder from your profile so
+nothing is hand-typed into a shipped file. **You never edit files under the plugin or the binary to
+personalize; personalization lives only in `_knowledge/profile.yaml`.**
+
+Prefer to start from a plain folder without the plugin? From inside that folder, one command writes
+the minimal profile for you:
 
 ```bash
-claude --plugin-dir ./plugins/desk-standard
+cd /path/to/your/desk
+deskkit init            # writes _knowledge/profile.yaml: desk name from the folder, root "."
 ```
 
-Inside that session, the `desk-setup` skill scaffolds a new desk; `conventions-standard`
-and `harvest-loop` run the standing checks and the periodic improvement pass. See
-`plugin-guide.md` for when to reach for each.
+That is the whole setup — the profile it writes needs no environment variables when you run
+`deskkit` from inside the desk. Credentials never go in the profile: it holds identifiers only, and
+`secrets_ref.llm_api_key` names the *env var* that holds your key, never the key itself.
 
-## 2. Fill your profile
+## 4. Your first sweep and patrol
 
-The `desk-setup` skill scaffolds your desk with a shipped placeholder profile at
-`_knowledge/profile.example.yaml`. Copy it and fill in your identifiers — handles, repos, board,
-machines, preferences. **Never edit files under `plugin/` or `librarian/` to personalize.**
-
-```bash
-# run inside your desk — the scaffold ships _knowledge/profile.example.yaml (this repo does not)
-cp _knowledge/profile.example.yaml _knowledge/profile.yaml
-$EDITOR _knowledge/profile.yaml
-```
-
-Working from a plain folder instead (no plugin scaffold to copy from)? Once the
-librarian is built (step 3), `deskkit init [dir]` is the fastest path to a
-working profile: it writes the minimal `_knowledge/profile.yaml` a folder needs — desk
-name from the folder's basename, `root: "."` — with `--force` to overwrite and
-`--with-env` to also scaffold a `.env` naming your LLM API-key env var. It never touches
-anything outside `_knowledge/` and `.env`, and never creates the store.
-
-The profile validates against schema v1. You can check it with the plugin's
-`profile_validate` MCP tool (see `plugin-guide.md`); a well-formed profile returns
-`{"valid":true,"errors":[]}`, and every scaffold placeholder resolves from it via
-`template_render` — so a missing required key fails loud instead of writing an empty string.
-
-Keep credentials out of the profile: it holds identifiers only. `secrets_ref.llm_api_key`
-names the *env var* that holds your key, never the key itself.
-
-## 3. Build the librarian
-
-The librarian is a single Go binary. Build it (Go 1.25.0 is pinned — PocketBase's `go.mod`
-floors it):
+Run `deskkit` from **inside your desk** — the folder whose `_knowledge/profile.yaml` you just
+created. It finds the profile by walking up from your working directory, so there is nothing to
+configure and no environment variables to export:
 
 ```console
-$ cd librarian
-$ make build          # -> ./deskkit
-$ ./deskkit --version
-deskkit version 0.5.0
+$ cd /path/to/your/desk
+$ deskkit sweep      # index the desk tree (creates the store on first run)
+$ deskkit patrol     # flag convention violations — a dry run; never writes your files
 ```
 
-A `make`-built or release binary reports its release version via `--version`; a binary that
-prints `dev` was built with a bare `go build` (no version stamp) — pin such a build from its
-source commit instead.
+`sweep` indexes the tree and `patrol` flags rule violations. Neither needs an LLM key, and **neither
+ever writes your desk files** — `patrol` is a pure dry run. To see what was flagged, or to repair
+the mechanical findings under a byte-exact undo, the daily loop is in `librarian-guide.md`.
 
-Prefer a prebuilt binary? The release workflow publishes a `deskkit` binary for macOS and
-Linux (amd64 + arm64) on every `v*` tag — no Go toolchain needed to run it elsewhere.
+## 5. Meet the TUI
 
-**While this repo is private** (it stays private until v1.0.0), download the release asset with
-an authenticated `gh`; the public `install.sh` one-liner below only works once the repo is public:
+`deskkit chat` opens the full-screen terminal UI — an interactive session over the same tools, and
+the home for the PM work-graph views. (Unlike `sweep`/`patrol`, `chat` talks to a model, so it
+needs an LLM key set once — the default provider reads `ANTHROPIC_API_KEY`, or point your profile's
+`models` + `secrets_ref.llm_api_key` at your key. Details in `../librarian/README.md`.)
 
-```bash
-mkdir -p ~/.local/bin
-os=$(uname -s | tr '[:upper:]' '[:lower:]')                 # darwin | linux
-arch=$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/')   # amd64 | arm64
-gh release download --repo hsb3/desk-standard \
-  --pattern "deskkit_*_${os}_${arch}" \
-  --output ~/.local/bin/deskkit --clobber
-chmod +x ~/.local/bin/deskkit
-deskkit --version
-```
+You don't have to memorize anything to find your way around:
 
-**Once the repo is public,** `install.sh` at the repo root does download + sha256-verify +
-install in one step:
+- **A tab strip across the top** shows every surface you can reach — `chat | pm context | pm board
+  | pm item` on a PM-enabled desk — with the active one highlighted. The views are visible on
+  sight; you never have to guess they exist.
+- **A footer** shows the keys for wherever you are. The essentials:
 
-```bash
-curl -fsSL https://raw.githubusercontent.com/hsb3/desk-standard/main/install.sh | bash
-# pin a version / preview without writing anything:
-#   ./install.sh --version vX.Y.Z --dry-run
-```
+  | Key | Does |
+  |---|---|
+  | `ctrl+p` | cycle to the next view (chat → pm context → pm board → pm item → chat) |
+  | `esc` | return to chat from any view |
+  | `?` | open the help overlay listing every key for the current view |
+  | `enter` | on the **pm board**, open the highlighted item's detail (**pm item**) |
+  | `r` | refresh the active PM view |
+  | `ctrl+c` | quit |
 
-## 4. First sweep and patrol
+- **`?` opens a help overlay** listing every binding in the current view — so the full key set is
+  always one keystroke away.
 
-The librarian needs to know two things — which desk to steward (`DESK_ROOT`) and a unique
-store name (`DESK_NAME`). **You already gave it both in step 2.** It walks up from your
-working directory, finds `_knowledge/profile.yaml`, and reads `desk.name` as `DESK_NAME`
-with the folder that owns `_knowledge/` as `DESK_ROOT`. So from your desk, with the binary on
-your `PATH` (installed by step 3's `install.sh`, or via `make install`), no exports are
-needed — just run:
-
-```console
-$ cd /path/to/your/desk      # the folder whose _knowledge/profile.yaml you filled
-$ deskkit sweep
-```
-
-> **Env vars are the override, not the requirement.** Two cases still need them:
-> - **A bare folder with no profile** (a scratch or UAT dir) — either run
->   `deskkit init` in it (writes that one-line `_knowledge/profile.yaml` for you),
->   drop the file in by hand (`desk:` with `name:` and `root: "."`), or set the vars for the
->   session: `export DESK_ROOT=/path/to/desk DESK_NAME=my-desk`. Note: `deskkit init` always names the desk from the folder's basename, not from any `DESK_NAME` you already exported — the two agree only if the folder happens to be named accordingly.
-> - **Running the dev build from `librarian/`** (`./deskkit …`) — you're outside the
->   desk tree, so the profile isn't on the walk-up path; export the two vars.
->
-> Env always wins over the profile. Either way the store lives outside the desk tree, at
-> `$XDG_DATA_HOME/deskkit/<DESK_NAME>/` (see
-> `decisions/0002-multi-desk-topology-store-per-desk.md`).
->
-> On an interactive terminal, you don't even have to remember `init`: any store-touching
-> command run where config can't resolve offers to scaffold it for you ("Set up this
-> folder as a desk? [Y/n]") and continues on accept. `--no-input` (or a non-TTY, e.g. CI)
-> skips the prompt and keeps the prior fail-closed error.
-
-Index the tree, then flag violations — no setup step needed, `sweep` creates the store on
-first run. `sweep` and `patrol` are LLM-free and **never write desk files** — `patrol` is a
-pure dry run:
-
-```console
-$ deskkit sweep
-{
-  "total": 4,
-  "created": 4,
-  "updated": 0,
-  "unchanged": 0,
-  "soft_deleted": 0
-}
-
-$ deskkit patrol
-{
-  "run_id": "patrol-20260717T171143Z",
-  "files_swept": 4,
-  "findings_new": 3,
-  "by_rule": { "R1": 1, "R2": 1, "R3": 1 }
-}
-```
-
-(Transcript from a scratch `example-desk` seeded with one violation each of R1/R2/R3.) See
-what was flagged with a read-only query:
-
-```console
-$ deskkit query findings --pretty
-findings: 3
-
-R1 (1)
-  tasks/wire-up-ingest.md  missing universal frontmatter: created, updated, tags, synopsis
-R2 (1)
-  journal/kickoff-notes.md  journal filename not yyyy-mm-dd-*.md: kickoff-notes.md
-R3 (1)
-  analyses/backlog-triage.md  type 'task' but file lives under 'analyses' (expected tasks/)
-```
+To reach the **PM board** on your first run: launch `deskkit chat`, press `ctrl+p` to step from the
+chat into `pm context`, again into `pm board`, and `enter` on an item to open its detail. The tab
+strip and footer show you exactly where you are the whole way. The PM views and their keys are
+documented in full in `pm-guide.md`. On a desk with the PM module turned off, no PM views mount and
+the tab strip is absent — `ctrl+p` tells you so rather than doing nothing.
 
 ## What's next
 
-- **Chat with it** — `deskkit chat` opens an interactive session over the same tools
-  (a full-screen view on a terminal). Unlike `sweep`/`patrol`, `chat` needs an LLM: set
-  `ANTHROPIC_API_KEY` for the default provider, or point `models` + `secrets_ref.llm_api_key`
-  at your key in the profile. Details in `../librarian/README.md`.
-- **Repair the fixable findings** — the supervised `propose-fix → apply-fix` write path and
-  the byte-exact `restore` undo are the daily loop: `librarian-guide.md`.
-- **Learn the skills** — greenfield setup, the rule set, the harvest loop, and brownfield
-  adoption: `plugin-guide.md`.
-- **Verify your build** — `make verify` runs the whole chain against a throwaway desk it
-  creates and destroys; safe to run any time.
+- **The PM work graph** — the phase machine, gates, and every PM surface (CLI, MCP, TUI, plugin):
+  `pm-guide.md`.
+- **Repair the fixable findings** — the supervised `propose-fix → apply-fix` write path and the
+  byte-exact `restore` undo are the daily loop: `librarian-guide.md`.
+- **Learn the skills** — greenfield setup, the rule set, the harvest loop, and brownfield adoption:
+  `plugin-guide.md`.
+- **Build from source, or override the desk/store with environment variables** — the developer
+  track: [`development/install-and-build.md`](development/install-and-build.md).
 
-You now have a personalized desk under a plugin that maintains it and a librarian that
-patrols it. That is the whole loop from a clean checkout to a self-patrolled desk.
+You now have a personalized desk under a plugin that maintains it and a librarian that patrols it —
+reached from one install command and `deskkit` run inside your desk.
