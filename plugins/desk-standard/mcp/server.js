@@ -21995,11 +21995,17 @@ function loadSchemaObject(path) {
   }
   return obj;
 }
+var KNOWN_CONTRACT_VERSIONS = [1];
 var validatorCache = new Map;
 function compileValidator(schemaObj) {
+  const version2 = schemaObj["x-contract-version"];
+  if (typeof version2 !== "number" || !KNOWN_CONTRACT_VERSIONS.includes(version2)) {
+    throw new Error(`schema contract version ${JSON.stringify(version2)} is not recognized ` + `(known versions: [${KNOWN_CONTRACT_VERSIONS.join(", ")}])`);
+  }
+  const { "x-contract-version": _cv, ...schemaForAjv } = schemaObj;
   const ajv = new Ajv2020({ allErrors: true, strict: false });
   addFormats(ajv);
-  return ajv.compile(schemaObj);
+  return ajv.compile(schemaForAjv);
 }
 function getValidator(schemaPath) {
   const cached2 = validatorCache.get(schemaPath);

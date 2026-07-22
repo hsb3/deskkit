@@ -1,5 +1,9 @@
 _The deskkit daily loop, told as a story: index a desk, flag violations, and repair the mechanical ones under a byte-exact undo._
 Status: active
+Audience: **desk owners** — you run a desk; you are not building the products. Assumes no build
+toolchain and only a minimal terminal: `deskkit` run from inside your profiled desk, no env
+exports required. Building from source and the env-var / store-path lore live in the developer
+track ([`development/install-and-build.md`](development/install-and-build.md)).
 
 # deskkit — the daily loop
 
@@ -36,12 +40,13 @@ auto-fixed.
 
 ## Where the store lives (and the open-guard)
 
-The librarian is a one-shot CLI; its "instance" is an on-disk SQLite store. With no
-`--dir`, the store resolves to `$XDG_DATA_HOME/deskkit/<DESK_NAME>/` (falling back
-to `~/.local/share/deskkit/<DESK_NAME>/`) — **outside** the desk tree on purpose,
-so the librarian never indexes its own database and a cloud-synced desk folder never
-corrupts a live SQLite file. `DESK_NAME` names the store directory and must be unique
-across your desks.
+The librarian is a one-shot CLI; its "instance" is an on-disk SQLite store, kept **outside** the
+desk tree on purpose, so the librarian never indexes its own database and a cloud-synced desk
+folder never corrupts a live SQLite file. On your own desk, run `deskkit` from inside it — a
+desk carrying a `_knowledge/profile.yaml` (with `desk.name` and `root: "."`) resolves everything
+from that file, and no environment variable is required. With no `--dir` and no resolvable
+profile, the store falls back to `$XDG_DATA_HOME/deskkit/<DESK_NAME>/`
+(`~/.local/share/deskkit/<DESK_NAME>/` by default).
 
 ![The open-guard refusing a store that belongs to another desk](media/open-guard.gif)
 
@@ -50,14 +55,12 @@ different `DESK_NAME`, the command refuses and names both values, so a copy-past
 never interleave two desks into one store. The full rationale is
 `decisions/0002-multi-desk-topology-store-per-desk.md`.
 
-Every command below uses two required env vars (the binary refuses to run without them) and
-a scratch store home so nothing touches a real desk:
-
-```bash
-export DESK_ROOT=/path/to/example-desk    # the desk tree to steward
-export DESK_NAME=example-desk             # unique store name
-export XDG_DATA_HOME=/path/to/scratch/xdg # scratch store home (demo only)
-```
+The transcripts below run against a scratch `example-desk`, pointed at a scratch store via
+env vars (`DESK_ROOT`, `DESK_NAME`, `XDG_DATA_HOME`) so the demo never touches a real desk or
+store — none of that is a prerequisite on your own profiled desk, where running `deskkit` from
+inside it is enough. The full env-var precedence and the XDG store-path lore live in
+[`development/install-and-build.md`](development/install-and-build.md); this page only
+demonstrates the loop, it does not require you to export anything first.
 
 ## The seeded desk
 

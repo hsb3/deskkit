@@ -1,5 +1,13 @@
 $schema: "https://json-schema.org/draft/2020-12/schema"
 $id: "schema/profile.schema.yaml"
+# CONTRACT VERSION (ADR 0009 schema/-versioning work item). Marks the version of THIS shared
+# contract file itself; the plugin loader (plugin/core/schema.ts) reads it and refuses an
+# unrecognized value loud (today the known set is {1}). A schema-meta key, NOT a profile
+# instance property — it is stripped before ajv compilation, so `additionalProperties: false`
+# never sees it. Deliberately NOT named `schema_version`: that key (below) constrains a
+# profile INSTANCE to declare itself v1 and is a different thing. Also distinct from the
+# store-side `module_schema_versions` migration mechanism (pm-system spec §8.3 / R7.1).
+x-contract-version: 1
 title: "desk-standard schema v1 — profile block"
 description: >-
   Validates a _knowledge/profile.{yaml,json,md-frontmatter} personalization profile

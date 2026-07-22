@@ -1,9 +1,10 @@
 // Module-view hosting (spec §5.3): the chat TUI mounts the views the enabled modules
 // contribute through Module.TUIViews — the core tuiview plug-point D2 deferred — without
 // knowing any module exists. The chat transcript stays the home surface; ctrl+p cycles
-// chat → view 1 → … → view N → chat; esc returns to chat from any view; every other key
-// while a view is active routes to the view. On a librarian-only desk the mounted set is
-// empty, the ctrl+p binding stays disabled (hidden from help), and the surface is unchanged.
+// chat → view 1 → … → view N → chat; esc returns to chat from any view; ?/ctrl+g toggle the
+// full-help overlay; every other key while a view is active routes to the view. On a librarian-only
+// desk the mounted set is empty, the ctrl+p binding stays disabled (hidden from help), and the
+// surface is unchanged apart from an explanatory toast if ctrl+p is pressed anyway.
 package tui
 
 import (
@@ -56,6 +57,12 @@ func (m model) handleViewKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		}
 		return m.activateView(next)
 
+	case key.Matches(msg, m.keymap.help):
+		// ? / ctrl+g toggle the same full-help overlay here as in chat. While a view is active every
+		// key routes here, so ? always means help (no empty-draft guard) — the textarea is not in play.
+		m.hlp.ShowAll = !m.hlp.ShowAll
+		return m, nil
+
 	default:
 		v, cmd := m.views[m.activeView].Update(msg)
 		m.views[m.activeView] = v
@@ -70,7 +77,7 @@ func (m model) viewFooter() string {
 	if m.activeView >= 0 && m.activeView < len(m.views) {
 		name = m.views[m.activeView].Name()
 	}
-	hints := m.styles.footerState.Render("esc chat · ctrl+p next view · ctrl+c quit")
+	hints := m.styles.footerState.Render("esc chat · ctrl+p next view · ? help · ctrl+c quit")
 	state := m.styles.footerState.Render("  " + name)
 	return m.styles.footerBar.Width(m.width).MaxWidth(m.width).Render(hints + state)
 }

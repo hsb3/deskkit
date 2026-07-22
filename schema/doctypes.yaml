@@ -13,6 +13,15 @@
 # REFINEMENTS vs the vault (flagged, not silently forked — owner intent on #49). Marked inline
 # with `# REFINEMENT:`. The reconciliation dispositions table is ADR 0006.
 
+# CONTRACT VERSION (ADR 0009 schema/-versioning work item). Marks the version of THIS shared
+# contract file itself, so both lanes' loaders can tell one contract shape from the next and
+# refuse an unrecognized value loud instead of silently misreading it (today the known set is
+# {1}). This is NOT the store-side `module_schema_versions` migration mechanism (pm-system
+# spec §8.3 / R7.1), which versions a desk's PocketBase PM migrations — a different, already-
+# shipped thing. It is also distinct from `profile.schema.yaml`'s `schema_version`, which
+# constrains a profile INSTANCE, not the contract file.
+contract_version: 1
+
 # Required on every doc (status is optional on `lightweight` types — see below).
 universal: [type, status, created, updated, tags]
 

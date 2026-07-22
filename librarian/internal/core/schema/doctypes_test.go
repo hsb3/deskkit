@@ -4,13 +4,16 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 )
 
 // TestDoctypesEmbeddedCopy_MatchesRepoRoot is the drift guard for the embedded vocabulary:
 // go:embed cannot reach outside the Go module (librarian/), so core/schema carries a copy of
 // the repo-root schema/doctypes.yaml. The two files must stay byte-identical — edit the repo
-// root copy, then re-copy it here.
+// root copy, then re-copy it here. The `contract_version` marker (ADR 0009's shared-contract
+// versioning) is part of what "byte-identical" now pins: bump it in the repo-root source and
+// re-copy, never edit only one side.
 func TestDoctypesEmbeddedCopy_MatchesRepoRoot(t *testing.T) {
 	_, thisFile, _, ok := runtime.Caller(0)
 	if !ok {
@@ -53,6 +56,38 @@ func TestVocab_ParsesEmbeddedDoctypes(t *testing.T) {
 	// example gates a task doc on status `active`).
 	if !v.StatusAllowed("task", "active") {
 		t.Error("task/active should be allowed (no status family on lightweight types)")
+	}
+}
+
+// TestParseDoctypes_RejectsUnknownContractVersion proves the loader fails loud when the
+// contract_version marker is not in the known set (ADR 0009 shared-contract versioning). The
+// test constructs a minimal doctypes byte slice in-memory; it does not edit the shipped file.
+func TestParseDoctypes_RejectsUnknownContractVersion(t *testing.T) {
+	// Valid structural shape, but a version this build does not understand.
+	unknown := []byte("contract_version: 999\n" +
+		"universal: [type]\n" +
+		"status:\n  meta: [final]\n" +
+		"types:\n  readme: { status: meta }\n")
+	_, err := parseDoctypes(unknown)
+	if err == nil {
+		t.Fatal("parseDoctypes should reject an unrecognized contract_version")
+	}
+	if !strings.Contains(err.Error(), "contract_version") || !strings.Contains(err.Error(), "999") {
+		t.Fatalf("error should name the unrecognized version 999, got: %v", err)
+	}
+
+	// A missing marker (contract_version 0) is likewise refused — the shipped contract always
+	// carries an explicit version.
+	missing := []byte("universal: [type]\nstatus:\n  meta: [final]\ntypes:\n  readme: { status: meta }\n")
+	if _, err := parseDoctypes(missing); err == nil {
+		t.Fatal("parseDoctypes should reject a missing contract_version")
+	}
+
+	// The same shape at a KNOWN version parses cleanly — proving the check gates on the version
+	// value, not the structure.
+	known := []byte("contract_version: 1\nuniversal: [type]\nstatus:\n  meta: [final]\ntypes:\n  readme: { status: meta }\n")
+	if _, err := parseDoctypes(known); err != nil {
+		t.Fatalf("parseDoctypes rejected a known contract_version: %v", err)
 	}
 }
 

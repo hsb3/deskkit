@@ -2,6 +2,9 @@ _The PM module as a daily surface: what the document-gated work graph is, how to
 the CLI / MCP / TUI / plugin surfaces over it — every command, tool, and flag as it actually
 ships._
 Status: active
+Audience: **desk owners** — you run a desk; you are not building the products. Assumes no build
+toolchain and only a minimal terminal: `deskkit chat` and the `pm` CLI, with the TUI carrying the
+rest.
 
 # The PM work graph — user guide
 
@@ -106,6 +109,46 @@ carrying `updated`), and is at status `active`.
 
 Authoritative version: [`pm-system-v1-spec.md` §4](pm-system-v1-spec.md#4-gates--the-spine-r3).
 
+## The TUI — reach the board from `deskkit chat`
+
+For a desk owner, `deskkit chat` is the first-class way in: run it and the module views are
+there to find, not something you have to know a chord for first. On a PM-enabled desk a
+**tab strip** sits across the top of the screen reading `chat · pm context · pm board · pm item`,
+with the active surface highlighted — visible on sight, before you press anything — and a
+one-time line at launch also names the mounted views.
+
+**Reaching the board.** From the chat prompt, press `ctrl+p` to enter the module views; `pm
+context` — the landing view — is the first stop, the same `get_context` briefing the CLI and MCP
+tool return. Press `ctrl+p` again to cycle onward to `pm board`, the work graph by phase and
+court. The views wrap: `chat → pm context → pm board → pm item → chat`.
+
+**Keys, by mode:**
+
+- **Chat mode:** `enter` sends the message · `ctrl+p` enters/cycles the module views · `?` opens
+  a help overlay listing every key (only when the message draft is empty — a `?` typed mid-message
+  inserts literally, it never hijacks a keystroke) · `ctrl+g` opens the same help overlay
+  unconditionally · `ctrl+c` quits.
+- **View mode** (a PM view active): `esc` returns to chat · `ctrl+p` advances to the next view
+  (wrapping) · `?` / `ctrl+g` open the help overlay · `enter` on **pm board** opens the highlighted
+  item's detail, **pm item** · `r` refreshes the active view.
+- The footer always shows the live keys for whichever surface — chat or a PM view — is on screen,
+  so nothing above is something you have to memorize.
+
+**The three views**, each over the same engine as the CLI and MCP surfaces:
+
+- **`pm context`** — the landing view: the `get_context` briefing rendered on entry (the same call
+  the tool and the CLI make).
+- **`pm board`** — the work graph by phase / court; `enter` on a highlighted item opens `pm item`.
+- **`pm item`** — one item's detail: notes, dependencies, transitions, ancestors.
+
+**PM module off.** No PM views mount and the tab strip does not appear; pressing `ctrl+p` in chat
+never silently no-ops — it shows a toast, "no module views on this desk — PM is off."
+
+The CLI and MCP tables below are the owner/script and agent surfaces — legitimately terminal, and
+useful once you know what you're asking for — but `deskkit chat` above is the surface a cold
+reader should reach for first; the JSON in the sections that follow is there to show what each
+call returns, not as the only door in.
+
 ## The `pm` CLI — the owner / script surface
 
 Registered only when the module is enabled. Every subcommand is a thin adapter over the same
@@ -197,16 +240,6 @@ inventing their own sentinel.
 ```bash
 deskkit pm update <id> --body ""  # clears body
 ```
-
-## The TUI views
-
-When the module is enabled, three PM views mount into `deskkit`'s full-screen TUI, over the same
-engine as the CLI and MCP surfaces:
-
-- **`pm context`** — the landing view: the `get_context` briefing rendered on entry (the same call
-  the tool and the CLI make).
-- **`pm board`** — the work graph by phase / court.
-- **`pm item`** — one item's detail: notes, dependencies, transitions, ancestors.
 
 ## The `desk-persona` plugin
 
