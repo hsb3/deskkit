@@ -66,14 +66,23 @@ three are credibility/safety-grade. Ratified as recommended." _Not cited in-repo
 
 **F5 — `_knowledge/` gets done right (pre-1.0 refactor).** "Introduce a single shared profile-root
 constant/config FIRST (kills the cross-language drift risk), THEN move `_knowledge/` in one
-coordinated rename. Not a `git mv`." _Cited by issues #84 and #170 and by `_meta/HANDOFF.md`._
-- **Owner sign-off (2026-07-21):** the move is **approved in principle, but the target is still
-  unnamed** — the sign-off's "move it" choice was submitted with an empty target field, and triage
-  had already found the destination was never ruled anywhere. Record this fork as
-  **approved-pending-target**: the shared profile-root constant groundwork has landed (one
-  authoritative constant across schema/TS/Go, guarded by a drift check), so the rename is a small
-  low-risk sweep, but it stays **gated by issue #170** until the owner names the target folder.
-  Until then `_knowledge/` stands.
+coordinated rename. Not a `git mv`." _Cited by issues #84 and #170 and by `_meta/HANDOFF.md`. The
+"coordinated rename" framing was superseded at execution — the fix turned out to be a removal, not
+a rename; see the 2026-07-21 ruling below._
+- **Owner ruling (2026-07-21) — executed, supersedes the earlier "approved-pending-target"
+  framing.** The motivation was that `_knowledge/` **at the repo root** is confusing: the template
+  folder structure is applied to exec desks and that is the only place `_knowledge/` belongs — **the
+  repo itself is not an exec desk** (per the ruling comment on issue #170, 2026-07-21). Concretely,
+  **no rename of the desk-side convention**: the `profile_root` constant, the TS/Go lane constants,
+  and the `check-profile-root` guard are all unchanged, and product remedy strings / MCP descriptions
+  keep naming `_knowledge` because they describe desks. What changed is only the **repo-root
+  `_knowledge/` instance, which is removed**; the canonical example profile now lives with the
+  desk-setup scaffold template
+  (`plugin/claude-plugin/skills/desk-setup/assets/template/_knowledge/profile.example.yaml`), and the
+  repo-facing docs re-point there. The shared profile-root constant groundwork (F5's "constant
+  first") had already landed. Because nothing renames, the '#84 move-day literal sweep' mostly
+  dissolves. Executed as `refactor/remove-repo-knowledge-root`; closes issues #170 and the second
+  half of #84.
 
 **F6 — conformance for 1.0.** "Run the `mise-en-place-scaffold` …, author the three design-bearing
 docs (**CLAUDE.md, AGENTS.md, docs/CHARTER.md**), and rule the root **`tests/`** question (author a
@@ -104,8 +113,9 @@ and the librarian v1 scope boundary (ADR 0014) is untouched.
   does **not** itself edit ADR 0001 (webapp deferral), ADR 0008 (PM ship-dark default), or ADR
   0005 (MAJOR = breaking contract). Those dated amendments/corrections land in the same change as
   each lane's build, citing this record.
-- **F5 stays gated.** The `_knowledge/` move cannot start until the owner names a target
-  (issue #170); the shared-constant half is already done and is independent of the move.
+- **F5 is executed (2026-07-21).** Resolved as a *removal* of the repo-root `_knowledge/` instance
+  (not a rename) per the owner ruling on issue #170; the shared-constant half had already landed and
+  the desk-side `_knowledge/` convention is unchanged.
 - **F2 and F7 are unblocked to build** on their blessed seed / approved scoping; F3 is in build as
   the dead-last stub.
 - If any fork's premise is later found wrong, repair per the ADR discipline (supersession if the

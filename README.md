@@ -24,8 +24,9 @@ org, repo, or issue number:
 - **`schema/`** — schema v1: the shared, product-neutral contract both `plugin/` and
   `librarian/` read as their rule/structure source.
 
-You personalize by filling `_knowledge/profile.yaml` (copied from
-`_knowledge/profile.example.yaml`) — never by editing a shipped skill, template, or tool.
+You personalize a desk by filling its `_knowledge/profile.yaml` (copied from the desk-setup
+scaffold's `_knowledge/profile.example.yaml`) — never by editing a shipped skill, template, or
+tool. This repo is not itself a desk; it ships no repo-root `_knowledge/`.
 
 ## Scope of this build (v1)
 
@@ -70,12 +71,19 @@ For local development you can still point Claude Code straight at the source tre
 ## Quick start
 
 ```bash
-# 1. Fill in your profile (never edit files under plugin/ or librarian/ to personalize)
+# Point Claude Code at the plugin (local dev; or install from the marketplace, above)
+claude --plugin-dir ./plugin/claude-plugin
+```
+
+Inside that session, the `desk-setup` skill scaffolds a new desk **outside this repo**. The
+scaffold ships `_knowledge/profile.example.yaml`; copy it to `_knowledge/profile.yaml` *in your
+desk* and fill in your identifiers (never edit files under `plugin/` or `librarian/` to
+personalize):
+
+```bash
+# run inside your desk — this repo ships no _knowledge/ of its own
 cp _knowledge/profile.example.yaml _knowledge/profile.yaml
 $EDITOR _knowledge/profile.yaml
-
-# 2. Point Claude Code at the plugin
-claude --plugin-dir ./plugin/claude-plugin
 ```
 
 Steering a plain folder instead of the plugin scaffold? `deskkit init [dir]`
@@ -83,8 +91,7 @@ Steering a plain folder instead of the plugin scaffold? `deskkit init [dir]`
 desk name from the folder's basename — without the plugin's other placeholders; see
 `docs/getting-started.md` §2.
 
-Inside that session, the `desk-setup` skill scaffolds a new desk from your profile;
-`conventions-standard` and `harvest-loop` run the standing checks and the periodic
+`conventions-standard` and `harvest-loop` then run the standing checks and the periodic
 improvement-log pass.
 
 ## Install the `deskkit` binary
@@ -148,7 +155,6 @@ plugin/
   claude-plugin/    Claude Code adapter: manifest, .mcp.json, skills/
 librarian/          deskkit: Go binary, embedded PocketBase, MCP server + CLI
 schema/             schema v1 — shared by plugin/ and librarian/
-_knowledge/         your personalization root (profile + freeform background)
 docs/               product specs, ADRs, and the getting-started / plugin / librarian guides
 ```
 

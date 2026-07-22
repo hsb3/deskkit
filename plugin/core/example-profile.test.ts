@@ -6,17 +6,29 @@ import { compileValidator, discoverSchema, loadSchemaObject, validateProfile } f
 
 // AC8 proof gap: schema.test.ts already proves rejection (unknown key, bad slug,
 // loadAndValidateProfile throwing) and custom-block acceptance against SYNTHETIC objects.
-// The missing proof is that the *actually shipped* artifact — _knowledge/profile.example.yaml,
-// the file a stranger copies to start — validates against schema v1, and that the
-// reject-at-top-level / accept-under-`custom:` pairing holds for a realistic agent-written key.
+// The missing proof is that the *actually shipped* artifact — the desk-setup scaffold's
+// _knowledge/profile.example.yaml, the file a stranger copies to start — validates against
+// schema v1, and that the reject-at-top-level / accept-under-`custom:` pairing holds for a
+// realistic agent-written key.
 
 const here = dirname(fileURLToPath(import.meta.url));
 const schemaPath = discoverSchema(here);
 if (!schemaPath) throw new Error("schema/profile.schema.yaml not found from test dir");
 const validator = compileValidator(loadSchemaObject(schemaPath));
 
-// The shipped example lives at repo _knowledge/profile.example.yaml (two levels up from plugin/core).
-const examplePath = join(here, "..", "..", "_knowledge", "profile.example.yaml");
+// The shipped example lives with the desk-setup scaffold template (the single home for it, K12):
+// plugin/claude-plugin/skills/desk-setup/assets/template/_knowledge/profile.example.yaml.
+const examplePath = join(
+  here,
+  "..",
+  "claude-plugin",
+  "skills",
+  "desk-setup",
+  "assets",
+  "template",
+  "_knowledge",
+  "profile.example.yaml",
+);
 
 test("shipped profile.example.yaml validates against schema v1 (AC8: the profile validates)", () => {
   const profile = loadProfile(examplePath);

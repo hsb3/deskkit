@@ -1,8 +1,8 @@
-# --- personalization: the real profile never ships; the example does ---
-_knowledge/profile.yaml
-_knowledge/profile.json
-_knowledge/profile.md
-!_knowledge/profile.example.yaml
+# --- local dogfooding: this repo is NOT an exec desk. A personal _knowledge/ created here (to
+#     drive the tools against the repo) is a local artifact — never tracked, never committable.
+#     The shipped example profile lives with the desk-setup scaffold template, not at repo root.
+#     (Leading slash anchors this to the repo root; the template's own _knowledge/ stays tracked.) ---
+/_knowledge/
 
 # --- secrets / env ---
 .env

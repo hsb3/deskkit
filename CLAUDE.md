@@ -7,8 +7,10 @@ this one ever disagree about direction, the charter wins.
 ## Project Overview
 
 **desk-standard is two products over one shared schema**, all identity-neutral — nothing shipped
-carries a person, org, repo, or issue number. You personalize by filling `_knowledge/profile.yaml`
-(copied from `_knowledge/profile.example.yaml`), never by editing a shipped skill, template, or tool.
+carries a person, org, repo, or issue number. A desk is personalized by filling its
+`_knowledge/profile.yaml` (copied from the desk-setup scaffold's `_knowledge/profile.example.yaml`),
+never by editing a shipped skill, template, or tool. This repo is NOT itself an exec desk — it ships
+no repo-root `_knowledge/`; the `_knowledge/` convention belongs to the desks the tools stand up.
 
 **Architecture — two lanes + one contract:**
 
@@ -37,7 +39,6 @@ plugin/            TS lane — harness-pure core + MCP server, packaged as a Cla
   opencode/        frozen, unwired OpenCode spike — ships nothing in v1
 librarian/         Go lane — the deskkit binary; embedded PocketBase; CLI/MCP/TUI; verify.sh gate
 schema/            schema v1 — shared rule/structure source for both lanes
-_knowledge/        your personalization root (profile.yaml + freeform background); real profile gitignored
 docs/              specs, ADRs (docs/decisions/), the CHARTER, and using/developing guides
 scripts/           repo-wide gate scripts (*.mjs) + record-media.sh
 tests/             signpost only — suites live with their products; see tests/README.md

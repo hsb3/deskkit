@@ -40,10 +40,12 @@ and `harvest-loop` run the standing checks and the periodic improvement pass. Se
 
 ## 2. Fill your profile
 
-Copy the shipped placeholder profile and fill in your identifiers — handles, repos, board,
+The `desk-setup` skill scaffolds your desk with a shipped placeholder profile at
+`_knowledge/profile.example.yaml`. Copy it and fill in your identifiers — handles, repos, board,
 machines, preferences. **Never edit files under `plugin/` or `librarian/` to personalize.**
 
 ```bash
+# run inside your desk — the scaffold ships _knowledge/profile.example.yaml (this repo does not)
 cp _knowledge/profile.example.yaml _knowledge/profile.yaml
 $EDITOR _knowledge/profile.yaml
 ```
