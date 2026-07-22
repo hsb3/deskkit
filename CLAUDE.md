@@ -80,7 +80,7 @@ the exit code and has let a failing gate through before (incident, 2026-07-17).
 | `make build` | Build both lanes: plugin (`bun run build`) + librarian binary (version-stamped) |
 | `make test` | Fast unit tests: plugin `bun test` + librarian `go test ./...` |
 | `make check` | Repo gates: neutrality + self-test, kit-drift, prompt-drift, tool-surface drift + self-test, scaffold frontmatter, textfield-max, query-kind drift + self-test, plugin core-purity, shellcheck, actionlint, workflow SHA-pin drift + self-test, profile-root drift + self-test |
-| `make verify` | Librarian integration gate — `librarian/verify.sh` (55 checks, throwaway scratch desk) |
+| `make verify` | Librarian integration gate — `librarian/verify.sh` (61 checks, throwaway scratch desk) |
 | `make e2e` | End-to-end system-behaviour suite — whole system (cold-start → profile → librarian → PM → surfaces → release-shaped) on a throwaway desk; offline, no LLM key (`librarian/e2e/e2e.sh`) |
 | `make package` | Regenerate the marketplace bundle (`plugins/desk-standard/` artifacts) |
 | `make install` | Build + install the `deskkit` binary to `~/.local/bin` (override `PREFIX=`) |

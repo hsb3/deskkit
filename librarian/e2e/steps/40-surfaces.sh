@@ -60,7 +60,7 @@ PM_NAMES=$(printf '%s' "$PMOUT" | jq -r '.tools[].name' 2>/dev/null)
   && ! printf '%s\n' "$PM_NAMES" | grep -qx 'propose_fix' \
   && ! printf '%s\n' "$PM_NAMES" | grep -qx 'record_feedback'
 check "MCP_MODULES=pm mount exposes exactly the 12 PM tools (no librarian ride-alongs)" $?
-note "desk-pm mount tool count: $PMCNT"
+note "pm-only mount tool count: $PMCNT"
 
 # --- skills present: 4 desk-standard + 3 desk-persona PM skills -----------------------------
 SKILLS_MISSING=0
