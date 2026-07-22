@@ -963,6 +963,14 @@ qualification are all unchanged, and the desk-relative qualifier
 `graduated_to` becomes an instance of the primitive later, on the schema-v2 track — no field
 migrates onto the shape in this cycle.
 
+**Shared-contract versioning (ADR 0009) — distinct from store migrations.** The shared `schema/`
+files this lane reads (`doctypes.yaml`, embedded and parsed by `internal/core/schema`) each carry a
+`contract_version` / `x-contract-version` marker; the loader refuses a value it does not recognize
+(today the known set is `{1}`) rather than silently misreading a future contract shape. This
+versions the build-time CONTRACT source that ships inside the binary — it is NOT the store-side
+`module_schema_versions` migration ledger (pm-system spec §8.3 / R7.1), which versions a desk's
+PocketBase migrations per install. Same word "version", disjoint mechanisms: don't conflate them.
+
 **Line counting (deterministic).** "lines" means `len(text.split("\n"))` — a raw newline count over
 the **whole file including frontmatter**, not a logical-line or trimmed count. Used by R5's
 `lines > 40` gate (§5.2); the `graduated_to` marker check above has no length gate.
