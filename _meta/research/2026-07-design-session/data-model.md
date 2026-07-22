@@ -13,6 +13,14 @@ _Every PocketBase collection, field, enum, and cross-reference-shaped value both
 persist, plus the shared `schema/` contract and where it collides with itself. Grounding dossier
 for the 2026-07 design session (see `../README.md` §6)._
 
+> **Correction (2026-07-21):** the #126 v1 model simulations empirically falsified three claims
+> below (evidence: `_meta/research/model-simulations/deficiency-report.md`, observations O1–O3):
+> **§4** — `items.type` IS validated at create (`create_item` refuses an unknown type; the
+> asymmetric gap is `update_item`, tracked as issue #185, whose fix reconciles §4 in place);
+> **§5.3** — the disposition-blind-aggregate defect was fixed in the 0.8.0 bug floor;
+> **Gaps** — `transitions.event=gate_refused` is live, not dead. Read those sections against
+> this callout.
+
 Status: draft (2026-07-20)
 
 All citations are repo-relative `path:line` against commit `51235f6` (post-PR-112 main).
