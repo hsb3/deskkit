@@ -360,7 +360,7 @@ func TestResolveModuleGate(t *testing.T) {
 	}
 }
 
-// TestResolveModuleGate_PMFilter proves the desk-pm mount's gate: with BOTH librarian and pm
+// TestResolveModuleGate_PMFilter proves the pm-only mount's gate: with BOTH librarian and pm
 // registered (the PM_ENABLED case), MCP_MODULES=pm resolves to exactly the twelve PM tools and
 // none of the librarian ride-alongs, while MCP_MODULES=librarian keeps exactly the librarian set.
 // It registers pm specs like the agent test does and restores the librarian-only registry via

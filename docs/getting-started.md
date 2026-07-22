@@ -125,7 +125,7 @@ $ deskkit sweep
 > - **A bare folder with no profile** (a scratch or UAT dir) — either run
 >   `deskkit init` in it (writes that one-line `_knowledge/profile.yaml` for you),
 >   drop the file in by hand (`desk:` with `name:` and `root: "."`), or set the vars for the
->   session: `export DESK_ROOT=/path/to/desk DESK_NAME=my-desk`.
+>   session: `export DESK_ROOT=/path/to/desk DESK_NAME=my-desk`. Note: `deskkit init` always names the desk from the folder's basename, not from any `DESK_NAME` you already exported — the two agree only if the folder happens to be named accordingly.
 > - **Running the dev build from `librarian/`** (`./deskkit …`) — you're outside the
 >   desk tree, so the profile isn't on the walk-up path; export the two vars.
 >

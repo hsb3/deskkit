@@ -115,7 +115,7 @@ func Serve(ctx context.Context, app core.App, cfg *config.Config) error {
 	}
 
 	// Module gate (MCP_MODULES): a shared MCP mount narrows the exposed set to specific modules —
-	// the desk-pm mount declares MCP_MODULES=pm so it carries the twelve PM tools and none of the
+	// the pm-only mount declares MCP_MODULES=pm so it carries the twelve PM tools and none of the
 	// librarian ride-alongs. resolveModuleGate encodes the three cases (unset = all, set-but-empty
 	// = fail, unresolvable = fail); a failure is surfaced here as a direct os.Exit(1) — never a
 	// returned error — mirroring the requireResolvedConfig precedent above, because PocketBase's
