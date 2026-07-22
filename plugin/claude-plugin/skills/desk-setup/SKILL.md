@@ -46,11 +46,13 @@ _structure/
   decisions/README.md     # the decision spine index (K5, K15), newest-first
 _knowledge/
   README.md               # what this folder is + the profile pointer (surfaces i/ii)
+  profile.example.yaml    # the canonical placeholder profile — copy to profile.yaml and fill in (K12)
 ```
 
-The scaffold does **not** ship a `profile.example.*` of its own — the canonical placeholder
-profile is shipped once with the plugin (under the repo's `_knowledge/`); the scaffold's
-`_knowledge/README.md` points at it, so there is one owner for that file (K12).
+The scaffold ships the canonical placeholder profile as its own `_knowledge/profile.example.yaml`,
+alongside the `_knowledge/README.md` that points at it — one owner for that file (K12). Copying the
+scaffold therefore brings the example profile into the new desk; there is no separate repo instance
+to fetch it from.
 
 ## Greenfield runbook (K23)
 
@@ -62,9 +64,9 @@ Ordered; each step verifies before the next:
    applies every external write, K1). Milestones, if any, enter later as owner *constraints*
    (K11) — they are not scaffold content.
 3. **Copy the scaffold** (`assets/template/`) into the new desk root.
-4. **Create the profile.** Copy the plugin's shipped `profile.example.*` to
-   `_knowledge/profile.yaml` (or `.json`/`.md`) and fill it in — the deployment's identifiers
-   (handles, repos, board, machines, preferences) live here, and nowhere else.
+4. **Create the profile.** Copy the scaffold's `_knowledge/profile.example.yaml` (brought in by
+   step 3) to `_knowledge/profile.yaml` (or `.json`/`.md`) and fill it in — the deployment's
+   identifiers (handles, repos, board, machines, preferences) live here, and nowhere else.
 5. **Materialize the seed files.** Run the plugin's **`template_render` MCP tool** to resolve
    every `{{profile.…}}` placeholder in the scaffold against `_knowledge/profile.yaml`. This is
    **fail-loud**: a required placeholder with no default whose key is absent aborts with an

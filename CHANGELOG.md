@@ -13,6 +13,21 @@ for why this policy exists.
 
 ## [Unreleased]
 
+### Changed
+
+- **Repo-root `_knowledge/` instance removed** (#170, #84 second half; ADR 0021 §F5). Per the
+  owner ruling on issue #170 (2026-07-21), the repo itself is not an exec desk, so it no longer
+  ships a repo-root `_knowledge/` — the `_knowledge/` convention belongs only to the desks the
+  tools stand up. This is **not a rename**: the desk-side convention is unchanged (the
+  `schema/paths.yaml` `profile_root`, the TS `PROFILE_ROOT_DIR` / Go `ProfileRootDir` constants,
+  the `check-profile-root` drift guard, and every product string naming `_knowledge/profile.yaml`
+  all stay exactly as they were). The canonical placeholder example profile now has a single home
+  **with the desk-setup scaffold template**
+  (`plugin/claude-plugin/skills/desk-setup/assets/template/_knowledge/profile.example.yaml`), so
+  copying the scaffold brings it into a new desk; the repo-facing docs (README, CLAUDE.md,
+  getting-started) re-point there, and the repo-root `.gitignore` now ignores any local `_knowledge/`
+  wholesale as a dogfooding artifact.
+
 ## [0.8.0] — 2026-07-21
 
 ### Added

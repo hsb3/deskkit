@@ -1,3 +1,10 @@
+# Personalization: the real profile carries this desk's identity and never ships; the
+# placeholder example does (copy it to profile.yaml and fill it in).
+_knowledge/profile.yaml
+_knowledge/profile.json
+_knowledge/profile.md
+!_knowledge/profile.example.yaml
+
 # The one secrets home (K29): keep the folder, never track its contents.
 _meta/secrets/*
 !_meta/secrets/.gitkeep
