@@ -1,0 +1,27 @@
+== scratch desk: /var/folders/4l/vwxc3x7d1f15vtqvmpq6ddl40000gn/T//s1-desk.G4wA41 ==
+--- 1. migrate up (self-init also works; explicit here) ---
+rc=0
+--- 2. sweep ---
+{"total":3,"created":3}
+--- 3. patrol ---
+{"run_id":"patrol-20260721T234142Z","by_rule":{"R1":1,"R3":1}}
+--- 4. query findings (default disposition=open) — NOTE: output carries NO finding id ---
+{"kind":"findings","count":2,"by_rule":{"R1":[{"path":"tasks/needs-fm.md","detail":"missing universal frontmatter: created, updated, tags, synopsis"}],"R3":[{"path":"analyses/misfiled.md","detail":"type 'task' but file lives under 'analyses' (expected tasks/)"}]}}
+    (findings dispose <id> requires a record id; no query kind on this surface emits one)
+--- 5. propose-fix --run patrol-20260721T234142Z (record-original-first; no fs write) ---
+[{"path":"tasks/needs-fm.md","outcome":"recorded"},{"path":"analyses/misfiled.md","outcome":"recorded"}]
+R1 file unchanged on disk after propose (expect created key absent -> 0):
+0
+--- 6. apply-fix --run patrol-20260721T234142Z (the write path) ---
+[{"path":"tasks/needs-fm.md","outcome":"applied"},{"path":"analyses/misfiled.md","outcome":"applied"}]
+R1 needs-fm.md now has created key (expect 1):
+1
+R3 moved to tasks/misfiled.md:
+yes
+R3 old path left a pointer stub (expected move behavior):
+---
+--- 7. restore --by-path tasks/needs-fm.md (byte-exact reversal) ---
+{"path":"tasks/needs-fm.md","restored":true}
+R1 created key after restore (expect 0 = original bytes back):
+0
+== done ==

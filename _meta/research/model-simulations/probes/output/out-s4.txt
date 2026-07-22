@@ -1,0 +1,13 @@
+== scratch desk (messy pre-existing folder): /var/folders/4l/vwxc3x7d1f15vtqvmpq6ddl40000gn/T//s4-desk.yqIe4h ==
+--- Phase 8 baseline: migrate up (fresh store) ---
+migrate rc=0
+recorded store path: /var/folders/4l/vwxc3x7d1f15vtqvmpq6ddl40000gn/T//s4-xdg.zBgWb2/deskkit/s4-desk
+store dir exists: yes
+--- Phase 8 baseline: sweep ---
+{"total":6,"created":6}
+--- Phase 8 baseline: patrol (record run id) ---
+{"run_id":"patrol-20260721T234453Z","findings_new":4,"by_rule":{"R1":1,"R3":2,"R4":1},"by_severity":null}
+recorded patrol run id: patrol-20260721T234453Z
+--- triage view: mechanical (auto-fixable) vs judgment (stays flagged for a human) ---
+{"open_findings_total":4,"by_severity":{"judgment":1,"mechanical":3},"by_rule":{"R1":1,"R3":2,"R4":1}}
+== done ==
