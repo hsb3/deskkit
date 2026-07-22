@@ -908,6 +908,12 @@ the reproducibility gate runs against the renamed layout too.
 - Product version + CHANGELOG follow the repo's existing policy (ADR 0005); the version number
   for this build is confirmed with the owner at bump time (the build order flags 0.6.0 as
   presumptively the owner's next number — do not assume).
+- **Not to be conflated with the shared-contract version.** `module_schema_versions` here versions
+  a **desk's PocketBase PM migrations** (a store-side, per-install migration ledger). It is a
+  different mechanism from the `contract_version` / `x-contract-version` marker on the shared
+  build-time `schema/` files (`doctypes.yaml`, `profile.schema.yaml`) that both lanes' loaders read
+  and refuse when unrecognized (ADR 0009) — that marker versions the CONTRACT source itself, ships
+  inside the binary/plugin, and touches no store.
 
 ---
 

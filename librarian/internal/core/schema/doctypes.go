@@ -40,9 +40,26 @@ type Vocabulary struct {
 
 // rawDoctypes mirrors the YAML shape of schema/doctypes.yaml.
 type rawDoctypes struct {
-	Universal []string                  `yaml:"universal"`
-	Status    map[string][]string       `yaml:"status"`
-	Types     map[string]map[string]any `yaml:"types"`
+	ContractVersion int                       `yaml:"contract_version"`
+	Universal       []string                  `yaml:"universal"`
+	Status          map[string][]string       `yaml:"status"`
+	Types           map[string]map[string]any `yaml:"types"`
+}
+
+// knownContractVersions is the set of schema/doctypes.yaml contract versions this build
+// understands (ADR 0009's shared-contract versioning). A file declaring anything else is
+// refused loud in parseDoctypes rather than silently misread. This is the CONTRACT file's own
+// version, distinct from the store-side module_schema_versions migration mechanism (pm-system
+// spec §8.3 / R7.1) and from profile.schema.yaml's instance-level schema_version.
+var knownContractVersions = []int{1}
+
+func isKnownContractVersion(v int) bool {
+	for _, k := range knownContractVersions {
+		if k == v {
+			return true
+		}
+	}
+	return false
 }
 
 var (
@@ -63,6 +80,11 @@ func parseDoctypes(b []byte) (*Vocabulary, error) {
 	var raw rawDoctypes
 	if err := yaml.Unmarshal(b, &raw); err != nil {
 		return nil, fmt.Errorf("schema: parse embedded doctypes.yaml: %w", err)
+	}
+	if !isKnownContractVersion(raw.ContractVersion) {
+		return nil, fmt.Errorf(
+			"schema: doctypes.yaml declares unrecognized contract_version %d (known: %v)",
+			raw.ContractVersion, knownContractVersions)
 	}
 	if len(raw.Universal) == 0 || len(raw.Types) == 0 {
 		return nil, fmt.Errorf("schema: embedded doctypes.yaml missing universal/types sections")

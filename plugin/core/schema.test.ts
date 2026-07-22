@@ -73,3 +73,36 @@ test("loadAndValidateProfile returns a valid profile", () => {
 test("getValidator memoizes by path", () => {
   expect(getValidator(schemaPath!)).toBe(getValidator(schemaPath!));
 });
+
+// ADR 0009 shared-contract versioning: the loader reads the schema file's own
+// `x-contract-version` marker and refuses a value it does not know, rather than silently
+// misreading a future contract shape.
+test("compileValidator rejects an unrecognized x-contract-version", () => {
+  const bogus = { ...loadSchemaObject(schemaPath!), "x-contract-version": 999 };
+  expect(() => compileValidator(bogus)).toThrow(/contract version 999 is not recognized/);
+});
+
+test("compileValidator rejects a missing x-contract-version", () => {
+  const stripped = loadSchemaObject(schemaPath!);
+  delete stripped["x-contract-version"];
+  expect(() => compileValidator(stripped)).toThrow(/is not recognized/);
+});
+
+test("getValidator rejects a fixture schema carrying an unrecognized version", () => {
+  const root = mkdtempSync(join(tmpdir(), "ds-schemaver-"));
+  mkdirSync(join(root, "schema"), { recursive: true });
+  const fixture = join(root, "schema", "profile.schema.yaml");
+  writeFileSync(
+    fixture,
+    '$schema: "https://json-schema.org/draft/2020-12/schema"\n' +
+      "x-contract-version: 2\n" +
+      "type: object\n",
+  );
+  expect(() => getValidator(fixture)).toThrow(/contract version 2 is not recognized/);
+});
+
+test("the shipped schema declares a known x-contract-version and compiles", () => {
+  const obj = loadSchemaObject(schemaPath!);
+  expect(obj["x-contract-version"]).toBe(1);
+  expect(() => compileValidator(obj)).not.toThrow();
+});
