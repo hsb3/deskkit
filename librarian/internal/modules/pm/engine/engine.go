@@ -204,6 +204,20 @@ func (e *Engine) loadItem(id string) (*core.Record, error) {
 	return rec, nil
 }
 
+// edgeGatedForAnyType reports whether rules binds at least one document requirement to edgeKey
+// for ANY known item type — i.e. whether SOME type on this desk would be gated
+// crossing this edge, regardless of the type of the item actually asking. rules.Gates values
+// are the gates package's unexported docRequirements, so this ranges rather than naming the
+// type; .Documents is an exported field and reads fine across the package boundary either way.
+func edgeGatedForAnyType(rules *gates.Config, edgeKey string) bool {
+	for _, transitions := range rules.Gates {
+		if reqs, ok := transitions[edgeKey]; ok && len(reqs.Documents) > 0 {
+			return true
+		}
+	}
+	return false
+}
+
 // checkVersion enforces the §3.6 optimistic-concurrency token: every mutating call takes the
 // version its caller read and refuses on mismatch.
 func checkVersion(rec *core.Record, version int) error {
@@ -364,6 +378,26 @@ func (e *Engine) transitionCore(ctx context.Context, in TransitionInput) (*core.
 		return nil, nil, derr
 	}
 	edgeKey := statemachine.EdgeKey(from, to)
+	// 4a. An empty type must not become an undetectable way to skip a document gate:
+	// dc.rules.Effective binds per-type requirements by looking up item.GetString("type") as a
+	// map key, so a "" type can never match a per-type rule no matter what the config says —
+	// the item silently sails through an edge the desk DOES gate for its intended type. Rather
+	// than requiring `type` at create time (ADR 0012 deliberately keeps it optional there, and
+	// reversing that is a bigger, unrelated behavior change), this refuses the specific edge
+	// the desk's config gates for AT LEAST ONE known type when the item itself carries none —
+	// closing the loophole while leaving every already-typed item's gate evaluation untouched
+	// (Effective/traits below are reached exactly as before once a type is set, even one this
+	// desk never gates). Assigning ANY recognized type (via update_item) clears this refusal,
+	// even if that type turns out to be itself ungated on this edge.
+	if item.GetString("type") == "" && edgeGatedForAnyType(dc.rules, edgeKey) {
+		msg := fmt.Sprintf(
+			"item %q has no type set, and %s is a gated edge for at least one item type on this desk; set a type before advancing",
+			item.Id, edgeKey)
+		return nil, &pendingAudit{
+			itemID: item.Id, fromPhase: string(from), toPhase: string(to),
+			event: "gate_refused", actor: in.Actor, detail: msg,
+		}, &Refusal{Reasons: []string{msg}}
+	}
 	reqs := dc.rules.Effective(item.GetString("type"), edgeKey, e.fieldLookup(ctx, item))
 	if gerr := gates.Evaluate(ctx, e.Validator, reqs, e.pointerResolver(item)); gerr != nil {
 		var r *Refusal

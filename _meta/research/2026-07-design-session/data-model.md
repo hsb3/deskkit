@@ -15,8 +15,11 @@ for the 2026-07 design session (see `../README.md` §6)._
 
 > **Correction (2026-07-21):** the #126 v1 model simulations empirically falsified three claims
 > below (evidence: `_meta/research/model-simulations/deficiency-report.md`, observations O1–O3):
-> **§4** — `items.type` IS validated at create (`create_item` refuses an unknown type; the
-> asymmetric gap is `update_item`, tracked as issue #185, whose fix reconciles §4 in place);
+> **§4** — `items.type` IS validated at create (`create_item` refuses an unknown type); the
+> asymmetric `update_item` gap this section originally described was closed by issue #185
+> (`update_item` now applies the identical vocabulary check, plus a new refusal for an untyped
+> item crossing a document-gated edge) — §4's `items.type` row and §2.1's `type` field note are
+> updated in place to reflect this;
 > **§5.3** — the disposition-blind-aggregate defect was fixed in the 0.8.0 bug floor;
 > **Gaps** — `transitions.event=gate_refused` is live, not dead. Read those sections against
 > this callout.
@@ -215,7 +218,7 @@ only widens three librarian-lane fields).
 |---|---|---|
 | `desk` | TextField | `collections.go:54` |
 | `title`, Required | TextField | `collections.go:55` |
-| `type` | TextField | **unvalidated** — see §4, §5 |
+| `type` | TextField | **validated at both `create_item` and `update_item`** (issue #185 closed the `update_item` gap this row used to describe) — see §4, §5 |
 | `phase`, Required | SelectField | `[queue, work, review, terminal]` (`collections.go:57-58`) |
 | `blocked` | BoolField | |
 | `restore_phase` | SelectField | `[queue, work, review, terminal]` — the §3.2 block/unblock side-state slot, not in the field table the comment references (`collections.go:60-63`) |
@@ -311,7 +314,7 @@ One row per desk: editable gate rules, status-label vocabulary, claim-TTL overri
 |---|---|---|---|
 | `files.graduated_to` | TextField | Opaque pointer text (`wb#N`, `#N`, bare number, or URL), populated **only** from an explicit marker: frontmatter `graduated_to:` key, or a canonical inline `graduated to: <ref>` line (regex-anchored at line start) | No — any string accepted; the marker-vs-not distinction is a **read-time heuristic** in `sweep.go`, not a schema constraint | `librarian/internal/modules/librarian/tools/sweep.go:349-376` (marker regex `:359`) |
 | `items.pointer` | TextField | A desk-relative file path, optionally suffixed with an advisory `§ heading` section anchor (`"notes.md § Decisions"`); a `#heading`-style suffix is NOT stripped and fails resolution with an actionable hint | Not at write time (no PM-side check); resolved/validated **at gate-evaluation time** by the librarian's `Verdict()` — existence + frontmatter-type + status, never the heading | Declared: `librarian/internal/modules/pm/collections/collections.go:67`. Resolution: `librarian/internal/modules/librarian/module.go:104-175` (`Verdict`), `:203-214` (`sectionFilePart`) |
-| `items.type` | TextField (no `Values`) | Intended to be a schema-v1/kit doctype string (e.g. `decision`, `feature-spec`) | **No** — `CreateItem` sets it directly from caller input with zero vocabulary check; a typo'd type advances ungated | `librarian/internal/modules/pm/collections/collections.go:56` (declaration, plain `TextField`); `librarian/internal/modules/pm/engine/engine.go:146` (`rec.Set("type", in.Type)`, no validation call anywhere in `CreateItem`, `engine.go:129-178`) |
+| `items.type` | TextField (no `Values`) | Intended to be a schema-v1/kit doctype string (e.g. `decision`, `feature-spec`) | **Yes, at both write paths** (issue #185 closed the asymmetry this row used to describe) — `CreateItem` refuses a non-empty, unrecognized type via `schema.Vocab().KnownType`, and `UpdateItem` now applies the identical check; an item left untyped (still legal — a deliberate ADR 0012 scope call) is additionally refused on any edge the desk's gate config binds for at least one known type, closing the "typo'd/absent type advances ungated" gap this row used to name | `librarian/internal/modules/pm/engine/engine.go` `CreateItem`'s vocab check + the `edgeGatedForAnyType`-gated refusal in `transitionCore`; `librarian/internal/modules/pm/engine/queries.go` `UpdateItem`'s matching vocab check |
 | `desk_config.rules` | TextField (no explicit `Max`) | A YAML document: `schema_version`, `gates: {type -> transition -> documents}`, `traits: [...]` | **Yes** — `gates.ParseRules` validates `schema_version==1`, every gate's item-type against `schema.Vocab().KnownType`, every transition key against `statemachine.ParseEdgeKey`, every doc requirement's type/status/pointer grammar; bound to `OnRecordCreate`/`OnRecordUpdate` hooks so an invalid config is rejected, never saved | `librarian/internal/modules/pm/gates/gates.go:57-123`; hooks at `librarian/internal/modules/pm/module.go:97-108,160-173` |
 | Gate `DocRequirement.Pointer` | Go string field (YAML `pointer:`) | `""`/`"item"` (item's own pointer) or `"note:<key>"` (a note's body) — closed 2-value grammar | Yes, at `ParseRules` time (`validateDocRequirement`) | `gates.go:25,109-123` |
 | `dependencies.kind` | SelectField `[blocks, relates-to]` | Surface accepts a third value, `is-blocked-by`, but the engine canonicalizes it to the inverse `blocks` edge **before** the DB write — it is never a stored value | Yes — both by the engine's own switch (`refuse` on anything else) and PocketBase's `SelectField` enum | `pm/collections/collections.go:90-93,99-100`; `pm/engine/engine.go:626-644` |
