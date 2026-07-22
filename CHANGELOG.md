@@ -13,6 +13,44 @@ for why this policy exists.
 
 ## [Unreleased]
 
+### Added
+
+- **`schema/` contract versioning** (#124; ADR 0009). `schema/doctypes.yaml` and
+  `schema/profile.schema.yaml` carry an explicit version marker (`contract_version` /
+  `x-contract-version`, both `1` today); both lanes' loaders reject an unrecognized version loud
+  instead of silently misreading it, distinct from the already-shipped store-side
+  `module_schema_versions` migration mechanism.
+- **Schema-v2 element model, reviewed draft** (#125, #126 v2 half; ADR 0018). The draft element
+  model graduated to `docs/element-model-v2-draft.md`, folding in ADR 0018's four owner rulings
+  and both adversarial reviews' 18 gaps. Tabletop simulations walked the model against six
+  scenarios (the four v1 flows plus two v2-native software/research walkthroughs); the
+  deficiency report at `_meta/research/model-simulations/` records every gap's disposition. Model
+  stays `status: draft`; finalization is the owner's 1.0.0 maturity call (#87). Filed #197
+  (software/PM phase-machine reconciliation) as a follow-up.
+- **Discoverable TUI views + guided first-run** (#189). The chat TUI now shows a tab strip
+  (`chat | pm context | pm board`), a keybinding footer, a `?` help overlay, and an
+  announce-or-explain behavior for PM module views instead of the prior unadvertised `ctrl+p`
+  chord and silent no-op on a no-mount desk.
+- **User/developer docs split** (#190). `docs/README.md` and the Using-track pages
+  (`getting-started.md`, `plugin-guide.md`, `librarian-guide.md`, `pm-guide.md`) now assume no
+  build toolchain and no env-var exports for the core sweep/patrol/PM flow; build-from-source and
+  env-var/store-path lore moved to a new `docs/development/install-and-build.md`.
+
+### Fixed
+
+- **`findings dispose` unusable from the CLI** (#184). `query findings` / `query uncollapsed`
+  now include each finding's record `id`, matching `feedback`'s existing shape — the CLI-only
+  disposition workflow no longer needs the admin GUI/REST to find an id.
+- **`update_item` skipped type validation** (#185). `update_item` now validates `items.type`
+  against the schema vocabulary like `create_item` does; an untyped item is refused on any edge
+  the desk config gates for a known type, closing a supervised-gate bypass.
+- **Subprocess test store collision across worktrees** (#182). `TestPMActorBeforeLeaf_Subprocess`
+  now resolves its store under a per-run temp `XDG_DATA_HOME`, so parallel worktrees at different
+  schema versions no longer collide on a shared machine-global store.
+- **Stale "desk-pm mount" label** (#181, #187). Renamed to "pm-only mount" across
+  `docs/tool-surface.md`, the MCP server + its tests, and the e2e suite; the default-mount tool
+  count corrected from the pre-PM-default-on `5` to the current `17`.
+
 ### Changed
 
 - **Plugin distribution bundles extracted to a top-level `plugins/` tree.** The two marketplace

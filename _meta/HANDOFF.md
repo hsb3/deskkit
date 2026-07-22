@@ -1,7 +1,7 @@
 _Session-to-session bridge for desk-standard. Read this before working; update it at the end
 of any substantial session. Secret-free — live URLs/credentials belong in `_meta/operations/`
 (untracked) if that dir is ever created._
-Status: active (2026-07-21, post v0.8.0 release; distilled from the wave-log form — prior
+Status: active (2026-07-22, post wave-v4; distilled from the wave-log form — prior
 versions live in this file's git history)
 
 # HANDOFF
@@ -28,14 +28,18 @@ inherits from lives in `…/Projects/dotfiles-agents-desk/_structure/decisions/`
 `dev-tooling-desk`, whose stale copy sits in `…/Projects/ARCHIVE/dev-tooling-desk-old/` — don't
 read the archive copy as current).
 
-## 1. Current standing (as of 2026-07-21) + what's next
+## 1. Current standing (as of 2026-07-22) + what's next
 
-**v0.8.0 is RELEASED** (owner-tagged; release workflow success; published binary + checksum
-verified). All three delivery plans (v1/v2/v3) are EXECUTED; **the owner decision queue is
-EMPTY** — the nine-item 2026-07-21 sign-off batch (trail:
-`_meta/signoff/2026-07-21-decision-queue/`) plus the in-session `_knowledge/` ruling were all
-approved and executed same-day. **The 1.0.0 milestone holds only #87** (the release-cut epic);
-every lane epic is closed.
+**Wave-v4 EXECUTED same-session** (6 crews + 1 reconciliation PR, all merged): schema-v2 arc
+closed for this cycle (#124, #125, #126 v2 half — the model stays `status: draft`, gated on the
+owner's #87 call), all findings-driven small buildables closed (#184, #185, #182, #181, #187),
+and both owner-raised UX/docs issues closed (#189 TUI discoverability, #190 user/dev docs
+split). Final union of `main` re-verified bare post-merge: `make check`, `make test`,
+`make verify` (61/61, up from 55), `make e2e` (43/45, 2 LLM-key skips). **The owner decision
+queue is EMPTY** going into and coming out of this run — no item needed a ruling; #185's
+empty-type gate policy and #190's docs-location call were engineering judgment calls the crews
+made and documented themselves. **The 1.0.0 milestone still holds only #87** (the release-cut
+epic).
 
 **Decision-record state:** ADRs 0009–0018 bind (2026-07-20 design session); **ADR 0020**
 (authoritative PM claims) owner-confirmed 2026-07-21, supersession window closed; **ADR 0021**
@@ -47,19 +51,18 @@ form, never chat questions (project memory; the 2026-07-21 batch proved the patt
 scale).
 
 **NEXT, in order of consequence:**
-1. **Schema-v2 arc (#130) — UNBLOCKED, next session's work**: #124 (version the schema
-   contract) → #125 (element model revision under ADR 0018; the v1 sims walkthroughs at
-   `_meta/research/model-simulations/` carry a ready `v2 (deferred)` column) → #126 v2 half.
-   Design-heavy; deserves a fresh session.
-2. **Small buildables** (findings-driven, all filed 2026-07-21): #184 (finding id missing from
-   query surfaces — CLI disposition dead-ends), #185 (update_item type-validation gate bypass),
-   #182 (subprocess-test shared-store collision), #181 + #187 (coupled label/doc passes — one
-   PR could take both).
-3. **1.0.0 maturity call (#87)** — owner's call; the value-evaluation verdict (wins all 3
-   rubric dimensions vs both baselines; honest caveats) is on file at
-   `_meta/research/2026-07-cohesion-value-evaluation/`.
+1. **#197** (gate:v2-final, filed 2026-07-22 by the wave-v4 model-simulations crew) — reconcile
+   the software-spec phase-machine with the PM item phase-machine and name the
+   building→shipped gate rule. The one open item blocking full schema-v2 epic (#130) closure.
+2. **1.0.0 maturity call (#87)** — owner's call, now better-informed: the value-evaluation
+   verdict (wins all 3 rubric dimensions vs both baselines; honest caveats) is on file at
+   `_meta/research/2026-07-cohesion-value-evaluation/`, and the model-simulations deficiency
+   report (v1 + v2, both models walked) is complete at `_meta/research/model-simulations/`.
+3. **#199** (filed 2026-07-22) — `docs/development/ts-proxy-design.md` still cites the retired
+   `plugin/desk-pm/` path (folded into desk-persona in #180, then moved under `plugins/` in
+   #191); needs the ts-proxy design owner's judgment, not a mechanical rename.
 4. **ts-proxy implementation** — `docs/development/ts-proxy-design.md` §5; slice 0 (host
-   spawn-capability probe) is the go/no-go.
+   spawn-capability probe) is the go/no-go; blocked behind #199's doc correction.
 
 **Carried-over open question** (2026-07-20, still unresolved): despite
 `enabledPlugins["desk-standard@desk-standard"]: true`, the plugin's 4 MCP tools would not
@@ -76,6 +79,12 @@ lives as an issue precisely so refreshes never touch commit history.
 
 ## 2. Delivery eras (newest first — blow-by-blow lives in #155's body, the PRs, and this file's git history)
 
+- **2026-07-22 · wave-v4** — 7 PRs (#192–#196, #198, #200); closed #124 #125 #126 #181 #182 #184
+  #185 #187 #189 #190; schema-v2 arc closed for this cycle (contract versioning, reviewed v2
+  element model, v1+v2 model simulations both walked), TUI discoverability (tab strip, footer,
+  help overlay) + user/dev docs split, 3 findings-driven librarian bugfixes, tool-surface label
+  cleanup, reconciliation pass. Filed #197, #199. One collision (wave 6 vs. wave 5 on
+  `docs/getting-started.md`, predicted in-brief) resolved directly by the coordinating session.
 - **2026-07-21 · wave-v3 + sign-off + v0.8.0** — 8 PRs (#176–#180, #183, #186, #188); closed
   #19 #81 #83 #84 #88 #170 #171; browser session surface, TUI archive lifecycle, PM default-on,
   desk-pm folded into desk-persona, K24 retrofit defaults ruled, `make e2e` gate (45 checks),
