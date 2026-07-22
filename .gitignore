@@ -18,7 +18,7 @@
 # --- PocketBase runtime store (never committed; the real store lives under $XDG_DATA_HOME) ---
 pb_data/
 
-# --- Node / TS (plugin/opencode, plugin/claude-plugin) ---
+# --- Node / TS (plugin/opencode, plugins/desk-standard) ---
 node_modules/
 dist/
 build/

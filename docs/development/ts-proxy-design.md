@@ -44,8 +44,8 @@ calls the other; they coexist only by both appearing in a session's MCP config.
   re-declares no schema and calls no other process. Its tools are the fixed four
   `profile_get`, `profile_validate`, `template_render`, `knowledge_index`
   (`plugin/core/tools.ts:240`; `docs/tool-surface.md:128-142`, "Count: 4, fixed (no gate)").
-- **The plugin bundle mounts only the TS server.** `plugin/claude-plugin/.mcp.json` runs
-  `bun ${CLAUDE_PLUGIN_ROOT}/mcp/server.js` (`plugin/claude-plugin/.mcp.json:1-6`) — the
+- **The plugin bundle mounts only the TS server.** `plugins/desk-standard/.mcp.json` runs
+  `bun ${CLAUDE_PLUGIN_ROOT}/mcp/server.js` (`plugins/desk-standard/.mcp.json:1-6`) — the
   generated, self-contained bundle copy of `server.ts`.
 - **The librarian surface is mounted separately, by the desk-pm bundle.**
   `plugin/desk-pm/.mcp.json` starts `deskkit mcp-serve` directly with
@@ -115,7 +115,7 @@ hardcoding a list — so the proxied surface can never drift from the Go gate.
 #79 precedent and ADR 0014 require **fail loud with a stderr mount signal**
 (`docs/decisions/0014-agent-integration-contract.md:30-31`), not the silent drop a PATH-less
 `deskkit` produces for the desk-pm mount today
-(`plugin/claude-plugin/skills/brownfield-adoption/SKILL.md:44-45`).
+(`plugins/desk-standard/skills/brownfield-adoption/SKILL.md:44-45`).
 
 **The judgment call this question forces.** The Go `mcp-serve` fails loud by `os.Exit(1)`
 (`librarian/internal/core/mcp/server.go:112-115, 123-128`) — correct *there*, because if the desk
@@ -187,7 +187,7 @@ follows one passed-through policy flag** — the smallest surface that satisfies
 proxied tools?
 
 **Finding.** In the plugin's skill layer today, `template_render` is claimed by `desk-setup`
-(`plugin/claude-plugin/skills/desk-setup/SKILL.md:8,68`) and `brownfield-adoption`; the other
+(`plugins/desk-standard/skills/desk-setup/SKILL.md:8,68`) and `brownfield-adoption`; the other
 three TS tools are **no-persona-by-design** (`docs/agent-integration-contract-v1-spec.md:131-140`).
 The 5 librarian tools are today claimed only by the **librarian system prompt** (the Go/in-binary
 persona) — *not* by any Claude Code skill in the plugin bundle. Surfacing them through the TS
@@ -294,9 +294,9 @@ slice 0 is the go/no-go probe.
 | **0** | **Spawn-feasibility probe** | *(spike, no owned prod file)* | Confirm a Claude Code plugin stdio MCP server may spawn `deskkit` as a subprocess in the target host. If not → §4 blocker → Option A fallback. **Do this first.** |
 | **1** | Proxy module | **new** `plugin/mcp/proxy.ts` | Spawn `deskkit mcp-serve` with `MCP_MODULES=librarian` (+ passthrough `LIBRARIAN_AUTONOMOUS_WRITES`); MCP **client** handshake (`initialize`→`tools/list`); `CallTool` forwarding; lifecycle/cleanup (§3.1); fail-loud + child-stderr forwarding (§3.2). Harness-pure boundary respected by living in `mcp/`, not `core/` (§3.5). Env trap: `spawn()` inherits `process.env` by default — which the child NEEDS (`DESK_ROOT`/`DESK_NAME`/cwd walk-up feed `requireResolvedConfig`); if the spawn passes an explicit `env`, it must spread `...process.env` before adding `MCP_MODULES`, or the child exits immediately as desk-unresolved. |
 | **2** | Server wiring | `plugin/mcp/server.ts` **(edited — out of scope for #122)** | Merge native `TOOLS` with the proxy's tool list in `ListTools`; route `CallTool` to native handler or proxy by name; emit the aggregate mount signal (§3.6). |
-| **3** | Claiming skill | **new/extended** under `plugin/claude-plugin/skills/` (e.g. `desk-librarian/SKILL.md`, or `conventions-standard`) | Claim the 5 proxied librarian tools so none is unclaimed (§3.4; ADR 0014). **Must ship in the same wave as slices 1–2.** |
+| **3** | Claiming skill | **new/extended** under `plugins/desk-standard/skills/` (e.g. `desk-librarian/SKILL.md`, or `conventions-standard`) | Claim the 5 proxied librarian tools so none is unclaimed (§3.4; ADR 0014). **Must ship in the same wave as slices 1–2.** |
 | **4** | Tool-surface truth | `docs/tool-surface.md` **§3 + Summary**, and the `tool-surface-drift-guard` (tracked **separately**) | Update surface-3 count from 4 to 4 + proxied (5/6); extend the drift guard to count the proxied tools. This issue only **notes** the guard must absorb them — it does not implement/extend the guard here. |
-| **5** | Bundle regeneration | generated `plugin/claude-plugin/mcp/server.js` via `make package` | The marketplace copies only `plugin/claude-plugin/`, so `proxy.ts` **must be bundled into** the self-contained `server.js`; the existing bundle drift guard (`git diff --exit-code`) then covers it. Verify the packaging step includes the new module. |
+| **5** | Bundle regeneration | generated `plugins/desk-standard/mcp/server.js` via `make package` | The marketplace copies only `plugins/desk-standard/`, so `proxy.ts` **must be bundled into** the self-contained `server.js`; the existing bundle drift guard (`git diff --exit-code`) then covers it. Verify the packaging step includes the new module. |
 | **6** | Spec reconciliation *(optional, same wave)* | `docs/pocket-librarian-v1-spec.md` §7.2 | Move the TS-boundary promise from "planned" to "shipped" once the proxy lands (ADR 0016 kept it "planned" until then, `docs/decisions/0016-ts-boundary-deskkit-proxy.md:36`). |
 
 CHANGELOG and version-sync do not fire for *this* docs-only issue; the CHANGELOG entry belongs to
@@ -330,7 +330,7 @@ Current-behavior claims, each spot-checked at the cited line:
   (`:48-53`).
 - `plugin/mcp/server.ts:59-63` — serves over `StdioServerTransport`.
 - `plugin/core/tools.ts:240` — the fixed four-tool `TOOLS` array.
-- `plugin/claude-plugin/.mcp.json:1-6` — bundle mounts only the TS server
+- `plugins/desk-standard/.mcp.json:1-6` — bundle mounts only the TS server
   (`bun ${CLAUDE_PLUGIN_ROOT}/mcp/server.js`).
 - `plugin/desk-pm/.mcp.json:1-10` — desk-pm mounts `deskkit mcp-serve` with `PM_ENABLED=true`,
   `MCP_MODULES=pm`.
@@ -351,10 +351,10 @@ Current-behavior claims, each spot-checked at the cited line:
   `:37-38` — fallback = reopen with Option A.
 - `docs/decisions/0014-agent-integration-contract.md:29-30` — tool-level gating so no tool is
   unclaimed; `:30-31` — fail-loud + stderr mount signal applies to every mount.
-- `plugin/claude-plugin/skills/brownfield-adoption/SKILL.md:42-52` — deskkit must be on PATH,
+- `plugins/desk-standard/skills/brownfield-adoption/SKILL.md:42-52` — deskkit must be on PATH,
   wires at session start, silent-drop is the failure being replaced, stderr signal is the
   diagnostic.
-- `plugin/claude-plugin/skills/desk-setup/SKILL.md:8,68` — `template_render` is skill-claimed.
+- `plugins/desk-standard/skills/desk-setup/SKILL.md:8,68` — `template_render` is skill-claimed.
 - `librarian/internal/core/mcp/server.go:97-101, 226-234` — stdin-EOF is a clean shutdown;
   `:112-115` — `requireResolvedConfig` fail-loud `os.Exit(1)`; `:123-128` — `MCP_MODULES` gate
   fail-loud; `:134-139` — stderr-only mount signal + stdio transport; `:145-186` — the three

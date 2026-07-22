@@ -9,10 +9,13 @@ versions live in this file's git history)
 ## 0. Orientation
 
 Two products over one shared schema, all identity-neutral (nothing shipped carries a
-person/org/repo/issue): **`plugin/`** (harness-pure TS core + stdio MCP server, wrapped as a
-Claude Code plugin with four skills) and **`librarian/`** (deskkit: single Go binary, embedded
-PocketBase, eino agent loop, record-original-first write boundary), with **`schema/`** as the
-contract both read. Personalization happens only in a desk's `_knowledge/profile.yaml` (the repo
+person/org/repo/issue): **`plugin/`** (harness-pure TS core + stdio MCP server) and
+**`librarian/`** (deskkit: single Go binary, embedded PocketBase, eino agent loop,
+record-original-first write boundary), with **`schema/`** as the contract both read. The two
+marketplace bundles live in a top-level **`plugins/`** tree (`plugins/desk-standard/` — the TS
+plugin adapter, GENERATED server.js; `plugins/desk-persona/` — the composed librarian+PM bundle);
+extracted from under `plugin/` on 2026-07-22, and a marketplace install copies ONLY
+`plugins/desk-standard/`. Watch the one-letter `plugin/` vs `plugins/` distinction. Personalization happens only in a desk's `_knowledge/profile.yaml` (the repo
 itself is NOT a desk — ruled 2026-07-21, PR #188). Root `README.md` is the front door;
 `CLAUDE.md` is the agent digest (hot-loaded — don't duplicate it here); `docs/CHARTER.md` is the
 canonical page (precedence rule); `docs/README.md` indexes the docs;

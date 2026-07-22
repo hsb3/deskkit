@@ -12,7 +12,7 @@ import { parse as parseYaml } from "yaml";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = join(HERE, "..");
-const BUNDLE = join(HERE, "desk-persona");
+const BUNDLE = join(REPO_ROOT, "plugins", "desk-persona");
 
 // The 5 librarian tools this mount exposes by default (LIBRARIAN_AUTONOMOUS_WRITES unset/false;
 // apply_fix withheld, restore never exposed over MCP — docs/tool-surface.md).
@@ -164,7 +164,7 @@ test("the marketplace registers desk-persona alongside desk-standard; desk-pm is
   const mk = JSON.parse(readFileSync(join(REPO_ROOT, ".claude-plugin", "marketplace.json"), "utf8"));
   const entry = mk.plugins.find((p: any) => p.name === "desk-persona");
   expect(entry).toBeDefined();
-  expect(entry.source).toBe("./plugin/desk-persona");
+  expect(entry.source).toBe("./plugins/desk-persona");
   expect(entry.version).toBe(canonicalVersion);
   // desk-standard stays; desk-pm was folded into desk-persona and removed from the marketplace
   // (owner ruling 2026-07-21 "fold"; ADR 0014(a) one composed bundle).

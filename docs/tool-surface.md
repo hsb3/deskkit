@@ -159,7 +159,7 @@ librarian's env flags. Its tools are the `TOOLS` array in `plugin/core/tools.ts`
 | `template_render` | `plugin/core/tools.ts` |
 | `knowledge_index` | `plugin/core/tools.ts` |
 
-**Count: 4**, fixed (no gate). The packaged copy at `plugin/claude-plugin/mcp/server.js` is
+**Count: 4**, fixed (no gate). The packaged copy at `plugins/desk-standard/mcp/server.js` is
 generated and drift-guarded — same four tools.
 
 ---

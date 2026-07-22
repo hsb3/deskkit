@@ -62,28 +62,28 @@ PM_NAMES=$(printf '%s' "$PMOUT" | jq -r '.tools[].name' 2>/dev/null)
 check "MCP_MODULES=pm mount exposes exactly the 12 PM tools (no librarian ride-alongs)" $?
 note "desk-pm mount tool count: $PMCNT"
 
-# --- skills present: 4 claude-plugin + 3 desk-persona PM skills -----------------------------
+# --- skills present: 4 desk-standard + 3 desk-persona PM skills -----------------------------
 SKILLS_MISSING=0
 for skill in \
-  "plugin/claude-plugin/skills/desk-setup/SKILL.md" \
-  "plugin/claude-plugin/skills/conventions-standard/SKILL.md" \
-  "plugin/claude-plugin/skills/harvest-loop/SKILL.md" \
-  "plugin/claude-plugin/skills/brownfield-adoption/SKILL.md" \
-  "plugin/desk-persona/skills/pm-session-open/SKILL.md" \
-  "plugin/desk-persona/skills/pm-triage/SKILL.md" \
-  "plugin/desk-persona/skills/pm-advance-item/SKILL.md"; do
+  "plugins/desk-standard/skills/desk-setup/SKILL.md" \
+  "plugins/desk-standard/skills/conventions-standard/SKILL.md" \
+  "plugins/desk-standard/skills/harvest-loop/SKILL.md" \
+  "plugins/desk-standard/skills/brownfield-adoption/SKILL.md" \
+  "plugins/desk-persona/skills/pm-session-open/SKILL.md" \
+  "plugins/desk-persona/skills/pm-triage/SKILL.md" \
+  "plugins/desk-persona/skills/pm-advance-item/SKILL.md"; do
   [ -f "$E2E_REPO/$skill" ] || SKILLS_MISSING=$((SKILLS_MISSING + 1))
 done
 [ "$SKILLS_MISSING" -eq 0 ]
-check "all 7 shipped skills present (4 claude-plugin + 3 desk-persona PM)" $?
+check "all 7 shipped skills present (4 desk-standard + 3 desk-persona PM)" $?
 
 # --- agents present --------------------------------------------------------------------------
-[ -f "$E2E_REPO/plugin/desk-persona/agents/librarian-operator.md" ] \
-  && [ -f "$E2E_REPO/plugin/desk-persona/agents/pm-operator.md" ]
+[ -f "$E2E_REPO/plugins/desk-persona/agents/librarian-operator.md" ] \
+  && [ -f "$E2E_REPO/plugins/desk-persona/agents/pm-operator.md" ]
 check "librarian-operator and pm-operator agents present" $?
 
 # --- SessionStart hook: LLM-free cold-start briefing on a PM-default-on desk ----------------
-BR=$(CLAUDE_PLUGIN_ROOT="$E2E_REPO/plugin/desk-persona" bash "$E2E_REPO/plugin/desk-persona/hooks/session-briefing.sh" 2>/dev/null)
+BR=$(CLAUDE_PLUGIN_ROOT="$E2E_REPO/plugins/desk-persona" bash "$E2E_REPO/plugins/desk-persona/hooks/session-briefing.sh" 2>/dev/null)
 printf '%s' "$BR" | grep -qF 'cold-start briefing' && printf '%s' "$BR" | grep -qF '{'
 check "SessionStart hook emits a PM cold-start briefing on a default-on desk" $?
 

@@ -17,11 +17,13 @@ if (!schemaPath) throw new Error("schema/profile.schema.yaml not found from test
 const validator = compileValidator(loadSchemaObject(schemaPath));
 
 // The shipped example lives with the desk-setup scaffold template (the single home for it, K12):
-// plugin/claude-plugin/skills/desk-setup/assets/template/_knowledge/profile.example.yaml.
+// plugins/desk-standard/skills/desk-setup/assets/template/_knowledge/profile.example.yaml.
 const examplePath = join(
   here,
   "..",
-  "claude-plugin",
+  "..",
+  "plugins",
+  "desk-standard",
   "skills",
   "desk-setup",
   "assets",

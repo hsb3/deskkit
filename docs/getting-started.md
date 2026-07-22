@@ -26,12 +26,12 @@ claude plugin marketplace add hsb3/desk-standard
 claude plugin install desk-standard@desk-standard
 ```
 
-The install copies only `plugin/claude-plugin/` into the plugin cache, so the plugin is
+The install copies only `plugins/desk-standard/` into the plugin cache, so the plugin is
 self-contained (its MCP server and schema ship inside it). For local development, point
 Claude Code straight at the source tree instead:
 
 ```bash
-claude --plugin-dir ./plugin/claude-plugin
+claude --plugin-dir ./plugins/desk-standard
 ```
 
 Inside that session, the `desk-setup` skill scaffolds a new desk; `conventions-standard`

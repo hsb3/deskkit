@@ -1,5 +1,5 @@
 // Public surface of the harness-pure core domain library (D2). Adapters (plugin/mcp,
-// plugin/opencode, plugin/claude-plugin) import from here — this is the single seam.
+// plugin/opencode, plugins/desk-standard) import from here — this is the single seam.
 
 export {
   discoverProfile,
