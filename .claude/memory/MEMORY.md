@@ -11,3 +11,5 @@ _Index format: one line per memory file — a markdown link to the topic file, t
 - [Calibrated model-tier delegation](feedback-calibrated-model-tier-delegation.md) — Henry accepts a calibrated (mixed sonnet/opus) delegation plan over a uniform heavier default, when the calibration is explained
 - [Multi-worktree wave mechanics](multi-worktree-wave-mechanics.md) — hard-won mechanics for running parallel PR lanes via .claude/worktrees in this repo
 - [Plugin marketplace packaging](plugin-marketplace-packaging.md) — how Claude Code marketplace install constrains desk-standard packaging, and the bundle solution that landed
+- [No public/1.0.0 nagging](feedback-no-public-1.0.0-nagging.md) — don't prompt Henry about going public or cutting 1.0.0 (#87); his call, not a standing agenda item
+- [Consolidation: single binary](consolidation-single-binary-decision.md) — owner ruling to collapse two plugins/MCP servers into one on the Go binary (reverses ADR 0016) + central config stores the LLM key
