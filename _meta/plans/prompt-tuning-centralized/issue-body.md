@@ -18,8 +18,8 @@ edit to the canonical wording reaches every place it is instantiated.
   `librarian/templates/librarian-system-prompt.txt`, `//go:embed`'d into the binary
   (`librarian/templates/templates.go:20-21`). Tuning it means editing that file and cutting a new
   `deskkit` release — propagation is "ship a new binary."
-- The PM instructions live in `plugin/desk-pm/agents/pm-operator.md` plus its skills
-  (`plugin/desk-pm/skills/*/SKILL.md`) — version-controlled markdown with **no** DB-backed row
+- The PM instructions live in `plugins/desk-persona/agents/pm-operator.md` plus its skills
+  (`plugins/desk-persona/skills/*/SKILL.md`) — version-controlled markdown with **no** DB-backed row
   (no `pm.system` prompt row or seed exists in shipped code — a grep across `plugin/` +
   `librarian/` returns zero matches; the only mentions are design docs discussing its absence).
   Tuning it means editing that markdown and republishing the plugin marketplace bundle — a
@@ -30,13 +30,13 @@ edit to the canonical wording reaches every place it is instantiated.
 
 **A sharper, independently re-derived gap: propagation to an *existing* desk is not "manual today,
 automatic tomorrow" — it is currently silent.** `prompt.Seed`
-(`librarian/internal/modules/librarian/prompt/prompt.go:24-40`) only checks whether a
-`librarian.system` row **exists** (`prompt.go:26-28`); it never compares the existing row's
+(`librarian/internal/modules/librarian/prompt/prompt.go:38-54`) only checks whether a
+`librarian.system` row **exists** (`prompt.go:39-42`); it never compares the existing row's
 content or a version marker against the currently-embedded default. Concretely: a desk that has
 been running for a while already has a seeded `prompts` row from whatever binary version first
 created it. Upgrading `deskkit` to a binary with a *tuned* embedded prompt does **not** update
 that row — `Seed` sees a row already present and no-ops, every time
-(`main.go:251-253`, `main.go:648-655`, both call `Seed` unconditionally on every run). The only way
+(`main.go:264`, `main.go:734`, both call `Seed` unconditionally on every run). The only way
 a tuning edit reaches an already-provisioned desk today is the manual reset-to-shipped affordance
 the sibling `prompt-governance` issue documents (delete the row, let it re-seed) — there is no
 automatic "the shipped default changed, adopt it" path. Whether that should change, and how, is
@@ -59,8 +59,8 @@ This design is a **v2-track item** (`_meta/plans/epic-schema-v2-track/issue-body
     baseline the design must improve on.
   - Answers **where the canonical tuned set lives.** Candidate mechanisms worth naming (not
     choosing): a shared prompt-set directory that both the Go embed and the plugin markdown are
-    generated/copied from, mirroring the existing `schema/` -> `plugin/claude-plugin/schema/`
-    copy-and-drift-guard pattern (`plugin/package.json:17`, `.github/workflows/ci.yml:81-85`); or
+    generated/copied from, mirroring the existing `schema/` -> `plugins/desk-standard/schema/`
+    copy-and-drift-guard pattern (`plugin/package.json:17`, `.github/workflows/ci.yml:143-147`); or
     keeping today's two per-lane sources but adding a shared manifest/registry that ties tuning
     edits together. Left **open** with a stated default.
   - Answers **how a tuning edit propagates** to: the Go embed (today: rebuild + release), the
@@ -76,8 +76,8 @@ This design is a **v2-track item** (`_meta/plans/epic-schema-v2-track/issue-body
   - Names what "tuned" means across desks: whether a tuning release is an atomic version all
     desks eventually converge on after upgrading, or whether a desk can pin/opt out of a given
     prompt version. Left **open** with a stated default.
-  - Notes `schema/profile.schema.yaml`'s existing `preferences` (`schema/profile.schema.yaml:185`)
-    and `custom` (`:197`, and the "anything not yet a first-class field belongs under `custom`"
+  - Notes `schema/profile.schema.yaml`'s existing `preferences` (`schema/profile.schema.yaml:193`)
+    and `custom` (`:205`, and the "anything not yet a first-class field belongs under `custom`"
     comment at `:7`) fields as a candidate home for a future tuning-related schema block, without
     committing to using them.
   - Names its own build slices (a bulleted breakdown of the eventual implementation work), so a
@@ -137,3 +137,4 @@ This design is a **v2-track item** (`_meta/plans/epic-schema-v2-track/issue-body
 - The `prompt-governance` issue's own deliverables (Seed-semantics documentation, the prompt-copy
   drift guard, reset-to-shipped documentation) — this issue depends on that vocabulary but does
   not redo it.
+

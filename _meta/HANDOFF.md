@@ -1,8 +1,8 @@
 _Session-to-session bridge for desk-standard. Read this before working; update it at the end
 of any substantial session. Secret-free — live URLs/credentials belong in `_meta/operations/`
 (untracked) if that dir is ever created._
-Status: active (2026-07-22, post wave-v4; distilled from the wave-log form — prior
-versions live in this file's git history)
+Status: active (2026-07-23, post planning-desk reconciliation; distilled from the wave-log
+form — prior versions live in this file's git history)
 
 # HANDOFF
 
@@ -50,10 +50,23 @@ amended: PM ships default-on. Decision packages for Henry are always the owner-s
 form, never chat questions (project memory; the 2026-07-21 batch proved the pattern at 10-items
 scale).
 
+**Planning-desk reconciliation EXECUTED 2026-07-23** (no code shipped): every open non-epic
+issue now has a reviewed, source-grounded plan on the desk (`_meta/plans/<slug>/`;
+reconcile/coverage/conformance/sync-bodies all exit 0), 16 shipped plan folders archived to
+`_meta/_archive/<issue>-<slug>/`, bodies #197/#199/#12/#36 restructured to template shape,
+#127/#128 factually corrected (items.type IS validated post-#185; retired desk-pm paths),
+#87/#104 epic-shaped, #155 re-titled with 📌 (tracker-type for the governance scripts) and
+refreshed. Two verified finds worth knowing: `plugins/desk-persona/.mcp.json` mounts
+`librarian,pm` (17 tools) — ts-proxy-design's pm-only premise drifted, #199's plan recommends
+"holds with amendment"; and schema v1 already ships AND runtime-enforces the `spec` status
+family (`librarian/internal/core/schema/doctypes.go:138-193`) — the #197 plan's decisive
+grounding for reading the draft's phase machine as the document's own status axis.
+
 **NEXT, in order of consequence:**
 1. **#197** (gate:v2-final, filed 2026-07-22 by the wave-v4 model-simulations crew) — reconcile
    the software-spec phase-machine with the PM item phase-machine and name the
    building→shipped gate rule. The one open item blocking full schema-v2 epic (#130) closure.
+   Build plan ready: `_meta/plans/phase-machine-reconciliation/`.
 2. **1.0.0 maturity call (#87)** — owner's call, now better-informed: the value-evaluation
    verdict (wins all 3 rubric dimensions vs both baselines; honest caveats) is on file at
    `_meta/research/2026-07-cohesion-value-evaluation/`, and the model-simulations deficiency

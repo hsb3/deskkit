@@ -31,7 +31,7 @@ tool. This repo is not itself a desk; it ships no repo-root `_knowledge/`.
 ## Scope of this build (v1)
 
 **Claude Code only.** OpenCode support is deferred to a separate common-core fan-out build
-(tracked in the workbench: `hsb3/dotfiles-agents-workbench#50`); `plugin/opencode/` holds a
+(tracked in #12, parked until ≥ v1.0.0); `plugin/opencode/` holds a
 frozen, unwired adapter spike kept as reference for that build (see its README) and ships nothing.
 
 Harness versions tested: Claude Code `2.1.204` · Go `1.25.0` (pinned — PocketBase's own

@@ -32,10 +32,15 @@ system does or does not already have:
      - there is no `milestone` collection or field. `milestone` is a **v2-track NET-NEW/partial**
      spine entity in the draft element model
      (`_meta/research/2026-07-design-session/platform/spec-element-model.md` section 1, row
-     `milestone` - "partial (roadmap phases, `target_ship_date`)"). Today, `items.type` is
-     free-text and **unvalidated** - `CreateItem` sets it directly from caller input with zero
-     vocabulary check (`data-model.md` section 4, `items.type` row) - so a caller could already
-     label an item's type `"milestone"` with **zero engine awareness** of what that means. The
+     `milestone` - "partial (roadmap phases, `target_ship_date`)"). Today, `items.type` IS
+     vocabulary-validated - `CreateItem` refuses an unknown type via `vocab.KnownType`
+     (`librarian/internal/modules/pm/engine/engine.go:142`) and `UpdateItem` applies the same
+     check (`engine/queries.go:538`, the #185 fix; the earlier "free-text, zero vocabulary
+     check" reading is corrected in `_meta/research/2026-07-design-session/data-model.md:16-22`,
+     dated 2026-07-21) - and `milestone` is absent from `schema/doctypes.yaml`, so a
+     `"milestone"`-typed item is **refused at create** today. The engine still has zero
+     awareness of milestone semantics; the gap is refusal-by-missing-vocabulary, not silent
+     free-text acceptance. The
      closest existing v1 mechanism to "reaching a marker" is the cascade engine's `auto`/
      `auto-reopen` unblock-at-phase-rank comparison
      (`_meta/research/2026-07-design-session/workflows.md` section 2.3, `tryAutoUnblock`) - a
@@ -44,7 +49,7 @@ system does or does not already have:
      milestone event.
    - **Meeting**: no `meeting` collection exists in either lane's shipped schema
      (`data-model.md` sections 1-2). `meeting-notes` is a shipped **document doctype** -
-     frontmatter-validated, required `meeting_date`/`attendees` (`schema/doctypes.yaml:81`) - but
+     frontmatter-validated, required `meeting_date`/`attendees` (`schema/doctypes.yaml:97`) - but
      that is a file convention, not a queryable entity or a scheduling surface. There is
      **no calendar/scheduling integration** anywhere in the profile contract today - a grep for
      "calendar", "meeting", and "trigger" against `schema/profile.schema.yaml` returns zero
@@ -130,3 +135,4 @@ system does or does not already have:
   F above.
 - Demo-prep - ADR 0018 explicitly defers it: "Demo-prep waits for a real demo."
   (`docs/decisions/0018-element-model-direction.md`, "Q4").
+

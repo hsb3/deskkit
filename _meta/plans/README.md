@@ -46,6 +46,10 @@ ACTIVE plans (associated with an OPEN issue) — add a row per plan you draft:
 `epic-schema-v2-track/` additionally holds the staged body for open epic #130 (no plan.md — epics
 are containers; the epic closes when #197 closes).
 
+Scheduling note: `trigger-design` and `prompt-tuning-centralized` each propose "the next free ADR
+number" and both currently guess 0022 — whichever lands second takes the next slot (both plans
+hedge this internally; confirm against `docs/decisions/` at landing time).
+
 ARCHIVED (issue closed/merged; folder moved to `_meta/_archive/<issue>-<slug>/`, content intact):
 
 | Plan (archived path) | Issue(s) | Why archived |
