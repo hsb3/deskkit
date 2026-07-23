@@ -1,7 +1,4 @@
 {
-  "enabledPlugins": {
-    "code-desk@dotfiles-agents": true
-  },
   "permissions": {
     "allow": [
       "Bash(make:*)",
@@ -17,5 +14,11 @@
       "Bash(actionlint:*)",
       "Bash(deskkit:*)"
     ]
-  }
+  },
+  "enabledPlugins": {
+    "code-desk@dotfiles-agents": true,
+    "claude-code-expertise@dotfiles-agents": true,
+    "deep-research@dotfiles-agents": true
+  },
+  "autoMemoryDirectory": "~/Developer/desk-standard/.claude/memory"
 }

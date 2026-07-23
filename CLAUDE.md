@@ -156,16 +156,17 @@ guard and `init` do exactly this). Fail-closed behavior in `serve` paths needs a
   `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` / `GEMINI_API_KEY`
 - `LIBRARIAN_AUTONOMOUS_WRITES=true` gates `apply_fix` (checked at execution time)
 
-### Dogfooding wiring (this repo's own agent config)
+### No in-repo dogfooding (ruled 2026-07-22, "no dogfood")
 
-Root `.mcp.json` registers both lanes' MCP servers off the **working tree**, not the marketplace
-bundle: `desk-standard-dev` (`bun plugin/mcp/server.ts`, live TS core) and `desk-persona-dev`
-(`deskkit mcp-serve`, the binary installed by `make install` — re-run it after librarian changes
-or you're dogfooding a stale build). Both need a desk to operate on: create a local, gitignored
-`_knowledge/` at the repo root (e.g. `deskkit init`) or the servers fail config resolution at
-startup. The `-dev` suffix keeps their tool names distinct from the marketplace-installed plugin's.
-`deskkit apply-fix` / `restore` are `ask`-gated in `.claude/settings.json` — supervised-only,
-matching the librarian's boundary.
+This repo does not register its own MCP servers on itself — there is no root `.mcp.json` and
+none should be added. The tools this repo builds (the librarian, the PM module, the desk-standard
+plugin) are for coordinating *other* desks; that standard doesn't apply reflexively to the repo
+that builds it, and the coordination tooling must live outside it — on a desk built to operate on
+this repo, e.g. the paired executive desk (`_meta/HANDOFF.md` §0). In-repo verification instead
+runs through `make verify` (`librarian/verify.sh`, a throwaway scratch desk) and `make e2e`, both
+of which stand up disposable desks rather than pointing the binary at this repo's own tree.
+`deskkit apply-fix` / `restore` stay `ask`-gated in `.claude/settings.json` regardless, matching
+the librarian's supervised-write boundary wherever it runs.
 
 ## Cross-cutting gotchas
 

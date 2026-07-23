@@ -20,4 +20,9 @@ required_folders: [] # repo-specific additions beyond the standard
 # entry is auto-created as an empty .gitkeep dir by the scaffold, which would fight the authored
 # README home. Broader 1.0.0 conformance (CLAUDE.md, AGENTS.md, docs/CHARTER.md) landed in the
 # same Lane-6 pass; see docs/CHARTER.md and the design review off-repo.
+# Root .mcp.json ruling (2026-07-22, "no dogfood"): this repo deliberately does not register
+# its own MCP servers on itself — the standard's ROOT-07 row stays a GAP by design, not an
+# oversight. The tools this repo builds coordinate desks other than the one that builds them; see
+# CLAUDE.md's "No in-repo dogfooding" section. Do not add .mcp.json back or add it here to
+# silence the row — there is no exclusion knob for a standard-required file, only additions.
 required_files: []

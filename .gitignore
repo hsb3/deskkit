@@ -44,3 +44,12 @@ _meta/plans/_utils/__pycache__/
 .claude/*.lock
 .claude/**/.DS_Store
 CLAUDE.local.md
+
+# >>> project-memory (managed) >>>
+# narrow-ignore: ignore only machine-local/transient; track everything else under .claude/
+# (memory/, rules/, settings.json stay tracked & transferable)
+.claude/settings.local.json
+.claude/worktrees/
+.claude/*.lock
+.claude/**/.DS_Store
+# <<< project-memory (managed) <<<
