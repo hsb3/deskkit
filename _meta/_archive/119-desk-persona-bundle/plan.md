@@ -1,3 +1,12 @@
+---
+title: "Desk-persona bundle — build plan"
+type: spec
+status: shipped
+created: 2026-07-20
+purpose: "Build the composed desk-persona Claude Code bundle (librarian + PM under the agent integration contract)."
+notes: "Issue #119 (closed). Blocked by agent-integration-contract (#114); ADR 0014 clause (a), binds ADR 0015."
+---
+
 # Plan - desk-persona bundle
 
 _Build plan for the composed desk-persona Claude Code bundle (librarian + PM under the contract)._

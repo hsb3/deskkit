@@ -1,3 +1,12 @@
+---
+title: "Findings lifecycle completion — build plan"
+type: spec
+status: shipped
+created: 2026-07-20
+purpose: "Complete the findings lifecycle ADR 0013 opened: retire the dead `dismissed` state, make every count surface agree on \"open findings,\" record disposition provenance, and shrink `adoption_log` to one event per writer."
+notes: "Issue #118 (closed). Predecessor #93 shipped the disposition axis in PR #112, the 0.8.0 bug floor."
+---
+
 # findings-lifecycle-completion - build plan
 
 _Complete the findings lifecycle ADR 0013 opened: retire the dead `dismissed` state, make every

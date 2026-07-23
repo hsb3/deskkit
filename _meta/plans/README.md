@@ -36,19 +36,36 @@ ACTIVE plans (associated with an OPEN issue) — add a row per plan you draft:
 
 | Plan | Issue(s) | Status |
 | ---- | -------- | ------ |
-| agent-integration-contract | #114 | planned; gate:1.0.0; epic #129 |
-| findings-lifecycle-completion | #118 | planned; gate:1.0.0; epic #129; supersedes closed #99 |
-| desk-persona-bundle | #119 | planned; gate:1.0.0; epic #129; blocked by #114 |
-| document-identity-hygiene | #123 | planned; gate:1.0.0; epic #129 |
+| phase-machine-reconciliation | #197 | planned; gate:v2-final; epic #130; the one buildable-now item |
+| ts-proxy-doc-correction | #199 | planned; owner-gated (design-doc judgment); gates ts-proxy slice 0 |
+| trigger-design | #127 | planned; backlog, unscheduled; schema-v2 model track |
+| prompt-tuning-centralized | #128 | planned; backlog, unscheduled; ADR 0015 track |
+| sop-library-expansion | #36 | parked post-1.0 (owner, 2026-07-21); plan captures unpark state |
+| dual-format-fanout | #12 | parked until >= v1.0.0 (owner, 2026-07-17); plan captures unpark state |
 
-The other 13 wave issues (#115-#117, #120-#122, #124-#128, epics #129/#130) carry staged,
-review-conformed bodies in their folders but no deep plan.md yet — `coverage.py` lists them
-as the planning backlog; add a row here when a plan.md is authored.
+`epic-schema-v2-track/` additionally holds the staged body for open epic #130 (no plan.md — epics
+are containers; the epic closes when #197 closes).
 
-ARCHIVED (issue closed/merged; plan moved to `_meta/_archive/<issue>-<slug>.md`):
+ARCHIVED (issue closed/merged; folder moved to `_meta/_archive/<issue>-<slug>/`, content intact):
 
 | Plan (archived path) | Issue(s) | Why archived |
 | -------------------- | -------- | ------------ |
+| _archive/114-agent-integration-contract/ | #114 | shipped; epic #129 v1 build wave |
+| _archive/115-pointer-grammar-spec/ | #115 | shipped; epic #129 v1 build wave |
+| _archive/116-typed-reference-contract/ | #116 | shipped; epic #129 v1 build wave |
+| _archive/117-item-type-validation/ | #117 | shipped; epic #129 v1 build wave |
+| _archive/118-findings-lifecycle-completion/ | #118 | shipped; epic #129 v1 build wave |
+| _archive/119-desk-persona-bundle/ | #119 | shipped; epic #129 v1 build wave |
+| _archive/120-prompt-governance/ | #120 | shipped; epic #129 v1 build wave |
+| _archive/121-tool-surface-drift-guard/ | #121 | shipped; epic #129 v1 build wave |
+| _archive/122-ts-proxy-design/ | #122 | shipped; design doc landed (docs/development/ts-proxy-design.md) |
+| _archive/123-document-identity-hygiene/ | #123 | shipped; epic #129 v1 build wave |
+| _archive/124-schema-versioning/ | #124 | shipped wave-v4 (PR #193) |
+| _archive/125-element-model-revision/ | #125 | shipped wave-v4 (PR #192) |
+| _archive/126-model-simulations/ | #126 | shipped wave-v4 (PR #198); v2 residual filed as #197 |
+| _archive/129-epic-design-session-v1/ | #129 | epic closed 2026-07-20 (PRs #136-#147) |
+| _archive/189-tui-ux-onboarding/ | #189 | shipped wave-v4 (PR #195) |
+| _archive/190-user-dev-docs-split/ | #190 | shipped wave-v4 (PR #195) |
 
 ## The loop (how plans get produced)
 

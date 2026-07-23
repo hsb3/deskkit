@@ -1,3 +1,12 @@
+---
+title: "Document identity + schema hygiene — build plan (ADR 0017)"
+type: spec
+status: shipped
+created: 2026-07-20
+purpose: "Retire three low-urgency document-model gaps ADR 0017 covers: frontmatter id, doctype rename, cap guard."
+notes: "Issue #123 (closed). Raised by decision book D8, promoted to a full session ruling at the owner's 2026-07-20 scope sign-off."
+---
+
 # Document identity + schema hygiene (ADR 0017)
 
 Status: draft

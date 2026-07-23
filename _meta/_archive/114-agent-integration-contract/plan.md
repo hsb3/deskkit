@@ -1,3 +1,12 @@
+---
+title: "Agent integration contract — build plan"
+type: spec
+status: shipped
+created: 2026-07-20
+purpose: "Write the agent integration contract down once, then make the shared mount, the in-binary loop, and the librarian prompt conform to it."
+notes: "Issue #114 (closed). ADR 0014 (D5, Accepted 2026-07-20); also binds ADR 0015."
+---
+
 # Plan - agent integration contract
 
 _Build plan for the agent integration contract: write it down once, then make the shared mount,
