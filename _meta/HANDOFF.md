@@ -182,3 +182,10 @@ Durable lessons are promoted into §3; the dated blow-by-blow entries (2026-07-1
 thirteen incidents across four foreman runs) live in this file's git history (versions at and
 before commit `c6d1655`) and in the PRs they cite. Add new incidents here dated; promote and
 prune them at the next distillation pass.
+
+- **2026-07-23 (planning-desk run):** sustained API instability (repeated mid-response
+  disconnects + stream-watchdog stalls) killed 6 builder/reviewer agents mid-task, several more
+  than once — every one recovered via SendMessage-continue (never re-brief, per §3). The
+  effective mitigation for writers: brief them to emit long files INCREMENTALLY (Write the
+  frontmatter + first section, Edit-append the rest section by section) so a dropped stream
+  loses one section, not the whole file.
