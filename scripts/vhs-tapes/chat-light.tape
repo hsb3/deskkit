@@ -1,4 +1,4 @@
-# chat-light.tape — the chat TUI on a LIGHT terminal background: proves the answer text is
+# chat-light.tape — the chat REPL on a LIGHT terminal background: proves the answer text is
 # readable with the light palette (--theme light; auto-detection does the same on a real light
 # terminal), then shows the help toggle and the copy-answer toast. Needs a real LLM provider
 # key, exactly like chat.tape — scripts/record-media.sh only records it when ANTHROPIC_API_KEY

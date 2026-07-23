@@ -12,7 +12,7 @@
 # path resolves from the repo root). Idempotent: every run starts from a fresh scratch tree and leaves
 # no litter behind (trap-cleaned on exit, including on error/interrupt).
 set -euo pipefail
-
+#TODO: update to output gifs to docs/assets/
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 LIB_DIR="$REPO_ROOT/librarian"

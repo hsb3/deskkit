@@ -33,8 +33,7 @@ instead. Full contributor setup is in [`README.md`](README.md).
 The release workflow publishes a `deskkit` binary for macOS and Linux (amd64 + arm64) on every
 `v*` tag — no Go toolchain needed to run it elsewhere.
 
-**While this repo is private** (it stays private until v1.0.0), download the release asset with an
-authenticated `gh`; the public `install.sh` one-liner below only works once the repo is public:
+**repo is private** download the release asset with an authenticated `gh`:
 
 ```bash
 mkdir -p ~/.local/bin
@@ -47,15 +46,6 @@ chmod +x ~/.local/bin/deskkit
 deskkit --version
 ```
 
-**Once the repo is public,** `install.sh` at the repo root does download + sha256-verify + install
-in one step:
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/hsb3/desk-standard/main/install.sh | bash
-# pin a version / preview without writing anything:
-#   ./install.sh --version vX.Y.Z --dry-run
-```
-
 ## Env-var overrides and where the store lives
 
 Run `deskkit` from **inside a desk** (a folder whose `_knowledge/profile.yaml` sets `desk.name`
@@ -63,10 +53,10 @@ and `root: "."`) and no environment variables are needed — it walks up from yo
 reads `desk.name` as the store name, and uses the folder that owns `_knowledge/` as the desk root.
 The two env vars are the **override**, not the requirement, and they win over the profile:
 
-| Variable | What it sets | When you need it |
-|---|---|---|
+| Variable    | What it sets             | When you need it                                                                                                     |
+| ----------- | ------------------------ | -------------------------------------------------------------------------------------------------------------------- |
 | `DESK_ROOT` | the desk tree to steward | running the binary from outside the desk tree (e.g. a dev build from `librarian/`), or a bare folder with no profile |
-| `DESK_NAME` | the unique store name | same — and it must be unique across your desks |
+| `DESK_NAME` | the unique store name    | same — and it must be unique across your desks                                                                       |
 
 ```bash
 export DESK_ROOT=/path/to/desk DESK_NAME=my-desk    # only when outside a profiled desk

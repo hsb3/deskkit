@@ -1,4 +1,4 @@
-# chat.tape — the full-screen chat TUI: a streamed answer with a visible tool call (sweep),
+# chat.tape — the full-screen chat REPL: a streamed answer with a visible tool call (sweep),
 # a brief look at expanded step detail, then a clean quit. Needs a real LLM provider key (the
 # model's own sweep call talks to Anthropic) — scripts/record-media.sh only records this tape
 # when ANTHROPIC_API_KEY is set in the environment, and skips it otherwise so the default

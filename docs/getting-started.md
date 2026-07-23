@@ -25,18 +25,18 @@ source, environment overrides, JSON output — is the developer track, linked wh
 
 ## 1. Install `deskkit`
 
-`deskkit` installs from one command, no toolchain:
+`deskkit` installs from the below super-complicated command:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/hsb3/desk-standard/main/install.sh | bash
+mkdir -p ~/.local/bin
+os=$(uname -s | tr '[:upper:]' '[:lower:]')                 # darwin | linux
+arch=$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/')   # amd64 | arm64
+gh release download --repo hsb3/desk-standard \
+  --pattern "deskkit_*_${os}_${arch}" \
+  --output ~/.local/bin/deskkit --clobber
+chmod +x ~/.local/bin/deskkit
 deskkit --version
 ```
-
-> **Pre-public interim.** The repo is private until v1.0.0, so the one-liner above will work once
-> it goes public. In the meantime, pull the prebuilt binary with an authenticated `gh` (or build
-> from source) as described in
-> [`development/install-and-build.md`](development/install-and-build.md) — a one-time step; the
-> rest of this page is unchanged.
 
 ## 2. Install the plugin
 
@@ -70,7 +70,7 @@ deskkit init            # writes _knowledge/profile.yaml: desk name from the fol
 
 That is the whole setup — the profile it writes needs no environment variables when you run
 `deskkit` from inside the desk. Credentials never go in the profile: it holds identifiers only, and
-`secrets_ref.llm_api_key` names the *env var* that holds your key, never the key itself.
+`secrets_ref.llm_api_key` names the _env var_ that holds your key, never the key itself.
 
 ## 4. Your first sweep and patrol
 
@@ -98,18 +98,18 @@ needs an LLM key set once — the default provider reads `ANTHROPIC_API_KEY`, or
 You don't have to memorize anything to find your way around:
 
 - **A tab strip across the top** shows every surface you can reach — `chat | pm context | pm board
-  | pm item` on a PM-enabled desk — with the active one highlighted. The views are visible on
+| pm item` on a PM-enabled desk — with the active one highlighted. The views are visible on
   sight; you never have to guess they exist.
 - **A footer** shows the keys for wherever you are. The essentials:
 
-  | Key | Does |
-  |---|---|
+  | Key      | Does                                                                   |
+  | -------- | ---------------------------------------------------------------------- |
   | `ctrl+p` | cycle to the next view (chat → pm context → pm board → pm item → chat) |
-  | `esc` | return to chat from any view |
-  | `?` | open the help overlay listing every key for the current view |
-  | `enter` | on the **pm board**, open the highlighted item's detail (**pm item**) |
-  | `r` | refresh the active PM view |
-  | `ctrl+c` | quit |
+  | `esc`    | return to chat from any view                                           |
+  | `?`      | open the help overlay listing every key for the current view           |
+  | `enter`  | on the **pm board**, open the highlighted item's detail (**pm item**)  |
+  | `r`      | refresh the active PM view                                             |
+  | `ctrl+c` | quit                                                                   |
 
 - **`?` opens a help overlay** listing every binding in the current view — so the full key set is
   always one keystroke away.
