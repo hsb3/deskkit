@@ -200,10 +200,10 @@ From the constraint walls (`../../README.md` §7):
 
 **(a)**, by option: A1 (frontmatter id) — `sweep.go` (match by id), a new migration on
 `0001_files.go` (adds `id`/`doc_id`), `schema/doctypes.yaml` (new frontmatter key),
-`docs/pocket-librarian-v1-spec.md`, scaffold templates that mint new docs. A2 (checksum
+`docs/development/specs/pocket-librarian-v1-spec.md`, scaffold templates that mint new docs. A2 (checksum
 inference) — confined to `sweep.go`'s create/update/soft-delete loop (`:49-94`), no
 schema/spec change. A3 (git-based) — no schema change; a new CLI/MCP tool shelling out to
-git; `docs/pocket-librarian-v1-spec.md` if documented; no help for non-git desks.
+git; `docs/development/specs/pocket-librarian-v1-spec.md` if documented; no help for non-git desks.
 
 **(b)**, by option: B1 (rename column) — new migration under
 `librarian/internal/modules/librarian/collections/`, `sweep.go:248`'s `.Set` site, CLI/query

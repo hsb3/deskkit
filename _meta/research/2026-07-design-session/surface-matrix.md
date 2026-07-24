@@ -20,7 +20,7 @@ Status: draft (2026-07-20)
 
 ## 0. Anchor and how this dossier extends it
 
-[`docs/tool-surface.md`](../../../docs/tool-surface.md) is the shipped, empirically-derived
+[`docs/development/specs/tool-surface.md`](../../../docs/development/specs/tool-surface.md) is the shipped, empirically-derived
 map of the three tool-bearing surfaces (librarian CLI, librarian MCP, plugin TS MCP) and their
 counts (16 base CLI / 5·6·17·18 MCP by gate / 4 TS, fixed). This dossier's source-level
 re-check of those claims **found no discrepancy**:
@@ -28,7 +28,7 @@ re-check of those claims **found no discrepancy**:
 - Librarian CLI: reading `registerToolCommands`/`registerPMCommands` directly gives the same
   16 base subcommands (`init sweep patrol propose-fix apply-fix restore query findings-dispose
   record-feedback agent chat mcp-serve gui` + PocketBase's `serve migrate superuser`), plus the
-  gated `pm` group of 12 — matches `docs/tool-surface.md` table 1 exactly.
+  gated `pm` group of 12 — matches `docs/development/specs/tool-surface.md` table 1 exactly.
 - Librarian MCP: `toolcore.AgentTools`/`ExposedTools`
   (`librarian/internal/core/toolcore/toolcore.go:133-156`) and the two module `Specs()`
   functions (`librarian/internal/modules/librarian/tools/specs.go`,
@@ -39,7 +39,7 @@ re-check of those claims **found no discrepancy**:
 
 What this dossier adds beyond the anchor: the **CLI** and **MCP** are only two of nine access
 surfaces the product actually has. This matrix adds the **chat TUI**, the **in-binary eino
-agent** (a fourth tool-bearing surface `docs/tool-surface.md` does not cover — its tool set is
+agent** (a fourth tool-bearing surface `docs/development/specs/tool-surface.md` does not cover — its tool set is
 gate-identical to the MCP server, §2), the **admin console**, the **four Claude Code plugin
 skills**, the **desk-pm bundle** (persona + skills + hook), and **direct human file/GUI paths**
 — then cross-references which of the nine actually *claims* each tool in its own instructions
@@ -67,7 +67,7 @@ skills**, the **desk-pm bundle** (persona + skills + hook), and **direct human f
 | **patrol** (flag R1-R6 findings) | `patrol`, default-exposed. `specs.go:31-35` | `patrol [--path]`, `main.go:704-717` | via agent tool-call | same spec as S1 | findings viewable/editable as raw records (bypasses the rule engine) | not named in any of the 4 skills | — | none |
 | **query** (8 read kinds: `live_files recent orphans uncollapsed findings summary adoption feedback`, `librarian/internal/modules/librarian/tools/query.go:38-56`) | `query`, default-exposed. `specs.go:56-63` | `query <kind> [--days] [--pretty] [--include-disposed]`, `main.go:772-807` | via agent tool-call | same spec as S1 | any collection browsable directly (equivalent read, no kind grouping) | not named in any of the 4 skills | read desk files directly (equivalent to `live_files`/`orphans` but unindexed) | none. `--include-disposed` / disposition filtering is CLI/MCP-only; the admin console shows raw rows regardless of disposition |
 | **propose-fix** (plan a mechanical fix; record original) | `propose_fix`, default-exposed. `specs.go:36-40` | `propose-fix [--run] [--rules]`, `main.go:720-735` | via agent tool-call | same spec as S1 | revisions row insertable by hand (not the intended path) | not named in any of the 4 skills | — | none |
-| **apply-fix** (commit a proposed fix, byte-exact) | `apply_fix`, **AgentGated** — exposed only when `LIBRARIAN_AUTONOMOUS_WRITES=true`. `specs.go:41-45` | `apply-fix [--run] [--revision-ids]`, `main.go:738-753`, no gate — CLI always has it | via agent tool-call, gated same as S1 | same spec as S1 (gated) | a desk file editable directly, **bypassing record-original-first entirely** | not named in any of the 4 skills | editing the file by hand is the ungated equivalent write | `LIBRARIAN_AUTONOMOUS_WRITES` (registration-time; checked again at execution, per `docs/tool-surface.md` L80-81) |
+| **apply-fix** (commit a proposed fix, byte-exact) | `apply_fix`, **AgentGated** — exposed only when `LIBRARIAN_AUTONOMOUS_WRITES=true`. `specs.go:41-45` | `apply-fix [--run] [--revision-ids]`, `main.go:738-753`, no gate — CLI always has it | via agent tool-call, gated same as S1 | same spec as S1 (gated) | a desk file editable directly, **bypassing record-original-first entirely** | not named in any of the 4 skills | editing the file by hand is the ungated equivalent write | `LIBRARIAN_AUTONOMOUS_WRITES` (registration-time; checked again at execution, per `docs/development/specs/tool-surface.md` L80-81) |
 | **restore** (reverse to recorded original) | **never exposed** — neither `AgentDefault` nor `AgentGated`; `ExposedTools` also filters it defensively. `specs.go:46-50`, `toolcore.go:144-150` | `restore [--revision \| --by-path]`, `main.go:756-770` — **CLI-only** | not available (not in the S4 tool set, so not in S3 either) | not available — same exclusion as S1 | a prior state is recoverable only if the admin console still holds the `revisions` row (raw, unassisted) | not named in any of the 4 skills | `deskkit restore --by-path <path>` **is** the sanctioned human recovery path | structural exclusion, not an env flag — supervised-only by design |
 | **findings dispose** (`open\|acknowledged\|triaged\|wont_fix`) | **no MCP tool** (like `restore`, deliberately CLI-only) | `findings dispose <id> --as <disposition>`, `main.go:809-837` | not available | not available | disposition field editable directly on the `findings`/`patrol_findings` record (bypasses the normalize/validate step in `tools.DisposeFinding`) | not named in any of the 4 skills | — | supervised-only, no flag |
 | **record-feedback** (append feedback-log entry) | `record_feedback`, default-exposed. `specs.go:61-67` | `record-feedback --kind --summary [--detail] [--context] [--source]`, `main.go:839-869` | via agent tool-call | same spec as S1 | `feedback` collection insertable directly | not named in any of the 4 skills | — | none — DB-only write, no file-write gate applies |
@@ -119,7 +119,7 @@ env-var gate exists for this surface — fixed set of 4, always all four.
 
 1. **The desk-pm MCP mount ride-along.** `plugin/desk-pm/.mcp.json:1-9` starts
    `deskkit mcp-serve` with only `PM_ENABLED=true` set — neither `LIBRARIAN_AUTONOMOUS_WRITES`
-   nor `PM_AUTONOMOUS_WRITES` is touched, so per the gate table (`docs/tool-surface.md` row 3)
+   nor `PM_AUTONOMOUS_WRITES` is touched, so per the gate table (`docs/development/specs/tool-surface.md` row 3)
    this mount exposes **17 tools**: the 12 PM tools *plus the 5 default librarian tools*
    (`sweep patrol propose_fix query record_feedback`). Neither the `pm-operator` agent's
    `tools:` allowlist (`agents/pm-operator.md:13-26`, all 12 PM names, zero librarian names)
@@ -184,12 +184,12 @@ env-var gate exists for this surface — fixed set of 4, always all four.
 
 ## 8. Gaps & uncertainties
 
-- **Empirical re-run not performed.** This dossier verified `docs/tool-surface.md`'s counts by
+- **Empirical re-run not performed.** This dossier verified `docs/development/specs/tool-surface.md`'s counts by
   re-reading the same source it cites (`toolcore.go`, both `specs.go` files, `registerToolCommands`/
   `registerPMCommands`, `plugin/core/tools.ts`) and found no discrepancy, but did **not** rebuild
   the `deskkit` binary or re-run the doc's JSON-RPC probe — no build step was taken in this
   file-scoped slice. If the design session wants a fresh empirical count, re-run the probe in
-  `docs/tool-surface.md`'s "How the counts were derived" section.
+  `docs/development/specs/tool-surface.md`'s "How the counts were derived" section.
 - **TUI write-affordance check is code-level, not behavioral.** §3 states the 3 PM TUI views
   (`views.go`) bind no write keypress beyond `r` (refresh) — verified by reading every
   `tea.KeyPressMsg` branch in `views.go`, but the chat TUI's underlying agent loop can still

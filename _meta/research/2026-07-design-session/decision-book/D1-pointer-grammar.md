@@ -204,7 +204,7 @@ Any ruling must satisfy the constraint walls (`README.md` §7) that bind here:
 
 Concrete artifacts, by option class:
 
-- **Spec (`docs/pm-system-v1-spec.md`).** All options add the missing grammar section: pointer
+- **Spec (`docs/development/specs/pm-system-v1-spec.md`).** All options add the missing grammar section: pointer
   forms, per-form gate satisfaction, fail-closed set, the `§`-advisory rule, and the
   `DocRequirement.Pointer` selector grammar. The current broad one-liner (`:396`) and the
   "GitHub issue URL" prose (`:744`) are **corrected in place** to match the ruling (they currently

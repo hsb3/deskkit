@@ -12,7 +12,7 @@ synopsis: "R3 element-model proposal: every entity, document template, and workf
 > **Graduated (2026-07-22, #125).** This R3 proposal — and its two embedded adversarial reviews — is
 > now **frozen as provenance**. The reviewed, revised schema-v2 element model (ADR 0018 Q1–Q4 rulings
 > + all 18 review gaps folded in) lives at
-> [`docs/element-model-v2-draft.md`](../../../../docs/element-model-v2-draft.md). Read that for the
+> [`docs/development/specs/element-model-v2-draft.md`](../../../../docs/development/specs/element-model-v2-draft.md). Read that for the
 > current model; this file remains the record of the mining, the frame's origin, and the reviews.
 
 _Status: **draft**, pending adversarial completeness review. Sources: 3 read-only scouts over

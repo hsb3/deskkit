@@ -14,7 +14,7 @@ re-reading source.*
 Status: draft (2026-07-20)
 
 All citations are `path:line` against commit `51235f6` (branch `fix/0.8.0-bug-floor`). Spec
-references (`docs/pocket-librarian-v1-spec.md` §N, `docs/pm-system-v1-spec.md` §N) are given for
+references (`docs/development/specs/pocket-librarian-v1-spec.md` §N, `docs/development/specs/pm-system-v1-spec.md` §N) are given for
 orientation; **code is ground truth** per the assignment brief, and any place code and spec text
 appear to diverge is called out inline.
 
@@ -45,7 +45,7 @@ appear to diverge is called out inline.
 - **Invariants**: idempotent (unchanged rows produce zero writes); a per-file read error is
   recorded and skipped, never aborts the whole sweep (`sweep.go:58-62`); `dir_kind` is derived
   for every file, not just `.md` (`sweep.go:229-230`).
-- Spec: `docs/pocket-librarian-v1-spec.md` §5.1 (lines 825-946).
+- Spec: `docs/development/specs/pocket-librarian-v1-spec.md` §5.1 (lines 825-946).
 
 ### 1.2 Patrol — flag rule violations (dry-run)
 
@@ -87,7 +87,7 @@ appear to diverge is called out inline.
   detection-difficulty property — R4's detection is mechanical but its *fix* is judgment
   (`patrol.go:123-127`); dedupe key is the finding's own **stored** checksum (at flag time), not
   the file's current checksum (`patrol.go:50-51,95`).
-- Spec: `docs/pocket-librarian-v1-spec.md` §5.2 (lines 946-1030).
+- Spec: `docs/development/specs/pocket-librarian-v1-spec.md` §5.2 (lines 946-1030).
 
 ### 1.3 propose_fix → apply_fix → restore (the write boundary)
 
@@ -174,7 +174,7 @@ appear to diverge is called out inline.
   0014); a half-applied *edit* (vs. move) is indistinguishable from a concurrent user edit and
   is deliberately **never** auto-confirmed (`restore.go:158-161`).
 
-Spec: `docs/pocket-librarian-v1-spec.md` §5.3-§5.5 (lines 1030-1308).
+Spec: `docs/development/specs/pocket-librarian-v1-spec.md` §5.3-§5.5 (lines 1030-1308).
 
 ### 1.4 record_feedback
 
@@ -245,7 +245,7 @@ Spec: `docs/pocket-librarian-v1-spec.md` §5.3-§5.5 (lines 1030-1308).
   by **which tools are in the slice**, never by a runtime check inside the loop
   (`agent.go:102-106`); the system prompt is a **live** DB read every run, so a GUI/REST edit to
   the `prompts` collection applies to the very next run with no redeploy (`agent.go:38-41`).
-- Spec: `docs/pocket-librarian-v1-spec.md` §6 (lines 1389-1728).
+- Spec: `docs/development/specs/pocket-librarian-v1-spec.md` §6 (lines 1389-1728).
 
 ### 1.7 Wake layer / cron hooks
 
@@ -280,7 +280,7 @@ Spec: `docs/pocket-librarian-v1-spec.md` §5.3-§5.5 (lines 1030-1308).
   non-blocking, with every wake auditable via the `tasks` row (`trigger.go:1-9`); registered
   only under `serve` (`librarian/cmd/deskkit/main.go:264-269`) so one-shot CLI commands that also
   create records never enqueue tasks.
-- Spec: `docs/pocket-librarian-v1-spec.md` §2.4 (lines 158-227).
+- Spec: `docs/development/specs/pocket-librarian-v1-spec.md` §2.4 (lines 158-227).
 
 ---
 
@@ -302,7 +302,7 @@ Spec: `docs/pocket-librarian-v1-spec.md` §5.3-§5.5 (lines 1030-1308).
   `done`/`dropped`/`superseded`→terminal. Freely editable per desk via
   `desk_config.status_labels`. `blocked`/`waiting` are explicitly **not** labels — they surface
   the blocked flag regardless of phase (`statemachine.go:115-117`).
-- Spec: `docs/pm-system-v1-spec.md` §3.2-§3.3 (lines 410-459).
+- Spec: `docs/development/specs/pm-system-v1-spec.md` §3.2-§3.3 (lines 410-459).
 
 ### 2.2 Gated transitions — the §4.1 sequence (machine → blocked → claim → gates → write)
 
@@ -357,7 +357,7 @@ Spec: `docs/pocket-librarian-v1-spec.md` §5.3-§5.5 (lines 1030-1308).
   (closing the check-then-act TOCTOU, `engine.go:238-244`); a gate refusal is always observable
   (never silent) even though it rolls back every other write; the same `transitionCore` is the
   **one** path every surface routes through (no second write path).
-- Spec: `docs/pm-system-v1-spec.md` §4.1 (lines 548-573), §4.2 (573-614), §3.6 (492-517).
+- Spec: `docs/development/specs/pm-system-v1-spec.md` §4.1 (lines 548-573), §4.2 (573-614), §3.6 (492-517).
 
 ### 2.3 Cascade — Block/Unblock + auto/auto-reopen/manual/permanent
 
@@ -385,7 +385,7 @@ Spec: `docs/pocket-librarian-v1-spec.md` §5.3-§5.5 (lines 1030-1308).
 - **Invariants**: cascade writes are desk-scoped defense-in-depth — `tryAutoUnblock`/`reblock`
   refuse to touch an item on a different desk even if an edge somehow points there
   (`engine.go:756,795-797`).
-- Spec: `docs/pm-system-v1-spec.md` §3.5 (lines 476-492).
+- Spec: `docs/development/specs/pm-system-v1-spec.md` §3.5 (lines 476-492).
 
 ### 2.4 Claim/Release
 
@@ -402,7 +402,7 @@ Spec: `docs/pocket-librarian-v1-spec.md` §5.3-§5.5 (lines 1030-1308).
 - **Invariants**: a live foreign claim also refuses `Transition` (advance/demote/reopen) and
   refuses `Claim` — §2.2 step 4 and this section share the same `liveForeignClaim` predicate,
   so a claim is a hold over every mutating path, not just claim/release itself.
-- Spec: `docs/pm-system-v1-spec.md` §3.6 (lines 492-517).
+- Spec: `docs/development/specs/pm-system-v1-spec.md` §3.6 (lines 492-517).
 
 ### 2.5 SetStatusLabel — same-phase vs. cross-phase
 
@@ -427,7 +427,7 @@ Spec: `docs/pocket-librarian-v1-spec.md` §5.3-§5.5 (lines 1030-1308).
   (same-phase).
 - **Invariants**: "the label and the machine cannot drift" — a label mapping to a different
   phase is *always* a gated transition request, never a bare label overwrite.
-- Spec: `docs/pm-system-v1-spec.md` §3.3 (lines 442-459).
+- Spec: `docs/development/specs/pm-system-v1-spec.md` §3.3 (lines 442-459).
 
 ### 2.6 AddNote
 
@@ -438,7 +438,7 @@ Spec: `docs/pocket-librarian-v1-spec.md` §5.3-§5.5 (lines 1030-1308).
   phase at note time), `key`, `body`, `actor`/`actor_kind`.
 - **Writes**: `notes` collection only (no version bump on the item, no audit `transitions` row).
 - **Invariants**: notes are phase-scoped snapshots, not versioned or gated.
-- Spec: `docs/pm-system-v1-spec.md` §3.7 (lines 517-533).
+- Spec: `docs/development/specs/pm-system-v1-spec.md` §3.7 (lines 517-533).
 
 ### 2.7 The importer
 
@@ -466,7 +466,7 @@ Spec: `docs/pocket-librarian-v1-spec.md` §5.3-§5.5 (lines 1030-1308).
   deterministic id skips it, `importer.go:15-16,178-186`); the `GraphSnapshot`/`Canonical`
   oracle (`importer.go:269-328`) projects a deterministic, timestamp-excluded view of the graph
   so two rebuilds from the same manifest can be asserted byte-identical.
-- Spec: `docs/pm-system-v1-spec.md` §8.1-§8.2 (lines 759-794).
+- Spec: `docs/development/specs/pm-system-v1-spec.md` §8.1-§8.2 (lines 759-794).
 
 ### 2.8 Version-token optimistic concurrency (cross-cutting)
 

@@ -102,7 +102,7 @@ via the agent path and once via a reviewer's plain-CLI repro.
 against `deskkit mcp-serve`: `initialize → notifications/initialized → tools/list → tools/call`
 for all 5 default tools (`sweep`, `patrol`, `propose_fix`, `query`, `record_feedback`) and, with
 `LIBRARIAN_AUTONOMOUS_WRITES=true`, the 6th (`apply_fix`), which was confirmed to actually write
-to disk over the wire. Tool counts matched `docs/tool-surface.md` exactly (5/6).
+to disk over the wire. Tool counts matched `docs/development/specs/tool-surface.md` exactly (5/6).
 
 ## 5. Track 3 — PM module, real-agent workflow
 
@@ -123,7 +123,7 @@ reason) → `unblock_item(B)` succeeds → `transition_item(B)` now succeeds (ph
 progression and audit trail confirmed via `get_item` at each step.
 
 **Module gating confirmed empirically, twice:** `MCP_MODULES=pm` exposes exactly the 12 documented
-PM tools and **none** of the 5 librarian ride-alongs — matches `docs/tool-surface.md` §2.1 exactly.
+PM tools and **none** of the 5 librarian ride-alongs — matches `docs/development/specs/tool-surface.md` §2.1 exactly.
 
 ## 6. Confirmed bugs filed as issues
 

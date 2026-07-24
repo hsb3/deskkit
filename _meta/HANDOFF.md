@@ -80,13 +80,14 @@ caught this class. Written contract: **`docs/development/docs-layout.md`** (what
 load-bearing, why the working desk isn't gated); CLAUDE.md's "load-bearing paths" rule rewritten to
 match. `make check`/`test`/`verify` all exit 0.
 
-**Deferred (owner curation, NOT blocking):** ~25 `_meta/` working-desk files still cite old spec
-paths — the design-session research snapshot (`_meta/research/2026-07-design-session/`), the
-ADR-0022-mooted `ts-proxy-doc-correction` plan, and the deferred `sop-library-expansion` plan. These
-are gate-excluded (working desk = point-in-time snapshots), so they don't block CI. Recommended
-cleanup: **archive the superseded ones to `_meta/_archive/`** (mooted/completed) rather than repoint.
-Also pre-existing (predates reorg, #77): `_meta/build-brief.md` was relocated off-repo but is still
-named in `docs/development/README.md:62` + `schema/README.md` (backtick refs, gate-invisible).
+**Working-desk cleanup DONE (2026-07-24):** the ADR-0022-mooted `ts-proxy-doc-correction` plan was
+archived to `_meta/_archive/` (#199 still open — formally supersede at Wave 3), and all remaining
+`_meta/` spec citations (design-session research provenance, deferred plans) were repointed to
+`docs/development/specs/` so nothing dangles. `_meta/research/2026-07-design-session/` stays live in
+place — 8+ published ADRs (0009–0016) cite it as "Raised by" provenance, so it can't be archived.
+Left as-is (pre-existing, predates the reorg — #77): `_meta/build-brief.md` was relocated off-repo but
+is still named in `docs/development/README.md:62` + `schema/README.md` (backtick refs, gate-invisible)
+— remove or redirect those when convenient.
 
 **NEXT, in order of consequence:**
 1. **#197** (gate:v2-final, filed 2026-07-22) — reconcile the software-spec phase-machine with the

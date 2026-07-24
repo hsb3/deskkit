@@ -36,9 +36,9 @@ gap:
   deliverables (D4/D5), no longer exists at that path (confirmed missing), nor does
   `_meta/build-brief.md` (also confirmed missing — referenced only historically, e.g.
   `docs/development/README.md:62`, `schema/README.md:9,54`). The project's canonical direction page
-  is now `docs/CHARTER.md` (CLAUDE.md:1-3, "if that page and this one ever disagree about
+  is now `docs/development/CHARTER.md` (CLAUDE.md:1-3, "if that page and this one ever disagree about
   direction, the charter wins"); it states plainly: **"Scope is Claude Code only in v1; OpenCode is
-  a deferred, separate fan-out build"** (`docs/CHARTER.md:38`).
+  a deferred, separate fan-out build"** (`docs/development/CHARTER.md:38`).
 
 No production step exists yet for an OpenCode instance. `plugin/opencode/` holds a **frozen,
 unwired hand-written adapter spike** (`plugin/opencode/plugin.ts`, 98 lines: `resolvePluginRoot`,
@@ -99,7 +99,7 @@ for 1.0.0: "What 0021 does NOT change (recorded for completeness): the Claude-on
 
 - **Governing dependency — parked until >= v1.0.0** (owner ruling, Henry, 2026-07-17;
   `_meta/HANDOFF.md:73`, "OpenCode #12 parked (Henry, 2026-07-17) until >= v1.0.0"), reaffirmed by
-  `docs/decisions/0021-desk-standard-1-0-0-direction.md:102-104` and `docs/CHARTER.md:38`. No build
+  `docs/decisions/0021-desk-standard-1-0-0-direction.md:102-104` and `docs/development/CHARTER.md:38`. No build
   work starts before that gate lifts.
 - **Sequencing note** (recorded live on the issue by the owner, 2026-07-16): last of the pre-park
   backlog, after #8 -> #13 -> #7 — "this is a production step over the authored core, and every

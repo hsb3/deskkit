@@ -49,7 +49,7 @@ repo gates are green. The findings below are seams a careful integrator should k
    as MCP tools; likewise the librarian's `propose-fix` (CLI) is `propose_fix` (MCP). This is a
    real naming seam across surfaces, but a *justified* one: MCP tools live in one flat namespace
    (so they need the `_item` qualifier and snake_case), while the CLI groups them under a `pm`
-   parent (so the noun is redundant). The mapping is documented in `docs/tool-surface.md`. Accept.
+   parent (so the noun is redundant). The mapping is documented in `docs/development/specs/tool-surface.md`. Accept.
 
 2. **"Desk name" has two independent sources.** Store resolution uses the `DESK_NAME` env var
    (config rule 2), while the profile carries its own `desk.name` — and `deskkit init` derives
@@ -78,7 +78,7 @@ repo gates are green. The findings below are seams a careful integrator should k
 
 5. **The MCP default-mount count is 5 in one sub-table and 17 in the prose.** With PM default-on,
    the live default librarian MCP mount exposes **17** tools (5 librarian + 12 PM), which the E2E
-   asserts (check 34) and `docs/tool-surface.md` states in prose (and pins with
+   asserts (check 34) and `docs/development/specs/tool-surface.md` states in prose (and pins with
    `TestToolSurfaceDoc_MCPCounts`). But the doc's §2.1 sub-table still lists a "Librarian MCP
    (default) … 5" row (the PM-*off* matrix case). The two are reconciled by the surrounding prose,
    so this is a **consistency-of-presentation nit, not a behaviour mismatch** — a reader skimming

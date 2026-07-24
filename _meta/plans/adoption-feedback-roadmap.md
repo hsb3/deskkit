@@ -23,7 +23,7 @@ Ordering principle: **user-facing value + risk**, never a release cut or public 
 1. **Consolidation = "everything on deskkit."** Move the 4 TS profile tools into the Go binary;
    retire the TS MCP server; ship ONE plugin + ONE MCP server (`deskkit mcp-serve`). Recorded in
    **ADR 0022 (Accepted 2026-07-23)**, which supersedes 0016; withdraws
-   `docs/development/ts-proxy-design.md`; moots #199 and the ts-proxy build; simplifies #12
+   `_meta/_archive/ts-proxy-design.md`; moots #199 and the ts-proxy build; simplifies #12
    (OpenCode). See [[consolidation-single-binary-decision]].
 2. **Central config stores the actual API key** — machine-local `~/.config/deskkit/config.yaml`
    (0600) holds `llm.provider` + `llm.model` + `llm.api_key`.
@@ -69,7 +69,7 @@ Highest visible payoff per unit effort; each item independent.
   unset) is picked up by `agent`/`chat`; `config show` proves the precedence; file is 0600.
 
 ### Wave 3 — The consolidation  *(GATE CLEARED: ADR 0022 Accepted 2026-07-23)*
-- ADR 0022 (accepted) records the collapse; at build, mark `docs/development/ts-proxy-design.md`
+- ADR 0022 (accepted) records the collapse; at build, mark `_meta/_archive/ts-proxy-design.md`
   withdrawn and add the dated amendment note to ADR 0014 (one bundle; TS mount retired).
 - Reimplement the 4 profile tools in Go behind a `profile` value in `MCP_MODULES`
   (`librarian/internal/core/mcp/server.go`); reuse `config.DiscoverProfile`/`LoadProfile` +
@@ -78,7 +78,7 @@ Highest visible payoff per unit effort; each item independent.
 - One marketplace bundle: one plugin dir, one `.mcp.json`
   (`deskkit mcp-serve`, `MCP_MODULES=profile,librarian,pm`), merged skills + agents + hook; one
   entry in `.claude-plugin/marketplace.json`.
-- Update `docs/tool-surface.md` (+ `scripts/check-tool-surface.mjs`), `CLAUDE.md`, `librarian/README.md`.
+- Update `docs/development/specs/tool-surface.md` (+ `scripts/check-tool-surface.mjs`), `CLAUDE.md`, `librarian/README.md`.
 - *Done when:* fresh install = one plugin, one MCP server exposing all tools; the 4 profile tools
   work via the Go server against a scratch desk; `make package` + `git diff` clean; neutrality +
   tool-surface + purity gates green; `make e2e` passes; ADR 0016 marked `Superseded-by`.

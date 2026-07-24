@@ -49,10 +49,10 @@ CONFIRMED with the fresh citation. **Verdict counts: 14 CONFIRMED · 0 STALE · 
 | # | Claim (analysis) | Analysis said | Current reality | Verdict | Citation (fresh) |
 |---|---|---|---|---|---|
 | 1 | **No librarian Claude Code bundle** | PM spec D5 (skills/agent/hook/`.mcp.json`) has no librarian counterpart; librarian's only Claude Code path is a README snippet | Still true. Marketplace lists only `desk-standard` (the 4-profile-tool plugin) and `desk-pm`; no `desk-librarian`. Librarian Claude Code wiring is a README `.mcp.json` snippet | CONFIRMED | `.claude-plugin/marketplace.json:9-23`; `librarian/README.md:216-227` |
-| 2 | **Ride-along tools on the PM mount** | `deskkit mcp-serve` exposes *every* enabled module's tools, so mounting desk-pm also surfaces ~5 librarian tools no persona claims | Still true. `NewServer` loops over `toolcore.ExposedTools(cfg)` = the merged registry of all enabled modules; with `PM_ENABLED` the mount exposes **17** (5 librarian default + 12 PM). Now *documented* (not resolved) in the new `docs/tool-surface.md` | CONFIRMED | `core/mcp/server.go:69-81`; `toolcore.go:133-156`; corroborated `docs/tool-surface.md` §2 (PM_ENABLED → 17) |
+| 2 | **Ride-along tools on the PM mount** | `deskkit mcp-serve` exposes *every* enabled module's tools, so mounting desk-pm also surfaces ~5 librarian tools no persona claims | Still true. `NewServer` loops over `toolcore.ExposedTools(cfg)` = the merged registry of all enabled modules; with `PM_ENABLED` the mount exposes **17** (5 librarian default + 12 PM). Now *documented* (not resolved) in the new `docs/development/specs/tool-surface.md` | CONFIRMED | `core/mcp/server.go:69-81`; `toolcore.go:133-156`; corroborated `docs/development/specs/tool-surface.md` §2 (PM_ENABLED → 17) |
 | 3 | **In-binary loop gets PM tools without PM discipline** | With `PM_ENABLED` the eino loop receives the 12 PM tools via the merged registry, but its resolved system prompt is librarian-only; pm-operator's read-before-write / gate-routing / claim-release discipline lives only in the plugin lane | Still true. `buildTools` → `toolcore.AgentTools(cfg)` returns the merged (librarian+PM) slice; `systemPrompt` resolves only `librarian.system` (no `pm.system` is ever seeded). The PM discipline is in `pm-operator.md`, not in any in-binary prompt | CONFIRMED | `pm/module.go:78-81` → `agent.go:107-117` → `toolcore.go:133-142`; prompt `agent.go:42-53`; discipline `pm-operator.md:52-55` |
 | 4 | **Prompt-governance split** | Librarian instructions DB-backed/GUI-editable; PM instructions version-controlled markdown; neither model chosen for both | Still true and unchanged: two governance models, one per surface | CONFIRMED | `prompt.go:16-40` + `agent.go:42-53` (DB) vs `pm-operator.md` + `skills/*` (markdown) |
-| 5 | **Spec-promised route that doesn't exist** | Spec says librarian tools are callable via the TS `plugin/mcp` boundary; the shipped TS server exposes only the 4 profile tools. Also stale librarian counts ("four tools", "six-tool core") vs the real 7/5 | Still true. Spec still promises the plugin/mcp boundary can "call the librarian's tools directly"; the TS server exposes only `TOOLS` from `plugin/core` = 4 profile tools. Spec counts still stale ("six-tool core" TOC/§3.3 table; "default set … four" in §7.2). #94 shipped a NEW authoritative doc (`docs/tool-surface.md`) rather than editing the spec, so the spec residue persists | CONFIRMED | spec `docs/pocket-librarian-v1-spec.md:1784-1790` (route), `:399` + TOC `:14` ("six-tool"), `:1789` ("four"); `plugin/mcp/server.ts:29-35` + `plugin/core/tools.ts:65,127,175,205` (4 tools) |
+| 5 | **Spec-promised route that doesn't exist** | Spec says librarian tools are callable via the TS `plugin/mcp` boundary; the shipped TS server exposes only the 4 profile tools. Also stale librarian counts ("four tools", "six-tool core") vs the real 7/5 | Still true. Spec still promises the plugin/mcp boundary can "call the librarian's tools directly"; the TS server exposes only `TOOLS` from `plugin/core` = 4 profile tools. Spec counts still stale ("six-tool core" TOC/§3.3 table; "default set … four" in §7.2). #94 shipped a NEW authoritative doc (`docs/development/specs/tool-surface.md`) rather than editing the spec, so the spec residue persists | CONFIRMED | spec `docs/development/specs/pocket-librarian-v1-spec.md:1784-1790` (route), `:399` + TOC `:14` ("six-tool"), `:1789` ("four"); `plugin/mcp/server.ts:29-35` + `plugin/core/tools.ts:65,127,175,205` (4 tools) |
 | 6 | **Mount failure modes diverge inside one bundle (= #79)** | The desk-pm SessionStart hook self-gates on `command -v deskkit`; the `.mcp.json` mount does not — #79, already 0.8.0 | **#79 fix SHIPPED in PR 112.** The hook still self-gates (silent no-op if binary absent). The `.mcp.json` is still a static mount, but the divergence is now addressed on the *server* side, not by symmetric self-gating: `mcp.Serve` calls `requireResolvedConfig(cfg)` and `os.Exit(1)` with an actionable "desk not resolved…" message when config doesn't resolve (fail-loud, not silent-absent), and emits a one-line **mount signal** to stderr naming the exposed tool set on success | CHANGED | hook `plugin/desk-pm/hooks/session-briefing.sh:21`; static mount `plugin/desk-pm/.mcp.json`; fix `core/mcp/server.go:92-119` (fail-loud 102-105, mount signal 114), `requireResolvedConfig` 126-142, `emitMountSignal` 148-151 |
 
 ## New since the analysis (PR 112 — bears on the symmetry decision)
@@ -66,15 +66,15 @@ CONFIRMED with the fresh citation. **Verdict counts: 14 CONFIRMED · 0 STALE · 
   the fail-loud only fires once the binary runs — a *missing* `deskkit` binary named in `.mcp.json`
   still fails at the host level (the hook's `command -v` guard has no server-side twin).
   `core/mcp/server.go:92-151`.
-- **`docs/tool-surface.md` is now the authoritative surface inventory (#94).** Status `active`,
+- **`docs/development/specs/tool-surface.md` is now the authoritative surface inventory (#94).** Status `active`,
   dated 2026-07-20, counts derived empirically (JSON-RPC `tools/list` probe, not by reading source):
   Librarian CLI 16 base (+`pm` group under `PM_ENABLED`); Librarian MCP 5 / 6 / 17 / 18 by env combo;
   Plugin TS server 4. It documents the ride-along (asymmetry #2) explicitly but does not resolve it,
   and it does **not** correct the spec's stale "six-tool core" / "four default" language (asymmetry #5
-  residue). `docs/tool-surface.md:1-152`.
+  residue). `docs/development/specs/tool-surface.md:1-152`.
 - **Ride-along is now countable, not just implied.** The tool-surface table quantifies the
   merged-mount blast radius (PM_ENABLED → 17 tools on one server; both flags → 18), which sharpens the
-  session's "per-module vs shared mount" decision (design-prep C1). `docs/tool-surface.md:64-70`.
+  session's "per-module vs shared mount" decision (design-prep C1). `docs/development/specs/tool-surface.md:64-70`.
 
 ## Gaps & uncertainties
 
@@ -93,7 +93,7 @@ CONFIRMED with the fresh citation. **Verdict counts: 14 CONFIRMED · 0 STALE · 
   composed/per-module in-binary prompt, re-derive the exact discipline delta then.
 - **"record_feedback" makes the librarian README itself stale.** `librarian/README.md:214-215` lists
   the mcp-serve default as `sweep, patrol, propose_fix, query` (4) — it omits `record_feedback`, so the
-  real default is 5 (as `docs/tool-surface.md` and `specs.go` confirm). This is a second stale-count
+  real default is 5 (as `docs/development/specs/tool-surface.md` and `specs.go` confirm). This is a second stale-count
   site beyond the spec ones the analysis named; minor, noted for the spec-reconcile lane, not fixed here.
 - **Marketplace "entry" for desk-pm.** Confirmed desk-pm is listed in `.claude-plugin/marketplace.json`
   and carries its own `.claude-plugin/plugin.json`; I did not exercise an actual `claude plugin install`

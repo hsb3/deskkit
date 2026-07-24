@@ -43,7 +43,7 @@ point instead of a cold read of a now-partly-stale issue.
 | Librarian-embedded templates (`librarian/templates/`) | Still exactly 2 content templates: `frontmatter-universal.md`, `pointer-stub.md` (`templates.go:14-18`), plus the unrelated system-prompt embed. Unchanged since #36 was filed. |
 | SOP catalog source content | Already vendored: 23 kit dirs on disk = 23 `kits.yaml` entries, guarded by `scripts/check-kits.mjs` (`make check` + CI). Shipped via #49/epic #55 (both CLOSED), documented in ADR 0006. NOT part of this issue's remaining scope. |
 | Runtime consumption of `kits/` | None. ADR 0006's 2026-07-21 correction states explicitly: no lane consumes `kits/` at runtime. Only a render-compatibility test exists (`librarian/templates/kit_render_test.go`), not a selection/integration path. |
-| Type-to-dir_kind classification | Still open: `schema/doctypes.yaml` has 23 types; `dir_kind` (`docs/pocket-librarian-v1-spec.md:476`) has 9 values. No mapping between them is defined anywhere. |
+| Type-to-dir_kind classification | Still open: `schema/doctypes.yaml` has 23 types; `dir_kind` (`docs/development/specs/pocket-librarian-v1-spec.md:476`) has 9 values. No mapping between them is defined anywhere. |
 
 **Net effect on scope:** #36's residual has shrunk to a runtime/binary-integration problem. The
 "port + neutralize the vault content" work this issue's original body scoped is done and should not
@@ -67,10 +67,10 @@ rulings; sequencing build work ahead of it would risk re-doing it under a wrong 
 - **B - Selection logic.** Implement the type-selection rule the ADR rules on (frontmatter `type:`,
   directory name, or agent judgment) inside the fix-proposal path.
 - **C - Classification mapping.** Resolve the type<->`dir_kind` gap per the ADR's ruling; may touch
-  `schema/doctypes.yaml` and the `dir_kind` sections of `docs/pocket-librarian-v1-spec.md`.
+  `schema/doctypes.yaml` and the `dir_kind` sections of `docs/development/specs/pocket-librarian-v1-spec.md`.
 - **D - verify.sh coverage.** New `librarian/verify.sh` check proving a template-scaffolded file's
   content traces to its source template plus only documented substitutions (no synthesized prose).
-- **E - Spec + doc updates.** `docs/pocket-librarian-v1-spec.md` §5.4 and the `dir_kind` sections
+- **E - Spec + doc updates.** `docs/development/specs/pocket-librarian-v1-spec.md` §5.4 and the `dir_kind` sections
   amended in the same change that lands the library, not deferred.
 
 ## Acceptance (verifiable; restated from issue-body.md so an unparking owner needs no cross-reference)
@@ -82,7 +82,7 @@ rulings; sequencing build work ahead of it would risk re-doing it under a wrong 
       written file matches the source template plus only documented substitutions, zero synthesized
       prose.
 - [ ] `librarian/verify.sh` gains the template-scaffold-provenance check.
-- [ ] `docs/pocket-librarian-v1-spec.md` §5.4 and the `dir_kind`/classification sections updated to
+- [ ] `docs/development/specs/pocket-librarian-v1-spec.md` §5.4 and the `dir_kind`/classification sections updated to
       describe the library and the resolved mapping.
 - [ ] `node scripts/check-kits.mjs` stays green if `kits/` or `kits.yaml` is touched.
 

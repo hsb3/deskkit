@@ -69,7 +69,7 @@ two directions the dossiers made concrete:
 
 Shipped-issue lineage: **#79** (mount failure modes diverging inside one bundle) is the one
 asymmetry already resolved — its fail-loud + mount-signal fix is the precedent every future
-mount decision here should inherit. **#94** shipped `docs/tool-surface.md` (authoritative tool
+mount decision here should inherit. **#94** shipped `docs/development/specs/tool-surface.md` (authoritative tool
 inventory) but did not resolve the ride-along it documents, nor correct the spec residue —
 i.e. #94 quantified the problem this brief must rule on. The four asymmetries themselves are
 unruled: no issue closed them.
@@ -107,7 +107,7 @@ Uncertainties). Dossier files live at `../` (one level up from this book).
 - `agent-symmetry.md § Verdict table — the 6 "accidental / unruled" asymmetries` (#2) — the
   `deskkit mcp-serve` server loops over the *merged* registry of all enabled modules; with
   `PM_ENABLED` the mount exposes **17** tools (5 default librarian + 12 PM), now documented but
-  not resolved (`core/mcp/server.go:69-81`; `toolcore.go:133-156`; `docs/tool-surface.md` §2,
+  not resolved (`core/mcp/server.go:69-81`; `toolcore.go:133-156`; `docs/development/specs/tool-surface.md` §2,
   PM_ENABLED → 17).
 - `surface-matrix.md § 6. Unclaimed-surface findings (the ride-along problem)` (finding 1) —
   `plugin/desk-pm/.mcp.json` sets only `PM_ENABLED=true`, so the PM mount surfaces the 5 default
@@ -328,7 +328,7 @@ is part of the radius.
   (`librarian/README.md` + a charter/spec note ruling CLI/TUI-first).
 - **5.b — mount shape (B1/B2):** `librarian/internal/core/mcp/server.go` (mount entry / flag),
   `toolcore` (a per-mount tool-filter dimension for B2, or a `--module` scoping for B1),
-  `plugin/desk-pm/.mcp.json` (and any librarian `.mcp.json`), and `docs/tool-surface.md` (counts
+  `plugin/desk-pm/.mcp.json` (and any librarian `.mcp.json`), and `docs/development/specs/tool-surface.md` (counts
   change). No collection/migration change unless `import` gets a real surface (then a CLI
   subcommand in `cmd/deskkit/main.go`, no new collection). Admin-console posture is docs-only.
 - **5.c — in-binary prompt/slice (C1/C2/C3):** C1 = a scoping change in
@@ -340,8 +340,8 @@ is part of the radius.
 - **5.d — instruction sources:** plugin skills (`plugin/claude-plugin/skills/*`, `plugin/desk-pm/skills/*`)
   named-tool edits; the parity contract spec section (new). Interacts with D6 (mechanism) and D7
   (the TS boundary's promised tool set).
-- **The contract spec itself:** a new section in `docs/pocket-librarian-v1-spec.md` and/or
-  `docs/pm-system-v1-spec.md` (and possibly the charter if direction moves), plus an ADR in
+- **The contract spec itself:** a new section in `docs/development/specs/pocket-librarian-v1-spec.md` and/or
+  `docs/development/specs/pm-system-v1-spec.md` (and possibly the charter if direction moves), plus an ADR in
   `docs/decisions/` recording the parity ruling and each asymmetry's policy-vs-debt verdict.
 
 ## Out of scope / interactions
@@ -384,7 +384,7 @@ is part of the radius.
   ruling that intent, not discovering it.
 - **Tool counts are source-verified, not re-run empirically a second time** (`surface-matrix.md
   § 0. Anchor and how this dossier extends it`; `agent-symmetry.md § New since the analysis`) —
-  the dossiers re-read the source behind `docs/tool-surface.md`'s counts and found no
+  the dossiers re-read the source behind `docs/development/specs/tool-surface.md`'s counts and found no
   discrepancy, but did not rebuild the binary / re-run the JSON-RPC probe. If a count is
   load-bearing to a ruling, re-run the probe.
 - **Config line-number drift** — the write-gate lines moved by one from the exec-desk analysis
