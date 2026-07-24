@@ -2,7 +2,11 @@
 
 _Settles the spec-vs-reality gap on what the TS `plugin/mcp` boundary promises._
 
-- **Status:** Accepted
+> **Superseded by [0022](0022-collapse-onto-deskkit-single-surface.md) (2026-07-23):** the TS
+> boundary and its designed deskkit proxy are retired — the four profile tools move into the Go
+> binary and the whole surface ships as one plugin / one MCP server. Text kept for provenance.
+
+- **Status:** Superseded-by-0022 (2026-07-23)
 - **Date:** 2026-07-20
 - **Raised by:** decision book `_meta/research/2026-07-design-session/decision-book/D7-spec-reality-reconciliation.md`; owner sign-off note 2026-07-20
 

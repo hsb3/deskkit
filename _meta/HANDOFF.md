@@ -1,8 +1,8 @@
 _Session-to-session bridge for desk-standard. Read this before working; update it at the end
 of any substantial session. Secret-free — live URLs/credentials belong in `_meta/operations/`
 (untracked) if that dir is ever created._
-Status: active (2026-07-23, post planning-desk reconciliation; distilled from the wave-log
-form — prior versions live in this file's git history)
+Status: active (2026-07-23, post adoption-feedback design session + ADR 0022 acceptance;
+distilled from the wave-log form — prior versions live in this file's git history)
 
 # HANDOFF
 
@@ -15,12 +15,14 @@ record-original-first write boundary), with **`schema/`** as the contract both r
 marketplace bundles live in a top-level **`plugins/`** tree (`plugins/desk-standard/` — the TS
 plugin adapter, GENERATED server.js; `plugins/desk-persona/` — the composed librarian+PM bundle);
 extracted from under `plugin/` on 2026-07-22, and a marketplace install copies ONLY
-`plugins/desk-standard/`. Watch the one-letter `plugin/` vs `plugins/` distinction. Personalization happens only in a desk's `_knowledge/profile.yaml` (the repo
+`plugins/desk-standard/`. Watch the one-letter `plugin/` vs `plugins/` distinction. **Superseded
+direction — ADR 0022 (Accepted 2026-07-23):** this two-bundle / two-MCP-server split is being
+collapsed onto the Go binary (one plugin, one MCP server; TS server retired) — decided, NOT yet
+built (roadmap Wave 3); the description above is current CODE reality. Personalization happens only in a desk's `_knowledge/profile.yaml` (the repo
 itself is NOT a desk — ruled 2026-07-21, PR #188). Root `README.md` is the front door;
-`CLAUDE.md` is the agent digest (hot-loaded — don't duplicate it here); `docs/CHARTER.md` is the
-canonical page (precedence rule); `docs/README.md` indexes the docs;
-`docs/pocket-librarian-v1-spec.md` is the librarian's build spec (operator docs
-`librarian/README.md`).
+`CLAUDE.md` is the agent digest (hot-loaded — don't duplicate it here); the canonical CHARTER + build specs were RELOCATED 2026-07-23 (see ⚠ in §1: `docs/` top level
+emptied — CHARTER → `docs/development/CHARTER.md`, the specs → `_meta/_archive/`); operator docs
+stay at `librarian/README.md`.
 
 Siblings: `hsb3/dotfiles-agents` (pattern source). The **paired executive desk** is
 `~/Documents/EXECUTIVE_DESK/Projects/desk-standard-desk`; the off-repo decision spine it
@@ -28,7 +30,7 @@ inherits from lives in `…/Projects/dotfiles-agents-desk/_structure/decisions/`
 `dev-tooling-desk`, whose stale copy sits in `…/Projects/ARCHIVE/dev-tooling-desk-old/` — don't
 read the archive copy as current).
 
-## 1. Current standing (as of 2026-07-22) + what's next
+## 1. Current standing (as of 2026-07-23) + what's next
 
 **Wave-v4 EXECUTED same-session** (6 crews + 1 reconciliation PR, all merged): schema-v2 arc
 closed for this cycle (#124, #125, #126 v2 half — the model stays `status: draft`, gated on the
@@ -50,41 +52,52 @@ amended: PM ships default-on. Decision packages for Henry are always the owner-s
 form, never chat questions (project memory; the 2026-07-21 batch proved the pattern at 10-items
 scale).
 
-**Planning-desk reconciliation EXECUTED 2026-07-23** (no code shipped): every open non-epic
-issue now has a reviewed, source-grounded plan on the desk (`_meta/plans/<slug>/`;
-reconcile/coverage/conformance/sync-bodies all exit 0), 16 shipped plan folders archived to
-`_meta/_archive/<issue>-<slug>/`, bodies #197/#199/#12/#36 restructured to template shape,
-#127/#128 factually corrected (items.type IS validated post-#185; retired desk-pm paths),
-#87/#104 epic-shaped, #155 re-titled with 📌 (tracker-type for the governance scripts) and
-refreshed. Two verified finds worth knowing: `plugins/desk-persona/.mcp.json` mounts
-`librarian,pm` (17 tools) — ts-proxy-design's pm-only premise drifted, #199's plan recommends
-"holds with amendment"; and schema v1 already ships AND runtime-enforces the `spec` status
-family (`librarian/internal/core/schema/doctypes.go:138-193`) — the #197 plan's decisive
-grounding for reading the draft's phase machine as the document's own status axis.
+**Adoption-feedback design session EXECUTED 2026-07-23** (docs-only, UNCOMMITTED on `main`): early
+user feedback ("super-confusing; two plugins + two MCP servers; alphabetical CLI; no 'list my
+desks'; unclear config / no central LLM-key home; visual data browser?"). Two owner rulings →
+**(1)** collapse everything onto the Go binary (one plugin/one MCP server; the 4 profile tools move
+to Go; TS server retired) = **ADR 0022 (Accepted)**, supersedes 0016; **(2)** a machine-local
+`~/.config/deskkit/config.yaml` (0600) stores provider + model + **the LLM API key value**
+(precedence env > per-desk profile > central > default). Full design + ordered 4-wave roadmap:
+`_meta/plans/adoption-feedback-roadmap.md`. New memories: `consolidation-single-binary-decision`,
+`feedback-no-public-1.0.0-nagging`. Nothing built yet; the 2026-07-23 planning-desk reconciliation
+run is now a §2 era pointer.
+
+**⚠ REPO GATES BROKEN by a mid-session reorg (Henry, commits `2d84472` + `ba42fd7`, 2026-07-23,
+`main`).** `docs/` top level was EMPTIED: build specs + `tool-surface.md` → `_meta/_archive/`
+(`pocket-librarian-v1-spec`, `pm-system-v1-spec`, `agent-integration-contract-v1-spec`,
+`element-model-v2-draft`, `tool-surface`, `chat-tui-ux-survey`); `CHARTER.md` → `docs/development/`;
+guides → `docs/usage/`; VHS tapes → `scripts/vhs-tapes/`. Gates were NOT updated, so **`make check`
+FAILS**: `check-prompt-drift` + `check-tool-surface` + `check-query-kinds` cite now-missing `docs/…`
+paths. Dangling citations also in CLAUDE.md:178-179, README.md:181-182, `_meta/plans/_config.md:47`,
+and the whole `#197` plan. **Reconcile before any build** — either move the specs back to `docs/`
+(CLAUDE.md still says "don't move them") or repoint every gate + citation to the new homes.
+Direction is an OWNER call (commit msg: specs belong on the planning/strategy desk).
 
 **NEXT, in order of consequence:**
-1. **#197** (gate:v2-final, filed 2026-07-22 by the wave-v4 model-simulations crew) — reconcile
-   the software-spec phase-machine with the PM item phase-machine and name the
-   building→shipped gate rule. The one open item blocking full schema-v2 epic (#130) closure.
-   Build plan ready: `_meta/plans/phase-machine-reconciliation/`.
-2. **1.0.0 maturity call (#87)** — owner's call, now better-informed: the value-evaluation
-   verdict (wins all 3 rubric dimensions vs both baselines; honest caveats) is on file at
-   `_meta/research/2026-07-cohesion-value-evaluation/`, and the model-simulations deficiency
-   report (v1 + v2, both models walked) is complete at `_meta/research/model-simulations/`.
-3. **#199** (filed 2026-07-22) — `docs/development/ts-proxy-design.md` still cites the retired
-   `plugin/desk-pm/` path (folded into desk-persona in #180, then moved under `plugins/` in
-   #191); needs the ts-proxy design owner's judgment, not a mechanical rename.
-4. **ts-proxy implementation** — `docs/development/ts-proxy-design.md` §5; slice 0 (host
-   spawn-capability probe) is the go/no-go; blocked behind #199's doc correction.
+1. **#197** (gate:v2-final, filed 2026-07-22) — reconcile the software-spec phase-machine with the
+   PM item phase-machine and name the building→shipped gate rule. The one open item blocking full
+   schema-v2 epic (#130) closure. Build plan ready: `_meta/plans/phase-machine-reconciliation/`.
+   **⚠ its target `docs/element-model-v2-draft.md` moved to `_meta/_archive/` (see ⚠ above) — repoint the plan first.**
+2. **Adoption-feedback roadmap, Waves 1–3** (`_meta/plans/adoption-feedback-roadmap.md`; ADR 0022
+   gate cleared) — issues NOT yet filed. Wave 1 quick wins (CLI command groups, `deskkit desks`,
+   `deskkit config`, surface the existing PocketBase data browser), Wave 2 central config, Wave 3
+   the collapse. All Go-lane; Wave 1 items are independent/parallelizable.
+3. ~~**#199** + **ts-proxy implementation**~~ **MOOTED by ADR 0022** — the ts-proxy path is
+   withdrawn (the collapse reaches one mount without a spawned-child proxy). Mark #199 + the
+   unfilled ts-proxy build superseded when Wave 3 files.
 
-**Carried-over open question** (2026-07-20, still unresolved): despite
-`enabledPlugins["desk-standard@desk-standard"]: true`, the plugin's 4 MCP tools would not
-surface as agent-callable in a live session in this repo — needs a from-scratch session test.
+**Carried-over open question — now largely MOOT via ADR 0022** (was 2026-07-20): the desk-standard
+plugin's 4 TS MCP tools not surfacing as agent-callable in a live session is superseded by the
+collapse — those tools move into the Go `mcp-serve` surface. Re-check as part of Wave 3's live test.
 
-**Standing, settled decisions:** public launch deferred until ≥ v1.0.0 (Henry, 2026-07-19; repo
-stays PRIVATE; the public `curl|bash` 404 is by-design — §3 has the authed-`gh` workaround;
-don't re-surface as a blocker). OpenCode #12 parked (Henry, 2026-07-17) until ≥ v1.0.0.
-#36 SOP library deferred post-1.0 (owner sign-off, 2026-07-21).
+**Standing, settled decisions:** **Do NOT prompt/nag Henry about going public or cutting 1.0.0
+(#87)** — his call, not a standing agenda item (2026-07-23; memory `feedback-no-public-1.0.0-nagging`).
+Public launch stays deferred / repo PRIVATE (Henry, 2026-07-19; public `curl|bash` 404 is by-design
+— §3 has the authed-`gh` workaround). #87 (1.0.0 maturity) is owner's-court, well-informed (value
+eval `_meta/research/2026-07-cohesion-value-evaluation/`; model-sim deficiency report
+`_meta/research/model-simulations/`) — record it, don't surface it. OpenCode #12 parked until ≥
+v1.0.0 (simpler post-ADR-0022: one Go server to expose). #36 SOP library deferred post-1.0.
 
 **Open backlog: the live triaged view is pinned issue #155** — refresh it (edit the body via
 `gh issue edit 155 --body-file`, bump its date) at session boundaries alongside this file; it
@@ -92,29 +105,23 @@ lives as an issue precisely so refreshes never touch commit history.
 
 ## 2. Delivery eras (newest first — blow-by-blow lives in #155's body, the PRs, and this file's git history)
 
+- **2026-07-23 · planning-desk reconciliation + adoption-feedback design** (no code shipped) —
+  every open non-epic issue given a reviewed, source-grounded plan (`_meta/plans/<slug>/`, all
+  governance scripts exit 0); 16 shipped plan folders archived to `_meta/_archive/`; #155 re-titled
+  📌. Then a feedback-driven design session: **ADR 0022 (Accepted)** collapse-onto-deskkit
+  (supersedes 0016) + the 4-wave adoption roadmap (§1). Docs UNCOMMITTED.
 - **2026-07-22 · wave-v4** — 7 PRs (#192–#196, #198, #200); closed #124 #125 #126 #181 #182 #184
-  #185 #187 #189 #190; schema-v2 arc closed for this cycle (contract versioning, reviewed v2
-  element model, v1+v2 model simulations both walked), TUI discoverability (tab strip, footer,
-  help overlay) + user/dev docs split, 3 findings-driven librarian bugfixes, tool-surface label
-  cleanup, reconciliation pass. Filed #197, #199. One collision (wave 6 vs. wave 5 on
-  `docs/getting-started.md`, predicted in-brief) resolved directly by the coordinating session.
-- **2026-07-21 · wave-v3 + sign-off + v0.8.0** — 8 PRs (#176–#180, #183, #186, #188); closed
-  #19 #81 #83 #84 #88 #170 #171; browser session surface, TUI archive lifecycle, PM default-on,
-  desk-pm folded into desk-persona, K24 retrofit defaults ruled, `make e2e` gate (45 checks),
-  v1 model sims + deficiency report, repo-root `_knowledge/` removed; v0.8.0 released.
-- **2026-07-21 · wave-v2 + triage** — PRs #172–#175; closed #82 #85 #163–#169; gofmt/query-kind
-  gates, verify.sh 48→55, PM polish (unset-vs-empty = presence-not-value), profile-root
-  constant + drift guard; Dependabot action majors merged.
-- **2026-07-21 · wave-v1** — PRs #156–#162; ~20 issues closed; Go module rename, CI hardening
-  lanes, transcript-flush fix, TUI sessions surface, PM completion (ADR 0019/0020), content
-  indexing + search/content query kinds.
-- **2026-07-20/21 · integration-testing wave** — PR #152 (4 bug fixes); report at
-  `_meta/research/2026-07-20-integration-agent-led-testing/`; manual dogfood scripts on main
-  (deliberately NOT in CI).
-- **2026-07-20 · v1 build wave + design session** — epic #129 closed (PRs #136–#147); ADRs
-  0009–0018 ruled (PR #113); 0.8.0 bug floor (PR #112); Lane 6 conformance (PR #105).
-- **2026-07-16→19 · v0.4.0→v0.7.0 era** — ADRs 0001–0007; chat TUI; XDG store; store self-init;
-  rename `pocket-librarian` → `deskkit`; PM system shipped dark at v0.7.0.
+  #185 #187 #189 #190; schema-v2 arc closed this cycle (contract versioning, reviewed v2 model,
+  v1+v2 sims walked), TUI discoverability + user/dev docs split, 3 librarian bugfixes, tool-surface
+  cleanup, reconciliation. Filed #197, #199.
+- **2026-07-21 · waves v1–v3 + v0.8.0** — PRs #156–#188; ~40 issues closed (Go module rename, CI
+  hardening, PM completion ADR 0019/0020 + default-on, browser session surface, TUI archive
+  lifecycle, profile-root constant+guard, repo-root `_knowledge/` removed, `make e2e` 45-check gate,
+  gofmt/query-kind gates, desk-pm folded into desk-persona); **v0.8.0 released**. Detail in PRs + #155.
+- **2026-07-16→21 · genesis → v1 build (pre-wave)** — ADRs 0001–0018; chat TUI, XDG store, store
+  self-init, `pocket-librarian`→`deskkit` rename, PM shipped dark (v0.7.0); epic #129 v1 build
+  (PRs #105/#112/#113/#136–#147); integration-testing PR #152 (report at
+  `_meta/research/2026-07-20-integration-agent-led-testing/`). Detail in git history + #155.
 
 ## 3. Conventions & gotchas
 
@@ -162,10 +169,10 @@ trap — are in **CLAUDE.md** (hot-loaded). Only what CLAUDE.md doesn't cover li
   tool calls need the `argNormalizingTool` adapter. No terminal queries after bubbletea starts;
   theme resolves ONCE pre-program (`tui.ResolveTheme`); new TUI colors go in `newStyles`'s
   per-theme switch, never AdaptiveColor (guarded in `tui/defects_test.go`).
-- **Docs layout**: Using vs Development tracks per `docs/README.md`; spec + ADRs deliberately
-  stay at `docs/` top level (cited from code/skills/neutrality allowlist — don't move). VHS
-  tapes in `docs/development/tapes/`, GIFs land in `docs/media/`; re-recording re-encodes ALL
-  GIFs (`git restore` the unchanged ones); tapes need
+- **Docs layout**: **the 2026-07-23 reorg (⚠ §1) emptied `docs/` top level** — specs →
+  `_meta/_archive/`, CHARTER → `docs/development/`, guides → `docs/usage/`; ADRs still at
+  `docs/decisions/`. VHS tapes moved to `scripts/vhs-tapes/` (from `docs/development/tapes/`), GIFs
+  in `docs/media/`; re-recording re-encodes ALL GIFs (`git restore` unchanged ones); tapes need
   `ANTHROPIC_API_KEY="$(secret get ANTHROPIC_API_KEY)" bash scripts/record-media.sh`.
 - **Commits auto-close**: `Resolves #N` closes when the commit lands on `main` — post the proof
   comment first (close-with-comment fails on an already-closed issue).
@@ -189,3 +196,6 @@ prune them at the next distillation pass.
   effective mitigation for writers: brief them to emit long files INCREMENTALLY (Write the
   frontmatter + first section, Edit-append the rest section by section) so a dropped stream
   loses one section, not the whole file.
+- **2026-07-23 (design session):** Explore agents left running when the prior session's process
+  exited (no completion record) resumed cleanly via SendMessage to their agentId (restarts from
+  transcript) — a stopped/cross-process agent is recoverable, not lost; don't re-launch duplicates.

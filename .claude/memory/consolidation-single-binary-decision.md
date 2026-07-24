@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: 688b2df2-944b-44e6-95d9-abe6d3e20436
-  modified: 2026-07-23T23:05:48.879Z
+  modified: 2026-07-24T01:13:41.805Z
 ---
 
 Early user feedback (2026-07-23) was "the plugin is super-confusing — why two plugins and two MCP
@@ -30,6 +30,7 @@ servers? just make it one." Henry ruled two design decisions in response:
 **Why:** owner architecture ruling — record so it survives a clear and isn't re-litigated.
 
 **How to apply:** the full design + 4-wave roadmap live at
-`_meta/plans/adoption-feedback-roadmap.md`. Wave 3 (the collapse) is gated on the superseding ADR
-being accepted. Do not re-open the two-plugin/ts-proxy architecture as if it were still live.
+`_meta/plans/adoption-feedback-roadmap.md`. The superseding ADR is **0022 (Accepted 2026-07-23)**;
+it supersedes 0016 (now `Superseded-by-0022`) and the Wave 3 build gate is cleared. Do not re-open
+the two-plugin/ts-proxy architecture as if it were still live.
 Related: [[plugin-marketplace-packaging]] (the constraints the two-bundle split originally solved).

@@ -24,9 +24,10 @@ where the decision binds; never delete a record — supersede or correct in plac
 | [0013](0013-disposition-completion-adoption-log.md) | Findings lifecycle completed — provenance on the finding, adoption log shrunk to writer-backed events | Accepted (2026-07-20) |
 | [0014](0014-agent-integration-contract.md) | The agent integration contract — composed desk persona bundle, gated shared mount, librarian-only in-binary loop | Accepted (2026-07-20) |
 | [0015](0015-prompt-governance.md) | Prompt governance — git is truth, DB rows a re-seeded cache, centralized tuning requirement | Accepted (2026-07-20) |
-| [0016](0016-ts-boundary-deskkit-proxy.md) | TS plugin boundary — extend via a designed deskkit proxy; drift-guarded tool-surface truth | Accepted (2026-07-20) |
+| [0016](0016-ts-boundary-deskkit-proxy.md) | TS plugin boundary — extend via a designed deskkit proxy; drift-guarded tool-surface truth | Superseded-by-0022 (2026-07-23) |
 | [0017](0017-document-identity-and-hygiene.md) | Document identity & hygiene — frontmatter id, `entity_type` column rename, text-cap sweep + guard | Accepted (2026-07-20) |
 | [0018](0018-element-model-direction.md) | Element-model direction — simple goal, optional workstream tag, research loop, trigger-gated exec outputs | Accepted (2026-07-20) |
 | [0019](0019-durable-pm-defaults.md) | Durable PM defaults — autonomous-writes-on and claim-TTL-30m recorded from spec §13 | Accepted (2026-07-21) |
 | [0020](0020-pm-claim-semantics.md) | PM claim semantics — a live claim is authoritative over every direct mutation | Accepted (owner-confirmed 2026-07-21) |
 | [0021](0021-desk-standard-1-0-0-direction.md) | desk-standard 1.0.0 release direction — the F1–F7 forks graduated from the executive desk (PM default-on, webapp lane, `_knowledge/` move, cohesion+value eval) | Accepted (2026-07-21) |
+| [0022](0022-collapse-onto-deskkit-single-surface.md) | Collapse the plugin surface onto deskkit — one binary, one MCP server, one bundle (supersedes 0016; amends 0014) | Accepted (2026-07-23) |

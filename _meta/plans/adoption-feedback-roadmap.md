@@ -21,9 +21,10 @@ Ordering principle: **user-facing value + risk**, never a release cut or public 
 ## Owner decisions (2026-07-23)
 
 1. **Consolidation = "everything on deskkit."** Move the 4 TS profile tools into the Go binary;
-   retire the TS MCP server; ship ONE plugin + ONE MCP server (`deskkit mcp-serve`). Reverses ADR
-   0016 → needs a superseding ADR; withdraws `docs/development/ts-proxy-design.md`; moots #199 and
-   the ts-proxy build; simplifies #12 (OpenCode). See [[consolidation-single-binary-decision]].
+   retire the TS MCP server; ship ONE plugin + ONE MCP server (`deskkit mcp-serve`). Recorded in
+   **ADR 0022 (Accepted 2026-07-23)**, which supersedes 0016; withdraws
+   `docs/development/ts-proxy-design.md`; moots #199 and the ts-proxy build; simplifies #12
+   (OpenCode). See [[consolidation-single-binary-decision]].
 2. **Central config stores the actual API key** — machine-local `~/.config/deskkit/config.yaml`
    (0600) holds `llm.provider` + `llm.model` + `llm.api_key`.
 
@@ -67,9 +68,9 @@ Highest visible payoff per unit effort; each item independent.
 - `config set`/`config edit` write the central file. *Done when:* a key in the central file (env
   unset) is picked up by `agent`/`chat`; `config show` proves the precedence; file is 0600.
 
-### Wave 3 — The consolidation  *(GATE: superseding ADR accepted first)*
-- New ADR supersedes 0016 (collapse onto Go; profile tools in Go; TS MCP server retired); mark
-  `docs/development/ts-proxy-design.md` withdrawn; reconcile ADR 0014 (one bundle).
+### Wave 3 — The consolidation  *(GATE CLEARED: ADR 0022 Accepted 2026-07-23)*
+- ADR 0022 (accepted) records the collapse; at build, mark `docs/development/ts-proxy-design.md`
+  withdrawn and add the dated amendment note to ADR 0014 (one bundle; TS mount retired).
 - Reimplement the 4 profile tools in Go behind a `profile` value in `MCP_MODULES`
   (`librarian/internal/core/mcp/server.go`); reuse `config.DiscoverProfile`/`LoadProfile` +
   `schema/profile.schema.yaml` + `templates.Render` + the librarian `files` index.
