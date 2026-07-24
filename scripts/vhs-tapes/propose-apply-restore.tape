@@ -1,7 +1,7 @@
 # propose-apply-restore.tape — the safety loop: propose a mechanical fix, apply it, then
 # restore proves the change is byte-exact reversible (record-original-first, ADR/decision
 # 0014). Regenerate: bash scripts/record-media.sh (never hand-edit the GIF).
-Output docs/media/propose-apply-restore.gif
+Output docs/assets/propose-apply-restore.gif
 
 Require deskkit
 

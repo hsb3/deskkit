@@ -90,7 +90,7 @@ auto-unblock paths are untouched.
 
 - **Contract, stated once:** "A live foreign claim refuses every direct mutation of the item
   (transition, block, unblock, update); it is honored by the holder and lapses at its TTL." This lands
-  in `docs/pm-system-v1-spec.md` (§3.6) and `docs/pm-guide.md`, and the `claim_item` tool description.
+  in `docs/development/specs/pm-system-v1-spec.md` (§3.6) and `docs/usage/pm-guide.md`, and the `claim_item` tool description.
 - **Tests:** a non-holder `Block` / `Unblock` / `UpdateItem` on a claimed item is refused, one test
   pinning each path; the holder's own call and the expired-claim case still succeed.
 - **Behavior-change fallout:** any existing test or fixture that mutated a claimed item as a non-holder
@@ -103,6 +103,6 @@ auto-unblock paths are untouched.
 
 `librarian/internal/modules/pm/engine/engine.go` (`Block`, `Unblock` claim checks) ·
 `librarian/internal/modules/pm/engine/queries.go` (`UpdateItem` claim check) ·
-engine/queries tests · `docs/pm-system-v1-spec.md` §3.6 · `docs/pm-guide.md` ·
+engine/queries tests · `docs/development/specs/pm-system-v1-spec.md` §3.6 · `docs/usage/pm-guide.md` ·
 the `claim_item` tool description · [ADR 0019](0019-durable-pm-defaults.md) (claim TTL default,
 the mitigation for a stale claim under reading (a)).

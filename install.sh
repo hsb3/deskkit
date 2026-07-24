@@ -18,7 +18,7 @@
 # NOTE (live e2e): releases are published (through v0.7.0), but this repo stays PRIVATE until
 # v1.0.0 — so the public unauthenticated one-liner above 404s by design until then. Install today
 # with the authenticated `gh release download` path (README "Install the deskkit binary" /
-# docs/getting-started.md). This script is shellcheck-clean and its --dry-run plan is verified
+# docs/usage/getting-started.md). This script is shellcheck-clean and its --dry-run plan is verified
 # against the exact artifact strings in release.yml; a full unauthenticated end-to-end run happens
 # once the repo is public.
 #
@@ -282,5 +282,5 @@ step "Done"
 if $DRY_RUN; then
   info "Dry run complete — nothing was downloaded or written."
 else
-  info "librarian installed at ${DEST}. Next: fill _knowledge/profile.yaml and see docs/getting-started.md."
+  info "librarian installed at ${DEST}. Next: fill _knowledge/profile.yaml and see docs/usage/getting-started.md."
 fi

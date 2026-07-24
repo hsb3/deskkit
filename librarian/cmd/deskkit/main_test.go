@@ -11,14 +11,14 @@ import (
 // TestNoStaleSevenToolClaim guards against the return of the false "seven-tool core" help string:
 // the librarian MCP default surface exposes 5 tools (6 with LIBRARIAN_AUTONOMOUS_WRITES, +12 under
 // PM_ENABLED) and the CLI carries far more than seven subcommands — the authoritative map is
-// docs/tool-surface.md. RED before the fix (the mcp-serve Short said "seven-tool core"), green after.
+// docs/development/specs/tool-surface.md. RED before the fix (the mcp-serve Short said "seven-tool core"), green after.
 func TestNoStaleSevenToolClaim(t *testing.T) {
 	src, err := os.ReadFile("main.go")
 	if err != nil {
 		t.Fatalf("read main.go: %v", err)
 	}
 	if bytes.Contains(src, []byte("seven-tool core")) {
-		t.Error(`main.go still contains the false "seven-tool core" claim; describe the surface accurately (see docs/tool-surface.md)`)
+		t.Error(`main.go still contains the false "seven-tool core" claim; describe the surface accurately (see docs/development/specs/tool-surface.md)`)
 	}
 }
 

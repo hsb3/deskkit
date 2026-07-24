@@ -3,7 +3,7 @@ Status: active
 Audience: **desk owners** — you run a desk; you are not building the products. Assumes no build
 toolchain and only a minimal terminal: `deskkit` run from inside your profiled desk, no env
 exports required. Building from source and the env-var / store-path lore live in the developer
-track ([`development/install-and-build.md`](development/install-and-build.md)).
+track ([`development/install-and-build.md`](../development/install-and-build.md)).
 
 # deskkit — the daily loop
 
@@ -16,9 +16,9 @@ back exactly.
 This guide walks the whole loop on a throwaway `example-desk`. Every transcript below is a
 real run captured against a scratch desk with a scratch store — never a real desk. For
 provider setup, the admin console, the MCP surface, and the sandbox, see the operator
-reference in `../librarian/README.md`; this page is the daily-use story.
+reference in `../../librarian/README.md`; this page is the daily-use story.
 
-![The safety loop: propose a fix, apply it, restore it byte-exact](media/propose-apply-restore.gif)
+![The safety loop: propose a fix, apply it, restore it byte-exact](../assets/propose-apply-restore.gif)
 
 ## What you get, at a glance
 
@@ -48,7 +48,7 @@ from that file, and no environment variable is required. With no `--dir` and no 
 profile, the store falls back to `$XDG_DATA_HOME/deskkit/<DESK_NAME>/`
 (`~/.local/share/deskkit/<DESK_NAME>/` by default).
 
-![The open-guard refusing a store that belongs to another desk](media/open-guard.gif)
+![The open-guard refusing a store that belongs to another desk](../assets/open-guard.gif)
 
 Opening a store runs a **desk open-guard**: if the store already holds rows stamped with a
 different `DESK_NAME`, the command refuses and names both values, so a copy-pasted env can
@@ -59,7 +59,7 @@ The transcripts below run against a scratch `example-desk`, pointed at a scratch
 env vars (`DESK_ROOT`, `DESK_NAME`, `XDG_DATA_HOME`) so the demo never touches a real desk or
 store — none of that is a prerequisite on your own profiled desk, where running `deskkit` from
 inside it is enough. The full env-var precedence and the XDG store-path lore live in
-[`development/install-and-build.md`](development/install-and-build.md); this page only
+[`development/install-and-build.md`](../development/install-and-build.md); this page only
 demonstrates the loop, it does not require you to export anything first.
 
 ## The seeded desk
@@ -103,7 +103,7 @@ up` is available as an explicit, optional alternative.)
 row. It is a **dry run — it never writes desk files.** Note the `run_id`; the write path
 keys off it.
 
-![patrol firing real R1 and R2 findings on a seeded desk](media/patrol.gif)
+![patrol firing real R1 and R2 findings on a seeded desk](../assets/patrol.gif)
 
 ```console
 $ ./deskkit patrol
@@ -282,7 +282,7 @@ export ANTHROPIC_API_KEY=sk-...
 ```
 
 Provider selection, key redirection via `secrets_ref.llm_api_key`, history bounds, and the
-gated tool set are documented in `../librarian/README.md`.
+gated tool set are documented in `../../librarian/README.md`.
 
 ## Health check — `verify.sh`
 

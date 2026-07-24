@@ -268,7 +268,7 @@ unset LIBRARIAN_AUTONOMOUS_WRITES
 
 # --- real multi-message MCP protocol session, both tool surfaces ------------------------
 #
-# Framing per docs/tool-surface.md "How the counts were derived": one-shot init+initialized+
+# Framing per docs/development/specs/tool-surface.md "How the counts were derived": one-shot init+initialized+
 # call per invocation against the SAME persistent --dir store, so state (files/findings/
 # revisions) carries across calls even though each call is its own process — this is the
 # same pattern dogfood-pm.sh uses for its MCP session. A trailing `sleep 1` keeps stdin open

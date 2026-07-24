@@ -33,8 +33,8 @@ never by editing a shipped skill, template, or tool.
   `plugin/` + `librarian/`. Shipped code names no deployment identity. (`docs/` and repo-root
   files are exempt and may cite issues/identity freely.)
 - **One version, one repo.** Both products ship under the single root `VERSION`; a release tags
-  that one version (SemVer policy: [ADR-0005](decisions/0005-versioning-and-changelog.md)).
-- **Decisions are ADRs**, append-only, in [`decisions/`](decisions/) and cited where they bind.
+  that one version (SemVer policy: [ADR-0005](../decisions/0005-versioning-and-changelog.md)).
+- **Decisions are ADRs**, append-only, in [`decisions/`](../decisions/) and cited where they bind.
 - **Scope is Claude Code only** in v1; OpenCode is a deferred, separate fan-out build.
 
 ## Direction settled for 1.0.0
@@ -49,7 +49,7 @@ These are decided; open build detail lives in the roadmap and issues, not here.
   `modules.pm.enabled: false`.
 - **The PocketBase-served webapp is in 1.0.0 scope.** The deferred chat surface moves out of
   post-1.0 deferral into a pre-1.0 build lane, amending
-  [ADR-0001](decisions/0001-interactive-surface-tui-first.md)'s TUI-first deferral; the
+  [ADR-0001](../decisions/0001-interactive-surface-tui-first.md)'s TUI-first deferral; the
   serving-stack call is made when that lane starts, not here.
 - **Public launch is deferred to ≥ 1.0.0.** The repo stays private until then; the public
   `curl | bash` install path is expected to 404 by design until launch — install from the
@@ -59,8 +59,8 @@ These are decided; open build detail lives in the roadmap and issues, not here.
 
 | For | Read |
 |---|---|
-| Working in the repo as an agent | [`../CLAUDE.md`](../CLAUDE.md) (command surface + the one rule) |
+| Working in the repo as an agent | [`CLAUDE.md`](../../CLAUDE.md) (command surface + the one rule) |
 | The docs map (using vs developing) | [`README.md`](README.md) |
-| The librarian's build spec | [`pocket-librarian-v1-spec.md`](pocket-librarian-v1-spec.md) |
-| The PM system's build spec | [`pm-system-v1-spec.md`](pm-system-v1-spec.md) |
-| Why a decision was made | [`decisions/`](decisions/) |
+| The librarian's build spec | [`pocket-librarian-v1-spec.md`](specs/pocket-librarian-v1-spec.md) |
+| The PM system's build spec | [`pm-system-v1-spec.md`](specs/pm-system-v1-spec.md) |
+| Why a decision was made | [`decisions/`](../decisions/) |

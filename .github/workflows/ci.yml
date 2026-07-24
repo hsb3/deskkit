@@ -64,7 +64,7 @@ jobs:
       - name: Prompt-copy drift guard — embed vs spec quote
         run: node scripts/check-prompt-drift.mjs
 
-      # Tool-surface drift: docs/tool-surface.md's counts must match source (ADR 0016). The TS
+      # Tool-surface drift: docs/development/specs/tool-surface.md's counts must match source (ADR 0016). The TS
       # server (4) and CLI (16 base) counts are pinned here; the gate-dependent Librarian MCP
       # counts (5/6/17/18, MCP_MODULES=pm → 12) are pinned by TestToolSurfaceDoc_MCPCounts on the
       # go-test lane below. Self-test proves the guard still fails on a tool add/remove.
@@ -97,6 +97,16 @@ jobs:
         run: |
           node scripts/check-profile-root.mjs
           node scripts/check-profile-root.mjs --self-test
+
+      # Doc-link integrity: every cited doc/media path on the published+shipped surface must resolve.
+      # Incident 2026-07-24 — a docs reorg left dozens of dangling `docs/...` citations that no gate
+      # saw (the only symptom was an unrelated gate crashing on ENOENT reading a moved spec). The
+      # working desk (_meta/, .claude/) is excluded by design. Self-test proves the guard still catches
+      # a seeded dangler.
+      - name: Doc-link drift guard (+ self-test)
+        run: |
+          node scripts/check-doc-links.mjs
+          node scripts/check-doc-links.mjs --self-test
 
       # Advisory only (never fails the build): nudges when user-facing changes have piled up
       # under plugin/ or librarian/ since the last v* tag without a VERSION bump. The hard gate

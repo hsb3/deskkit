@@ -26,7 +26,7 @@ import { fileURLToPath } from "node:url";
 
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const EMBED = join(REPO_ROOT, "librarian", "templates", "librarian-system-prompt.txt");
-const SPEC = join(REPO_ROOT, "docs", "pocket-librarian-v1-spec.md");
+const SPEC = join(REPO_ROOT, "docs", "development", "specs", "pocket-librarian-v1-spec.md");
 
 // The spec quotes the embed under this sentinel line; the very next ```text … ``` fence is the
 // "kept verbatim" copy. Locate by content, never by line number — the fence moves as the spec

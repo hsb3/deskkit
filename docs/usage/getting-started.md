@@ -6,7 +6,7 @@ Audience: **desk owners** — you run a desk; you are not building the products.
 toolchain and only a minimal terminal: one install command and `deskkit` launched inside your desk,
 with the TUI and the Claude-session skills carrying the rest. Building from source, release-asset
 downloads, and environment-variable lore live in the developer track
-([`development/install-and-build.md`](development/install-and-build.md)).
+([`development/install-and-build.md`](../development/install-and-build.md)).
 
 # Getting started
 
@@ -21,7 +21,7 @@ guided desk setup, and `deskkit` run from inside your desk. Deeper guides: `plug
 four skills) and `pm-guide.md` (the PM work graph). Everything terminal-heavy — building from
 source, environment overrides, JSON output — is the developer track, linked where it belongs.
 
-![First sweep: index the desk, then see findings and orphans](media/sweep-and-findings.gif)
+![First sweep: index the desk, then see findings and orphans](../assets/sweep-and-findings.gif)
 
 ## 1. Install `deskkit`
 
@@ -93,7 +93,7 @@ the mechanical findings under a byte-exact undo, the daily loop is in `librarian
 `deskkit chat` opens the full-screen terminal UI — an interactive session over the same tools, and
 the home for the PM work-graph views. (Unlike `sweep`/`patrol`, `chat` talks to a model, so it
 needs an LLM key set once — the default provider reads `ANTHROPIC_API_KEY`, or point your profile's
-`models` + `secrets_ref.llm_api_key` at your key. Details in `../librarian/README.md`.)
+`models` + `secrets_ref.llm_api_key` at your key. Details in `../../librarian/README.md`.)
 
 You don't have to memorize anything to find your way around:
 
@@ -129,7 +129,7 @@ the tab strip is absent — `ctrl+p` tells you so rather than doing nothing.
 - **Learn the skills** — greenfield setup, the rule set, the harvest loop, and brownfield adoption:
   `plugin-guide.md`.
 - **Build from source, or override the desk/store with environment variables** — the developer
-  track: [`development/install-and-build.md`](development/install-and-build.md).
+  track: [`development/install-and-build.md`](../development/install-and-build.md).
 
 You now have a personalized desk under a plugin that maintains it and a librarian that patrols it —
 reached from one install command and `deskkit` run inside your desk.

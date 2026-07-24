@@ -1,6 +1,6 @@
 # patrol.tape — a patrol run over an already-swept desk, surfacing real R1/R2 rule findings.
 # Regenerate: bash scripts/record-media.sh (never hand-edit the GIF).
-Output docs/media/patrol.gif
+Output docs/assets/patrol.gif
 
 Require deskkit
 

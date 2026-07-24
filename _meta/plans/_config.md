@@ -43,12 +43,12 @@ about which do NOT fire. Run gate commands **bare, never piped** (a pipe masks t
 
 A load-bearing claim cites `path:line` OR one of these spine docs:
 
-- `docs/CHARTER.md` — canonical direction; precedence rule (charter wins).
-- `docs/pocket-librarian-v1-spec.md` and `docs/pm-system-v1-spec.md` — the two build specs
+- `docs/development/CHARTER.md` — canonical direction; precedence rule (charter wins).
+- `docs/development/specs/pocket-librarian-v1-spec.md` and `docs/development/specs/pm-system-v1-spec.md` — the two build specs
   (paths are load-bearing; cited from code + the neutrality allowlist).
 - `docs/decisions/` — ADRs 0001–0018; 0009–0018 are the 2026-07-20 design-session rulings
   every feature lane binds to.
-- `docs/tool-surface.md` — empirically-verified tool counts (ADR 0016 makes it drift-guarded truth).
+- `docs/development/specs/tool-surface.md` — empirically-verified tool counts (ADR 0016 makes it drift-guarded truth).
 - `schema/` — the shared contract both lanes read.
 - `CLAUDE.md` — the agent digest (commands, generated artifacts, cross-cutting gotchas).
 

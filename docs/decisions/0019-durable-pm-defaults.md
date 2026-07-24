@@ -5,7 +5,7 @@ so the spec→record chain is reconcilable from the ADR set rather than from PR 
 
 - **Status:** Accepted
 - **Date:** 2026-07-21
-- **Raised by:** issue #103 (R-3); `docs/pm-system-v1-spec.md` §13 items 7 & 9
+- **Raised by:** issue #103 (R-3); `docs/development/specs/pm-system-v1-spec.md` §13 items 7 & 9
 
 ## Context
 
@@ -46,7 +46,7 @@ binding decision"; the value here is traceability (what the default is, why, and
 
 ## Affects
 
-`docs/pm-system-v1-spec.md` §13 items 7 & 9 (now cite this ADR) ·
+`docs/development/specs/pm-system-v1-spec.md` §13 items 7 & 9 (now cite this ADR) ·
 `librarian/internal/core/config/config.go` (`PMAutonomousWrites`, `PMClaimTTL`) ·
 `librarian/internal/modules/pm/module.go`, `.../pm/engine/engine.go` (default application) ·
 [ADR 0002](0002-multi-desk-topology-store-per-desk.md) (single-writer, out of scope here).

@@ -38,7 +38,7 @@ test: ## Fast tests both lanes: plugin (bun test) + librarian (go test ./...)
 	@cd plugin && bun run test
 	@$(MAKE) -C librarian test
 
-check: ## Repo gates: neutrality lint + self-test, kit-manifest drift, prompt-copy drift, tool-surface drift + self-test, scaffold frontmatter, persona drift, textfield-max, query-kind drift + self-test, plugin core purity, shellcheck, actionlint, workflow SHA-pin drift + self-test, profile-root drift + self-test
+check: ## Repo gates: neutrality lint + self-test, kit-manifest drift, prompt-copy drift, tool-surface drift + self-test, scaffold frontmatter, persona drift, textfield-max, query-kind drift + self-test, doc-link integrity + self-test, plugin core purity, shellcheck, actionlint, workflow SHA-pin drift + self-test, profile-root drift + self-test
 	@node scripts/check-neutrality.mjs
 	@node scripts/check-neutrality.mjs --self-test
 	@node scripts/check-kits.mjs
@@ -50,6 +50,8 @@ check: ## Repo gates: neutrality lint + self-test, kit-manifest drift, prompt-co
 	@node scripts/check-textfield-max.mjs
 	@node scripts/check-query-kinds.mjs
 	@node scripts/check-query-kinds.mjs --self-test
+	@node scripts/check-doc-links.mjs
+	@node scripts/check-doc-links.mjs --self-test
 	@cd plugin && bun run check:purity
 	@shellcheck install.sh librarian/verify.sh librarian/dogfood-agent.sh librarian/dogfood-pm.sh librarian/sandbox/*.sh scripts/record-media.sh librarian/e2e/e2e.sh librarian/e2e/lib.sh librarian/e2e/steps/*.sh
 	@actionlint

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
-// Tool-surface drift guard (the JS half). docs/tool-surface.md is the repo's authoritative,
+// Tool-surface drift guard (the JS half). docs/development/specs/tool-surface.md is the repo's authoritative,
 // empirically-derived map of every tool-bearing surface (shipped by #94). ADR 0016 rules that
-// "tool-surface truth lives in docs/tool-surface.md, pinned by a drift guard (script or
+// "tool-surface truth lives in docs/development/specs/tool-surface.md, pinned by a drift guard (script or
 // generation) so counts can't rot again" — the way VERSION is pinned to the shipped manifests
 // (check-version-sync.mjs) and kits.yaml to the kits/ tree (check-kits.mjs). Before this guard,
 // the doc's own closing line ("re-run the probe … the numbers in this doc must match") was a
@@ -33,7 +33,7 @@ import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
-const DOC = join(REPO_ROOT, "docs", "tool-surface.md");
+const DOC = join(REPO_ROOT, "docs", "development", "specs", "tool-surface.md");
 const TS_TOOLS = join(REPO_ROOT, "plugin", "core", "tools.ts");
 const CLI_MAIN = join(REPO_ROOT, "librarian", "cmd", "deskkit", "main.go");
 // The Go half that pins the gate-dependent Librarian MCP counts; its presence is asserted here.
@@ -125,10 +125,10 @@ function checkAll({ tsSource, goSource, docMd, goGuardPresent }) {
   } else {
     for (const [where, val] of [["§3 \"Count: N\"", tsDoc.section], ["Summary table row", tsDoc.summary]]) {
       if (val === null) {
-        problems.push(`TS surface: could not parse the documented count (${where}) in docs/tool-surface.md`);
+        problems.push(`TS surface: could not parse the documented count (${where}) in docs/development/specs/tool-surface.md`);
       } else if (val !== tsDerived) {
         problems.push(
-          `TS surface: docs/tool-surface.md ${where} says ${val}, but plugin/core/tools.ts TOOLS array has ${tsDerived}`,
+          `TS surface: docs/development/specs/tool-surface.md ${where} says ${val}, but plugin/core/tools.ts TOOLS array has ${tsDerived}`,
         );
       }
     }
@@ -138,10 +138,10 @@ function checkAll({ tsSource, goSource, docMd, goGuardPresent }) {
   const cli = deriveCliCount(goSource);
   const cliDoc = parseDocCliCount(docMd);
   if (cliDoc === null) {
-    problems.push("CLI surface: could not parse the documented base count (Summary table row) in docs/tool-surface.md");
+    problems.push("CLI surface: could not parse the documented base count (Summary table row) in docs/development/specs/tool-surface.md");
   } else if (cli.total !== cliDoc) {
     problems.push(
-      `CLI surface: docs/tool-surface.md says ${cliDoc} base, but librarian/cmd/deskkit/main.go derives ` +
+      `CLI surface: docs/development/specs/tool-surface.md says ${cliDoc} base, but librarian/cmd/deskkit/main.go derives ` +
         `${cli.total} (${cli.add} AddCommand + ${cli.lateCount} pbLate + ${cli.migrate} migratecmd)`,
     );
   }
@@ -179,7 +179,7 @@ function runScan() {
     console.error(`check-tool-surface: FAIL — ${problems.length} tool-surface drift(s):`);
     for (const p of problems) console.error(`  ${p}`);
     console.error(
-      `\ndocs/tool-surface.md is the pinned source of truth (ADR 0016); reconcile the doc's counts with the ` +
+      `\ndocs/development/specs/tool-surface.md is the pinned source of truth (ADR 0016); reconcile the doc's counts with the ` +
         `tool registrations, then re-run.`,
     );
     process.exit(1);

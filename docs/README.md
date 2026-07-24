@@ -1,0 +1,26 @@
+_The documentation index for desk-standard, split into two tracks: **Using** (run a desk) and
+**Developing** (build the tools). The front door is the root [`README.md`](../README.md); the
+canonical direction is [`development/CHARTER.md`](development/CHARTER.md) (it wins any conflict)._
+Status: active
+
+# Documentation
+
+## Using — run a desk
+
+- [`usage/getting-started.md`](usage/getting-started.md) — install, fill your profile, build the librarian, first sweep + patrol.
+- [`usage/plugin-guide.md`](usage/plugin-guide.md) — the desk-standard plugin's skills as user journeys: when to reach for each, what you get.
+- [`usage/librarian-guide.md`](usage/librarian-guide.md) — the daily loop: sweep → patrol → fix → byte-exact restore.
+- [`usage/pm-guide.md`](usage/pm-guide.md) — the PM work graph: enable it, the phase machine + gates, and the CLI / MCP / TUI / `desk-persona` surfaces.
+
+## Developing — build the tools
+
+- [`development/CHARTER.md`](development/CHARTER.md) — the canonical page: what the project is, the 1.0.0 direction, the precedence rule.
+- [`development/README.md`](development/README.md) — contributor overview: build, test, regenerate media, cut a release.
+- [`development/install-and-build.md`](development/install-and-build.md) — toolchain floors and the build lanes in detail.
+- [`development/specs/`](development/specs/) — the build specs (librarian + PM technical/product specs, the tool-surface map, the agent-integration contract, the v2 element-model draft). Several are read by CI gates.
+- [`development/docs-layout.md`](development/docs-layout.md) — the docs layout contract: what lives where, which paths are load-bearing, and how the working desk differs.
+- [`decisions/`](decisions/) — Architecture Decision Records (append-only; cited where they bind).
+
+Working-desk material — session handoffs, plans, research, archived docs — lives under
+[`../_meta/`](../_meta/), not here. It is point-in-time working state, curated by hand, not published
+documentation; see [`development/docs-layout.md`](development/docs-layout.md) for the boundary.

@@ -20,7 +20,7 @@ org, repo, or issue number:
   carries the **PM module** — a document-gated work graph (items move through a rigid phase
   machine; a phase advance is refused until the document that phase requires validates),
   **on by default** — opt a desk out per desk with `PM_ENABLED=false`. See
-  [docs/pm-guide.md](docs/pm-guide.md) and the composed `desk-persona` plugin.
+  [docs/usage/pm-guide.md](docs/usage/pm-guide.md) and the composed `desk-persona` plugin.
 - **`schema/`** — schema v1: the shared, product-neutral contract both `plugin/` and
   `librarian/` read as their rule/structure source.
 
@@ -89,7 +89,7 @@ $EDITOR _knowledge/profile.yaml
 Steering a plain folder instead of the plugin scaffold? `deskkit init [dir]`
 (built in "Running the librarian" below) writes the minimal zero-export profile above —
 desk name from the folder's basename — without the plugin's other placeholders; see
-`docs/getting-started.md` §2.
+`docs/usage/getting-started.md` §2.
 
 `conventions-standard` and `harvest-loop` then run the standing checks and the periodic
 improvement-log pass.
@@ -135,7 +135,7 @@ make patrol   # flag rule violations — dry-run, never writes
 The store self-initializes on first run — `./deskkit migrate up` is optional. The
 exports above are needed here only because `make` runs from `librarian/`; with the binary on
 your `PATH` and a `_knowledge/profile.yaml` in the desk (`desk.name` + `root: "."`), running
-`deskkit` from inside the desk needs no env vars. See `docs/getting-started.md` §4.
+`deskkit` from inside the desk needs no env vars. See `docs/usage/getting-started.md` §4.
 
 `apply-fix` is deliberately not a Makefile target — it's supervised-only, run by hand, and
 every fix it applies can be reversed with `./deskkit restore --by-path <path>`.
@@ -162,23 +162,23 @@ docs/               product specs, ADRs, and the getting-started / plugin / libr
 
 ## Documentation
 
-The canonical page is **[docs/CHARTER.md](docs/CHARTER.md)** — what the project is and what's
+The canonical page is **[docs/development/CHARTER.md](docs/development/CHARTER.md)** — what the project is and what's
 settled for 1.0.0; if anything here disagrees with it, the charter wins. Agents working in the repo
 start at **[CLAUDE.md](CLAUDE.md)**. Docs split into two tracks — see **[docs/README.md](docs/README.md)**
 for the full index.
 
 **Using it** — install and run:
 
-- **[docs/getting-started.md](docs/getting-started.md)** — install, fill your profile, build the librarian, first sweep + patrol.
-- **[docs/plugin-guide.md](docs/plugin-guide.md)** — the four skills as user journeys: when to reach for each, what you get.
-- **[docs/librarian-guide.md](docs/librarian-guide.md)** — the daily loop: sweep → patrol → fix → byte-exact restore.
-- **[docs/pm-guide.md](docs/pm-guide.md)** — the PM work graph: enable it, the phase machine + gates, and the CLI / MCP / TUI / `desk-persona` plugin surfaces.
+- **[docs/usage/getting-started.md](docs/usage/getting-started.md)** — install, fill your profile, build the librarian, first sweep + patrol.
+- **[docs/usage/plugin-guide.md](docs/usage/plugin-guide.md)** — the four skills as user journeys: when to reach for each, what you get.
+- **[docs/usage/librarian-guide.md](docs/usage/librarian-guide.md)** — the daily loop: sweep → patrol → fix → byte-exact restore.
+- **[docs/usage/pm-guide.md](docs/usage/pm-guide.md)** — the PM work graph: enable it, the phase machine + gates, and the CLI / MCP / TUI / `desk-persona` plugin surfaces.
 - `plugin/README.md`, `plugins/desk-persona/README.md`, `schema/README.md`, `librarian/README.md` — per-product operator detail.
 
 **Developing it** — build, test, release:
 
 - **[docs/development/](docs/development/)** — the contributor overview: build/test gates, media regeneration, and how to cut a release.
-- `docs/pocket-librarian-v1-spec.md` — the librarian's product and technical spec.
-- `docs/pm-system-v1-spec.md` — the PM system's product and technical spec (core+modules refactor, PM module, gates, surfaces, plugin).
+- `docs/development/specs/pocket-librarian-v1-spec.md` — the librarian's product and technical spec.
+- `docs/development/specs/pm-system-v1-spec.md` — the PM system's product and technical spec (core+modules refactor, PM module, gates, surfaces, plugin).
 - `docs/decisions/` — architecture decision records (interactive surface, multi-desk topology, store self-initialization, chat TUI, versioning policy, kit port, Charm v2 stack, PM core+modules architecture).
 - **[CHANGELOG.md](CHANGELOG.md)** — what changed in each release.

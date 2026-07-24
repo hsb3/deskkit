@@ -1,7 +1,7 @@
 _ADR for pocket-librarian's multi-desk topology: how an estate of many desks maps to stores, where stores live on disk, and what the `desk` field is for._
 Status: Accepted (corrected 2026-07-18) — 2026-07-17
 
-> **Correction (2026-07-18):** The D2b chassis rename (PR #62; `docs/pm-system-v1-spec.md`
+> **Correction (2026-07-18):** The D2b chassis rename (PR #62; `docs/development/specs/pm-system-v1-spec.md`
 > §2.10, epic #55) renamed the binary and its store home: the canonical store now lives at
 > `$XDG_DATA_HOME/deskkit/<DESK_NAME>/` (fallback `~/.local/share/deskkit/<DESK_NAME>/`). On
 > startup the binary automatically moves a store still at the pre-rename

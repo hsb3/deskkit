@@ -15,7 +15,7 @@ const REPO_ROOT = join(HERE, "..");
 const BUNDLE = join(REPO_ROOT, "plugins", "desk-persona");
 
 // The 5 librarian tools this mount exposes by default (LIBRARIAN_AUTONOMOUS_WRITES unset/false;
-// apply_fix withheld, restore never exposed over MCP — docs/tool-surface.md).
+// apply_fix withheld, restore never exposed over MCP — docs/development/specs/tool-surface.md).
 const LIBRARIAN_TOOLS = ["sweep", "patrol", "propose_fix", "query", "record_feedback"];
 // The frozen D4 PM tool family (internal/modules/pm/tools/specs.go ToolNames()).
 const PM_TOOLS = [
@@ -110,7 +110,7 @@ test("every one of the 17 exposed tools is referenced by name somewhere in the c
 // (get_context response fields + the desk_config collection). Plus one addition specific to this
 // composed bundle:
 // `apply_fix` is a REAL librarian tool (librarian/internal/core/toolcore/toolcore.go,
-// docs/tool-surface.md) that this bundle's README legitimately names as the tool withheld unless
+// docs/development/specs/tool-surface.md) that this bundle's README legitimately names as the tool withheld unless
 // LIBRARIAN_AUTONOMOUS_WRITES=true — it is not part of the 17-tool exposed set on this mount, but
 // it is not an INVENTED name either, so it is allowlisted here rather than flagged as a phantom.
 // MAINTENANCE: if a skill/agent/README begins referencing another two-word snake_case data field

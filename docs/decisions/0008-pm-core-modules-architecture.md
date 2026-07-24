@@ -23,7 +23,7 @@ Status: Accepted — 2026-07-19 (amended 2026-07-21 — PM default-on; see Amend
 
 The librarian shipped as a single Go module with a flat `internal/` tree: the tool registry,
 migrations, MCP/CLI/TUI bindings, and store code were all librarian-specific. The PM system
-(document-gated work graph, `docs/pm-system-v1-spec.md`) had to live **in the same binary and the
+(document-gated work graph, `docs/development/specs/pm-system-v1-spec.md`) had to live **in the same binary and the
 same per-desk store** — ruling R5.5 rejected a second service, a shared multi-desk database, and
 any runtime plugin loading. But the two domains must stay *extractable*: the PM module must not
 reach into the librarian's collections, and a desk must be able to run librarian-only.

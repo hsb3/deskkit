@@ -50,6 +50,6 @@ deficiencies — before the v2 model is finalized. This is a named deliverable o
 
 ## Affects
 
-`schema/` (versioning) · the constraint-wall statements in `docs/CHARTER.md` and the specs ·
+`schema/` (versioning) · the constraint-wall statements in `docs/development/CHARTER.md` and the specs ·
 `_meta/research/2026-07-design-session/platform/*` (adopted record) · ADRs 0011/0013/0015/0017
 (regime-parameterized) · the Phase-4 build plan (simulations deliverable).

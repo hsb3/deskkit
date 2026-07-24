@@ -30,7 +30,7 @@ owner-ruled 2026-07-20):
   work item** that precedes any implementation.
 - Meanwhile the spec is corrected to describe shipped reality (four profile tools) plus the
   planned extension, so no reader mistakes the promise for the present.
-- **Tool-surface truth lives in `docs/tool-surface.md`**, pinned by a drift guard (script or
+- **Tool-surface truth lives in `docs/development/specs/tool-surface.md`**, pinned by a drift guard (script or
   generation) so counts can't rot again (#94's doc becomes the guarded source).
 
 ## Consequences
@@ -43,6 +43,6 @@ owner-ruled 2026-07-20):
 
 ## Affects
 
-`docs/pocket-librarian-v1-spec.md` (§7.2 clause + §3.3/§5 counts) · `docs/tool-surface.md`
+`docs/development/specs/pocket-librarian-v1-spec.md` (§7.2 clause + §3.3/§5 counts) · `docs/development/specs/tool-surface.md`
 (+ its new drift guard in `scripts/`) · `plugin/mcp/server.ts` (eventual proxy) · the ADR
 0014 contract audit · `librarian/README.md` stale counts.

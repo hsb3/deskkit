@@ -5,7 +5,7 @@
 //   1. the jsonschema struct tag on QueryInput.Kind in
 //      librarian/internal/modules/librarian/tools/types.go — what the MCP tool schema advertises
 //      to a calling agent (the "One of: ..." token list).
-//   2. the spec's `docs/pocket-librarian-v1-spec.md` §5.6 quote of that same struct — a
+//   2. the spec's `docs/development/specs/pocket-librarian-v1-spec.md` §5.6 quote of that same struct — a
 //      hand-copied fenced ```go block, not generated.
 //   3. the `switch in.Kind { ... }` block in `func Query`
 //      (librarian/internal/modules/librarian/tools/query.go) — the RUNTIME registry: the actual
@@ -29,7 +29,7 @@ import { fileURLToPath } from "node:url";
 
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const TYPES_GO = join(REPO_ROOT, "librarian", "internal", "modules", "librarian", "tools", "types.go");
-const SPEC = join(REPO_ROOT, "docs", "pocket-librarian-v1-spec.md");
+const SPEC = join(REPO_ROOT, "docs", "development", "specs", "pocket-librarian-v1-spec.md");
 const QUERY_GO = join(REPO_ROOT, "librarian", "internal", "modules", "librarian", "tools", "query.go");
 
 const rel = (p) => relative(REPO_ROOT, p).split("\\").join("/");

@@ -53,5 +53,5 @@ new claimed tool when it lands.
 
 A new spec section (the contract) · `librarian/internal/core/mcp/server.go` (tool gating) ·
 `librarian/templates/librarian-system-prompt.txt` (staleness fix) · the eino `buildTools`
-slice · the new desk-persona bundle artifacts · `docs/tool-surface.md` · PM `import` +
+slice · the new desk-persona bundle artifacts · `docs/development/specs/tool-surface.md` · PM `import` +
 admin-console docs.

@@ -1,7 +1,7 @@
 # CLAUDE.md
 
 This file guides coding agents working in this repo. For the project's canonical direction
-(what it is, what's settled for 1.0.0) see [`docs/CHARTER.md`](docs/CHARTER.md); if that page and
+(what it is, what's settled for 1.0.0) see [`docs/development/CHARTER.md`](docs/development/CHARTER.md); if that page and
 this one ever disagree about direction, the charter wins.
 
 ## Project Overview
@@ -79,7 +79,7 @@ the exit code and has let a failing gate through before (incident, 2026-07-17).
 | `make setup` | `bun install` (plugin) + `lefthook install` (git hooks) |
 | `make build` | Build both lanes: plugin (`bun run build`) + librarian binary (version-stamped) |
 | `make test` | Fast unit tests: plugin `bun test` + librarian `go test ./...` |
-| `make check` | Repo gates: neutrality + self-test, kit-drift, prompt-drift, tool-surface drift + self-test, scaffold frontmatter, textfield-max, query-kind drift + self-test, plugin core-purity, shellcheck, actionlint, workflow SHA-pin drift + self-test, profile-root drift + self-test |
+| `make check` | Repo gates: neutrality + self-test, kit-drift, prompt-drift, tool-surface drift + self-test, scaffold frontmatter, textfield-max, query-kind drift + self-test, doc-link integrity + self-test, plugin core-purity, shellcheck, actionlint, workflow SHA-pin drift + self-test, profile-root drift + self-test |
 | `make verify` | Librarian integration gate — `librarian/verify.sh` (61 checks, throwaway scratch desk) |
 | `make e2e` | End-to-end system-behaviour suite — whole system (cold-start → profile → librarian → PM → surfaces → release-shaped) on a throwaway desk; offline, no LLM key (`librarian/e2e/e2e.sh`) |
 | `make package` | Regenerate the marketplace bundle (`plugins/desk-standard/` artifacts) |
@@ -115,7 +115,7 @@ self-contained — that's why it's committed and drift-guarded.
 | `VERSION` == shipped manifests | `scripts/check-version-sync.mjs` |
 | `kits.yaml` == `kits/` tree | `scripts/check-kits.mjs` |
 | Prompt copies byte-identical (embed ↔ spec quote; ADR 0015) | `scripts/check-prompt-drift.mjs` |
-| `docs/tool-surface.md` counts match source (ADR 0016) | `scripts/check-tool-surface.mjs` (+ `--self-test`; MCP gated counts by `TestToolSurfaceDoc_MCPCounts` on `make test`) |
+| `docs/development/specs/tool-surface.md` counts match source (ADR 0016) | `scripts/check-tool-surface.mjs` (+ `--self-test`; MCP gated counts by `TestToolSurfaceDoc_MCPCounts` on `make test`) |
 | Scaffold instruments carry conformant frontmatter | `scripts/check-scaffold-frontmatter.mjs` |
 | Persona `librarian-operator` agent stays generated from the librarian prompt (ADR 0014/0015); PM surfaces are authored-in-place post-fold | `scripts/check-persona-drift.mjs` |
 | Content TextFields carry an explicit Max (ADR 0017) | `scripts/check-textfield-max.mjs` (+ `--self-test`) |
@@ -125,6 +125,7 @@ self-contained — that's why it's committed and drift-guarded.
 | Every workflow `uses:` stays SHA-pinned (no mutable `@vN` tag) | `scripts/check-workflow-pins.mjs` (+ `--self-test`) |
 | Profile root (`_knowledge`) pinned identically across schema/TS/Go | `scripts/check-profile-root.mjs` (+ `--self-test`) |
 | Shell entry points stay lint-clean (install.sh, verify.sh, dogfood-*.sh, sandbox/*, record-media, e2e/*) | `shellcheck` (CI + `make check`) |
+| Every cited doc/media path on the published+shipped surface resolves (no dangling links; incident 2026-07-24) | `scripts/check-doc-links.mjs` (+ `--self-test`) |
 
 ### Order-sensitive chains
 
@@ -175,14 +176,19 @@ the librarian's supervised-write boundary wherever it runs.
 - **Altering a shipped PocketBase collection: add a forward migration, never edit the applied one**
   (fresh stores only see the edit; existing stores need the new migration). Content-bearing text
   fields must set an explicit `Max` — a bare `TextField` silently caps at 5000 chars.
-- **`docs/` spec + ADR paths are load-bearing** — `docs/pocket-librarian-v1-spec.md`,
-  `docs/pm-system-v1-spec.md`, `docs/decisions/*` are cited from code, skills, and the neutrality
-  allowlist. Don't move them.
+- **Doc paths are load-bearing — moving one means repointing its citations in the same change.**
+  The build specs live in `docs/development/specs/` (`pocket-librarian-v1-spec.md`,
+  `pm-system-v1-spec.md`, `tool-surface.md`, `agent-integration-contract-v1-spec.md`,
+  `element-model-v2-draft.md`) and are read by CI gates + a Go test; ADRs live in `docs/decisions/*`.
+  Both are cited from code, skills, and the neutrality allowlist. `scripts/check-doc-links.mjs` (in
+  `make check`) fails on any dangling doc/media citation across the published+shipped surface, so a
+  move that forgets a citation is caught — see `docs/development/docs-layout.md` for the full layout
+  contract (what lives where, what's load-bearing, and how the working desk differs).
 - **Toolchain floors:** Go `1.25` (PocketBase's `go.mod` floors it), Bun `1.3.14`.
 
 ## Documentation
 
-- **[`docs/CHARTER.md`](docs/CHARTER.md)** — canonical page (what it is, 1.0.0 direction, precedence rule).
+- **[`docs/development/CHARTER.md`](docs/development/CHARTER.md)** — canonical page (what it is, 1.0.0 direction, precedence rule).
 - **[`docs/README.md`](docs/README.md)** — docs index, split Using vs Developing.
 - **[`docs/decisions/`](docs/decisions/)** — ADRs (append-only; cited where they bind).
 - **[`_meta/HANDOFF.md`](_meta/HANDOFF.md)** — session-to-session bridge: current standing + deep gotchas.

@@ -10,7 +10,7 @@ The chat TUI is built on the Charm v1 stack (bubbletea 1.3.x, lipgloss 1.1.x, bu
 glamour 1.0). The product direction after the chat-TUI UX pass (PR #48) is a full chat
 application — session management, context-window visibility, richer chrome — with the design
 language deliberately lifted from the current generation of Charm-built clients (Crush being
-the reference; survey in `docs/development/chat-tui-ux-survey.md`).
+the reference; survey in `_meta/_archive/chat-tui-ux-survey.md`).
 
 That generation is built on the Charm **v2** stack, which is also where Charm's development
 investment now goes. Staying on v1 means hand-rolling components v2 ships (session lists,

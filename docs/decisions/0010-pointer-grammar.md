@@ -36,6 +36,6 @@ re-derived; decision-book Verification record, claim 2).
 
 ## Affects
 
-`docs/pm-system-v1-spec.md` (pointer prose incl. the corrected URL sentence) ·
+`docs/development/specs/pm-system-v1-spec.md` (pointer prose incl. the corrected URL sentence) ·
 `librarian/internal/modules/librarian/module.go` (`Verdict`, `sectionFilePart` — behavior
 pinned by tests, now cited) · `librarian/internal/modules/pm/gates/defaults.go` · ADR 0011.
