@@ -134,7 +134,7 @@ evidence; the session answers them directly.
   the migrated `plan.md`.
 - **`schema/`:** versioning (v1 frozen contract + v2 track) — touches both lanes' loaders and
   the drift-guard set.
-- **Docs:** `docs/CHARTER.md` gains the platform direction (charter precedence rule applies);
+- **Docs:** `docs/development/CHARTER.md` gains the platform direction (charter precedence rule applies);
   the spec set gains the two-track note.
 - **Desks:** dev-tooling-desk's desk-platform thread is closed (migration pointers in place);
   this repo's handoff carries the merged session; the R3→R4 work re-homes here.

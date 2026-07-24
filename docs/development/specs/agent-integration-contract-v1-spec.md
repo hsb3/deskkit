@@ -18,9 +18,9 @@ contract** — five named parameters — and each agent (the librarian's in-bina
 PM module's plugin-markdown operator) **instantiates** that contract. Where an instantiation
 differs from its sibling, this document states whether the difference is **ratified policy** (a
 deliberate, documented asymmetry that stands) or **debt** (a gap this issue closes). The ruling
-is ADR [0014](decisions/0014-agent-integration-contract.md); the prompt-sourcing mechanism
-behind parameter 1 is ADR [0015](decisions/0015-prompt-governance.md); the empirical tool
-inventory this document audits against is [`docs/tool-surface.md`](tool-surface.md).
+is ADR [0014](../../decisions/0014-agent-integration-contract.md); the prompt-sourcing mechanism
+behind parameter 1 is ADR [0015](../../decisions/0015-prompt-governance.md); the empirical tool
+inventory this document audits against is [`docs/development/specs/tool-surface.md`](tool-surface.md).
 
 ## 2. The five-parameter contract table
 
@@ -141,10 +141,10 @@ documented owner:
 
 ## 7. Citations
 
-- ADR [0014 — the agent integration contract](decisions/0014-agent-integration-contract.md) —
+- ADR [0014 — the agent integration contract](../../decisions/0014-agent-integration-contract.md) —
   the ruling this document elaborates: one contract, five parameters, four sub-decisions (a)–(d).
-- ADR [0015 — prompt governance](decisions/0015-prompt-governance.md) — the mechanism behind
+- ADR [0015 — prompt governance](../../decisions/0015-prompt-governance.md) — the mechanism behind
   parameter 1 (persona instructions): the version-controlled source (Go embed / plugin markdown)
   is truth, and the DB `prompts` row is a re-seeded cache.
-- [`docs/tool-surface.md`](tool-surface.md) — the empirically-derived tool inventory and gate
+- [`docs/development/specs/tool-surface.md`](tool-surface.md) — the empirically-derived tool inventory and gate
   table this audit (§5) is built against.

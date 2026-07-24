@@ -141,7 +141,7 @@ the mismatch rather than refusing it.
 
 ### Option C — Rule ungated-advance deliberate (document only, no code change)
 
-Leave `CreateItem` as-is. `docs/pm-system-v1-spec.md` and/or the gate-rule documentation state
+Leave `CreateItem` as-is. `docs/development/specs/pm-system-v1-spec.md` and/or the gate-rule documentation state
 explicitly that a type with no bound gate config — whether because it is genuinely
 untracked-by-design or because it is a typo — advances ungated by design, extending the
 general "no bound rule ⇒ no gate" behavior that already governs unconfigured demote/reopen
@@ -196,7 +196,7 @@ Any ruling on this brief must satisfy, citing the prep-doc constraint walls (`..
 `rec.Set("type", in.Type)`. No PocketBase migration required as an application-level check
 (`TextField` unchanged) — same pattern already proven for `desk_config.rules`; a later move to
 a DB-level `SelectField` enum instead IS a forward migration and needs an explicit data-fix
-plan for any live-store row already outside the new enum. Spec — `docs/pm-system-v1-spec.md`
+plan for any live-store row already outside the new enum. Spec — `docs/development/specs/pm-system-v1-spec.md`
 needs the new invariant stated explicitly (not confirmed either way by the dossiers whether
 it's currently silent — see Uncertainties). Test lane — importer/rebuild-reproducibility tests
 and any manifest-driven seed data (`workflows.md § 2.7`) need auditing for out-of-vocabulary
@@ -210,7 +210,7 @@ tool-response field, with no existing dossier-cited construct today. Spec needs 
 warning contract precisely so every surface (MCP/CLI/TUI) treats it identically — a symmetry
 concern that echoes D5/C1.
 
-**Option C (document only):** Docs only — `docs/pm-system-v1-spec.md` gains an explicit
+**Option C (document only):** Docs only — `docs/development/specs/pm-system-v1-spec.md` gains an explicit
 sentence on the "unconfigured type ⇒ ungated" behavior. No code, no migration, no test impact.
 Possible companion (out of scope for this brief): a workflow-layer detector, new patrol-style
 scope over PM `items` — patrol today only reaches the librarian's `files` collection
@@ -242,7 +242,7 @@ scope over PM `items` — patrol today only reaches the librarian's `files` coll
   cites that function only for `status_label` writes. If `type` is also settable there, a
   birth-only validation (any option here) leaves a same-shaped gap at update time. Needs a
   targeted read of `queries.go` before a ruling finalizes on "birth-time is sufficient."
-- Whether `docs/pm-system-v1-spec.md` currently documents (or is silent on) the "type with no
+- Whether `docs/development/specs/pm-system-v1-spec.md` currently documents (or is silent on) the "type with no
   bound gate rule advances ungated" behavior is not dossier-confirmed either way —
   `workflows.md`'s own Gaps section flags that `gates/defaults.go`'s default gate bindings
   were not read, and neither dossier quotes the spec's `CreateItem`-adjacent section directly.

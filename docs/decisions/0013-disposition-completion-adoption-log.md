@@ -57,5 +57,5 @@ record, claim 1).
 
 `librarian/internal/modules/librarian/collections/` (new forward migration) ·
 `tools/query.go` (summary/uncollapsed) · `tools/dispose.go` (provenance) · `patrol.go`
-(inheritance) · TUI/MCP count surfaces · `docs/pocket-librarian-v1-spec.md` §5 · the
+(inheritance) · TUI/MCP count surfaces · `docs/development/specs/pocket-librarian-v1-spec.md` §5 · the
 adoption-log spec prose.

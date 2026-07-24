@@ -41,4 +41,4 @@ primitive — the v2 element model needs exactly this substrate.
 
 `schema/` (the reference contract + versioning per ADR 0009) · both lanes' validators ·
 `librarian/.../tools/sweep.go` graduation extraction (eventual instance migration) ·
-`docs/pocket-librarian-v1-spec.md` / `docs/pm-system-v1-spec.md` reference prose.
+`docs/development/specs/pocket-librarian-v1-spec.md` / `docs/development/specs/pm-system-v1-spec.md` reference prose.

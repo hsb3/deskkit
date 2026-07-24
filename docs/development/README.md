@@ -18,7 +18,7 @@ make setup      # install plugin deps + lefthook pre-commit hooks (first-time se
 ```
 
 The librarian's version is stamped from the root `VERSION` file via ldflags; a bare `go build`
-reports `dev`. See [releasing.md](releasing.md).
+reports `dev`. See [README.md](README.md).
 
 ## Test & gates
 
@@ -34,11 +34,11 @@ Run these before claiming any change done — they mirror CI:
 
 ## Demo media (VHS)
 
-The demo GIFs in [`../media/`](../media/) are **generated artifacts** — never hand-edited. Their
-source `.tape` files live in [`tapes/`](tapes/), kept separate from the GIF output.
+The demo GIFs in [`../assets/`](../assets/) are **generated artifacts** — never hand-edited. Their
+source `.tape` files live in [`../../scripts/vhs-tapes/`](../../scripts/vhs-tapes/), kept separate from the GIF output.
 
 ```bash
-make media      # rebuild the librarian, then drive vhs over every tape into ../media/*.gif
+make media      # rebuild the librarian, then drive vhs over every tape into ../assets/*.gif
 ```
 
 The recorder (`scripts/record-media.sh`) is hermetic: it seeds throwaway scratch desks under a
@@ -48,7 +48,7 @@ the default `make media` run stays offline. Requires `vhs` + `ttyd` (`brew insta
 
 ## Release
 
-Both products ship under one version. The full runbook is [releasing.md](releasing.md); in short:
+Both products ship under one version. The full runbook is [README.md](README.md); in short:
 bump `VERSION` + the three manifests → move `[Unreleased]` CHANGELOG entries into a dated section
 → `make release-prep` → `git tag v<version> && git push --tags`. `make version-status` flags
 unreleased drift; `check-changelog.mjs` gates a tag against a documented CHANGELOG section
@@ -56,7 +56,7 @@ unreleased drift; `check-changelog.mjs` gates a tag against a documented CHANGEL
 
 ## Canonical references
 
-- [`../pocket-librarian-v1-spec.md`](../pocket-librarian-v1-spec.md) — the librarian's build spec.
+- [`specs/pocket-librarian-v1-spec.md`](specs/pocket-librarian-v1-spec.md) — the librarian's build spec.
 - [`../decisions/`](../decisions/) — Architecture Decision Records (append-only; cited from code
   and docs — their paths are kept stable).
 - `../../_meta/build-brief.md` — the original build brief (repo shape, acceptance criteria).

@@ -1,12 +1,12 @@
 _The developer / advanced-operator install paths: build the librarian from source, pull a prebuilt
 release asset while the repo is private, and the env-var + store-path lore. The user install path
-is [`../getting-started.md`](../getting-started.md); this page holds the toolchain details it
+is [`../getting-started.md`](../usage/getting-started.md); this page holds the toolchain details it
 deliberately leaves out._
 Status: active
 
 # Installing and building — developer track
 
-The [user getting-started guide](../getting-started.md) installs a **prebuilt `deskkit` binary**
+The [user getting-started guide](../usage/getting-started.md) installs a **prebuilt `deskkit` binary**
 and drives everything from the TUI, with no toolchain. This page is the other side of that split:
 building from source, the release-asset download while the repo is private, and the environment
 variables that override desk/store resolution. If you are a desk owner and not a contributor, you

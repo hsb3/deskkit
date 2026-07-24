@@ -49,7 +49,7 @@ covers the gap in between.
 - A release is now: bump `VERSION` + the three manifests → move `[Unreleased]` entries into a
   dated `## [<version>]` section → `make release-prep` (now also runs `check-changelog` and prints
   the advisory) → `git tag v<version> && git push --tags`. Written up in
-  [`docs/development/releasing.md`](../development/releasing.md).
+  [`docs/development/README.md`](../development/README.md).
 - `ci.yml` checks out with `fetch-depth: 0` so the advisory can see tags and diff since the last
   release. The advisory degrades to a soft note (still exit 0) if history/tags are unavailable.
 - `CHANGELOG.md` and both guard scripts live at the repo root / `scripts/`, outside the neutrality

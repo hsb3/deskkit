@@ -27,7 +27,7 @@ for a minor bump.
 `librarian/templates/{frontmatter-universal,pointer-stub}.md`, wired via `//go:embed` in
 `librarian/templates/templates.go:14-18` (`FrontmatterUniversal`, `PointerStub`; a third embed,
 `SystemPrompt`, is the agent system prompt, not a content template). Boundary
-(`docs/pocket-librarian-v1-spec.md:1541`, §5.4 write path at `:1187-1246`): all written content
+(`docs/development/specs/pocket-librarian-v1-spec.md:1541`, §5.4 write path at `:1187-1246`): all written content
 comes from approved templates only; planners never synthesize prose. These two remain
 remediation-only (R1 frontmatter fence, pointer-stub collapse), placeholder-safe, no document-type
 scaffolding.
@@ -98,7 +98,7 @@ worked instance) is unchanged from the original description. `postmortem`, `rele
    (the librarian could cite when-to-write / anti-patterns when proposing a type) and `example.md`?
 3. **Type <-> classification.** How does an SOP type map to the existing `dir_kind` model (9 values:
    `decisions, tasks, analyses, journal, meta, memory, root, other, infra` —
-   `docs/pocket-librarian-v1-spec.md:476`) and the `type:` frontmatter field (23 values in
+   `docs/development/specs/pocket-librarian-v1-spec.md:476`) and the `type:` frontmatter field (23 values in
    `schema/doctypes.yaml`)? The two enums are structurally different sizes today — this gap is
    confirmed still open, not resolved by the #49 port. Does adding the library change `sweep`
    classification or introduce a new "expected type for this dir" check the patrol rules can lean
@@ -130,7 +130,7 @@ worked instance) is unchanged from the original description. `postmortem`, `rele
 - [ ] `librarian/verify.sh` gains a check proving a template-scaffolded file is written from the
       template (extends the existing pattern set by `librarian/templates/kit_render_test.go`, which
       today proves render-compatibility only, not integration).
-- [ ] `docs/pocket-librarian-v1-spec.md` §5.4 and the `dir_kind`/classification sections are updated
+- [ ] `docs/development/specs/pocket-librarian-v1-spec.md` §5.4 and the `dir_kind`/classification sections are updated
       to describe the library and the resolved type<->classification mapping.
 - [ ] If the build touches `kits/` or `kits.yaml`, `node scripts/check-kits.mjs` stays green (manifest
       and tree agree).
@@ -153,7 +153,7 @@ worked instance) is unchanged from the original description. `postmortem`, `rele
 - **ADR required** — the design questions above are explicitly unresolved; an ADR recording the
   ruling (vendor/embed mechanics, triad scope, type<->classification, selection logic) is a hard
   precondition per this issue's own acceptance criteria, not an optional gate.
-- **Spec drift** — `docs/pocket-librarian-v1-spec.md` §5.4 and the `dir_kind` sections must be
+- **Spec drift** — `docs/development/specs/pocket-librarian-v1-spec.md` §5.4 and the `dir_kind` sections must be
   amended in the same change that lands the library, per this issue's acceptance criteria; no
   automated drift guard covers prose spec sections, so this is a manual review gate.
 - **Does NOT fire:** version-sync, bundle-drift (`make package`), CHANGELOG (only relevant once work

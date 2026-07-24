@@ -4,7 +4,7 @@
 # when ANTHROPIC_API_KEY is set in the environment, and skips it otherwise so the default
 # `make media` run stays hermetic. Regenerate: bash scripts/record-media.sh (never hand-edit
 # the GIF); to record THIS one specifically: export ANTHROPIC_API_KEY=... and re-run.
-Output docs/media/chat.gif
+Output docs/assets/chat.gif
 
 Require deskkit
 

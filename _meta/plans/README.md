@@ -37,7 +37,7 @@ ACTIVE plans (associated with an OPEN issue) — add a row per plan you draft:
 | Plan | Issue(s) | Status |
 | ---- | -------- | ------ |
 | phase-machine-reconciliation | #197 | planned; gate:v2-final; epic #130; the one buildable-now item |
-| ts-proxy-doc-correction | #199 | planned; owner-gated (design-doc judgment); gates ts-proxy slice 0 |
+| ts-proxy-doc-correction | #199 | ARCHIVED 2026-07-24 → `_meta/_archive/` (ADR 0022 mooted the ts-proxy path); #199 to be formally superseded at Wave 3 |
 | trigger-design | #127 | planned; backlog, unscheduled; schema-v2 model track |
 | prompt-tuning-centralized | #128 | planned; backlog, unscheduled; ADR 0015 track |
 | sop-library-expansion | #36 | parked post-1.0 (owner, 2026-07-21); plan captures unpark state |
@@ -62,7 +62,7 @@ ARCHIVED (issue closed/merged; folder moved to `_meta/_archive/<issue>-<slug>/`,
 | _archive/119-desk-persona-bundle/ | #119 | shipped; epic #129 v1 build wave |
 | _archive/120-prompt-governance/ | #120 | shipped; epic #129 v1 build wave |
 | _archive/121-tool-surface-drift-guard/ | #121 | shipped; epic #129 v1 build wave |
-| _archive/122-ts-proxy-design/ | #122 | shipped; design doc landed (docs/development/ts-proxy-design.md) |
+| _archive/122-ts-proxy-design/ | #122 | shipped; design doc landed (_meta/_archive/ts-proxy-design.md) |
 | _archive/123-document-identity-hygiene/ | #123 | shipped; epic #129 v1 build wave |
 | _archive/124-schema-versioning/ | #124 | shipped wave-v4 (PR #193) |
 | _archive/125-element-model-revision/ | #125 | shipped wave-v4 (PR #192) |

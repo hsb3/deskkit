@@ -1,6 +1,6 @@
 # sweep-and-findings.tape — index a desk tree, then inspect open findings and orphaned docs.
 # Regenerate: bash scripts/record-media.sh (never hand-edit the GIF).
-Output docs/media/sweep-and-findings.gif
+Output docs/assets/sweep-and-findings.gif
 
 Require deskkit
 

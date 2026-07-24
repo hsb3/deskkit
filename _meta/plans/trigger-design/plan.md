@@ -43,7 +43,7 @@ newline the live fetch adds (`diff` output: `132a133 > ` -- a blank line, not a 
 **No trigger design exists anywhere in this repo today.** `rg -i "trigger" schema/` and a search
 of `plugin/`, `librarian/`, `docs/` for a trigger *definition* (as opposed to the unrelated
 librarian wake-layer package, see below) return nothing that answers "what is a trigger" --
-confirmed by `docs/element-model-v2-draft.md` itself disclaiming the question three separate
+confirmed by `docs/development/specs/element-model-v2-draft.md` itself disclaiming the question three separate
 times: section 7 ("trigger design is deferred to the separate `trigger-design` epic-child
 (#127)... This document states only the Q4 constraint; it does not design the triggers",
 `element-model-v2-draft.md:75-77`), section 13 ("all trigger design -- deferred: ... trigger
@@ -59,7 +59,7 @@ scope ("Designing the exec-output triggers -- `trigger-design` (#127)", `:462`).
   triggers. for now, they're just on demand. i'm open to defining triggers but don't want to
   produce documents that aren't needed. i'll say that candidate triggers are a) a meeting b)
   reaching some milestone/marker in task completion."
-- `docs/element-model-v2-draft.md` section 7 names the same two candidates and states the
+- `docs/development/specs/element-model-v2-draft.md` section 7 names the same two candidates and states the
   constraint as "Deliverables are produced on a trigger, never speculatively" (`:273-274`), and
   section 7's Rendering paragraph: "A `deliverable` renders via the exec-desk **comms** skill
   (deck-builder / pptx-themes / audio) -> delivered. The comms skill is the output-plane engine"
@@ -79,7 +79,7 @@ see the correction below):**
   (`_meta/research/2026-07-design-session/data-model.md:202,211,238,253,270,284` -- section
   headers verified by direct read); there is no `milestone` collection or field anywhere in either
   lane's shipped schema. `milestone` is a v2-track spine entity, not yet built
-  (`docs/element-model-v2-draft.md:92`, row `milestone`, "partial (roadmap phases,
+  (`docs/development/specs/element-model-v2-draft.md:92`, row `milestone`, "partial (roadmap phases,
   `target_ship_date`)"). `schema/doctypes.yaml` has zero `milestone` entries (grep-confirmed,
   exit 1) -- there is no `milestone` doctype string in the vocabulary today.
 - **Correction to the issue-body's claim.** The staged `issue-body.md` (and the live #127 body,
@@ -112,7 +112,7 @@ see the correction below):**
 - **New finding beyond the issue body: a real "wake layer" already exists, but is not wired to
   the PM module.** `librarian/internal/modules/librarian/trigger/` (package `trigger`) implements
   exactly the spec's "how PocketBase hooks wake the agent" section
-  (`docs/pocket-librarian-v1-spec.md:158`, the `tasks` queue spec'd at `:590`): a record hook
+  (`docs/development/specs/pocket-librarian-v1-spec.md:158`, the `tasks` queue spec'd at `:590`): a record hook
   (`RegisterHooks`, bound today only to the `files` collection's create event) and an hourly cron
   (`RegisterCron`) both `enqueue` a row into the `tasks` collection; a single claimer goroutine
   (`StartClaimer`/`ClaimOnce`) polls and dispatches by `tasks.kind`
@@ -139,10 +139,10 @@ see the correction below):**
   profile contract today.
 - No comms-skill / deck-builder / pptx-themes implementation exists under `plugin/`, `librarian/`,
   or `kits/` -- a repo-wide grep for `deck-builder`/`pptx-themes`/`comms.skill` returns hits only
-  in prose docs (`docs/element-model-v2-draft.md`, `_meta/research/...`,
+  in prose docs (`docs/development/specs/element-model-v2-draft.md`, `_meta/research/...`,
   `.claude/memory/decision-briefings-outside-terminal.md`), never a shipped implementation. The
   `deliverable -> comms skill -> delivered` rendering path named in
-  `docs/element-model-v2-draft.md:280-281` is unbuilt in this repo (per that same document, the
+  `docs/development/specs/element-model-v2-draft.md:280-281` is unbuilt in this repo (per that same document, the
   comms skill is "the desk-platform stream's tooling, not desk-standard's" per the issue body's
   own framing, `issue-body.md:60-62` -- unchanged by the correction above, independently
   confirmed by the grep).
@@ -155,7 +155,7 @@ them against the verified/corrected facts above rather than the issue body's poi
 claims.
 
 1. **What IS a trigger in the model, and which plane?** Both candidates are activity-plane
-   events -- a meeting is an interaction/spine entity (`docs/element-model-v2-draft.md:94`, spine
+   events -- a meeting is an interaction/spine entity (`docs/development/specs/element-model-v2-draft.md:94`, spine
    row `meeting`); "reaching a milestone/marker" is squarely the PM engine's phase-transition
    machinery (the cascade `tryAutoUnblock` mechanism above). **Recommended default: state this
    plainly as the answer** -- a trigger is an activity-plane event, not a floating concept or a
@@ -212,7 +212,7 @@ body's word:
 - `docs/decisions/0018-element-model-direction.md` is itself "Raised by
   `_meta/research/2026-07-design-session/platform/spec-element-model.md` §8" (`0018:7`) -- i.e.
   ADR 0018 is the graduated form of exactly this research-doc-first pattern.
-- `docs/element-model-v2-draft.md`'s own Provenance section: "Graduated 2026-07-22 from the R3
+- `docs/development/specs/element-model-v2-draft.md`'s own Provenance section: "Graduated 2026-07-22 from the R3
   proposal ... (3 read-only scouts ... two opus adversarial reviews)" (`element-model-v2-draft.md:469-473`)
   -- a second, more recent instance of the same research-doc -> reviewed `docs/`-landed artifact
   pattern, this time landing as a `docs/` spec rather than an ADR (showing the pattern is not
@@ -221,11 +221,11 @@ body's word:
 Given trigger-design produces a **ruling** (what triggers are, hard constraints) more than a
 **spec** (element inventories), an ADR is the better graduated shape than a `docs/` spec doc --
 matching ADR 0018's own precedent for exactly this kind of owner-constraint-carrying content,
-not `docs/element-model-v2-draft.md`'s precedent (a spec-shaped inventory document). Exact
+not `docs/development/specs/element-model-v2-draft.md`'s precedent (a spec-shaped inventory document). Exact
 filename/number is confirmed only at landing time (see Open questions).
 
 **Required out-of-scope follow-up (not owned by this plan folder):** once the design ratifies,
-`docs/element-model-v2-draft.md` sections 7 (`:276-278`), 13 (`:452-454`), and 14 (`:462`) each
+`docs/development/specs/element-model-v2-draft.md` sections 7 (`:276-278`), 13 (`:452-454`), and 14 (`:462`) each
 currently say the trigger question is deferred to "the separate `trigger-design` epic-child
 (#127)" -- those three spots need a small follow-up edit pointing at the landed ADR/design doc
 instead of "deferred." That file is owned by whoever holds `element-model-revision`/model-track
@@ -258,7 +258,7 @@ docs, not this plan folder; name it as a build-slice dependency, do not edit it 
   phase-crossing-to-firing wiring on `tryAutoUnblock` -- explicitly **blocked on v2 model
   finalization** per ADR 0009's ordering rule ("Implementing any v2 collection, migration, or
   store change" is forbidden "ahead of the finalized model",
-  `docs/element-model-v2-draft.md:458`), so this slice cannot start until the model (currently
+  `docs/development/specs/element-model-v2-draft.md:458`), so this slice cannot start until the model (currently
   gated on #197, see Dependencies) finalizes; (iii) the comms-skill rendering path itself --
   explicitly out of this repo's scope, a cross-repo/cross-stream dependency, name and defer, do
   not attempt.
@@ -287,7 +287,7 @@ Restated from the issue body's own criteria, corrected where the source has move
       verified against the F deliverable above: at minimum the meeting-hook slice, the
       milestone-vocabulary slice (with its finalization-gate dependency stated), and the
       comms-skill slice (named and deferred, not attempted) are each addressed.
-- [ ] (New, not in the issue body) The three `docs/element-model-v2-draft.md` cross-reference
+- [ ] (New, not in the issue body) The three `docs/development/specs/element-model-v2-draft.md` cross-reference
       spots (`:276-278`, `:452-454`, `:462`) are named as a required follow-up in the design
       record or its landing PR description, so the graduated design does not leave the v2 draft
       pointing at a still-open issue.
@@ -297,7 +297,7 @@ Restated from the issue body's own criteria, corrected where the source has move
 **Independent of `#197`, not behind it.** Verified directly, not inferred from the issue body
 (which predates #197 and does not mention it): `#197` ("reconcile the software spec phase-machine
 with the PM item phase-machine and name the building->shipped gate rule") is scoped to
-`docs/element-model-v2-draft.md` sections **6.1/6.4** -- the **activity-plane** spec-document
+`docs/development/specs/element-model-v2-draft.md` sections **6.1/6.4** -- the **activity-plane** spec-document
 lifecycle (`draft -> in-review -> approved -> building -> shipped`) versus PM `items.phase`, and
 the `test-run -> verified-by ->` gate rule. `#127` is scoped to section **7**, the **output
 plane**. Different plane, different mechanism family (spec-document status axis vs. exec-output
@@ -354,7 +354,7 @@ implementable code units. No timelines; the shape is:
    any build slice is "ready to pick up").
 3. Graduate the reviewed shape into a new ADR (advisory `0022`, confirm true next-free number at
    landing).
-4. File the `docs/element-model-v2-draft.md` cross-reference follow-up (out-of-scope for this
+4. File the `docs/development/specs/element-model-v2-draft.md` cross-reference follow-up (out-of-scope for this
    plan's own files -- a required handoff to whoever owns that doc) and the epic `#130`
    Close-when checkbox update.
 5. Only after (3): pick up any of the named build slices (F), each gated individually by its own

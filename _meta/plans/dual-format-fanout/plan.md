@@ -4,7 +4,7 @@ type: spec
 status: parked
 created: 2026-07-23
 purpose: "Capture the residual design/build work for #12 in scheduleable shape while it stays parked, so an owner can pick it up cold when the >= v1.0.0 gate lifts."
-notes: "Tracks #12. Parked by owner ruling (Henry, 2026-07-17) until >= v1.0.0 (_meta/HANDOFF.md:73; docs/decisions/0021-desk-standard-1-0-0-direction.md:102-104; docs/CHARTER.md:38). This plan does not unpark the issue — it documents current state and the unpark condition."
+notes: "Tracks #12. Parked by owner ruling (Henry, 2026-07-17) until >= v1.0.0 (_meta/HANDOFF.md:73; docs/decisions/0021-desk-standard-1-0-0-direction.md:102-104; docs/development/CHARTER.md:38). This plan does not unpark the issue — it documents current state and the unpark condition."
 ---
 
 # Dual-format fan-out (Claude + OpenCode from one core)
@@ -25,7 +25,7 @@ Date: 2026-07-23
 decision 0016). **Parked by owner ruling (Henry, 2026-07-17) until >= v1.0.0** — recorded at
 `_meta/HANDOFF.md:73` ("OpenCode #12 parked (Henry, 2026-07-17) until >= v1.0.0") and reaffirmed by
 `docs/decisions/0021-desk-standard-1-0-0-direction.md:102-104` ("the Claude-only v1 scope (Claude +
-OpenCode dual-format stays post-1.0)") and `docs/CHARTER.md:38` ("Scope is Claude Code only in v1;
+OpenCode dual-format stays post-1.0)") and `docs/development/CHARTER.md:38` ("Scope is Claude Code only in v1;
 OpenCode is a deferred, separate fan-out build"). No epic parent found for #12 (not listed under
 either `epic-schema-v2-track` (#130) or the 1.0.0 wave epic (#129) at the time of this refresh).
 This plan does not change the park; it exists so an unparking owner has schedule-ready detail
@@ -74,7 +74,7 @@ folder.
 - **The old citation surface for this issue is gone.** `docs/build-brief.md` (cited by the
   pre-refresh body for AC1/AC3, D4/D5) does not exist at that path; `_meta/build-brief.md` (the
   file other in-repo docs actually cite historically, e.g. `docs/development/README.md:62`,
-  `schema/README.md:9,54`) is also missing from the current tree. `docs/CHARTER.md` is the
+  `schema/README.md:9,54`) is also missing from the current tree. `docs/development/CHARTER.md` is the
   canonical direction page now (CLAUDE.md:1-3, precedence rule) and is the correct citation target
   going forward.
 

@@ -10,7 +10,7 @@
 #   2. seeds two items via the `pm` CLI: item A (owner court) and item B (desk court), then
 #      links A --blocks--> B (cascade auto, unblock_at work) — B comes up blocked immediately
 #   3. drives the PM MCP surface over raw newline-delimited JSON-RPC stdio
-#      (`deskkit mcp-serve`, framing per docs/tool-surface.md "How the counts were derived"):
+#      (`deskkit mcp-serve`, framing per docs/development/specs/tool-surface.md "How the counts were derived"):
 #        transition_item (refused: B is blocked)
 #          -> unblock_item (clears the block)
 #          -> transition_item (now succeeds: queue -> work)
@@ -100,10 +100,10 @@ if [ "$B_BLOCKED" = "true" ]; then rc=0; else rc=1; fi
 check "item B comes up blocked=true after the link" "$rc"
 B_VERSION=$(printf '%s' "$B_GET" | jq -r '.version')
 
-# --- MCP stdio JSON-RPC helper (one-shot tools/call; framing per docs/tool-surface.md) ---
+# --- MCP stdio JSON-RPC helper (one-shot tools/call; framing per docs/development/specs/tool-surface.md) ---
 #
 # A trailing `sleep 1` inside the printf group keeps stdin open long enough for the response
-# to flush before the pipe's EOF races the server shutdown (same reason docs/tool-surface.md's
+# to flush before the pipe's EOF races the server shutdown (same reason docs/development/specs/tool-surface.md's
 # own MCP_MODULES probe uses it).
 
 INIT_REQ='{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"dogfood-pm","version":"0"}}}'
@@ -114,7 +114,7 @@ mcp_call() { # mcp_call <tool-name> <json-args> [MCP_MODULES value; OMIT the arg
   local call_req
   call_req=$(jq -n --arg name "$tool" --argjson args "$args" \
     '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":$name,"arguments":$args}}')
-  # NOTE: MCP_MODULES="" (set-but-empty) is NOT the same as unset — per docs/tool-surface.md
+  # NOTE: MCP_MODULES="" (set-but-empty) is NOT the same as unset — per docs/development/specs/tool-surface.md
   # §2.1, an empty/unresolvable MCP_MODULES fails the process closed (exit 1), it does not
   # fall back to "no filter". So when no module filter is wanted, MCP_MODULES must be left
   # entirely unset, never set to "" — hence the branch instead of always exporting it.

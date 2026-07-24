@@ -3,7 +3,7 @@
 # _knowledge/profile.yaml and the original command continues seamlessly. Fully offline (query
 # needs no LLM), so this tape records in the default hermetic `make media` run. Regenerate:
 # bash scripts/record-media.sh (never hand-edit the GIF).
-Output docs/media/init-onramp.gif
+Output docs/assets/init-onramp.gif
 
 Require deskkit
 

@@ -227,7 +227,7 @@ migration):
   - *Kill `adoption_log`* (Option 4): forward migration dropping the collection; remove
     `recordAdoptionLog`, the `query adoption` read path, and the collection from
     `deskguard`'s desk-carrying set (all source-observed, §9). The one destructive-shaped migration.
-- **Spec sections:** `docs/pocket-librarian-v1-spec.md` — §5.2 (patrol), §5.3–§5.5 (write boundary /
+- **Spec sections:** `docs/development/specs/pocket-librarian-v1-spec.md` — §5.2 (patrol), §5.3–§5.5 (write boundary /
   restore), and the §5.4 `adoption_log` row-format the spec pins (`apply_fix.go:242` cites it). The
   0.8.0 disposition-lifecycle section gains the coherence + provenance + composition deltas.
 - **`schema/` contract:** **untouched.** `state`/`disposition`/`adoption_log` are librarian-lane
@@ -237,7 +237,7 @@ migration):
   unaffected; if provenance columns land, any agent guidance that references "open findings"
   semantics (the librarian system prompt) should be checked. Whether `dispose` should *become* an
   agent/MCP tool is a D5 surface question, not decided here.
-- **Docs:** an ADR recording the ruling; `docs/tool-surface.md` if the `dispose` signature changes or
+- **Docs:** an ADR recording the ruling; `docs/development/specs/tool-surface.md` if the `dispose` signature changes or
   a query kind is added/removed; `CHANGELOG.md`.
 
 ## 7. Out of scope / interactions

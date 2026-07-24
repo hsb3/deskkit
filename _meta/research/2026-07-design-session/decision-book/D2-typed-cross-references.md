@@ -207,7 +207,7 @@ Any ruling must satisfy the constraint walls (`../README.md` §7) that bind here
 ## Blast radius
 
 **Option 1 (field-local):** no collection or `schema/` change. Code: `sweep.go` graduation regex +
-its comment. Spec: `docs/pocket-librarian-v1-spec.md` §5.1 graduated_to precedence and §5.2 R5 —
+its comment. Spec: `docs/development/specs/pocket-librarian-v1-spec.md` §5.1 graduated_to precedence and §5.2 R5 —
 both pin the regex verbatim, so tightening it is a spec delta. Docs: the harvest-loop skill's
 graduation guidance.
 
@@ -225,7 +225,7 @@ graduation guidance.
   `Verdict`/`sectionFilePart` (D1 territory — the pointer's `target` grammar); pm engine pointer
   resolution (`engine.go` `pointerResolver`); `plugin/core` TS if the primitive is validated there
   (new enforcement).
-- _Spec:_ `docs/pocket-librarian-v1-spec.md` (graduated_to §5.1, R5 §5.2), `docs/pm-system-v1-spec.md`
+- _Spec:_ `docs/development/specs/pocket-librarian-v1-spec.md` (graduated_to §5.1, R5 §5.2), `docs/development/specs/pm-system-v1-spec.md`
   (pointer definition §3.1 / R2.3, `:396`/`:744`).
 - _Docs/skills/ADR:_ a new ADR in `docs/decisions/`; harvest-loop + conventions-standard skills.
 - _Option 3 adds:_ the qualifier must also be written into the desk file marker (else it fails the

@@ -10,7 +10,7 @@ content before any write, so every change can be reversed byte-exact. It is iden
 nothing about a person, org, repo, or desk is hardcoded. `DESK_ROOT`, `DESK_NAME`, path
 conventions, model id, and provider all come from environment/config.
 
-Full spec: `../docs/pocket-librarian-v1-spec.md`.
+Full spec: `../docs/development/specs/pocket-librarian-v1-spec.md`.
 
 ## Quick start
 
@@ -311,7 +311,7 @@ appear:
 `PM_AUTONOMOUS_WRITES` (default `true`) gates whether agents get the write tools over MCP; the
 document gate is the real safety regardless. Full surface reference — every `pm` subcommand, the
 MCP tools, the TUI views, the `desk-pm` plugin, and the adoption path — is in
-[`../docs/pm-guide.md`](../docs/pm-guide.md).
+[`../docs/usage/pm-guide.md`](../docs/usage/pm-guide.md).
 
 ## Triggers — the wake layer under `serve`
 

@@ -4,7 +4,7 @@
 # key, exactly like chat.tape — scripts/record-media.sh only records it when ANTHROPIC_API_KEY
 # is set, and skips it otherwise. Regenerate: bash scripts/record-media.sh (never hand-edit the
 # GIF).
-Output docs/media/chat-light.gif
+Output docs/assets/chat-light.gif
 
 Require deskkit
 

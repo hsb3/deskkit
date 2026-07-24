@@ -1,8 +1,8 @@
 _Session-to-session bridge for desk-standard. Read this before working; update it at the end
 of any substantial session. Secret-free — live URLs/credentials belong in `_meta/operations/`
 (untracked) if that dir is ever created._
-Status: active (2026-07-23, post adoption-feedback design session + ADR 0022 acceptance;
-distilled from the wave-log form — prior versions live in this file's git history)
+Status: active (2026-07-24, post reorg-reconciliation: docs/ moves fixed + doc-link gate added;
+2026-07-23 adoption-feedback design + ADR 0022 acceptance prior; older versions in git history)
 
 # HANDOFF
 
@@ -63,22 +63,37 @@ to Go; TS server retired) = **ADR 0022 (Accepted)**, supersedes 0016; **(2)** a 
 `feedback-no-public-1.0.0-nagging`. Nothing built yet; the 2026-07-23 planning-desk reconciliation
 run is now a §2 era pointer.
 
-**⚠ REPO GATES BROKEN by a mid-session reorg (Henry, commits `2d84472` + `ba42fd7`, 2026-07-23,
-`main`).** `docs/` top level was EMPTIED: build specs + `tool-surface.md` → `_meta/_archive/`
-(`pocket-librarian-v1-spec`, `pm-system-v1-spec`, `agent-integration-contract-v1-spec`,
-`element-model-v2-draft`, `tool-surface`, `chat-tui-ux-survey`); `CHARTER.md` → `docs/development/`;
-guides → `docs/usage/`; VHS tapes → `scripts/vhs-tapes/`. Gates were NOT updated, so **`make check`
-FAILS**: `check-prompt-drift` + `check-tool-surface` + `check-query-kinds` cite now-missing `docs/…`
-paths. Dangling citations also in CLAUDE.md:178-179, README.md:181-182, `_meta/plans/_config.md:47`,
-and the whole `#197` plan. **Reconcile before any build** — either move the specs back to `docs/`
-(CLAUDE.md still says "don't move them") or repoint every gate + citation to the new homes.
-Direction is an OWNER call (commit msg: specs belong on the planning/strategy desk).
+**✓ REORG RECONCILED (2026-07-24).** The mid-session reorg (commits `2d84472` + `ba42fd7`) that
+emptied `docs/` top level had broken `make check` (3 gates) AND `make test` (the tool-surface Go
+test `TestToolSurfaceDoc_MCPCounts`, not caught in the prior handoff) — all now GREEN.
+**Owner ruling:** the 5 live drift-guarded specs live at **`docs/development/specs/`**
+(`pocket-librarian-v1-spec`, `pm-system-v1-spec`, `tool-surface`, `agent-integration-contract-v1-spec`,
+`element-model-v2-draft`); `plugin-guide` → `docs/usage/`; genuinely-archival docs stay in
+`_meta/_archive/` (ts-proxy-design [mooted by ADR 0022], chat-tui-ux-survey, model-sims, old
+issue-plans, signoff). ~90 dangling published-surface citations repointed across the 3 gates + the
+Go test, CLAUDE.md, README, all ADRs, the moved specs' own relative links, shipped-tree comments,
+install.sh, VHS tapes (+ `docs/media/` → `docs/assets/`), and the #197 plan. `docs/README.md`
+rebuilt; `releasing.md` content confirmed folded into `docs/development/README.md` (only its link
+dangled). **New prevention gate: `scripts/check-doc-links.mjs`** (in `make check` + CI, `--self-test`)
+fails on any dangling doc/media citation on the published+shipped surface — the guard that would have
+caught this class. Written contract: **`docs/development/docs-layout.md`** (what lives where, what's
+load-bearing, why the working desk isn't gated); CLAUDE.md's "load-bearing paths" rule rewritten to
+match. `make check`/`test`/`verify` all exit 0.
+
+**Working-desk cleanup DONE (2026-07-24):** the ADR-0022-mooted `ts-proxy-doc-correction` plan was
+archived to `_meta/_archive/` (#199 still open — formally supersede at Wave 3), and all remaining
+`_meta/` spec citations (design-session research provenance, deferred plans) were repointed to
+`docs/development/specs/` so nothing dangles. `_meta/research/2026-07-design-session/` stays live in
+place — 8+ published ADRs (0009–0016) cite it as "Raised by" provenance, so it can't be archived.
+Left as-is (pre-existing, predates the reorg — #77): `_meta/build-brief.md` was relocated off-repo but
+is still named in `docs/development/README.md:62` + `schema/README.md` (backtick refs, gate-invisible)
+— remove or redirect those when convenient.
 
 **NEXT, in order of consequence:**
 1. **#197** (gate:v2-final, filed 2026-07-22) — reconcile the software-spec phase-machine with the
    PM item phase-machine and name the building→shipped gate rule. The one open item blocking full
    schema-v2 epic (#130) closure. Build plan ready: `_meta/plans/phase-machine-reconciliation/`.
-   **⚠ its target `docs/element-model-v2-draft.md` moved to `_meta/_archive/` (see ⚠ above) — repoint the plan first.**
+   (Target repointed 2026-07-24: now `docs/development/specs/element-model-v2-draft.md`; the plan is clean.)
 2. **Adoption-feedback roadmap, Waves 1–3** (`_meta/plans/adoption-feedback-roadmap.md`; ADR 0022
    gate cleared) — issues NOT yet filed. Wave 1 quick wins (CLI command groups, `deskkit desks`,
    `deskkit config`, surface the existing PocketBase data browser), Wave 2 central config, Wave 3
@@ -169,11 +184,12 @@ trap — are in **CLAUDE.md** (hot-loaded). Only what CLAUDE.md doesn't cover li
   tool calls need the `argNormalizingTool` adapter. No terminal queries after bubbletea starts;
   theme resolves ONCE pre-program (`tui.ResolveTheme`); new TUI colors go in `newStyles`'s
   per-theme switch, never AdaptiveColor (guarded in `tui/defects_test.go`).
-- **Docs layout**: **the 2026-07-23 reorg (⚠ §1) emptied `docs/` top level** — specs →
-  `_meta/_archive/`, CHARTER → `docs/development/`, guides → `docs/usage/`; ADRs still at
-  `docs/decisions/`. VHS tapes moved to `scripts/vhs-tapes/` (from `docs/development/tapes/`), GIFs
-  in `docs/media/`; re-recording re-encodes ALL GIFs (`git restore` unchanged ones); tapes need
-  `ANTHROPIC_API_KEY="$(secret get ANTHROPIC_API_KEY)" bash scripts/record-media.sh`.
+- **Docs layout** (reconciled 2026-07-24 — see §1): specs at `docs/development/specs/`, CHARTER at
+  `docs/development/`, guides at `docs/usage/`, ADRs at `docs/decisions/`, the docs index at
+  `docs/README.md`. The layout contract is `docs/development/docs-layout.md`; `scripts/check-doc-links.mjs`
+  (in `make check`) gates every published+shipped doc/media citation. VHS tapes at `scripts/vhs-tapes/`,
+  GIFs at `docs/assets/` (moved from `docs/media/`); re-recording re-encodes ALL GIFs (`git restore`
+  unchanged ones); tapes need `ANTHROPIC_API_KEY="$(secret get ANTHROPIC_API_KEY)" bash scripts/record-media.sh`.
 - **Commits auto-close**: `Resolves #N` closes when the commit lands on `main` — post the proof
   comment first (close-with-comment fails on an already-closed issue).
 - **Pre-staged files**: a parallel agent may `git add` before you commit; `git commit` with a

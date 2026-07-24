@@ -85,7 +85,7 @@ a rename; see the 2026-07-21 ruling below._
   half of #84.
 
 **F6 — conformance for 1.0.** "Run the `mise-en-place-scaffold` …, author the three design-bearing
-docs (**CLAUDE.md, AGENTS.md, docs/CHARTER.md**), and rule the root **`tests/`** question (author a
+docs (**CLAUDE.md, AGENTS.md, docs/development/CHARTER.md**), and rule the root **`tests/`** question (author a
 real `tests/` … or add a standard-level exemption)." _Not cited in-repo by fork label._
 
 **F7 — system cohesion + value evaluation is a pre-1.0 requirement.** Before 1.0, testing +

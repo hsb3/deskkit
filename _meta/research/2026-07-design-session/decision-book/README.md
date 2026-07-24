@@ -111,7 +111,7 @@ plan-changing, so each was re-derived from source, not trusted):
    `tools/specs.go:55`); it is also third in deskguard's desk-carrying set
    (`core/store/deskguard.go:13`) for desk-collision detection. D4's kill-option blast radius
    includes all query surfaces, the guard, and a migration.
-2. **CONFIRMED and broader** — `docs/pm-system-v1-spec.md:744` promises GitHub-issue-URL
+2. **CONFIRMED and broader** — `docs/development/specs/pm-system-v1-spec.md:744` promises GitHub-issue-URL
    pointers while `Verdict` fails `://` closed (`librarian/internal/modules/librarian/module.go:123-124`;
    D1's bare `module.go` cites mean this file — no `pm/gates/module.go` exists). Broader: the
    shipped default gates (`pm/gates/defaults.go:23-36`) seed `pointer: item` for decision/task,

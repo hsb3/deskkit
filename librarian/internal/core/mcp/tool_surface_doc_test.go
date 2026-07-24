@@ -48,7 +48,7 @@ type docSurfaceCounts struct {
 // assert this file's presence by function name.
 func TestToolSurfaceDoc_MCPCounts(t *testing.T) {
 	root := repoRootFrom(t)
-	docPath := filepath.Join(root, "docs", "tool-surface.md")
+	docPath := filepath.Join(root, "docs", "development", "specs", "tool-surface.md")
 	md, err := os.ReadFile(docPath)
 	if err != nil {
 		t.Fatalf("read %s: %v", docPath, err)
@@ -203,7 +203,7 @@ func repoRootFrom(t *testing.T) string {
 	}
 	dir := wd
 	for i := 0; i < 16; i++ {
-		if _, err := os.Stat(filepath.Join(dir, "docs", "tool-surface.md")); err == nil {
+		if _, err := os.Stat(filepath.Join(dir, "docs", "development", "specs", "tool-surface.md")); err == nil {
 			return dir
 		}
 		parent := filepath.Dir(dir)

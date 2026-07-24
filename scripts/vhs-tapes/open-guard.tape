@@ -1,7 +1,7 @@
 # open-guard.tape — the desk open-guard (ADR 0002 section 3): reopening the SAME store dir under a
 # different DESK_NAME is refused, naming both desks in the error.
 # Regenerate: bash scripts/record-media.sh (never hand-edit the GIF).
-Output docs/media/open-guard.gif
+Output docs/assets/open-guard.gif
 
 Require deskkit
 

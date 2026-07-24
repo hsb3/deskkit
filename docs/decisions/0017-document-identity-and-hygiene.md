@@ -44,4 +44,4 @@ Owner-ruled 2026-07-20 as a package (D8):
 
 `librarian/.../tools/sweep.go` (id matching) · `schema/` (the `id` frontmatter key) · a new
 forward migration (column rename + caps) · `scripts/` (the cap guard) · `query`/CLI output
-field names · `docs/pocket-librarian-v1-spec.md` identity prose.
+field names · `docs/development/specs/pocket-librarian-v1-spec.md` identity prose.

@@ -438,7 +438,7 @@ required config with no personal default.
 
 **Store location is not a `DESK_ROOT`-relative env var; see §10.6** for the canonical
 `XDG_DATA_HOME`-derived default, the `--dir` override, and the desk open-guard — decided in
-[`docs/decisions/0002-multi-desk-topology-store-per-desk.md`](decisions/0002-multi-desk-topology-store-per-desk.md).
+[`docs/decisions/0002-multi-desk-topology-store-per-desk.md`](../../decisions/0002-multi-desk-topology-store-per-desk.md).
 
 ---
 
@@ -638,7 +638,7 @@ never user-required**. At run start the agent loads the active, highest-`version
 interpolates desk facts; a missing/empty collection falls back to the embedded default so the agent
 always has a prompt. GUI/REST edits take effect on the **next** run.
 
-**Governance ([ADR 0015](decisions/0015-prompt-governance.md) — git is truth).** "Editable,
+**Governance ([ADR 0015](../../decisions/0015-prompt-governance.md) — git is truth).** "Editable,
 versioned" is an operator convenience, **not** a durability promise. The version-controlled
 embedded default (§6.1) is **canonical**; the `prompts` row it seeds is a **re-seeded cache**. A
 GUI/REST edit to that row is **ephemeral by rule** — it applies on the next run but does not
@@ -1469,7 +1469,7 @@ recs, err := app.FindRecordsByFilter(
 ## 6. Agent loop & provider adapter
 
 This section covers the librarian's own eino-driven agent loop and system prompt; see
-[`docs/agent-integration-contract-v1-spec.md`](agent-integration-contract-v1-spec.md) for how an
+[`docs/development/specs/agent-integration-contract-v1-spec.md`](agent-integration-contract-v1-spec.md) for how an
 external harness integrates with the librarian's tool surface.
 
 ### 6.1 Loop and stop semantics
@@ -1554,7 +1554,7 @@ preamble line above whichever text it resolved (the DB-active row or the embedde
 person-specific is compiled in (§11 identity-neutrality). GUI/REST edits to the active `prompts` row
 take effect on the **next** run; editing promotes a new `version` row and moves the `active` flag,
 retaining history (§4.10). Those edits are a re-seeded **cache**, not canonical, and are ephemeral
-by rule ([ADR 0015](decisions/0015-prompt-governance.md) — git is truth): clear the row and the
+by rule ([ADR 0015](../../decisions/0015-prompt-governance.md) — git is truth): clear the row and the
 embed above re-seeds it ("reset to shipped"); the only durable customization path is `_knowledge/`,
 never a DB prompt edit. The embed and this quoted block are held byte-identical by a drift guard
 (`scripts/check-prompt-drift.mjs`) so the "kept verbatim" copy cannot silently drift from the
@@ -1877,7 +1877,7 @@ external MCP server's tools). The librarian ALSO exposes its own tool core *outb
 **stdio server** (`deskkit mcp-serve`, §3.3), so a Claude Code or OpenCode session can
 call the librarian's tools directly by mounting it. *(Correction 2026-07-20, ADR 0016: the
 dual-format plugin's `plugin/mcp` boundary does NOT carry librarian tools today — it ships
-exactly the four profile/template/knowledge tools, per `docs/tool-surface.md`; a designed proxy
+exactly the four profile/template/knowledge tools, per `docs/development/specs/tool-surface.md`; a designed proxy
 from that boundary to this server is the planned extension.)* This is the
 one-binary "MCP server **and** CLI over a single tool core" pattern (the `hsb3/outlook-mcp`
 architecture): the CLI, the eino agent loop, and this MCP server are three surfaces over the **same**
@@ -1909,7 +1909,7 @@ none touches the Phase 1/2 build acceptance (§8). They are also listed in §11.
 
 > **Direction update (2026-07-16):** the "reuse the built-in GUI for chat" research spike below is
 > superseded for the **interactive surface** by ADR
-> [`docs/decisions/0001-interactive-surface-tui-first.md`](decisions/0001-interactive-surface-tui-first.md).
+> [`docs/decisions/0001-interactive-surface-tui-first.md`](../../decisions/0001-interactive-surface-tui-first.md).
 > A terminal session (`chat` subcommand, multi-turn REPL over the eino loop) ships as the on-demand
 > human surface; the three web options below are re-scoped as a **deferred** follow-on, with option
 > **(b)** (custom Go route serving an embedded page) recorded as the preferred choice if/when a
@@ -2308,7 +2308,7 @@ profile, so a provider swap updates one allow-list entry in both.
 ### 10.6 Store location & the desk open-guard (multi-desk topology)
 
 One store per desk (topology, ruling 1 of
-[`docs/decisions/0002-multi-desk-topology-store-per-desk.md`](decisions/0002-multi-desk-topology-store-per-desk.md)).
+[`docs/decisions/0002-multi-desk-topology-store-per-desk.md`](../../decisions/0002-multi-desk-topology-store-per-desk.md)).
 This subsection documents where that store lives on disk and the guard that keeps two desks
 from colliding on one.
 

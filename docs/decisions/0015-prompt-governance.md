@@ -41,4 +41,4 @@ librarian prompt was the live proof the split was ungoverned.
 
 `librarian/internal/modules/librarian/prompt/prompt.go` (`Seed` semantics documented) ·
 `collections/0009_prompts.go` prose · the ADR 0014 bundle's prompt sources · a drift guard
-across the version-controlled prompt copies · `docs/pocket-librarian-v1-spec.md` prompt prose.
+across the version-controlled prompt copies · `docs/development/specs/pocket-librarian-v1-spec.md` prompt prose.

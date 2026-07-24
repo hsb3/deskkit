@@ -3,7 +3,7 @@
 # 30 — PM graph: create / transition / gate / cascade. Sourced by e2e.sh; helpers
 # (check/skip/note/section/dk) and E2E_* state come from lib.sh, and this file runs after
 # step 10 has already `deskkit init`'d the scratch desk. PM_ENABLED is deliberately left
-# unset here — the module ships default-ON (docs/pm-system-v1-spec.md §2.9), so a plain
+# unset here — the module ships default-ON (docs/development/specs/pm-system-v1-spec.md §2.9), so a plain
 # `pm create` succeeding (rather than cobra's unknown-command error) is itself the proof.
 
 section "30 · PM graph — create / transition / gate / cascade"
@@ -77,7 +77,7 @@ else
   skip "PM terminal-hop completion" "work->review or review->terminal did not reach phase=terminal; see note above"
 fi
 
-# --- pm context is the cold-start briefing source (docs/pm-system-v1-spec.md §5.2) ----------
+# --- pm context is the cold-start briefing source (docs/development/specs/pm-system-v1-spec.md §5.2) ----------
 CTX_JSON=$(dk pm context 2>&1)
 CTX_RC=$?
 printf '%s' "$CTX_JSON" | jq -e '.counts' >/dev/null 2>&1

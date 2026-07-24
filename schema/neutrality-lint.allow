@@ -34,10 +34,10 @@ librarian/internal/modules/librarian/desklib/desklib.go | #1
 # same issue ordinals the canonical file carries.
 librarian/internal/core/schema/doctypes.yaml
 
-# Agent-integration contract spec: the cross-product agent/PM parity doc under docs/ — a docs
+# Agent-integration contract spec: the cross-product agent/PM parity doc under docs/development/specs/ — a docs
 # authoring surface (SCAN_DIRS does not cover docs/), allow-listed explicitly since the doc
 # necessarily names internal path/tool identifiers across both lanes.
-docs/agent-integration-contract-v1-spec.md
+docs/development/specs/agent-integration-contract-v1-spec.md
 
 # Go module hosting path: the module at librarian/go.mod is
 # github.com/hsb3/desk-standard/librarian, so it — and every import path derived from it — names

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# record-media.sh — regenerate docs/media/*.gif from docs/development/tapes/*.tape (VHS).
+# record-media.sh — regenerate docs/assets/*.gif from scripts/vhs-tapes/*.tape (VHS).
 #
 # The tapes are the source of truth; the GIFs are generated artifacts (never hand-edited —
 # re-run this script to regenerate them after any tape edit). This script is fully
@@ -8,7 +8,7 @@
 # EVERY store-touching invocation at a scratch XDG_DATA_HOME + HOME so nothing can ever touch
 # the operator's real ~/.local/share/deskkit, pre-runs whatever setup each tape's demo
 # assumes already happened (migrate/sweep/patrol), then drives `vhs` over each tape (sources in
-# docs/development/tapes/), writing the GIFs to docs/media/ (each tape's `Output docs/media/*.gif`
+# scripts/vhs-tapes/), writing the GIFs to docs/assets/ (each tape's `Output docs/assets/*.gif`
 # path resolves from the repo root). Idempotent: every run starts from a fresh scratch tree and leaves
 # no litter behind (trap-cleaned on exit, including on error/interrupt).
 set -euo pipefail
@@ -17,7 +17,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 LIB_DIR="$REPO_ROOT/librarian"
 BIN="$LIB_DIR/deskkit"
-MEDIA_DIR="$REPO_ROOT/docs/media"
+MEDIA_DIR="$REPO_ROOT/docs/assets"
 
 log() { printf 'record-media: %s\n' "$1"; }
 
@@ -193,7 +193,7 @@ record_tape() { # record_tape <tape-file> <desk_root> <xdg_home> [store_one]
   local tape="$1" desk="$2" xdg="$3" store_one="${4:-}"
   log "recording $tape"
   MEDIA_DESK_ROOT="$desk" MEDIA_XDG_HOME="$xdg" MEDIA_STORE_ONE="$store_one" \
-    vhs "docs/development/tapes/$tape"
+    vhs "scripts/vhs-tapes/$tape"
 }
 
 record_tape sweep-and-findings.tape "$DESK_SWEEP" "$XDG_SWEEP"

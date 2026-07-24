@@ -35,4 +35,4 @@ only new creations are checked.
 
 `librarian/internal/modules/pm/engine/engine.go` (`CreateItem`) ·
 `librarian/internal/core/schema/doctypes.go` (`KnownType` call site) · the PM importer ·
-`docs/pm-system-v1-spec.md` (item-creation prose) · a red-able regression test per the #82 bar.
+`docs/development/specs/pm-system-v1-spec.md` (item-creation prose) · a red-able regression test per the #82 bar.

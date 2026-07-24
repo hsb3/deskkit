@@ -20,7 +20,7 @@ shape from the next instead of silently misreading it, and is the substrate the 
 on. Two things it is deliberately **not**: (1) `profile.schema.yaml`'s own `schema_version` key, which
 const-1 pins a profile *instance* to schema v1 (a different value space, hence the marker is *not*
 named `schema_version`); (2) the store-side `module_schema_versions` mechanism
-(`docs/pm-system-v1-spec.md` §8.3 / R7.1), which versions a desk's PocketBase PM migrations per
+(`docs/development/specs/pm-system-v1-spec.md` §8.3 / R7.1), which versions a desk's PocketBase PM migrations per
 install. Same word "version", disjoint mechanisms.
 
 **What's in it now.** Three schema dimensions, plus a shared path-constants file:

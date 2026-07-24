@@ -22,12 +22,12 @@ servers:
 
 Both are listed side by side in `.claude-plugin/marketplace.json`. The two servers are
 un-composed — "neither calls the other; they coexist only by both appearing in a session's MCP
-config" (`docs/development/ts-proxy-design.md`).
+config" (`_meta/_archive/ts-proxy-design.md`).
 
 **ADR 0016** settled the spec-vs-reality gap on the TS boundary by choosing to *keep the TS server
 and extend it via a designed proxy to deskkit* — the TS server would spawn `deskkit mcp-serve` as a
 child and re-expose librarian tools through one mount, "never by reimplementing librarian logic in
-TS." That proxy was designed (`docs/development/ts-proxy-design.md`) but **never built**; its own
+TS." That proxy was designed (`_meta/_archive/ts-proxy-design.md`) but **never built**; its own
 slice 0 is a spawn-feasibility go/no-go probe, and it explicitly kept PM on a separate mount, so
 even the designed unification did not collapse to a single server. **ADR 0014** packaged the agent
 surface as one composed desk-persona bundle and ruled per-module mounts out, but left the TS
@@ -67,7 +67,7 @@ four calls:
 
 - **(d) The ts-proxy design is withdrawn.** The collapse reaches the same "one mount" outcome the
   0016 proxy aimed at, without a spawned-child process — removing exactly the lifecycle-coupling
-  risk the proxy design flagged as its central unknown (slice 0). `docs/development/ts-proxy-design.md`
+  risk the proxy design flagged as its central unknown (slice 0). `_meta/_archive/ts-proxy-design.md`
   is marked withdrawn.
 
 **Fidelity rule (mirrors 0016's "record the fallback, don't improvise").** If a specific profile
@@ -86,7 +86,7 @@ the same change that builds the collapse.
 
 - **The user-facing model is what the feedback asked for:** one plugin, one MCP server, one binary.
   "deskkit is the engine; the plugin is its Claude Code face" becomes literally true.
-- **Tool surface** on `deskkit mcp-serve` now spans profile + librarian + PM. `docs/tool-surface.md`
+- **Tool surface** on `deskkit mcp-serve` now spans profile + librarian + PM. `docs/development/specs/tool-surface.md`
   and its drift guard (`scripts/check-tool-surface.mjs`) update; the count lives there, not in this
   ADR.
 - **Neutrality** applies to the new Go profile tools (they land under `librarian/`, inside
@@ -105,13 +105,13 @@ the same change that builds the collapse.
 
 - Supersedes [ADR 0016](0016-ts-boundary-deskkit-proxy.md) (status flip on acceptance) · amends
   [ADR 0014](0014-agent-integration-contract.md) (dated note at build; one bundle, TS mount retired).
-- Withdraws `docs/development/ts-proxy-design.md`.
+- Withdraws `_meta/_archive/ts-proxy-design.md`.
 - `librarian/internal/core/mcp/server.go` (register profile tools; new `MCP_MODULES=profile`) + the
   new Go profile-tool implementations (reusing `config`/`schema`/`templates`/`files`-index).
 - `plugin/mcp/server.ts`, `plugin/package.json` (retire TS-server emit), `scripts/check-core-purity.mjs`
   (scope) · `plugins/desk-standard/` + `plugins/desk-persona/` → one bundle ·
   `.claude-plugin/marketplace.json` (one entry).
-- `docs/tool-surface.md` (+ `scripts/check-tool-surface.mjs`) · `CLAUDE.md` (architecture section) ·
+- `docs/development/specs/tool-surface.md` (+ `scripts/check-tool-surface.mjs`) · `CLAUDE.md` (architecture section) ·
   `librarian/README.md`.
 
 ## Provenance

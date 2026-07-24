@@ -14,7 +14,7 @@ document-gated work graph: work items move through a rigid phase machine, and a 
 binary, one per-desk store, three surfaces (CLI, MCP, TUI) over one engine — plus the composed
 Claude Code plugin (`desk-persona`).
 
-Design and rationale: `pm-system-v1-spec.md` and
+Design and rationale: `../development/specs/pm-system-v1-spec.md` and
 `decisions/0008-pm-core-modules-architecture.md`.
 
 ## It's on by default — how to opt out
@@ -74,7 +74,7 @@ first startup, with one logged line — no desk loses its store across the renam
   of the item — transition, block, unblock, and update are all refused for a non-holder while the
   claim is live — until it lapses (default 30 min, `PM_CLAIM_TTL`) or the holder releases it; the
   holder's own writes proceed as normal. Cascade/auto-unblock is derived graph state, not a direct
-  call, so it is unaffected by claims. See [ADR 0020](decisions/0020-pm-claim-semantics.md).
+  call, so it is unaffected by claims. See [ADR 0020](../decisions/0020-pm-claim-semantics.md).
 - **Audit:** every transition appends an immutable row; a refusal lands as a `gate_refused` audit
   entry. Every write records who acted via optional `actor`/`actor_kind`/`delegation_parent`
   fields (unset → actor `agent`, kind `agent`); the CLI instead defaults `--actor` to `$USER`,
@@ -107,7 +107,7 @@ rest: a gated document missing it is refused exactly as one missing a doctype-sp
 gated: it is refused until a `task` document exists at the item's pointer, validates (including
 carrying `updated`), and is at status `active`.
 
-Authoritative version: [`pm-system-v1-spec.md` §4](pm-system-v1-spec.md#4-gates--the-spine-r3).
+Authoritative version: [`pm-system-v1-spec.md` §4](../development/specs/pm-system-v1-spec.md#4-gates--the-spine-r3).
 
 ## The TUI — reach the board from `deskkit chat`
 
@@ -250,7 +250,7 @@ documents or writes a repo; and a `SessionStart` hook that injects `deskkit pm c
 start (silent no-op when PM is off or `deskkit` is absent). It mounts these alongside the librarian
 surfaces on one MCP server (`MCP_MODULES=librarian,pm`). The data and runtime stay in the one
 binary — the plugin is the surface, not a second store. Details:
-`../plugins/desk-persona/README.md`.
+`../../plugins/desk-persona/README.md`.
 
 ## Adopting the PM graph on a real desk
 

@@ -7,7 +7,7 @@ single version.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html). See
-[`docs/development/releasing.md`](docs/development/releasing.md) for how a version is bumped and cut, and
+[`docs/development/README.md`](docs/development/README.md) for how a version is bumped and cut, and
 [`docs/decisions/0005-versioning-and-changelog.md`](docs/decisions/0005-versioning-and-changelog.md)
 for why this policy exists.
 

@@ -2,7 +2,7 @@
 
 A companion Claude Code plugin (distinct from the `desk-standard` plugin, shared marketplace) that
 instantiates the **agent integration contract**
-(`docs/agent-integration-contract-v1-spec.md`, ADR 0014, ADR 0015) as a single composed mount:
+(`docs/development/specs/agent-integration-contract-v1-spec.md`, ADR 0014, ADR 0015) as a single composed mount:
 one `deskkit` MCP server exposing both the librarian and PM tool families together, plus the
 agents, skills, and briefing hook that operate them. It proves the contract's general case — a desk
 that has *both* modules registered on one mount at once. The PM surfaces (the `pm-operator` agent,
@@ -27,7 +27,7 @@ is not part of `make package`.
 ## The composed mount
 
 `MCP_MODULES=librarian,pm` tells the mount to register both tool families rather than one, per
-the contract's mount invariant (`docs/agent-integration-contract-v1-spec.md` §4). The result is a
+the contract's mount invariant (`docs/development/specs/agent-integration-contract-v1-spec.md` §4). The result is a
 single MCP server exposing 17 tools, zero phantom entries:
 
 - **5 librarian tools** (always-on slice): `query`, `sweep`, `patrol`, `propose_fix`,

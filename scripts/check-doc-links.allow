@@ -1,0 +1,11 @@
+# check-doc-links.allow — intentional exceptions for the doc-link drift guard
+# (scripts/check-doc-links.mjs). One per line: "<citing-file> -> <cited-path>", where the cited
+# path legitimately does not exist on disk (e.g. a doc a plan promises to create later, or an
+# illustrative example path in prose). Blank lines and #-comments are ignored.
+#
+# Keep this file EMPTY unless a real exception arises — a growing allow-list is a signal that the
+# docs layout is drifting, which is exactly what this gate exists to prevent.
+
+# Illustrative example path inside the spec's sample tool-output JSON (shows what an "orphan file"
+# record looks like); `docs/deskkit-spec.md` is not a real file and never was.
+docs/development/specs/pocket-librarian-v1-spec.md -> docs/deskkit-spec.md

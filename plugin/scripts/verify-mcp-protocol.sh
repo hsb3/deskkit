@@ -2,7 +2,7 @@
 # Manual stdio JSON-RPC harness for the desk-standard plugin's MCP server
 # (plugins/desk-standard/mcp/server.js). Written for a manual protocol pass when a live
 # Claude Code session does not have this plugin's MCP tools natively connected (verify with
-# ToolSearch first — see docs/tool-surface.md "How the counts were derived" for the sibling
+# ToolSearch first — see docs/development/specs/tool-surface.md "How the counts were derived" for the sibling
 # pattern this mirrors against the librarian's MCP server).
 #
 # The server's tool handlers resolve `_knowledge/profile.*` by walking up from the SERVER
@@ -17,7 +17,7 @@
 #
 # Requests are newline-delimited JSON-RPC, forwarded verbatim on stdin. A real client also
 # sends `initialize` then `notifications/initialized` before any `tools/call` — see
-# docs/tool-surface.md for the exact framing. Responses print to stdout as the server emits
+# docs/development/specs/tool-surface.md for the exact framing. Responses print to stdout as the server emits
 # them (newline-delimited JSON), server diagnostics go to stderr.
 
 set -euo pipefail

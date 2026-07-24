@@ -24,7 +24,7 @@ as the schema-v2 track.
 | `agent-integration-contract` | 0014 | The contract spec section; tool-level gating on `mcp-serve`; librarian prompt staleness fix; eino slice stays librarian-only; `import` + admin-console ownership docs | gate:1.0.0 |
 | `desk-persona-bundle` | 0014 | The composed librarian+PM desk-persona Claude Code bundle: new shipped artifact, packaging + drift guard + neutrality surface | gate:1.0.0 |
 | `prompt-governance` | 0015 | Git-is-truth documented (`Seed` semantics, reset-to-shipped); drift guard across version-controlled prompt copies | gate:1.0.0 |
-| `tool-surface-drift-guard` | 0016 | `docs/tool-surface.md` pinned by a drift guard in `scripts/` | gate:1.0.0 |
+| `tool-surface-drift-guard` | 0016 | `docs/development/specs/tool-surface.md` pinned by a drift guard in `scripts/` | gate:1.0.0 |
 | `ts-proxy-design` | 0016 | Design item preceding implementation: TS `plugin/mcp` proxy to deskkit `mcp-serve` (lifecycle, availability, tool surface, 0014 gating); fallback recorded | none |
 | `document-identity-hygiene` | 0017 | Frontmatter `id` + sweep matching; `files.entity_type` column rename; cap sweep + TextField-Max CI guard | gate:1.0.0 |
 
