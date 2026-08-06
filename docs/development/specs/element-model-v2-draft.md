@@ -10,9 +10,9 @@ synopsis: "Reviewed draft of the schema-v2 element model: every entity, document
 # Desk Platform — element model (schema-v2 draft)
 
 _Status: **draft**. This is the schema-v2 track's reviewed element model — graduated from the R3
-research proposal at
-[`_meta/research/2026-07-design-session/platform/spec-element-model.md`](../../../_meta/research/2026-07-design-session/platform/spec-element-model.md)
-(which is frozen as provenance) after folding in ADR 0018's Q1–Q4 owner rulings and both adversarial
+research proposal at `_meta/research/2026-07-design-session/platform/spec-element-model.md`
+(frozen as provenance; the `_meta/` working desk was removed from the tree 2026-08 — the file
+lives in git history) after folding in ADR 0018's Q1–Q4 owner rulings and both adversarial
 reviews' 18 numbered gaps. It is **not finalized**: ADR 0009 holds the model draft "until its review
 fixes land and the simulations pass" (`docs/decisions/0009-platform-frame.md:49`). This document
 lands the review fixes and the rulings; finalization is gated on **`model-simulations` (#126)**._
@@ -467,8 +467,8 @@ a one-line reason). Nothing is silently dropped.
 ## Provenance
 
 Graduated 2026-07-22 from the R3 proposal
-[`_meta/research/2026-07-design-session/platform/spec-element-model.md`](../../../_meta/research/2026-07-design-session/platform/spec-element-model.md)
-(3 read-only scouts over `_headcase` @ 2026-07-20; frame + spine the foreman's synthesis; two opus
+`_meta/research/2026-07-design-session/platform/spec-element-model.md` (removed from the tree
+with `_meta/`, 2026-08 — in git history; 3 read-only scouts over `_headcase` @ 2026-07-20; frame + spine the foreman's synthesis; two opus
 adversarial reviews). Rulings: ADR 0018 (Q1–Q4), ADR 0009 (two-track, staged truth, simulations
 gate). Consumed mechanisms: ADR 0011/0012/0013/0017 (§11). Resolves #125; blocks #126; child of #130.
 </content>

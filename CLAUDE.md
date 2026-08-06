@@ -45,7 +45,7 @@ docs/              specs, ADRs (docs/decisions/), the CHARTER, and using/develop
 scripts/           repo-wide gate scripts (*.mjs) + record-media.sh
 tests/             signpost only — suites live with their products; see tests/README.md
 kits/ + kits.yaml  SOP template library + its drift-guarded manifest
-_meta/             the working desk (HANDOFF, plans, briefings, research); tracked by default
+HANDOFF.md         session-to-session bridge: current standing + deep gotchas
 .claude/           agent config: skills/, agents/, rules/, memory/, settings.json (tracked policy)
 .github/           CI workflows + issue/PR templates + dependabot
 Makefile           the canonical task interface — `make help` lists targets
@@ -163,7 +163,7 @@ This repo does not register its own MCP servers on itself — there is no root `
 none should be added. The tools this repo builds (the librarian, the PM module, the desk-standard
 plugin) are for coordinating *other* desks; that standard doesn't apply reflexively to the repo
 that builds it, and the coordination tooling must live outside it — on a desk built to operate on
-this repo, e.g. the paired executive desk (`_meta/HANDOFF.md` §0). In-repo verification instead
+this repo, e.g. the paired executive desk (`HANDOFF.md` §0). In-repo verification instead
 runs through `make verify` (`librarian/verify.sh`, a throwaway scratch desk) and `make e2e`, both
 of which stand up disposable desks rather than pointing the binary at this repo's own tree.
 `deskkit apply-fix` / `restore` stay `ask`-gated in `.claude/settings.json` regardless, matching
@@ -191,7 +191,7 @@ the librarian's supervised-write boundary wherever it runs.
 - **[`docs/development/CHARTER.md`](docs/development/CHARTER.md)** — canonical page (what it is, 1.0.0 direction, precedence rule).
 - **[`docs/README.md`](docs/README.md)** — docs index, split Using vs Developing.
 - **[`docs/decisions/`](docs/decisions/)** — ADRs (append-only; cited where they bind).
-- **[`_meta/HANDOFF.md`](_meta/HANDOFF.md)** — session-to-session bridge: current standing + deep gotchas.
+- **[`HANDOFF.md`](HANDOFF.md)** — session-to-session bridge: current standing + deep gotchas.
 - **[`CHANGELOG.md`](CHANGELOG.md)** — what changed per release.
 
 ## Keeping this file current

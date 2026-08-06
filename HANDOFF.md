@@ -1,8 +1,8 @@
 _Session-to-session bridge for desk-standard. Read this before working; update it at the end
-of any substantial session. Secret-free — live URLs/credentials belong in `_meta/operations/`
-(untracked) if that dir is ever created._
-Status: active (2026-07-24, post reorg-reconciliation: docs/ moves fixed + doc-link gate added;
-2026-07-23 adoption-feedback design + ADR 0022 acceptance prior; older versions in git history)
+of any substantial session. Secret-free — keep live URLs/credentials out of the repo entirely._
+Status: active (2026-08-05, post working-desk removal: `_meta/` deleted, this file now lives at
+repo root, doc-link repoints green-but-uncommitted — see §1; prior eras: 2026-07-24 reorg-reconciliation,
+2026-07-23 ADR 0022 acceptance; older versions in git history)
 
 # HANDOFF
 
@@ -20,9 +20,9 @@ direction — ADR 0022 (Accepted 2026-07-23):** this two-bundle / two-MCP-server
 collapsed onto the Go binary (one plugin, one MCP server; TS server retired) — decided, NOT yet
 built (roadmap Wave 3); the description above is current CODE reality. Personalization happens only in a desk's `_knowledge/profile.yaml` (the repo
 itself is NOT a desk — ruled 2026-07-21, PR #188). Root `README.md` is the front door;
-`CLAUDE.md` is the agent digest (hot-loaded — don't duplicate it here); the canonical CHARTER + build specs were RELOCATED 2026-07-23 (see ⚠ in §1: `docs/` top level
-emptied — CHARTER → `docs/development/CHARTER.md`, the specs → `_meta/_archive/`); operator docs
-stay at `librarian/README.md`.
+`CLAUDE.md` is the agent digest (hot-loaded — don't duplicate it here); CHARTER at
+`docs/development/CHARTER.md`, live specs at `docs/development/specs/` (§3 has the full docs
+layout); operator docs stay at `librarian/README.md`.
 
 Siblings: `hsb3/dotfiles-agents` (pattern source). The **paired executive desk** is
 `~/Documents/EXECUTIVE_DESK/Projects/desk-standard-desk`; the off-repo decision spine it
@@ -30,7 +30,24 @@ inherits from lives in `…/Projects/dotfiles-agents-desk/_structure/decisions/`
 `dev-tooling-desk`, whose stale copy sits in `…/Projects/ARCHIVE/dev-tooling-desk-old/` — don't
 read the archive copy as current).
 
-## 1. Current standing (as of 2026-07-23) + what's next
+## 1. Current standing (as of 2026-08-05) + what's next
+
+**⚠ Working desk REMOVED (2026-08-05, commit `3be0ef6` "remove desk items/clutter").** The
+entire `_meta/` tree — plans (incl. the adoption-feedback roadmap and the #197 build plan),
+research, archives, signoff records, plan utils — was deleted; only this handoff survived, moved
+to repo-root `HANDOFF.md` (tracked). **Every `_meta/...` path named below resolves only in git
+history** (checkout `206d969`, the commit before the removal). Consequences:
+
+- **Gate status:** the removal left HEAD (`a6f5eb7`) RED on `check-doc-links` (3 dangling refs:
+  CLAUDE.md → `_meta/HANDOFF.md`; element-model-v2-draft ×2 → the deleted research spec). Fixed
+  same day in the WORKING TREE (CLAUDE.md/README repointed, draft citations annotated
+  "removed from the tree") — `make check` exits 0 with those changes, but they are **UNCOMMITTED**
+  alongside a larger README rewrite (~263 lines churned). Commit them before anything else lands.
+- ADR "Raised by" provenance citations into `_meta/research/` (ADRs 0009–0016, 0018, 0020) now
+  point at git history; they're prose backticks, gate-invisible — annotate opportunistically.
+- Same session (commit `a6f5eb7`): `.claude/agent-memory/` was folded into the tracked
+  `.claude/memory/` (9 durable reviewer memories migrated with dated fact-updates; 6 pruned as
+  mooted by this very `_meta/` removal or superseded by code).
 
 **Wave-v4 EXECUTED same-session** (6 crews + 1 reconciliation PR, all merged): schema-v2 arc
 closed for this cycle (#124, #125, #126 v2 half — the model stays `status: draft`, gated on the
@@ -52,7 +69,8 @@ amended: PM ships default-on. Decision packages for Henry are always the owner-s
 form, never chat questions (project memory; the 2026-07-21 batch proved the pattern at 10-items
 scale).
 
-**Adoption-feedback design session EXECUTED 2026-07-23** (docs-only, UNCOMMITTED on `main`): early
+**Adoption-feedback design session EXECUTED 2026-07-23** (docs committed 2026-07-23,
+`1ac1ba1`/`ba42fd7`; the roadmap file was later deleted with `_meta/` — git history only): early
 user feedback ("super-confusing; two plugins + two MCP servers; alphabetical CLI; no 'list my
 desks'; unclear config / no central LLM-key home; visual data browser?"). Two owner rulings →
 **(1)** collapse everything onto the Go binary (one plugin/one MCP server; the 4 profile tools move
@@ -92,10 +110,10 @@ is still named in `docs/development/README.md:62` + `schema/README.md` (backtick
 **NEXT, in order of consequence:**
 1. **#197** (gate:v2-final, filed 2026-07-22) — reconcile the software-spec phase-machine with the
    PM item phase-machine and name the building→shipped gate rule. The one open item blocking full
-   schema-v2 epic (#130) closure. Build plan ready: `_meta/plans/phase-machine-reconciliation/`.
-   (Target repointed 2026-07-24: now `docs/development/specs/element-model-v2-draft.md`; the plan is clean.)
-2. **Adoption-feedback roadmap, Waves 1–3** (`_meta/plans/adoption-feedback-roadmap.md`; ADR 0022
-   gate cleared) — issues NOT yet filed. Wave 1 quick wins (CLI command groups, `deskkit desks`,
+   schema-v2 epic (#130) closure. Build plan was `_meta/plans/phase-machine-reconciliation/` —
+   deleted 2026-08-05, recover from `206d969`. (Target: `docs/development/specs/element-model-v2-draft.md`.)
+2. **Adoption-feedback roadmap, Waves 1–3** (roadmap doc deleted with `_meta/` — recover from
+   `206d969`; ADR 0022 gate cleared) — issues NOT yet filed. Wave 1 quick wins (CLI command groups, `deskkit desks`,
    `deskkit config`, surface the existing PocketBase data browser), Wave 2 central config, Wave 3
    the collapse. All Go-lane; Wave 1 items are independent/parallelizable.
 3. ~~**#199** + **ts-proxy implementation**~~ **MOOTED by ADR 0022** — the ts-proxy path is
@@ -195,7 +213,8 @@ trap — are in **CLAUDE.md** (hot-loaded). Only what CLAUDE.md doesn't cover li
 - **Pre-staged files**: a parallel agent may `git add` before you commit; `git commit` with a
   pathspec still sweeps the whole index — check `git status` before every commit.
 - **Worktree provisioning**: untracked-and-load-bearing = `plugin/node_modules` (run
-  `bun install --frozen-lockfile`) and `.claude/agent-memory/`. Everything else is committed.
+  `bun install --frozen-lockfile`). Everything else is committed (project memory is tracked at
+  `.claude/memory/` since 2026-08-05; `.claude/agent-memory/` no longer exists).
 - **A persistent 404 on release assets the authed API can see** = check repo visibility
   (`gh repo view`) before blaming CDN propagation.
 
