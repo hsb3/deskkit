@@ -32,22 +32,21 @@ read the archive copy as current).
 
 ## 1. Current standing (as of 2026-08-05) + what's next
 
-**⚠ Working desk REMOVED (2026-08-05, commit `3be0ef6` "remove desk items/clutter").** The
-entire `_meta/` tree — plans (incl. the adoption-feedback roadmap and the #197 build plan),
-research, archives, signoff records, plan utils — was deleted; only this handoff survived, moved
-to repo-root `HANDOFF.md` (tracked). **Every `_meta/...` path named below resolves only in git
-history** (checkout `206d969`, the commit before the removal). Consequences:
+**⚠ Working desk REMOVED (2026-08-05, commits `3be0ef6` + `c029607`).** The entire `_meta/`
+tree — plans (incl. the adoption-feedback roadmap and the #197 build plan), research, archives,
+signoff records, plan utils — was deleted; only this handoff survived, moved to repo-root
+`HANDOFF.md` (tracked). **Every `_meta/...` path named below resolves only in git history**
+(checkout `206d969`, the commit before the removal). Same day:
 
-- **Gate status:** the removal left HEAD (`a6f5eb7`) RED on `check-doc-links` (3 dangling refs:
-  CLAUDE.md → `_meta/HANDOFF.md`; element-model-v2-draft ×2 → the deleted research spec). Fixed
-  same day in the WORKING TREE (CLAUDE.md/README repointed, draft citations annotated
-  "removed from the tree") — `make check` exits 0 with those changes, but they are **UNCOMMITTED**
-  alongside a larger README rewrite (~263 lines churned). Commit them before anything else lands.
+- `c029607` also **deleted the frozen OpenCode spike `plugin/opencode/`** (plugin `bun test` is
+  now 65 tests across core/mcp/desk-persona) and repointed the doc-link breakage the removal
+  caused (CLAUDE.md → `_meta/HANDOFF.md`, element-model-v2-draft's research citations) plus a
+  ~263-line README rewrite. `make check` and `node scripts/check-doc-links.mjs` exit 0.
 - ADR "Raised by" provenance citations into `_meta/research/` (ADRs 0009–0016, 0018, 0020) now
   point at git history; they're prose backticks, gate-invisible — annotate opportunistically.
-- Same session (commit `a6f5eb7`): `.claude/agent-memory/` was folded into the tracked
-  `.claude/memory/` (9 durable reviewer memories migrated with dated fact-updates; 6 pruned as
-  mooted by this very `_meta/` removal or superseded by code).
+- `a6f5eb7`: `.claude/agent-memory/` folded into the tracked `.claude/memory/` (9 durable
+  reviewer memories migrated with dated fact-updates; 7 pruned as mooted by these same
+  removals or superseded by code).
 
 **Wave-v4 EXECUTED same-session** (6 crews + 1 reconciliation PR, all merged): schema-v2 arc
 closed for this cycle (#124, #125, #126 v2 half — the model stays `status: draft`, gated on the
@@ -202,17 +201,7 @@ trap — are in **CLAUDE.md** (hot-loaded). Only what CLAUDE.md doesn't cover li
 
 ## 4. Incident log
 
-Durable lessons are promoted into §3; the dated blow-by-blow entries (2026-07-17 → 2026-07-21,
-thirteen incidents across four foreman runs) live in this file's git history (versions at and
-before commit `c6d1655`) and in the PRs they cite. Add new incidents here dated; promote and
-prune them at the next distillation pass.
-
-- **2026-07-23 (planning-desk run):** sustained API instability (repeated mid-response
-  disconnects + stream-watchdog stalls) killed 6 builder/reviewer agents mid-task, several more
-  than once — every one recovered via SendMessage-continue (never re-brief, per §3). The
-  effective mitigation for writers: brief them to emit long files INCREMENTALLY (Write the
-  frontmatter + first section, Edit-append the rest section by section) so a dropped stream
-  loses one section, not the whole file.
-- **2026-07-23 (design session):** Explore agents left running when the prior session's process
-  exited (no completion record) resumed cleanly via SendMessage to their agentId (restarts from
-  transcript) — a stopped/cross-process agent is recoverable, not lost; don't re-launch duplicates.
+Durable lessons are promoted into §3 (latest promotion 2026-08-05: the two 2026-07-23
+API-instability/agent-recovery incidents, now folded into the wave playbook). Dated blow-by-blow
+entries live in this file's git history and the PRs they cite. Add new incidents here dated;
+promote and prune at the next distillation pass. Currently empty.

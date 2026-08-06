@@ -14,7 +14,6 @@ _Index format: one line per memory file — a markdown link to the topic file, t
 - [No public/1.0.0 nagging](feedback-no-public-1.0.0-nagging.md) — don't prompt Henry about going public or cutting 1.0.0 (#87); his call, not a standing agenda item
 - [Consolidation: single binary](consolidation-single-binary-decision.md) — owner ruling to collapse two plugins/MCP servers into one on the Go binary (reverses ADR 0016) + central config stores the LLM key
 - [Neutrality-lint blind spots](neutrality-lint-blindspots.md) — the D8 lint misses person names + qualified org/repo#issue inside its own scan scope; grep yourself, don't trust a green lint
-- [Frozen spike CI containment](frozen-spike-ci-containment.md) — "descoped/unwired" claims about plugin/opencode go stale; the bun test glob churns — grep plugin/package.json, never the README
 - [PocketBase serve swallows RunE errors](pocketbase-serve-swallows-runE-errors.md) — serve/superuser exit 0 on RunE failure; a printed `Error:` line ≠ nonzero exit — check `$?` directly
 - [TUI AdaptiveColor pre-warm](tui-adaptivecolor-prewarm.md) — chat-TUI no-terminal-query invariant holds only via bubbletea v1's tea_init.go pre-warm (gone in v2); re-verify on any bubbletea bump
 - [CLAUDE.md count drift](claudemd-count-drift.md) — hardcoded test/check counts in CLAUDE.md drift stale; re-run the gate, never trust the printed number

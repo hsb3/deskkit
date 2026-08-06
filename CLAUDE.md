@@ -35,7 +35,6 @@ no repo-root `_knowledge/`; the `_knowledge/` convention belongs to the desks th
 plugin/            TS lane — harness-pure core + stdio MCP server (the desk-standard plugin's engine)
   core/            harness-pure domain library (profile, schema validation, templating, indexing)
   mcp/             stdio MCP server entry (server.ts)
-  opencode/        frozen, unwired OpenCode spike — ships nothing in v1
 plugins/           the marketplace-distributed bundles (a marketplace install copies ONLY these)
   desk-standard/   marketplace adapter: manifest, skills/, GENERATED mcp/server.js + schema copy
   desk-persona/    the composed librarian+PM bundle: librarian-operator + pm-operator agents, 3 PM skills, SessionStart hook
