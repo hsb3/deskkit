@@ -81,31 +81,11 @@ to Go; TS server retired) = **ADR 0022 (Accepted)**, supersedes 0016; **(2)** a 
 `feedback-no-public-1.0.0-nagging`. Nothing built yet; the 2026-07-23 planning-desk reconciliation
 run is now a §2 era pointer.
 
-**✓ REORG RECONCILED (2026-07-24).** The mid-session reorg (commits `2d84472` + `ba42fd7`) that
-emptied `docs/` top level had broken `make check` (3 gates) AND `make test` (the tool-surface Go
-test `TestToolSurfaceDoc_MCPCounts`, not caught in the prior handoff) — all now GREEN.
-**Owner ruling:** the 5 live drift-guarded specs live at **`docs/development/specs/`**
-(`pocket-librarian-v1-spec`, `pm-system-v1-spec`, `tool-surface`, `agent-integration-contract-v1-spec`,
-`element-model-v2-draft`); `plugin-guide` → `docs/usage/`; genuinely-archival docs stay in
-`_meta/_archive/` (ts-proxy-design [mooted by ADR 0022], chat-tui-ux-survey, model-sims, old
-issue-plans, signoff). ~90 dangling published-surface citations repointed across the 3 gates + the
-Go test, CLAUDE.md, README, all ADRs, the moved specs' own relative links, shipped-tree comments,
-install.sh, VHS tapes (+ `docs/media/` → `docs/assets/`), and the #197 plan. `docs/README.md`
-rebuilt; `releasing.md` content confirmed folded into `docs/development/README.md` (only its link
-dangled). **New prevention gate: `scripts/check-doc-links.mjs`** (in `make check` + CI, `--self-test`)
-fails on any dangling doc/media citation on the published+shipped surface — the guard that would have
-caught this class. Written contract: **`docs/development/docs-layout.md`** (what lives where, what's
-load-bearing, why the working desk isn't gated); CLAUDE.md's "load-bearing paths" rule rewritten to
-match. `make check`/`test`/`verify` all exit 0.
-
-**Working-desk cleanup DONE (2026-07-24):** the ADR-0022-mooted `ts-proxy-doc-correction` plan was
-archived to `_meta/_archive/` (#199 still open — formally supersede at Wave 3), and all remaining
-`_meta/` spec citations (design-session research provenance, deferred plans) were repointed to
-`docs/development/specs/` so nothing dangles. `_meta/research/2026-07-design-session/` stays live in
-place — 8+ published ADRs (0009–0016) cite it as "Raised by" provenance, so it can't be archived.
-Left as-is (pre-existing, predates the reorg — #77): `_meta/build-brief.md` was relocated off-repo but
-is still named in `docs/development/README.md:62` + `schema/README.md` (backtick refs, gate-invisible)
-— remove or redirect those when convenient.
+**✓ Reorg reconciled (2026-07-24, PR #201):** the 2026-07-23 `docs/` reorg had broken 3 `make check`
+gates + the tool-surface Go test; ~90 citations repointed, all green. The durable outcomes — the
+docs-layout contract and the `check-doc-links` gate — live in §3; blow-by-blow in PR #201.
+Leftover (pre-existing, #77): `docs/development/README.md:62` + `schema/README.md` still name the
+long-gone `_meta/build-brief.md` in gate-invisible backticks — remove or redirect when convenient.
 
 **NEXT, in order of consequence:**
 1. **#197** (gate:v2-final, filed 2026-07-22) — reconcile the software-spec phase-machine with the
@@ -120,9 +100,8 @@ is still named in `docs/development/README.md:62` + `schema/README.md` (backtick
    withdrawn (the collapse reaches one mount without a spawned-child proxy). Mark #199 + the
    unfilled ts-proxy build superseded when Wave 3 files.
 
-**Carried-over open question — now largely MOOT via ADR 0022** (was 2026-07-20): the desk-standard
-plugin's 4 TS MCP tools not surfacing as agent-callable in a live session is superseded by the
-collapse — those tools move into the Go `mcp-serve` surface. Re-check as part of Wave 3's live test.
+**Carried-over question, MOOT via ADR 0022:** the 4 TS MCP tools not surfacing agent-callable in a
+live session — superseded by the collapse; re-check at Wave 3's live test.
 
 **Standing, settled decisions:** **Do NOT prompt/nag Henry about going public or cutting 1.0.0
 (#87)** — his call, not a standing agenda item (2026-07-23; memory `feedback-no-public-1.0.0-nagging`).
@@ -176,9 +155,12 @@ trap — are in **CLAUDE.md** (hot-loaded). Only what CLAUDE.md doesn't cover li
 - **Multi-agent wave playbook** (distilled from three foreman runs; auto-memory mirrors the
   harness bits):
   - Background crews routinely stop mid-task ("now let me…"): SendMessage the SAME agent
-    "continue to completion" + restate the checklist. Never re-brief. A lead's worker
-    notifications route to the ROOT session — relay them; tell leads to verify worker state
-    themselves.
+    "continue to completion" + restate the checklist. Never re-brief. Works even for agents
+    orphaned by a dead parent process (they resume from transcript) — don't launch duplicates.
+    A lead's worker notifications route to the ROOT session — relay them; tell leads to verify
+    worker state themselves. Under API instability, brief writer agents to emit long files
+    INCREMENTALLY (Write first section, Edit-append the rest) so a dropped stream loses one
+    section, not the file.
   - After ANY crew reports, check `git branch --show-current` in the main tree before
     ref-sensitive commands (an isolation worktree once came up ORPHANED and the agent worked in
     the main checkout, leaving it on its branch — nearly mis-tagged a release).
