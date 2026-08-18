@@ -30,13 +30,17 @@ Both are faces of **one Go tool core** (`internal/core/toolcore`), fed by the re
 
 ## 1. Librarian CLI subcommands (`deskkit`)
 
-Registered in `librarian/cmd/deskkit/main.go` (`registerToolCommands`) plus the PocketBase- and
-migratecmd-provided system commands. The CLI is the **only** surface that carries `restore` and the
-supervised `apply-fix`/`findings dispose` actions.
+Registered in `librarian/cmd/deskkit/main.go` (`registerToolCommands`, plus `finalizeCommandTree`
+for the PocketBase system commands and `migratecmd` for `migrate`). The CLI is the **only** surface
+that carries `restore` and the supervised `apply-fix`/`findings dispose` actions. `--help` renders
+them in labelled groups (Setup & config / Inspect / Fix / Work graph / Agent / Admin) rather than
+one alphabetic list; a command without a group is a bug, caught by `TestCommandGroups_*`.
 
 | Subcommand | Source | Notes |
 |---|---|---|
 | `init` | `registerToolCommands` / `newInitCmd` | Scaffold a desk profile; intercepted in `main()` before PocketBase bootstraps. |
+| `desks` | `registerToolCommands` / `newDesksCmd` | List the desks this machine has a store for, marking the one the current directory resolves to. Read-only over the XDG store home; intercepted in `main()` like `init`, so asking which desks exist never creates one. |
+| `config` (group) | `registerToolCommands` / `newConfigCmd` | `show` (every resolved setting + the source that won: env/profile/central/default), `path`, `edit`, `set <key> <value>` for the machine-wide config file. Secrets render masked. Intercepted in `main()` like `init`; creates no store. |
 | `sweep` | tool core | Reindex the desk tree. |
 | `patrol` | tool core | File rule findings R1–R6; no fs writes. |
 | `propose-fix` | tool core | Plan mechanical fixes; record originals. |
@@ -49,9 +53,9 @@ supervised `apply-fix`/`findings dispose` actions.
 | `chat` | `registerToolCommands` | Interactive session (TUI or REPL). |
 | `mcp-serve` | `registerToolCommands` | Start the librarian MCP server (surface 2 below). |
 | `gui` | `registerToolCommands` | Serve the DB + open the admin console. |
-| `serve` | PocketBase | Web server + wake layer. |
+| `serve` | PocketBase (`cmd.NewServeCommand`, registered by `finalizeCommandTree`) | Web server + wake layer. |
 | `migrate` | migratecmd | Schema migrations (`up`/`down`/…). |
-| `superuser` | PocketBase | Manage superusers. |
+| `superuser` | PocketBase (`cmd.NewSuperuserCommand`, registered by `finalizeCommandTree`) | Manage superusers. |
 | `help`, `completion` | Cobra built-ins | — |
 | `pm` (group) | `registerPMCommands` | Registered when the PM module is enabled — **on by default** since 1.0 (ADR 0008 amendment); `PM_ENABLED=false` (or profile `modules.pm.enabled: false`) disables it and `pm` becomes cobra's unknown-command error. |
 
@@ -190,7 +194,7 @@ an arbitrary cwd, so a cwd-only walk-up would find nothing in exactly the cases 
 
 | Surface | Count | Gate |
 |---|---:|---|
-| Librarian CLI subcommands | 16 base (+ `pm` group under `PM_ENABLED`) | — |
+| Librarian CLI subcommands | 18 base (+ `pm` group under `PM_ENABLED`) | — |
 | Librarian MCP — default | 9 | none |
 | Librarian MCP — `+LIBRARIAN_AUTONOMOUS_WRITES` | 10 | adds `apply_fix` |
 | Librarian MCP — `+PM_ENABLED` | 21 | adds 12 PM tools |

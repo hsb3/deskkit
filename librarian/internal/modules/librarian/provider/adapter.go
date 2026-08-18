@@ -35,7 +35,7 @@ import (
 func NewChatModel(ctx context.Context, cfg *config.Config) (model.ToolCallingChatModel, error) {
 	switch cfg.LLMProvider {
 	case "anthropic":
-		key, envName, _ := resolveAPIKey(cfg, "ANTHROPIC_API_KEY")
+		key, envName, _ := resolveAPIKey(cfg)
 		if key == "" {
 			return nil, missingKeyErr("anthropic", envName)
 		}
@@ -45,7 +45,7 @@ func NewChatModel(ctx context.Context, cfg *config.Config) (model.ToolCallingCha
 			MaxTokens: cfg.LLMMaxTokens,
 		})
 	case "openai":
-		key, envName, _ := resolveAPIKey(cfg, "OPENAI_API_KEY")
+		key, envName, _ := resolveAPIKey(cfg)
 		if key == "" {
 			return nil, missingKeyErr("openai", envName)
 		}
@@ -56,7 +56,7 @@ func NewChatModel(ctx context.Context, cfg *config.Config) (model.ToolCallingCha
 			MaxTokens: &maxTokens,   // *int on the OpenAI config
 		})
 	case "gemini":
-		key, envName, _ := resolveAPIKey(cfg, "GEMINI_API_KEY")
+		key, envName, _ := resolveAPIKey(cfg)
 		if key == "" {
 			return nil, missingKeyErr("gemini", envName)
 		}
@@ -83,11 +83,8 @@ func NewChatModel(ctx context.Context, cfg *config.Config) (model.ToolCallingCha
 // The key VALUE is never stored in Config (spec §6.3) — it is read here, at construction time,
 // and handed straight to the concrete component. A central config that cannot be read is
 // treated as absent: Load already reports that failure once at startup.
-func resolveAPIKey(cfg *config.Config, defaultEnv string) (key, envName, source string) {
-	envName = defaultEnv
-	if cfg.LLMAPIKeyEnv != "" {
-		envName = cfg.LLMAPIKeyEnv
-	}
+func resolveAPIKey(cfg *config.Config) (key, envName, source string) {
+	envName = config.APIKeyEnvName(cfg)
 	key, source = config.ResolveAPIKey(envName)
 	return key, envName, source
 }

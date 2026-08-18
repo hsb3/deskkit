@@ -49,7 +49,7 @@ func TestResolveAPIKey_Fallback(t *testing.T) {
 	// No profile indirection (LLMAPIKeyEnv empty) -> read the per-provider default var.
 	t.Setenv("ANTHROPIC_API_KEY", "sk-default-value")
 	cfg := &config.Config{LLMProvider: "anthropic"}
-	key, envName, source := resolveAPIKey(cfg, "ANTHROPIC_API_KEY")
+	key, envName, source := resolveAPIKey(cfg)
 	if envName != "ANTHROPIC_API_KEY" {
 		t.Fatalf("envName = %q, want ANTHROPIC_API_KEY", envName)
 	}
@@ -73,7 +73,7 @@ func TestResolveAPIKey_Central(t *testing.T) {
 	writeCentral(t, central)
 
 	cfg := &config.Config{LLMProvider: "anthropic"}
-	key, envName, source := resolveAPIKey(cfg, "ANTHROPIC_API_KEY")
+	key, envName, source := resolveAPIKey(cfg)
 	if key != "sk-central-fake-0000" || source != config.SourceCentral {
 		t.Fatalf("key = %q (%s), want the central key with source central", key, source)
 	}
@@ -83,7 +83,7 @@ func TestResolveAPIKey_Central(t *testing.T) {
 
 	// Env wins over central.
 	t.Setenv("ANTHROPIC_API_KEY", "sk-env-fake-1111")
-	key, _, source = resolveAPIKey(cfg, "ANTHROPIC_API_KEY")
+	key, _, source = resolveAPIKey(cfg)
 	if key != "sk-env-fake-1111" || source != config.SourceEnv {
 		t.Fatalf("key = %q (%s), want the env key with source env", key, source)
 	}
@@ -141,7 +141,7 @@ func TestResolveAPIKey_Indirection(t *testing.T) {
 	t.Setenv("ANTHROPIC_API_KEY", "sk-should-not-be-used")
 	t.Setenv("DESK_LLM_KEY", "sk-indirect-value")
 	cfg := &config.Config{LLMProvider: "anthropic", LLMAPIKeyEnv: "DESK_LLM_KEY"}
-	key, envName, _ := resolveAPIKey(cfg, "ANTHROPIC_API_KEY")
+	key, envName, _ := resolveAPIKey(cfg)
 	if envName != "DESK_LLM_KEY" {
 		t.Fatalf("envName = %q, want DESK_LLM_KEY", envName)
 	}

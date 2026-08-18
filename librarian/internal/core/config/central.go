@@ -140,6 +140,27 @@ func (c *Central) Get(key string) (string, bool) {
 	return "", false
 }
 
+// APIKeyEnvName returns the NAME of the env var that would hold the LLM API key: the profile's
+// secrets_ref.llm_api_key indirection (surfaced as LLMAPIKeyEnv) when set, else the default var
+// for the resolved provider. Only the name is decided here; ResolveAPIKey reads the value.
+//
+// This mapping lives here, beside ResolveAPIKey, because BOTH the provider adapter and the
+// config display surface need it. A second copy of this switch would drift silently: a display
+// naming the wrong var is a config command that lies about where the key comes from.
+func APIKeyEnvName(cfg *Config) string {
+	if cfg.LLMAPIKeyEnv != "" {
+		return cfg.LLMAPIKeyEnv
+	}
+	switch cfg.LLMProvider {
+	case "openai":
+		return "OPENAI_API_KEY"
+	case "gemini":
+		return "GEMINI_API_KEY"
+	default:
+		return "ANTHROPIC_API_KEY"
+	}
+}
+
 // ResolveAPIKey resolves the LLM API key given the NAME of the env var that may hold it (the
 // per-provider default, or the profile's secrets_ref.llm_api_key indirection target): the env
 // var first, then the central config's llm.api_key. source is SourceEnv, SourceCentral, or ""

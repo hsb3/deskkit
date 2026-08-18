@@ -185,7 +185,7 @@ func TestStripNoInput(t *testing.T) {
 
 func TestUnknownSubcommand(t *testing.T) {
 	// A representative registered set: leaf commands, groups (pm/findings/completion/migrate) with
-	// their children, and the pbLateCommands (serve/superuser) the guard seeds explicitly.
+	// their children, and the system commands (serve/superuser) finalizeCommandTree registers.
 	known := knownCommandSet{
 		top: map[string]bool{
 			"serve": true, "superuser": true, "migrate": true, "sweep": true,

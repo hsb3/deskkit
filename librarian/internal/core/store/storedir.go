@@ -1,6 +1,7 @@
 package store
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"io/fs"
@@ -47,6 +48,34 @@ func StoreDir(deskName string) (string, error) {
 		return "", err
 	}
 	return filepath.Join(base, AppDirName, deskName), nil
+}
+
+// ListDesks enumerates the desk store directories under <data-home>/deskkit/ — the desks this
+// machine has a store for. names holds the directory (= desk) names, sorted; base is the store
+// home it looked in, returned even when nothing is there so a caller can name the path in an
+// empty-state message. A MISSING home is not an error: it means no desk has a store yet, so
+// names is empty and err is nil. Directories only — a stray file in the store home is not a
+// desk. It creates nothing.
+func ListDesks() (names []string, base string, err error) {
+	home, err := dataHome()
+	if err != nil {
+		return nil, "", err
+	}
+	base = filepath.Join(home, AppDirName)
+	// os.ReadDir returns entries sorted by filename, which is the sort order promised above.
+	entries, rerr := os.ReadDir(base)
+	if rerr != nil {
+		if errors.Is(rerr, fs.ErrNotExist) {
+			return nil, base, nil
+		}
+		return nil, base, fmt.Errorf("store: list desks in %s: %w", base, rerr)
+	}
+	for _, e := range entries {
+		if e.IsDir() {
+			names = append(names, e.Name())
+		}
+	}
+	return names, base, nil
 }
 
 // MigrateLegacyStoreDir moves a desk's store from the pre-rename home
