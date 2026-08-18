@@ -267,18 +267,41 @@ time). History is bounded the same way as the REPL — the recent conversation i
 to the browser live, token by token, with tool steps shown, over Server-Sent Events, and a
 "New conversation" control resets the session.
 
-The route is unauthenticated, exactly like the TUI/REPL — its safety comes from `serve`'s
-loopback binding (`127.0.0.1`), not a login. It is a local, on-demand, single-operator
-surface, not a hosted service, and it deliberately sits outside the PocketBase superuser
-admin login below (that gating would disqualify it as a general session surface). Don't
-put `serve` on a public interface.
+Auth on this route depends on the RESOLVED bind address, computed at serve time — never on a
+separate flag. On a loopback bind (`127.0.0.1`, `localhost`, `::1`, or empty meaning
+PocketBase's own default) the route stays unauthenticated, exactly like the TUI/REPL: its
+safety comes from the loopback binding itself, not a login, and it deliberately sits outside
+the PocketBase superuser admin login below (that gating would disqualify it as a general
+session surface). This is the byte-for-byte historical, still-default behavior.
 
-As a second layer (defense against a page on another site quietly driving your local
-session from your browser), the state-changing endpoints — the turn/stream and the reset —
-reject any request whose browser `Origin` is not a loopback origin (`127.0.0.1`,
-`localhost`, or `[::1]`, any port) with a `403`. Requests with no `Origin` header (curl and
-other non-browser tools) are unaffected. This is not authentication — it only closes the
-cross-origin browser vector.
+Binding `serve` to anything else — a wildcard address, a bare `:PORT` with no host, a routable
+IP, or a hostname that can't be proven loopback — switches the process into **public mode**:
+every route on this surface, the page included, requires a valid auth token from the `users` or
+superusers collection (`401` with no token at all; `403` for a valid token from some other
+auth collection — PocketBase's own `RequireAuth` distinguishes the two), and `serve` refuses to
+even start unless a superuser is guaranteed to exist (see the superuser env vars below). Both
+`--http` and `--https` are classified, not just whichever one the dependency happens to report
+on the serve event — one exposed listener makes the whole process public. A hostname that can't
+be proven loopback classifies as public, fail closed — this is derived from the bind addresses
+rather than a `--public` opt-in specifically because an opt-in flag can be forgotten while the
+process still binds a wildcard address, which fails open.
+
+As a second layer (defense against a page on another site quietly driving your session from
+your browser), the state-changing endpoints — the turn/stream and the reset — reject a
+cross-origin browser request with a `403`. On a loopback bind, the check is the loopback-origin
+allowlist above (`127.0.0.1`, `localhost`, or `[::1]`, any port); on a public bind it switches to
+strict same-origin (the request's `Origin` must match its own `Host`), because the loopback
+allowlist would otherwise reject every real request to a hosted surface. Requests with no
+`Origin` header (curl and other non-browser tools) are unaffected in either mode. This check is
+CSRF defense in depth, not authentication by itself — on a public bind it runs alongside the
+route-level auth requirement above, and it is separate from the CORS header below.
+
+CORS is handled separately from that same-origin check, and the two modes differ: on a public
+bind, the embedded store's own default CORS middleware — which otherwise answers every route
+with a wildcard `Access-Control-Allow-Origin` — is left unbound, so no
+`Access-Control-Allow-Origin` header is emitted at all (this surface is served same-origin and
+needs no cross-origin allowlist). On a loopback bind, that stock wildcard is left as it always
+was, matching the rule that local `serve` behavior stays unchanged.
 
 ## The admin console
 
@@ -291,8 +314,16 @@ make gui             # builds, starts serve, opens http://127.0.0.1:8090/_/
 
 or by hand: `./deskkit serve` then open `http://127.0.0.1:8090/_/`. If
 `PB_SUPERUSER_EMAIL` and `PB_SUPERUSER_PASSWORD` are both set, `serve` auto-creates that
-superuser account on first run (idempotent — safe to leave set across restarts). Otherwise,
-use the console's first-run screen, or create one non-interactively:
+superuser account on first run (idempotent — an account that already exists under that email
+is left alone, its password never re-set, so the bootstrap is safe to leave set across
+restarts). Setting only one of the two is a loud fatal error in every mode — a half-configured
+pair looks like an operator mistake, not an intentional no-op, so it refuses to start rather
+than silently skipping the bootstrap. On a **public** bind (see "Browser session" above),
+`serve` additionally refuses to start at all unless one of the two is true: both env vars are
+set, or the store already holds a superuser record — a store exposed off-box with no superuser
+would otherwise be administered by whoever reaches it first. On a loopback bind, leaving both
+unset stays the existing silent no-op. Otherwise, use the console's first-run screen, or create
+one non-interactively:
 
 ```bash
 ./deskkit superuser create you@example.com <password>

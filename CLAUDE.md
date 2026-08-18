@@ -205,6 +205,23 @@ every resolved value with the leg that won.
   enough to run `agent`/`chat` with zero env vars set.
 - `LIBRARIAN_AUTONOMOUS_WRITES=true` gates `apply_fix` (checked at execution time)
 
+**Public-mode serve.** `serve`'s auth posture is derived from every resolved `--http`/`--https`
+bind address, never from a flag: a loopback bind (`127.0.0.1`/`localhost`/`::1`/empty) is today's
+unauthenticated local UX, unchanged; anything else on either listener (a wildcard bind, a bare
+`:PORT`, a routable IP, or a hostname that can't be proven loopback) makes the whole process
+public mode, and an unprovable hostname classifies as public — fail closed. In public mode
+`serve` refuses to open a listener at all unless it can *verify* an administrable superuser
+exists after provisioning: it fatally creates the `PB_SUPERUSER_EMAIL`/`PB_SUPERUSER_PASSWORD`
+account right there (rather than trusting a later non-fatal call) and re-counts superusers,
+excluding the framework's own installer-placeholder row, which would otherwise satisfy a naive
+count with no real account behind it. Setting exactly one of that env pair is a loud fatal error
+in every mode. A self-contradictory `--origins` (a bare `*` mixed with explicit origins) also
+refuses to start on a public bind. Public mode puts the `/desk/chat` surface's three routes
+behind `apis.RequireAuth` (401 with no token, 403 for a token from the wrong auth collection)
+and switches its CSRF check to strict same-origin; CORS drops the framework's default wildcard
+unless an explicit `--origins` allowlist is set, in which case that allowlist is preserved (see
+`librarian/README.md`'s "Browser session" section and `docs/pattern.md` for the full model).
+
 `deskkit desks` lists the desks this machine has a store for (marking which one the cwd
 resolves to); `deskkit config show|path|edit|set` inspects/edits the central file above. Neither
 opens a store. `deskkit --help` groups the command menu into six sections (Setup & config,
