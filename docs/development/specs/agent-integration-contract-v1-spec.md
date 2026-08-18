@@ -29,7 +29,7 @@ Date: 2026-07-20
 ## 1. The contract, in one line
 
 Agent symmetry is a **surface property of a shared core**, not a requirement that the librarian
-and PM integrations be identical implementations. `desk-standard` defines **one integration
+and PM integrations be identical implementations. deskkit defines **one integration
 contract** — five named parameters — and each agent (the librarian's in-binary eino loop; the
 PM module's plugin-markdown operator) **instantiates** that contract. Where an instantiation
 differs from its sibling, this document states whether the difference is **ratified policy** (a

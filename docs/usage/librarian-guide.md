@@ -271,18 +271,20 @@ exit=1
 `sweep`, `patrol`, `propose-fix`, `apply-fix`, `restore`, and `query` are all LLM-free — no
 provider, no API key. Only `agent` (a one-shot reasoning loop over the tools) and `chat` (a
 multi-turn conversation over the same loop) call a model. They resolve provider/model with
-precedence **env → profile → default** and read the provider's key from a fixed env var
-(`anthropic` → `ANTHROPIC_API_KEY`). The two commands below are **documented-not-run in this
+precedence **env → profile → machine-wide config → default**, and read the provider's key from a
+fixed env var (`anthropic` → `ANTHROPIC_API_KEY`), falling back to the machine-wide config's
+`llm.api_key` when that var is unset. The two commands below are **documented-not-run in this
 guide** because they require a live API key:
 
 ```bash
-export ANTHROPIC_API_KEY=sk-...
+export ANTHROPIC_API_KEY=sk-...          # or: deskkit config set llm.api_key sk-...
 ./deskkit agent "patrol the desk and summarize what you find"
 ./deskkit chat    # full-screen TUI on a terminal, line REPL when piped or --plain
 ```
 
-Provider selection, key redirection via `secrets_ref.llm_api_key`, history bounds, and the
-gated tool set are documented in [`deskkit-reference.md`](deskkit-reference.md).
+Provider selection, the machine-wide `deskkit config` file, key redirection via
+`secrets_ref.llm_api_key`, history bounds, and the gated tool set are documented in
+[`deskkit-reference.md`](deskkit-reference.md).
 
 ## Health check — `verify.sh`
 

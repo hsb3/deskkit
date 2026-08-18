@@ -1,25 +1,14 @@
 #!/usr/bin/env node
-// Persona drift guard (ADR 0014(a) + ADR 0015). The composed `deskkit` bundle's
-// librarian-operator agent is a GENERATED artifact: its persona body is a version-controlled copy
-// of exactly one authored source, so it cannot silently diverge from that source. This guard is
-// the repo's generated-artifact pattern (regenerate + compare) applied to that agent:
+// Persona drift guard. The bundle's librarian-operator agent is a GENERATED artifact — both its
+// `tools:` frontmatter and its persona body are regenerated from one authored source, so a tool
+// added to or removed from that prompt changes the persona and trips this guard:
 //
 //   plugins/deskkit/agents/librarian-operator.md   ← templates/librarian-system-prompt.txt
-//                                                          (the canonical librarian instruction; ADR 0015)
 //
-// The librarian agent is derived from the corrected 5-tool eino system prompt: its `tools:`
-// frontmatter and its embedded prompt body are both regenerated from that one file, so a tool
-// added to / removed from the canonical prompt changes the persona and trips this guard.
-//
-// The bundle's PM surfaces — pm-operator + the three pm-* skills — are NOT generated. When the
-// standalone `desk-pm` plugin was folded into the one bundle (now `deskkit`) and retired (owner
-// ruling 2026-07-21, ADR 0014(a) one-bundle), those files stopped being copies of an upstream
-// desk-pm source and became the ONE authored PM source per surface themselves (ADR 0014(d)). With
-// no second copy to diverge from, a copy/compare guard for them would guard nothing; they are
-// authored-in-place in plugins/deskkit/, alongside the bundle's other authored artifacts
-// (.mcp.json, plugin.json, hooks/, README.md). What holds those authored surfaces to the REAL
-// tool surface (no phantom tool names, no module silently dropped from the mount) is a separate
-// guard on the go-test lane: internal/core/mcp/bundle_shape_test.go.
+// The bundle's PM surfaces (pm-operator + the pm-* skills) are NOT generated: each is itself the
+// one authored source for its surface, with no second copy to diverge from. What holds them to
+// the REAL tool surface (no phantom tool names, no module silently dropped from the mount) is a
+// separate guard on the go-test lane: internal/core/mcp/bundle_shape_test.go.
 //
 // Usage (plain Node, no deps — like the other scripts/ guards):
 //   node scripts/check-persona-drift.mjs           compare on-disk vs regenerated; exit 1 on drift
@@ -55,7 +44,7 @@ function librarianToolNames(prompt) {
 }
 
 // Build the librarian-operator agent markdown: deterministic frontmatter (tools derived from the
-// prompt) + the canonical prompt embedded verbatim as the persona body (ADR 0015 prompt copy).
+// prompt) + the canonical prompt embedded verbatim as the persona body.
 function buildLibrarianAgent() {
   const prompt = r(LIBRARIAN_PROMPT).replace(/\s+$/, "");
   const tools = librarianToolNames(prompt);

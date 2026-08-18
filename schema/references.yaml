@@ -1,6 +1,6 @@
 # schema v1 — the reference dimension (companion to profile.schema.yaml and doctypes.yaml).
 #
-# WHAT THIS IS. The typed cross-reference primitive both lanes share: one shape for every
+# WHAT THIS IS. The typed cross-reference primitive: one shape for every
 # reference-shaped value in the store (graduation targets, gate pointers, and future refs).
 # A reference is { kind, target } — a closed `kind` enum plus a raw `target` string (the
 # reference exactly as authored, with no format constraint). This is the contract ADR 0011

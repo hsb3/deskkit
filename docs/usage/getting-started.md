@@ -24,7 +24,13 @@ source, environment overrides, JSON output — is the developer track, linked wh
 
 ## 1. Install `deskkit`
 
-`deskkit` installs from the below super-complicated command:
+One command downloads, sha256-verifies, and installs the release binary for your platform:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/hsb3/deskkit/main/install.sh | bash
+```
+
+Prefer to fetch the release asset yourself? `gh` does it directly:
 
 ```bash
 mkdir -p ~/.local/bin

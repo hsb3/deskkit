@@ -1,15 +1,13 @@
-// The Bubble Tea model for the full-screen chat surface. It owns the transcript, the input
-// textarea, the scrollback viewport, and the streaming state machine that drives one
-// agent.Session turn at a time. ALL model mutation happens inside Update on Bubble Tea's single
-// goroutine: engine events arrive only as messages (msgs.go, pumped by pump.go), so the model
-// never touches its fields off that goroutine and the whole design is race-free by construction.
+// The Bubble Tea model for the full-screen chat surface: the transcript, the input textarea, the
+// scrollback viewport, and the streaming state machine that drives one agent.Session turn at a
+// time. ALL model mutation happens inside Update on Bubble Tea's single goroutine — engine events
+// arrive only as messages, pumped by pump.go — so the design is race-free by construction.
 //
-// The session boundary is an interface (streamer) rather than *agent.Session, so Update is unit
-// testable with a fake that needs no real Session, DB, or LLM (model_test.go). The turn context
-// is derived from the model's base context and its cancel func is held on the model; esc calls
-// it to cancel an in-flight turn. Because eino does not propagate ctx-cancel into a stuck
-// provider stream, cancel only flips the footer to "cancelling…" — the pump keeps draining until
-// the engine's terminal event lands, then input re-enables as usual.
+// The session boundary is the streamer interface rather than *agent.Session, so Update is unit
+// testable with no real Session, DB, or LLM. The turn context derives from the model's base
+// context and its cancel func lives on the model; esc calls it. A stuck provider stream does not
+// observe ctx-cancel, so cancel only flips the footer to "cancelling…" — the pump drains until
+// the engine's terminal event lands, then input re-enables.
 package tui
 
 import (
@@ -37,19 +35,17 @@ import (
 )
 
 // streamer is the model's view of an agent.Session: driving a turn, plus the run identity the
-// picker needs to exclude the live session from the resume offers. *agent.Session satisfies it;
-// a fake satisfies it in tests, so the model needs no real Session, DB, or LLM to unit-test
-// Update.
+// picker needs to exclude the live session from the resume offers. A fake satisfies it in tests,
+// so Update is unit-testable with no real Session, DB, or LLM.
 type streamer interface {
 	StreamTurn(ctx context.Context, userInput string) <-chan agent.Event
 	RunID() string
 }
 
-// sessionProvider is the model's view of the agent package's conversation lifecycle: listing
-// resumable runs, resuming one, opening a fresh one, closing a session, and the sessions-manager
-// operations (rename, delete, preview). Keeping it an interface means Update never imports the
-// agent package's functions directly, so the picker + session-swap paths are unit-testable with a
-// fake (picker_test.go).
+// sessionProvider is the model's view of the conversation lifecycle: listing resumable runs,
+// resuming one, opening a fresh one, closing a session, plus rename/delete/preview. An interface,
+// so Update never calls the agent package directly and the picker + session-swap paths are
+// unit-testable with a fake.
 type sessionProvider interface {
 	list(limit int, excludeRunID string, includeArchived bool) ([]agent.ConversationInfo, error)
 	resume(ctx context.Context, runID string) (streamer, []agent.TranscriptEntry, error)
@@ -66,7 +62,7 @@ type sessionProvider interface {
 const previewMaxRows = 20
 
 // agentProvider is the production sessionProvider: a thin adapter over the agent package bound to
-// the app and resolved config. It is separate from the model's cfg (which the header still needs).
+// the app and resolved config, separate from the model's own cfg, which the header needs.
 type agentProvider struct {
 	app core.App
 	cfg *config.Config
@@ -112,15 +108,15 @@ func (p *agentProvider) rename(runID, title string) error {
 	return agent.RenameConversation(p.app, runID, title)
 }
 
-// delete hard-deletes a conversation's run row; its messages cascade away with it. This is not a
-// record-original-first boundary violation — a chat conversation is the user's own history to
-// discard (see agent/sessions.go).
+// delete hard-deletes a conversation's run row; its messages cascade away with it. Not a
+// record-original-first boundary violation: a chat conversation is the user's own history to
+// discard, not a desk file.
 func (p *agentProvider) delete(runID string) error {
 	return agent.DeleteConversation(p.app, runID)
 }
 
-// setArchived toggles a conversation's soft-archive flag. Archiving is reversible and leaves the
-// conversation's messages intact — distinct from delete's hard cascade (see agent/sessions.go).
+// setArchived toggles a conversation's soft-archive flag. Reversible, and it leaves the messages
+// intact — distinct from delete's hard cascade.
 func (p *agentProvider) setArchived(runID string, archived bool) error {
 	return agent.SetConversationArchived(p.app, runID, archived)
 }
@@ -141,15 +137,15 @@ const (
 	tabStripHeight    = 1 // view-switcher strip: one full-width row, present ONLY when views are mounted
 )
 
-// maxMeasure caps the transcript's readable text width. Wide terminals keep a comfortable measure
-// instead of stretching a line the full width of the screen; full-width chrome (the header/footer
-// bars, the input border) still spans the real terminal width — only the text measure is capped.
+// maxMeasure caps the transcript's readable text width, so a wide terminal keeps a comfortable
+// measure. Full-width chrome (header/footer bars, input border) still spans the real terminal
+// width — only the text measure is capped.
 const maxMeasure = 120
 
 // measureWidth is the capped text measure for the transcript: min(terminalWidth - chrome, 120),
-// floored at minWrap so a very narrow terminal still wraps sanely. chrome reserves the two columns
-// the left gutter/block border + its trailing space consume, so a gutter-prefixed line at the full
-// measure still fits the viewport width. Kept pure so the clamp is unit-tested without a terminal.
+// floored at minWrap so a very narrow terminal still wraps sanely. chrome reserves the two
+// columns the left gutter/block border and its trailing space consume, so a gutter-prefixed line
+// at the full measure still fits the viewport width. Pure, so the clamp is unit-testable.
 func measureWidth(termWidth int) int {
 	const chrome = 2 // left gutter glyph + its trailing space (or the block border + padding)
 	w := termWidth - chrome
@@ -171,12 +167,12 @@ const (
 	roleInfo // ambient host guidance (the one-time launch nudge), not a conversation turn
 )
 
-// entry is one transcript item. For an assistant turn, text is the streaming/answer bubble
-// (the authoritative final Content once finalized); steps carries any tool invocations;
-// commentary the model streamed before a tool call is retagged onto the step (see steps.go),
-// not left in text. interrupted marks a canceled turn (dim "(interrupted)" badge, UI-only),
-// isError a real terminal error (red). finalized gates markdown rendering: while false the
-// bubble renders as plain text (smooth streaming), and glamour runs once when it flips true.
+// entry is one transcript item. For an assistant turn, text is the answer bubble (the
+// authoritative final Content once finalized) and steps carries tool invocations; commentary
+// streamed before a tool call is retagged onto the step, not left in text. interrupted marks a
+// canceled turn (UI-only), isError a real terminal error. finalized gates markdown rendering:
+// while false the bubble renders as plain text for smooth streaming, and glamour runs once when
+// it flips true.
 type entry struct {
 	role        role
 	text        string
@@ -207,15 +203,12 @@ func (e *entry) matchStep(callID string) int {
 	return -1
 }
 
-// keymap is the surface's binding table — the single place keys are declared, each carrying its own
-// help text so the bubbles/help footer stays self-maintaining. openPicker (ctrl+o) opens the
-// conversation-resume overlay and newConversation (ctrl+n) starts a fresh conversation; both are
-// no-ops while a turn is streaming (like send), so no in-flight turn is ever disturbed. historyPrev
-// (up) / historyNext (down) walk prior prompts only at the textarea's edge rows; copyLast (ctrl+y)
-// copies the last answer's raw markdown; editExternal (ctrl+e) composes the draft in $EDITOR; help
-// (ctrl+g, or "?") toggles the expanded help. "?" is bound to help only when the chat draft is empty
-// or a module view is active, so a "?" typed mid-message still inserts literally (the empty-draft
-// guard lives in handleKey); ctrl+g always toggles help regardless of the draft.
+// keymap is the surface's binding table — the single place keys are declared, each carrying its
+// own help text so the bubbles/help footer stays self-maintaining. openPicker (ctrl+o) and
+// newConversation (ctrl+n) are no-ops while a turn is streaming, like send, so no in-flight turn
+// is disturbed. historyPrev/historyNext walk prior prompts only at the textarea's edge rows.
+// "?" reaches help only when the chat draft is empty or a module view is active, so a "?" typed
+// mid-message inserts literally (that guard lives in handleKey); ctrl+g always toggles help.
 type keymap struct {
 	send            key.Binding
 	newline         key.Binding
@@ -253,8 +246,8 @@ func defaultKeymap() keymap {
 		quit:            key.NewBinding(key.WithKeys("ctrl+c"), key.WithHelp("ctrl+c", "quit")),
 		openPicker:      key.NewBinding(key.WithKeys("ctrl+o"), key.WithHelp("ctrl+o", "resume")),
 		newConversation: key.NewBinding(key.WithKeys("ctrl+n"), key.WithHelp("ctrl+n", "new")),
-		// Module views (spec §5.3): disabled until attachViews mounts a non-empty set, so a
-		// librarian-only desk's surface (keys + help) is unchanged.
+		// Module views: disabled until attachViews mounts a non-empty set, so a librarian-only
+		// desk's surface (keys + help) is unchanged.
 		cycleViews: key.NewBinding(key.WithKeys("ctrl+p"), key.WithHelp("ctrl+p", "views"), key.WithDisabled()),
 	}
 }
@@ -276,10 +269,10 @@ func (k keymap) FullHelp() [][]key.Binding {
 	}
 }
 
-// pickerKeymap is the sessions-surface's contextual bindings — the keys that only mean something
-// while the picker overlay is open, so they live OFF the main surface keymap (they never appear in
-// the chat footer's help). Navigation, filter, resume, and close are handled via the list's own
-// keys and the model's send/cancel bindings; these three are the lifecycle verbs the picker adds.
+// pickerKeymap holds the bindings that only mean something while the picker overlay is open, so
+// they live OFF the main surface keymap and never appear in the chat footer's help. Navigation,
+// filter, resume, and close come from the list's own keys and the model's send/cancel bindings;
+// these three are the lifecycle verbs the picker adds.
 type pickerKeymap struct {
 	rename       key.Binding // enter inline rename over the selected row
 	delete       key.Binding // open the delete-confirm gate for the selected row
@@ -298,10 +291,9 @@ func defaultPickerKeymap() pickerKeymap {
 	}
 }
 
-// model is the chat surface. picker is the sessions overlay: nil when closed, and it only ever
-// lives while NOT streaming (ctrl+o opens it only when no turn is in flight). provider is the
-// session lifecycle boundary (list/resume/fresh/close/rename/delete/preview), an interface so
-// Update stays testable without a real Session.
+// model is the chat surface. picker is the sessions overlay: nil when closed, and it only lives
+// while NOT streaming. provider is the session lifecycle boundary, an interface so Update stays
+// testable without a real Session.
 type model struct {
 	baseCtx  context.Context
 	sess     streamer
@@ -311,11 +303,10 @@ type model struct {
 	llmProvider string
 	llmModel    string
 
-	// Token accounting (spec §6 usage surface). ctxWindow is the model's context budget, resolved
-	// ONCE in newModel from the config + the per-model table (usage.go). ctxTokens is the latest
-	// finished turn's prompt-token count — the current context size, which drives the header's ctx%
-	// gauge. sessionTokens is the cumulative total across the session (kept for the deferred
-	// SSE/webapp surface; not shown in the one-line header today).
+	// Token accounting. ctxWindow is the model's context budget, resolved ONCE in newModel from the
+	// config + the per-model table. ctxTokens is the latest finished turn's prompt-token count — the
+	// current context size, which drives the header's ctx% gauge. sessionTokens is the cumulative
+	// session total, not shown in the one-line header.
 	ctxWindow     int
 	ctxTokens     int
 	sessionTokens int
@@ -355,29 +346,26 @@ type model struct {
 
 	picker *pickerModel // conversation-resume overlay (ctrl+o); nil when closed.
 
-	// resumeFirst requests the sessions overlay be opened once at launch when prior resumable
-	// conversations exist (resume-first launch). Set by Run via enableResumeFirst; consumed
-	// (cleared) on the first sizing WindowSizeMsg so a later terminal resize never reopens it. It
-	// defaults false, so the pure-Update tests — which never set it — keep their launch behavior.
+	// resumeFirst opens the sessions overlay once at launch when prior resumable conversations
+	// exist. Set by Run via enableResumeFirst; cleared on the first sizing WindowSizeMsg so a later
+	// terminal resize never reopens it.
 	resumeFirst bool
 
 	// launchHint arms a one-time transcript nudge (seedLaunchHint) naming the mounted module views
 	// and the ?/ctrl+p keys that reach them. Set by Run via enableLaunchHint, consumed on the first
-	// WindowSizeMsg (like resumeFirst) and only when views are mounted. Defaults false, so the
-	// pure-Update tests — which never arm it — keep their launch behavior and entry counts.
+	// WindowSizeMsg like resumeFirst, and only when views are mounted.
 	launchHint bool
 
-	// Module-contributed views (spec §5.3; host_views.go): views is the mounted set (empty on
-	// a librarian-only desk), activeView the index of the one occupying the body region, or
-	// -1 when the chat transcript is showing.
+	// Module-contributed views (host_views.go): views is the mounted set (empty on a librarian-only
+	// desk), activeView the index of the one occupying the body region, or -1 when the chat
+	// transcript is showing.
 	views      []tuiview.View
 	activeView int
 }
 
-// newModel builds the chat model against an injected streamer (the real *agent.Session in
-// production, a fake in tests), the session provider (list/resume/fresh/close), the resolved
-// config for the header, and the theme resolved once at startup (a concrete "light"/"dark"; see
-// theme.go). The theme drives both the lipgloss palette and the glamour markdown style.
+// newModel builds the chat model against an injected streamer, the session provider, the resolved
+// config for the header, and the theme resolved once at startup as a concrete "light"/"dark".
+// That theme drives both the lipgloss palette and the glamour markdown style.
 func newModel(baseCtx context.Context, sess streamer, provider sessionProvider, cfg *config.Config, theme string) model {
 	ta := textarea.New()
 	ta.Placeholder = "Ask the librarian… (enter to send, alt+enter for a newline)"
@@ -388,14 +376,12 @@ func newModel(baseCtx context.Context, sess streamer, provider sessionProvider, 
 	// Plain enter is the send key (handled in Update); rebind the textarea's own newline to
 	// alt+enter so it never swallows the send key.
 	ta.KeyMap.InsertNewline = key.NewBinding(key.WithKeys("alt+enter"))
-	// The textarea keeps its inline virtual cursor — the only cursor the surface has ever had —
-	// rather than wiring the real terminal cursor through tea.View.Cursor (ADR 0007). Explicit,
-	// though it is also bubbles' default.
+	// The textarea keeps its inline virtual cursor rather than wiring the real terminal cursor
+	// through tea.View.Cursor. Explicit, though it is also bubbles' default.
 	ta.SetVirtualCursor(true)
-	// The AdaptiveColor-based defaults that v1 resolved via the lipgloss.SetHasDarkBackground pin
-	// (tui.go) are gone with the pin itself; textarea.DefaultStyles(isDark) is v2's own per-theme
-	// default table, selected by the same resolved theme, so the chrome (cursor line, line
-	// numbers, placeholder) still varies by theme without any runtime query.
+	// textarea.DefaultStyles(isDark) is a per-theme default table selected by the already-resolved
+	// theme, so the chrome (cursor line, line numbers, placeholder) varies by theme with NO runtime
+	// terminal query — the invariant the whole theme path exists to hold.
 	ta.SetStyles(textarea.DefaultStyles(theme == themeDark))
 	ta.Focus()
 
@@ -424,16 +410,15 @@ func newModel(baseCtx context.Context, sess streamer, provider sessionProvider, 
 		reduced:     reducedMotion(os.Getenv("NO_COLOR")),
 		inflightIdx: -1,
 		activeView:  -1,
-		// Resolve the context-window budget once: the profile/env override (Config.LLMContextWindow)
-		// wins, else the per-model table default (usage.go). Fixed for the session's provider/model.
+		// Resolve the context-window budget once: the profile/env override wins, else the per-model
+		// table default. Fixed for the session's provider/model.
 		ctxWindow: contextWindow(cfg.LLMProvider, cfg.LLMModel, cfg.LLMContextWindow),
 	}
 }
 
 // reducedMotion reports whether the reduced-motion path is active: any non-empty NO_COLOR value.
-// Read once at model construction (never per-frame) so the whole session is consistent. lipgloss
-// and termenv already strip color under NO_COLOR; this flag governs only the animated spinner,
-// which is swapped for a static "working…" state.
+// Read once at model construction, never per-frame, so the session stays consistent. lipgloss and
+// termenv already strip color under NO_COLOR; this flag governs only the animated spinner.
 func reducedMotion(noColor string) bool {
 	return noColor != ""
 }
@@ -564,8 +549,8 @@ func (m model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 
 	switch {
 	case key.Matches(msg, m.keymap.cancel):
-		// esc cancels an in-flight turn (footer → "cancelling…"); the pump drains to the terminal
-		// event, which may take a moment because eino cannot abort a stuck provider stream.
+		// esc cancels an in-flight turn; the pump drains to the terminal event, which may take a
+		// moment because a stuck provider stream cannot be aborted.
 		if m.streaming && m.cancelTurn != nil {
 			m.cancelTurn()
 			m.cancelling = true
@@ -583,9 +568,8 @@ func (m model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m.activateView(0)
 
 	case msg.String() == "ctrl+p":
-		// ctrl+p reached here only because the switcher binding is DISABLED — no module views are
-		// mounted. Explain rather than no-op so the key never reads as dead; the chat stays active
-		// (activeView unchanged at -1).
+		// ctrl+p reaches here only when the switcher binding is DISABLED — no module views mounted.
+		// Explain rather than no-op, so the key never reads as dead.
 		return m.showToast("no module views on this desk — PM is off")
 
 	case key.Matches(msg, m.keymap.openPicker):
@@ -663,10 +647,9 @@ func (m model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	}
 }
 
-// copyLastAnswer copies the last finalized assistant answer's RAW markdown to the system clipboard
-// (not the glamour-rendered output: terminal-wrapped rendering is mangled, the source is the point)
-// and shows a transient footer toast confirming the copy, its failure, or that there is nothing to
-// copy. The toast self-expires via a tea.Tick stamped with the toast sequence.
+// copyLastAnswer copies the last finalized assistant answer's RAW markdown to the clipboard, not
+// the glamour-rendered output, whose terminal wrapping is mangled outside the terminal. A
+// transient footer toast reports the copy, its failure, or that there is nothing to copy.
 func (m model) copyLastAnswer() (tea.Model, tea.Cmd) {
 	md, ok := lastAssistantMarkdown(m.entries)
 	if !ok {
@@ -678,18 +661,16 @@ func (m model) copyLastAnswer() (tea.Model, tea.Cmd) {
 	return m.showToast("copied")
 }
 
-// editInExternalEditor composes the current draft in the user's external editor, resolved from
-// $EDITOR (falling back to $VISUAL). It is a no-op while a turn is streaming — the same guard as
-// send/openPicker/newConversation, so no in-flight turn is ever disturbed. With no editor
-// configured it surfaces a footer toast rather than failing silently or crashing.
+// editInExternalEditor composes the current draft in the user's external editor. A no-op while a
+// turn is streaming, the same guard as send/openPicker/newConversation. With no editor configured
+// it surfaces a footer toast rather than failing silently.
 //
-// The draft is written to a temp .md file, then handed to tea.ExecProcess — the sanctioned way to
-// shell out under Bubble Tea: it releases the terminal to the child editor and restores the program
-// on return, so there is no stray terminal query racing the input reader (the no-runtime-query
-// invariant, ADR 0004). Any other shell-out would leave Bubble Tea holding the tty. When the editor
-// exits, editorFinishedMsg carries the temp path back to Update, which reads the composed text into
-// the textarea and removes the file. The draft is NOT auto-sent — the user reviews it and presses
-// enter.
+// The draft is written to a temp .md file, then handed to tea.ExecProcess — the only sanctioned
+// way to shell out under Bubble Tea: it releases the terminal to the child editor and restores
+// the program on return, so no stray terminal query races the input reader. Any other shell-out
+// leaves Bubble Tea holding the tty. When the editor exits, editorFinishedMsg carries the temp
+// path back to Update, which reads the text into the textarea and removes the file. The draft is
+// NOT auto-sent.
 func (m model) editInExternalEditor() (tea.Model, tea.Cmd) {
 	if m.streaming {
 		return m, nil // no-op while a turn is in flight (mirror send/openPicker)
@@ -713,10 +694,9 @@ func (m model) editInExternalEditor() (tea.Model, tea.Cmd) {
 	})
 }
 
-// handleEditorFinished folds the result of an external-editor compose back into the surface, on
-// Bubble Tea's goroutine. On success the composed text replaces the textarea value (readDraft has
-// already trimmed the editor's trailing newline); on failure a toast reports it. The temp file is
-// ALWAYS removed, whatever the outcome. The draft is left in the input for review — never auto-sent.
+// handleEditorFinished folds an external-editor compose back into the surface, on Bubble Tea's
+// goroutine. On success the composed text replaces the textarea value; on failure a toast reports
+// it. The temp file is ALWAYS removed. The draft is left in the input for review, never auto-sent.
 func (m model) handleEditorFinished(msg editorFinishedMsg) (tea.Model, tea.Cmd) {
 	defer os.Remove(msg.path)
 	if msg.err != nil {
@@ -752,11 +732,10 @@ func lastAssistantMarkdown(entries []entry) (string, bool) {
 	return "", false
 }
 
-// openPicker opens the sessions overlay. It is a no-op while a turn is streaming (so no in-flight
-// turn is ever disturbed) or when the picker is already open. It lists the recent conversations
-// synchronously — a fast local DB read — sizes the overlay to the viewport area, and loads the
-// preview for the initially-highlighted row. A list error leaves the picker closed rather than
-// crashing the surface.
+// openPicker opens the sessions overlay. A no-op while a turn is streaming or the picker is
+// already open. It lists the recent conversations synchronously (a fast local DB read), sizes the
+// overlay to the viewport area, and loads the preview for the initially-highlighted row. A list
+// error leaves the picker closed rather than crashing the surface.
 func (m model) openPicker() (tea.Model, tea.Cmd) {
 	if m.streaming || m.picker != nil {
 		return m, nil
@@ -784,10 +763,10 @@ func (m *model) enableResumeFirst() { m.resumeFirst = true }
 // (the consume guard only seeds when views are mounted).
 func (m *model) enableLaunchHint() { m.launchHint = true }
 
-// seedLaunchHint appends the one-time launch nudge to the transcript: a faint line naming the mounted
-// module views and the keys that reach them (ctrl+p) and the help overlay (?). Called once, only when
-// views are mounted, so a librarian-only desk's transcript is unchanged. The view names come from the
-// modules (view.Name()), never hardcoded here, so this carries no deployment identity.
+// seedLaunchHint appends the one-time launch nudge to the transcript: a faint line naming the
+// mounted module views and the keys that reach them (ctrl+p) and the help overlay (?). Called
+// once, only when views are mounted. The view names come from view.Name(), never hardcoded, so
+// this carries no deployment identity.
 func (m *model) seedLaunchHint() {
 	names := make([]string, 0, len(m.views))
 	for _, v := range m.views {
@@ -798,12 +777,11 @@ func (m *model) seedLaunchHint() {
 	m.entries = append(m.entries, entry{role: roleInfo, text: text, finalized: true})
 }
 
-// openLaunchPicker opens the sessions overlay at startup when prior resumable conversations exist
-// (resume-first launch): the reader lands on the list to pick one, or esc / ctrl+n to start
-// fresh in the session Run already created. With NO prior conversations — or a list error — it is a
-// no-op and the surface drops straight into the fresh conversation. This deliberately differs from
-// openPicker, which opens even on an empty list (an explicit ctrl+o earns visible feedback): an
-// empty overlay the user never asked for would just be dead chrome to esc past on first run.
+// openLaunchPicker opens the sessions overlay at startup when prior resumable conversations
+// exist: the reader lands on the list, or esc / ctrl+n to start fresh in the session Run already
+// created. With no prior conversations, or on a list error, it is a no-op. Unlike openPicker,
+// which opens even on an empty list because an explicit ctrl+o earns visible feedback, an empty
+// overlay nobody asked for would be dead chrome to esc past on first run.
 func (m *model) openLaunchPicker() {
 	if m.streaming || m.picker != nil {
 		return
@@ -823,11 +801,10 @@ func (m *model) appendError(text string) {
 	m.entries = append(m.entries, entry{role: roleAssistant, isError: true, finalized: true, errText: text})
 }
 
-// newConversation abandons the current conversation and starts a fresh one. It is a no-op while a
-// turn is streaming. Open-before-close: the fresh session is built FIRST, and the current one is
-// closed only once a replacement exists — so a failed open leaves the old session genuinely live
-// (not finalized out from under the user). No drain is needed at swap time: ctrl+n is a no-op
-// while streaming, so there is never an in-flight turn.
+// newConversation abandons the current conversation and starts a fresh one. A no-op while a turn
+// is streaming. Open-before-close: the fresh session is built FIRST and the current one closed
+// only once a replacement exists, so a failed open leaves the old session genuinely live rather
+// than finalized out from under the user. No drain is needed, since ctrl+n is a no-op mid-turn.
 func (m model) newConversation() (tea.Model, tea.Cmd) {
 	if m.streaming {
 		return m, nil
@@ -856,18 +833,16 @@ func (m model) newConversation() (tea.Model, tea.Cmd) {
 }
 
 // handlePickerKey routes a keypress while the sessions overlay is open, by the picker's mode:
-//   - rename mode routes to the inline title editor (handleRenameKey);
-//   - confirm-delete mode routes to the y/n gate (handleConfirmDeleteKey);
-//   - browse mode: while the list is actively capturing a filter query, EVERY key goes to the list
-//     so its own esc cancels and enter applies the filter (the outer esc/enter must not fire).
-//     Otherwise esc closes the overlay (or clears an applied filter first), enter resumes the
-//     highlighted run, r starts an inline rename, d opens the delete-confirm gate, and any other
-//     key drives the list (cursor movement / starting a filter with "/"), refreshing the preview
-//     as the selection moves.
+//   - rename mode routes to the inline title editor;
+//   - confirm-delete mode routes to the y/n gate;
+//   - browse mode: while the list is capturing a filter query, EVERY key goes to the list so its
+//     own esc cancels and enter applies the filter, and the outer esc/enter must not fire.
+//     Otherwise esc closes the overlay (clearing an applied filter first), enter resumes the
+//     highlighted run, r renames, d opens the delete gate, and anything else drives the list,
+//     refreshing the preview as the selection moves.
 //
-// Because the picker only lives while NOT streaming (ctrl+o/ctrl+n are no-ops mid-turn), there is
-// never an in-flight turn to drain at swap time, so closing the current session before opening the
-// resumed one is safe immediately — this is how the picker path respects the engine's drain contract.
+// The picker only lives while NOT streaming, so there is never an in-flight turn to drain at swap
+// time and closing the current session before opening the resumed one is immediately safe.
 func (m model) handlePickerKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch m.picker.mode {
 	case pickerRename:
@@ -928,12 +903,11 @@ func (m model) handlePickerKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	}
 }
 
-// toggleArchiveSelected soft-archives the highlighted conversation, or unarchives it when it is
-// already archived — a reversible hide from the default resume list that never touches the
-// conversation's messages (distinct from delete's hard cascade). It then reloads the list: when
-// archiving out of the default view the row vanishes, so the list settles on the nearest remaining
-// row; when unarchiving in the reveal view the row stays, so it keeps the selection. An empty
-// selection is a no-op; a store error dismisses the overlay with a visible reason.
+// toggleArchiveSelected soft-archives the highlighted conversation, or unarchives an archived
+// one: a reversible hide from the default resume list that never touches the conversation's
+// messages, unlike delete's hard cascade. Reloading the list settles on the nearest remaining row
+// when archiving out of the default view, and keeps the selection when unarchiving in the reveal
+// view. An empty selection is a no-op; a store error dismisses the overlay with a visible reason.
 func (m model) toggleArchiveSelected() (tea.Model, tea.Cmd) {
 	runID := m.picker.selectedRunID()
 	if runID == "" {
@@ -962,10 +936,9 @@ func (m model) toggleShowArchived() (tea.Model, tea.Cmd) {
 }
 
 // resumeSelected resumes the highlighted conversation, swapping the live session for it. An empty
-// selection (empty list) is a no-op that leaves the overlay open. Open-before-close (same reasoning
-// as newConversation): resume FIRST, and close the current session only once the replacement
-// exists, so a failed resume leaves the old session genuinely live rather than finalized out from
-// under the user; a visible inline error replaces a silent dismissal.
+// selection is a no-op that leaves the overlay open. Open-before-close, as in newConversation:
+// resume FIRST and close the current session only once the replacement exists, so a failed resume
+// leaves the old session live. A visible inline error replaces a silent dismissal.
 func (m model) resumeSelected() (tea.Model, tea.Cmd) {
 	runID := m.picker.selectedRunID()
 	if runID == "" {
@@ -989,10 +962,9 @@ func (m model) resumeSelected() (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-// handleRenameKey drives the inline title editor: esc cancels (row untouched), enter commits the
-// trimmed title via provider.rename then reloads the list, and every other key edits the input. An
-// empty/whitespace title on enter is treated as a cancel (the agent layer would reject it anyway,
-// and an empty input_summary would hide the run from the list).
+// handleRenameKey drives the inline title editor: esc cancels, enter commits the trimmed title
+// then reloads the list, and every other key edits the input. A blank title on enter is a cancel:
+// the agent layer rejects it, and an empty input_summary would hide the run from the list.
 func (m model) handleRenameKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch {
 	case key.Matches(msg, m.keymap.cancel):
@@ -1021,10 +993,10 @@ func (m model) handleRenameKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	}
 }
 
-// handleConfirmDeleteKey is the delete gate: y hard-deletes the highlighted run (cascading its
-// messages) and reloads the list; n / esc / any other key backs out untouched. A hard delete is
-// correct here — a chat conversation is the user's own history, not a desk-file fix under the
-// record-original-first boundary (see agent/sessions.go).
+// handleConfirmDeleteKey is the delete gate: y hard-deletes the highlighted run, cascading its
+// messages, and reloads the list; anything else backs out untouched. A hard delete is correct
+// here: a chat conversation is the user's own history, not a desk-file fix under the
+// record-original-first boundary.
 func (m model) handleConfirmDeleteKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	if key.Matches(msg, m.pickerKeys.confirmYes) {
 		runID := m.picker.selectedRunID()
@@ -1048,9 +1020,9 @@ func (m model) handleConfirmDeleteKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) 
 }
 
 // reloadPicker re-lists the conversations after a rename or delete and rebuilds the overlay in
-// place, re-selecting selectRunID when it is still present (a delete passes "" so the list settles
-// on the nearest remaining row), then reloads the preview for the new selection. A list error
-// dismisses the overlay with a visible reason rather than leaving a stale list.
+// place, re-selecting selectRunID when still present — a delete passes "" so the list settles on
+// the nearest remaining row — then reloads the preview. A list error dismisses the overlay with a
+// visible reason rather than leaving a stale list.
 func (m model) reloadPicker(selectRunID string) (tea.Model, tea.Cmd) {
 	convos, err := m.provider.list(pickerLimit, m.sess.RunID(), m.picker.showArchived)
 	if err != nil {
@@ -1065,8 +1037,8 @@ func (m model) reloadPicker(selectRunID string) (tea.Model, tea.Cmd) {
 }
 
 // refreshPreview loads the highlighted run's recent transcript into the picker's preview pane,
-// skipping the DB read when the pane already shows that run (a guard against re-querying on every
-// keystroke). An empty selection clears the pane; a preview-load error clears the rows so the pane
+// skipping the DB read when the pane already shows that run, so cursor movement does not re-query
+// on every keystroke. An empty selection clears the pane; a load error clears the rows so the pane
 // degrades to its neutral hint rather than showing a stale transcript.
 func (m *model) refreshPreview() {
 	if m.picker == nil {
@@ -1093,12 +1065,11 @@ func (m *model) refreshPreview() {
 // pickerLimit bounds how many recent conversations the resume overlay lists.
 const pickerLimit = 50
 
-// entriesFromTranscript maps a resumed conversation's transcript to display entries, one entry per
-// TranscriptEntry (the rows are already ordered and capped by the agent package). All entries are
-// finalized (they are history, not streaming). A user row is a user bubble; a plain assistant row
-// is an assistant bubble; a tool-calling assistant row and a tool row each become an assistant
-// entry carrying a single done step (the assistant's row keeps its commentary text; the tool's row
-// keeps its result text). An unrecognized role is skipped.
+// entriesFromTranscript maps a resumed conversation's transcript to display entries, one per
+// TranscriptEntry; the rows arrive ordered and capped. All entries are finalized, being history
+// rather than streaming. A user row is a user bubble; a plain assistant row is an assistant
+// bubble; a tool-calling assistant row and a tool row each become an assistant entry carrying one
+// done step. An unrecognized role is skipped.
 func entriesFromTranscript(ts []agent.TranscriptEntry) []entry {
 	out := make([]entry, 0, len(ts))
 	for _, t := range ts {
@@ -1166,12 +1137,11 @@ func (m model) startTurn(input string) (tea.Model, tea.Cmd) {
 	return m, tea.Batch(waitForEvent(ch), m.sp.Tick)
 }
 
-// handleEvent folds one engine event into the in-flight assistant entry. Token text
-// accumulates into the answer bubble; a tool_start retags the current bubble as that step's
-// commentary and resets the bubble (post-tool tokens become the real answer); a tool_end
-// resolves the step (Err → failed ✗, else Result); final replaces the bubble with the
-// authoritative content; error records the interrupted/error terminal state. An unrecognized
-// Kind is stored as a dim raw line, never a panic.
+// handleEvent folds one engine event into the in-flight assistant entry. Token text accumulates
+// into the answer bubble; a tool_start retags the current bubble as that step's commentary and
+// resets the bubble, so post-tool tokens become the real answer; a tool_end resolves the step;
+// final replaces the bubble with the authoritative content; error records the terminal state. An
+// unrecognized Kind is stored as a dim raw line, never a panic.
 func (m *model) handleEvent(ev agent.Event) {
 	if m.inflightIdx < 0 || m.inflightIdx >= len(m.entries) {
 		return
@@ -1220,10 +1190,9 @@ func (m *model) handleEvent(ev agent.Event) {
 }
 
 // recordUsage folds a terminal event's token accounting into the model and the finishing entry:
-// the turn's completion tokens land on the entry (its per-turn footer), the prompt-token count
-// becomes the live context size (the header ctx% gauge) when the provider reported one, and the
-// total adds to the running session tally. A turn whose provider reported no usage leaves all
-// three at zero, so the header/footer segments simply stay hidden.
+// completion tokens land on the entry's per-turn footer, the prompt-token count becomes the live
+// context size behind the header gauge, and the total adds to the session tally. A provider that
+// reported no usage leaves all three at zero, so those segments stay hidden.
 func (m *model) recordUsage(e *entry, ev agent.Event) {
 	e.tokens = ev.CompletionTokens
 	if ev.PromptTokens > 0 {
@@ -1269,10 +1238,10 @@ func (m *model) resize(w, h int) {
 	m.refreshViewport()
 }
 
-// refreshViewport re-renders the transcript into the viewport, preserving the user's scroll
-// position unless they were already at the bottom (in which case new output auto-scrolls). The
-// follow decision is captured BEFORE the content update — from the pre-update scroll position — so
-// a reader who scrolled up is never yanked back down by newly streamed content.
+// refreshViewport re-renders the transcript into the viewport, preserving the scroll position
+// unless the reader was already at the bottom, where new output auto-scrolls. The follow decision
+// is captured BEFORE the content update, from the pre-update position, so a reader who scrolled
+// up is never yanked back down by newly streamed content.
 func (m *model) refreshViewport() {
 	if !m.ready {
 		return
@@ -1294,12 +1263,11 @@ func (m model) renderTranscript() string {
 }
 
 // renderEntry renders one transcript item. A USER turn is a block: a thick ▌ accent left border,
-// left padding, and a subtle per-theme fill (renderEntry above). An ASSISTANT turn keeps the role
-// label, then steps, the body bubble (glamour once finalized, plain while streaming), any
-// interrupted/error badge, and — for a finished turn — a faint per-turn footer, all prefixed with
-// a faint thin │ gutter and NO background fill (answers stay on the terminal background for maximum
-// readability). Both role treatments survive NO_COLOR: lipgloss strips the color but the ▌ / │
-// glyphs remain, so turns stay visually separated colorless.
+// left padding, and a subtle per-theme fill. An ASSISTANT turn keeps the role label, then steps,
+// the body bubble (glamour once finalized, plain while streaming), any interrupted/error badge,
+// and on a finished turn a faint per-turn footer — all prefixed with a faint thin │ gutter and NO
+// background fill, so answers stay on the terminal background. Both treatments survive NO_COLOR:
+// lipgloss strips the color but the ▌ / │ glyphs remain, so turns stay separated colorless.
 func (m model) renderEntry(e entry) string {
 	switch e.role {
 	case roleUser:
@@ -1394,11 +1362,10 @@ func fmtDuration(d time.Duration) string {
 // View composes the surface: header, transcript viewport, input textarea, footer. Before the
 // first WindowSizeMsg it shows a minimal placeholder (bubbletea sends the size immediately).
 //
-// v2's Model.View returns a tea.View rather than a bare string; AltScreen is now a per-frame View
-// field (not a tea.WithAltScreen ProgramOption), and every return path below sets it — a path that
-// forgot it would silently drop the surface out of the alternate screen mid-run. BackgroundColor is
-// deliberately left nil in both paths: the TUI renders on the terminal's own background (ADR 0004 /
-// ADR 0007), never overriding it.
+// AltScreen is a per-frame tea.View field, not a ProgramOption, so EVERY return path below must
+// set it: a path that forgets drops the surface out of the alternate screen mid-run.
+// BackgroundColor stays nil in both paths — the TUI renders on the terminal's own background,
+// never overriding it.
 func (m model) View() tea.View {
 	if !m.ready {
 		v := tea.NewView("initializing…")
@@ -1407,8 +1374,8 @@ func (m model) View() tea.View {
 	}
 	// When the resume overlay is open it renders in place of the transcript viewport; the header,
 	// input, and footer stay put so the surface never loses its frame. An active module view
-	// (spec §5.3) occupies the same body region, padded to the viewport height so the input box
-	// and footer never jump.
+	// occupies the same body region, padded to the viewport height so the input box and footer
+	// never jump.
 	body := m.vp.View()
 	if m.picker != nil {
 		body = m.picker.View()
@@ -1416,8 +1383,8 @@ func (m model) View() tea.View {
 		body = padToHeight(m.views[m.activeView].Render(), m.vp.Height())
 	}
 	// The view-switcher strip sits directly under the header, but only on a desk that mounted module
-	// views — so a librarian-only surface is byte-identical to before. resize reserves its row in the
-	// body-height math, so the input box and footer never get pushed off-screen.
+	// views. resize reserves its row in the body-height math, so the input box and footer are never
+	// pushed off-screen.
 	parts := make([]string, 0, 5)
 	parts = append(parts, m.renderHeader())
 	if len(m.views) > 0 {
@@ -1430,10 +1397,9 @@ func (m model) View() tea.View {
 	return v
 }
 
-// renderHeader renders `desk · provider/model` as a full-width bar: a subtle per-theme background
-// fill spanning the whole terminal width, bold accent desk name, muted provider/model. The bar
-// segments each carry the fill so it is continuous behind the text; the outer bar pads the rest
-// and truncates to width so the one-line bar never wraps.
+// renderHeader renders `desk · provider/model` as a full-width bar. The segments each carry the
+// background fill so it is continuous behind the text; the outer bar pads the rest and truncates
+// to width, so the one-line bar never wraps.
 func (m model) renderHeader() string {
 	left := m.styles.headerAccent.Render(m.deskName)
 	right := m.styles.header.Render(" · " + m.llmProvider + "/" + m.llmModel)
@@ -1455,12 +1421,10 @@ func (m model) renderHeader() string {
 }
 
 // renderTabs renders the persistent view-switcher strip — `chat · <view1> · <view2> · …` — as a
-// full-width bar directly under the header, with the ACTIVE segment highlighted (chat is active when
-// activeView == -1; otherwise views[activeView]). It is the always-visible affordance that makes
-// every mounted module view discoverable on sight, without pressing ctrl+p. Only ever rendered when
-// views are mounted (View gates it), so a librarian-only desk never shows it. The segments each carry
-// the bar fill so the tint is continuous behind the text; the outer bar truncates to width so the
-// one-line strip never wraps.
+// full-width bar under the header, with the ACTIVE segment highlighted (chat is active when
+// activeView == -1). Only rendered when views are mounted, so a librarian-only desk never shows
+// it. The segments each carry the bar fill so the tint is continuous behind the text; the outer
+// bar truncates to width so the one-line strip never wraps.
 func (m model) renderTabs() string {
 	seg := func(label string, active bool) string {
 		if active {
@@ -1478,9 +1442,8 @@ func (m model) renderTabs() string {
 }
 
 // renderInput renders the textarea wrapped in a rounded, full-width border box. The border color
-// is a state cue, not a lock: accent when ready for input, faint while a turn is streaming (typing
-// still works throughout). The textarea was sized to width-2 in resize so the box spans the full
-// terminal width.
+// is a state cue, not a lock: typing works while a turn streams. resize sized the textarea to
+// width-2 so the box spans the full terminal width.
 func (m model) renderInput() string {
 	border := m.styles.inputBorder
 	if m.streaming {
@@ -1489,14 +1452,12 @@ func (m model) renderInput() string {
 	return border.Render(m.ta.View())
 }
 
-// renderFooter renders the self-documenting keybind help (bubbles/help) plus the live state
-// segment. When ctrl+g has toggled ShowAll, the grouped full help renders as an un-barred overlay
-// on the terminal background (a multi-line list, kept legible). Otherwise it is a full-width status
-// bar: a subtle per-theme fill matching the header bar, with the help hints on the left and the
-// live state on the right. The state shows a transient toast when set (copy confirmation / error);
-// otherwise the streaming/cancelling/ready indicator, with a "▼ new output" hint appended while the
-// reader has scrolled up mid-stream. Under reduced motion the animated spinner is replaced by
-// static "working…" text. The bar segments carry the fill so it is continuous behind the text.
+// renderFooter renders the keybind help plus the live state segment. With ShowAll toggled, the
+// grouped full help renders as an un-barred overlay on the terminal background. Otherwise it is a
+// full-width status bar matching the header fill: help hints left, live state right. The state
+// shows a transient toast when set, else the streaming/cancelling/ready indicator, with a
+// "▼ new output" hint while the reader has scrolled up mid-stream. Under reduced motion the
+// spinner is replaced by static "working…" text.
 func (m model) renderFooter() string {
 	// ctrl+g / ? expansion: a grouped overlay list on the terminal background, not a bar. Checked
 	// first so the overlay surfaces in BOTH chat and view mode (? opens the same help everywhere).

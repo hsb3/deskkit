@@ -1,5 +1,5 @@
-_The developer / advanced-operator install paths: build the librarian from source, pull a prebuilt
-release asset while the repo is private, and the env-var + store-path lore. The user install path
+_The developer / advanced-operator install paths: build the binary from source, pull a specific
+prebuilt release asset, and the env-var + store-path lore. The user install path
 is [`../getting-started.md`](../usage/getting-started.md); this page holds the toolchain details it
 deliberately leaves out._
 Status: active
@@ -8,17 +8,19 @@ Status: active
 
 The [user getting-started guide](../usage/getting-started.md) installs a **prebuilt `deskkit` binary**
 and drives everything from the TUI, with no toolchain. This page is the other side of that split:
-building from source, the release-asset download while the repo is private, and the environment
-variables that override desk/store resolution. If you are a desk owner and not a contributor, you
-do not need anything here.
+building from source, pulling a release asset directly, and the environment variables that
+override desk/store resolution. If you are a desk owner and not a contributor, you do not need
+anything here.
 
 ## Build from source
 
 `deskkit` is a single Go binary and the only thing built here (Go 1.25.0 is pinned — PocketBase's
-`go.mod` floors it; Node is needed only to run the repo's `scripts/*.mjs` gates). From a clone:
+`go.mod` floors it). Node is needed both for the repo's `scripts/*.mjs` gates and for the `web/`
+SPA that `make build` compiles and embeds via `go:embed`; a bare `go build` skips the SPA step and
+serves a placeholder page at `/`. From a clone:
 
 ```console
-$ make build          # the binary lands at ./deskkit
+$ make build          # SPA + binary; the binary lands at ./deskkit
 $ make install        # build + install deskkit to ~/.local/bin (override with PREFIX=/usr/local)
 $ deskkit --version
 deskkit version 0.8.0
@@ -33,7 +35,10 @@ instead. Full contributor setup is in [`README.md`](README.md).
 The release workflow publishes a `deskkit` binary for macOS and Linux (amd64 + arm64) on every
 `v*` tag — no Go toolchain needed to run it elsewhere.
 
-**repo is private** download the release asset with an authenticated `gh`:
+The one-liner in the root README (`curl -fsSL
+https://raw.githubusercontent.com/hsb3/deskkit/main/install.sh | bash`) covers the normal case.
+To pin a specific release asset instead — or to script the download without the installer — pull
+it with `gh`:
 
 ```bash
 mkdir -p ~/.local/bin

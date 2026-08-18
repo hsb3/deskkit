@@ -13,13 +13,15 @@ is the canonical task interface** — `make help` lists every target; CI
 ## Build
 
 ```bash
-make build      # build the deskkit binary (go — version-stamped)
+make build      # build the web/ SPA, then the deskkit binary (version-stamped) with it embedded
 make install    # build + install it to ~/.local/bin (override PREFIX=/usr/local)
 make setup      # install the lefthook pre-commit hooks (first-time setup)
 ```
 
 The version is stamped from the root `VERSION` file via ldflags; a bare `go build` reports `dev`.
-Go 1.25 is the floor (PocketBase's `go.mod`); Node is needed only to run the `scripts/*.mjs` gates.
+Go 1.25 is the floor (PocketBase's `go.mod`). Node is needed both to run the `scripts/*.mjs` gates
+and to build the `web/` SPA that `make build` embeds via `go:embed`; a bare `go build` that skips
+the SPA step still compiles and runs, serving a placeholder page at `/`.
 See [install-and-build.md](install-and-build.md).
 
 ## Test & gates

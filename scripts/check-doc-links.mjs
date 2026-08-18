@@ -14,11 +14,11 @@
 //
 // Scope: this gate enforces link integrity on the PUBLISHED + SHIPPED surface — docs/, the root
 // digests (README/CLAUDE/AGENTS), and the code tree (cmd/internal/templates/schema/plugins/scripts/kits).
-// It deliberately skips the working desk (`_meta/`) and agent state (`.claude/`) — point-in-time
-// snapshots, in-flight drafts, and curated memory whose refs are provenance, not maintained
-// navigation — plus `CHANGELOG.md` (append-only) and test files (synthetic path fixtures). Keeping
-// the working desk clean is a curation discipline (see docs/development/docs-layout.md), not a CI
-// gate. A path that intentionally does not exist yet is allow-listed one-per-line in
+// EXCLUDE_PREFIX skips ungated working-state paths, of which only `.claude/` (agent state: curated
+// memory and in-flight notes whose refs are provenance, not maintained navigation) exists today.
+// Also skipped: `CHANGELOG.md` (append-only) and test files (synthetic path fixtures). Keeping
+// working-state trees clean is a curation discipline (see docs/development/docs-layout.md), not a
+// CI gate. A path that intentionally does not exist yet is allow-listed one-per-line in
 // scripts/check-doc-links.allow as "<citing-file> -> <cited-path>".
 //
 //   node scripts/check-doc-links.mjs              scan; exit 1 on any dangling reference, 0 when clean

@@ -31,7 +31,8 @@ lands the review fixes and the rulings; finalization is gated on **`model-simula
   (ADR 0009, DESK-31); `model-simulations` cannot walk a coherent v2
   model until this revision exists, and `epic-schema-v2-track`'s child list sequences
   `model-simulations` after `element-model-revision`
-  (`_meta/plans/epic-schema-v2-track/issue-body.md:19-20`).
+  (`_meta/plans/epic-schema-v2-track/issue-body.md:19-20` — removed with the `_meta/` working desk
+  in 2026-08; in git history).
 - **Child of** `epic-schema-v2-track` (`#130`).
 - **Rulings folded:** ADR 0018 (Q1–Q4), ADR 0009 (two-track, staged truth, simulations gate).
 - **Reviews folded:** the R3 research review (8 gaps) + software review (10 gaps) + the shared defect,

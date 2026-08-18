@@ -1,4 +1,4 @@
-# schema v1 — filesystem path constants shared by both lanes.
+# schema v1 — filesystem path constants.
 # profile_root: the single directory name that holds the personalization profile
 # (profile.{yaml,yml,json,md}). The Go lane pins a constant to this value
 # (librarian config.ProfileRootDir); scripts/check-profile-root.mjs fails if the two

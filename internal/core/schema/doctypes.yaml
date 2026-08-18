@@ -14,7 +14,7 @@
 # with `# REFINEMENT:`. The reconciliation dispositions table is ADR 0006.
 
 # CONTRACT VERSION (ADR 0009 schema/-versioning work item). Marks the version of THIS shared
-# contract file itself, so both lanes' loaders can tell one contract shape from the next and
+# contract file itself, so the loader can tell one contract shape from the next and
 # refuse an unrecognized value loud instead of silently misreading it (today the known set is
 # {1}). This is NOT the store-side `module_schema_versions` migration mechanism (pm-system
 # spec §8.3 / R7.1), which versions a desk's PocketBase PM migrations — a different, already-
