@@ -2,8 +2,8 @@
 # lib.sh — shared harness for the desk-standard E2E system-behaviour suite (e2e.sh).
 #
 # Sourced by e2e.sh BEFORE any steps/*.sh. Defines the whole contract a step file may rely
-# on: assertion helpers (check / skip / note / section), a deskkit runner (dk), two MCP
-# JSON-RPC drivers (mcp_go / mcp_ts), a librarian fixture seeder, and the exported state
+# on: assertion helpers (check / skip / note / section), a deskkit runner (dk), the MCP
+# JSON-RPC driver (mcp_go), a librarian fixture seeder, and the exported state
 # (E2E_* vars + DESK_ROOT/DESK_NAME) that pins every step to ONE throwaway scratch desk.
 #
 # Design constraints baked in here so step authors don't have to rediscover them:
@@ -56,9 +56,11 @@ dk() { "$E2E_BIN" --dir "$E2E_STORE" --dev=false "$@"; }
 E2E_MCP_INIT='{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"e2e","version":"0"}}}'
 E2E_MCP_INITD='{"jsonrpc":"2.0","method":"notifications/initialized"}'
 
-# mcp_go <modules|-> <request-json-id-2>  — drive the Go librarian/PM MCP stdio server for a
-# single id:2 request; prints the bare `.result` object (compact JSON) on stdout. Pass "-" for
-# the default mount (no MCP_MODULES); pass e.g. "pm" to gate the mount.
+# mcp_go <modules|-> <request-json-id-2>  — drive the Go MCP stdio server (the one server: the
+# profile, librarian and PM modules) for a single id:2 request; prints the bare `.result` object
+# (compact JSON) on stdout. Pass "-" for the default mount (no MCP_MODULES); pass e.g. "pm" or
+# "profile" to gate the mount. DESK_ROOT (exported by e2e.sh) points every mount at the scratch
+# desk, so the profile module resolves that desk's scaffolded profile.
 mcp_go() {
   local modules="$1" req="$2"
   if [ "$modules" = "-" ]; then
@@ -71,19 +73,6 @@ mcp_go() {
       | jq -c 'select(.id==2) | .result'
   fi
 }
-
-# mcp_ts <request-json-id-2>  — drive the TypeScript plugin MCP stdio server (bun) for a single
-# id:2 request; prints the bare `.result` object. Requires bun (caller should guard with
-# have_bun and skip otherwise). Runs from the scratch DESK cwd (with the server referenced by
-# absolute path) so the plugin core's walk-up profile discovery resolves the desk's profile —
-# exactly how the plugin behaves when a session runs inside a desk.
-mcp_ts() {
-  local req="$1"
-  ( cd "$E2E_DESK" && printf '%s\n%s\n' "$E2E_MCP_INIT" "$req" | bun "$E2E_REPO/plugin/mcp/server.ts" 2>/dev/null ) \
-    | jq -c 'select(.id==2) | .result'
-}
-
-have_bun() { command -v bun >/dev/null 2>&1; }
 
 # seed_librarian_fixtures — plant a minimal, deterministic set of rule-violating docs on the
 # scratch desk so the sweep/patrol/fix chain has something to find. Mirrors the shapes
