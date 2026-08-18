@@ -8,7 +8,7 @@ single version.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html). See
 [`docs/development/README.md`](docs/development/README.md) for how a version is bumped and cut, and
-[`docs/decisions/0005-versioning-and-changelog.md`](docs/decisions/0005-versioning-and-changelog.md)
+ADR 0005 (DESK-27)
 for why this policy exists.
 
 ## [Unreleased]
@@ -217,7 +217,7 @@ for why this policy exists.
   next command or a `serve` restart re-seeds it from the embed). Documentation + a new gate only;
   no runtime behavior changes (`Seed`'s seed-if-absent logic and the resolver are unchanged).
 - **Tool-level MCP module gating on a shared mount** (`MCP_MODULES`; the agent integration
-  contract — [ADR 0014](docs/decisions/0014-agent-integration-contract.md),
+  contract — ADR 0014 (DESK-36),
   `docs/agent-integration-contract-v1-spec.md`, #114 under epic #129). `deskkit mcp-serve` now filters its
   exposed tool set to the modules named in `MCP_MODULES`, keyed on each tool's `ToolSpec.Module`
   (`internal/core/mcp/server.go` → `toolcore.SelectByModules` over `toolcore.ExposedSpecs(cfg)`),
@@ -277,7 +277,7 @@ for why this policy exists.
     precedence rule and the settled 1.0.0 direction.
   - **Scaffolded meta-structure** (`mise-en-place-scaffold`, additive-only) — `.claude/{agents,hooks,
     rules,memory}` with a tracked `settings.json` + `memory/MEMORY.md` index, root `.mcp.json`,
-    `.github/dependabot.yml`, and `docs/decisions/0000-template.md`.
+    `.github/dependabot.yml`, and the ADR template.
   - **`tests/` declared home** — `tests/README.md` documents that suites live with their products
     (`plugin/` bun, `librarian/` go, `librarian/verify.sh`), keeping `make test` / `make verify` as
     the canonical entries rather than hoisting suites to a root tree.
@@ -333,7 +333,7 @@ for why this policy exists.
   token-scoped `schema/neutrality-lint.allow` entries (owner ruling on the issue): a Go module
   path is compile-time public API and cannot be profile-templated.
 - **A live PM claim is now authoritative over every direct mutation** (#96,
-  [ADR 0020](docs/decisions/0020-pm-claim-semantics.md)). `liveForeignClaim` now gates `Block`,
+  ADR 0020 (DESK-41)). `liveForeignClaim` now gates `Block`,
   `Unblock`, and `UpdateItem` (including the `status_label` path) alongside `Transition` — a
   non-holder is refused with a message naming the holder and expiry until the claim lapses (TTL,
   ADR 0019) or is released. Cascade/auto-unblock paths are deliberately untouched (claims
@@ -446,7 +446,7 @@ for why this policy exists.
   lives in `schema/doctypes.yaml` (schema v1's doc-type dimension, successor of the vault
   `types:` model), with the seven previously-unschematized kit types added and the `user-defined`
   nonstandard types deliberately excluded. `kits/` is inside the neutrality-lint scan surface.
-  Port + gap dispositions: `docs/decisions/0006-kit-port-schema-reconciliation.md` (epic #55,
+  Port + gap dispositions: ADR 0006 (DESK-28) (epic #55,
   D1). The vault copies are frozen (read-only journal).
 - **`make install`** — build the version-stamped librarian binary and install it to `~/.local/bin`
   (override with `make install PREFIX=/usr/local`). The one-command update-from-source path.
@@ -478,7 +478,7 @@ for why this policy exists.
   or store layout.
 - **Chat TUI migrated to the Charm v2 stack** (bubbletea v2, lipgloss v2, bubbles v2,
   glamour v2 — the `charm.land` modules), recorded as
-  [ADR 0007](docs/decisions/0007-tui-charm-v2-stack.md). No feature or visual changes: the
+  ADR 0007 (DESK-29). No feature or visual changes: the
   TUI keeps rendering on the terminal's own background, the theme is still resolved once
   pre-program (flag > env > one background probe), and no terminal query ever runs after
   startup — glamour v2 removing auto-style detection makes part of that guarantee
@@ -495,7 +495,7 @@ for why this policy exists.
 
 The `chat` interactive surface graduates from a line REPL to a full-screen terminal UI, and the
 streaming substrate underneath it becomes reusable. Recorded as
-[ADR 0004](docs/decisions/0004-chat-full-screen-tui.md).
+ADR 0004 (DESK-26).
 
 ### Added
 
@@ -544,14 +544,14 @@ including the `v0.0.1-alpha` tag, lives in the git log and the merged PRs.)
   drift-guarded in CI and pre-commit.
 - **Makefile task interface** (`make help`) as the canonical entry point, plus lefthook
   pre-commit hooks mirroring CI, and three user guides + demo media.
-- **XDG store home + desk open-guard** ([ADR 0002](docs/decisions/0002-multi-desk-topology-store-per-desk.md)):
+- **XDG store home + desk open-guard** (ADR 0002, DESK-24):
   stores default to `$XDG_DATA_HOME/pocket-librarian/<DESK_NAME>/`; a store refuses a mismatched
   desk name.
-- **Line-REPL `chat` + trigger wake layer** ([ADR 0001](docs/decisions/0001-interactive-surface-tui-first.md)).
+- **Line-REPL `chat` + trigger wake layer** (ADR 0001, DESK-23).
 
 ### Changed
 
-- **Tool commands self-initialize the store** ([ADR 0003](docs/decisions/0003-tool-commands-self-initialize-store.md)):
+- **Tool commands self-initialize the store** (ADR 0003, DESK-25):
   `sweep`/`query`/`patrol`/`chat`/etc. run the app migrations idempotently at first touch, so a
   fresh desk needs no manual `migrate up`.
 

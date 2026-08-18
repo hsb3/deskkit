@@ -53,7 +53,7 @@ profile, the store falls back to `$XDG_DATA_HOME/deskkit/<DESK_NAME>/`
 Opening a store runs a **desk open-guard**: if the store already holds rows stamped with a
 different `DESK_NAME`, the command refuses and names both values, so a copy-pasted env can
 never interleave two desks into one store. The full rationale is
-`decisions/0002-multi-desk-topology-store-per-desk.md`.
+ADR 0002 (DESK-24).
 
 The transcripts below run against a scratch `example-desk`, pointed at a scratch store via
 env vars (`DESK_ROOT`, `DESK_NAME`, `XDG_DATA_HOME`) so the demo never touches a real desk or

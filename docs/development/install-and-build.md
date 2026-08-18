@@ -68,7 +68,7 @@ you already exported — the two agree only if the folder happens to be named ac
 The store lives **outside** the desk tree, at `$XDG_DATA_HOME/deskkit/<DESK_NAME>/` (falling back
 to `~/.local/share/deskkit/<DESK_NAME>/`), so the librarian never indexes its own database and a
 cloud-synced desk folder never corrupts a live SQLite file. See
-[`decisions/0002-multi-desk-topology-store-per-desk.md`](../decisions/0002-multi-desk-topology-store-per-desk.md).
+ADR 0002 (DESK-24).
 
 On an interactive terminal you don't even have to set these: any store-touching command run where
 config can't resolve offers to scaffold the folder as a desk (`Set up this folder as a desk?
