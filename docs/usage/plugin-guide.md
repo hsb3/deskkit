@@ -77,7 +77,7 @@ $ template_render { "template": "# {{profile.desk.name}}\nOwner: {{profile.ident
 # example-desk
 Owner: Example Owner (@example-personal)
 Default repo: example-org/example-desk
-Model: claude-opus-4-8
+Model: claude-haiku-4-5-20251001
 ```
 
 It is **fail-loud**: a placeholder with no `|| "default"` fallback that resolves absent

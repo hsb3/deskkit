@@ -83,7 +83,7 @@ func TestLoadEnvProvidesIdentity(t *testing.T) {
 	if want := filepath.Join(dir, ".librarian-ignore"); cfg.IgnoreConfig != want {
 		t.Errorf("IgnoreConfig = %q, want %q", cfg.IgnoreConfig, want)
 	}
-	if cfg.LLMProvider != "anthropic" || cfg.LLMModel != "claude-opus-4-8" {
+	if cfg.LLMProvider != "anthropic" || cfg.LLMModel != "claude-haiku-4-5-20251001" {
 		t.Errorf("model defaults wrong: %q/%q", cfg.LLMProvider, cfg.LLMModel)
 	}
 }

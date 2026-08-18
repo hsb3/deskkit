@@ -59,6 +59,16 @@ one alphabetic list; a command without a group is a bug, caught by `TestCommandG
 | `help`, `completion` | Cobra built-ins | — |
 | `pm` (group) | `registerPMCommands` | Registered when the PM module is enabled — **on by default** since 1.0 (ADR 0008 amendment); `PM_ENABLED=false` (or profile `modules.pm.enabled: false`) disables it and `pm` becomes cobra's unknown-command error. |
 
+> **`agent` is ratified surface, not an oversight.** It was added during Phase 1 because the
+> eino loop needed a way to be driven and tested outside `serve`, and the gap between that and
+> the spec's originally-scoped six-tool core (`sweep`/`patrol`/`propose_fix`/`apply_fix`/
+> `restore`/`query`) was never explicitly closed by a ruling — only by the command shipping and
+> staying real, exercised surface (the manual agent harness, `examples/agent-loop.sh`, drives it
+> directly). **Owner ruling 2026-08-18 (DESK-69): keep it.** The shipped surface led and this
+> spec followed — that is the honest framing, not a claim that `agent` was always documented as
+> deliberate. Nothing depends on its absence; removing a working, tested command to satisfy a
+> document would have been the wrong way round.
+
 Verify live: `deskkit --help` (the `pm` group shows by default; add `PM_ENABLED=false` to hide it).
 
 ---

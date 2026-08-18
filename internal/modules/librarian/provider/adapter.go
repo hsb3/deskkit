@@ -41,7 +41,7 @@ func NewChatModel(ctx context.Context, cfg *config.Config) (model.ToolCallingCha
 		}
 		return claude.NewChatModel(ctx, &claude.Config{
 			APIKey:    key,
-			Model:     cfg.LLMModel, // default claude-opus-4-8
+			Model:     cfg.LLMModel, // default claude-haiku-4-5-20251001
 			MaxTokens: cfg.LLMMaxTokens,
 		})
 	case "openai":

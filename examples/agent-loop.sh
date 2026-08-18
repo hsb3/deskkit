@@ -118,8 +118,8 @@ machines:
     projects_root: "."
 models:
   provider: "anthropic"
-  model: "claude-opus-4-8"
-  alternates: ["claude-sonnet-5"]
+  model: "claude-haiku-4-5-20251001"
+  alternates: ["claude-sonnet-5", "claude-opus-4-8"]
 secrets_ref:
   llm_api_key: "ANTHROPIC_API_KEY"
 preferences:
@@ -309,44 +309,44 @@ EOF
 
 echo
 echo "--- MCP session: 5-tool default surface ---"
-LIST5=$(mcp_list "$MCPSTORE5" DESK_ROOT="$MCPDESK" DESK_NAME=mcp-probe-5); RC=$?
+LIST5=$(mcp_list "$MCPSTORE5" DESK_ROOT="$MCPDESK" DESK_NAME=mcp-probe-5 MCP_MODULES=librarian); RC=$?
 echo "tools/list: $LIST5"
 COUNT5=$(printf '%s' "$LIST5" | jq -r '.result.tools | length')
 if [ "$RC" -eq 0 ] && [ "$COUNT5" -eq 5 ]; then rc=0; else rc=1; fi
 check "5-tool surface: tools/list returns exactly 5 tools (got $COUNT5)" "$rc"
 
-SWEEP5=$(mcp_call "$MCPSTORE5" sweep '{}' DESK_ROOT="$MCPDESK" DESK_NAME=mcp-probe-5); RC=$?
+SWEEP5=$(mcp_call "$MCPSTORE5" sweep '{}' DESK_ROOT="$MCPDESK" DESK_NAME=mcp-probe-5 MCP_MODULES=librarian); RC=$?
 echo "sweep: $SWEEP5"
 check "5-tool surface: sweep call succeeds" $RC
 
-PATROL5=$(mcp_call "$MCPSTORE5" patrol '{}' DESK_ROOT="$MCPDESK" DESK_NAME=mcp-probe-5); RC=$?
+PATROL5=$(mcp_call "$MCPSTORE5" patrol '{}' DESK_ROOT="$MCPDESK" DESK_NAME=mcp-probe-5 MCP_MODULES=librarian); RC=$?
 echo "patrol: $PATROL5"
 check "5-tool surface: patrol call succeeds" $RC
 
-QUERY5=$(mcp_call "$MCPSTORE5" query '{"kind":"findings"}' DESK_ROOT="$MCPDESK" DESK_NAME=mcp-probe-5); RC=$?
+QUERY5=$(mcp_call "$MCPSTORE5" query '{"kind":"findings"}' DESK_ROOT="$MCPDESK" DESK_NAME=mcp-probe-5 MCP_MODULES=librarian); RC=$?
 echo "query findings: $QUERY5"
 check "5-tool surface: query call succeeds" $RC
 
-FEEDBACK5=$(mcp_call "$MCPSTORE5" record_feedback '{"kind":"feedback","summary":"dogfood MCP probe"}' DESK_ROOT="$MCPDESK" DESK_NAME=mcp-probe-5); RC=$?
+FEEDBACK5=$(mcp_call "$MCPSTORE5" record_feedback '{"kind":"feedback","summary":"dogfood MCP probe"}' DESK_ROOT="$MCPDESK" DESK_NAME=mcp-probe-5 MCP_MODULES=librarian); RC=$?
 echo "record_feedback: $FEEDBACK5"
 check "5-tool surface: record_feedback call succeeds" $RC
 
 echo
 echo "--- MCP session: 6-tool LIBRARIAN_AUTONOMOUS_WRITES=true surface ---"
-LIST6=$(mcp_list "$MCPSTORE6" DESK_ROOT="$MCPDESK" DESK_NAME=mcp-probe-6 LIBRARIAN_AUTONOMOUS_WRITES=true); RC=$?
+LIST6=$(mcp_list "$MCPSTORE6" DESK_ROOT="$MCPDESK" DESK_NAME=mcp-probe-6 MCP_MODULES=librarian LIBRARIAN_AUTONOMOUS_WRITES=true); RC=$?
 echo "tools/list: $LIST6"
 COUNT6=$(printf '%s' "$LIST6" | jq -r '.result.tools | length')
 if [ "$RC" -eq 0 ] && [ "$COUNT6" -eq 6 ]; then rc=0; else rc=1; fi
 check "6-tool surface: tools/list returns exactly 6 tools, incl. apply_fix (got $COUNT6)" "$rc"
 
-mcp_call "$MCPSTORE6" sweep '{}' DESK_ROOT="$MCPDESK" DESK_NAME=mcp-probe-6 LIBRARIAN_AUTONOMOUS_WRITES=true > /dev/null
-mcp_call "$MCPSTORE6" patrol '{}' DESK_ROOT="$MCPDESK" DESK_NAME=mcp-probe-6 LIBRARIAN_AUTONOMOUS_WRITES=true > /dev/null
+mcp_call "$MCPSTORE6" sweep '{}' DESK_ROOT="$MCPDESK" DESK_NAME=mcp-probe-6 MCP_MODULES=librarian LIBRARIAN_AUTONOMOUS_WRITES=true > /dev/null
+mcp_call "$MCPSTORE6" patrol '{}' DESK_ROOT="$MCPDESK" DESK_NAME=mcp-probe-6 MCP_MODULES=librarian LIBRARIAN_AUTONOMOUS_WRITES=true > /dev/null
 
-PROPOSE6=$(mcp_call "$MCPSTORE6" propose_fix '{}' DESK_ROOT="$MCPDESK" DESK_NAME=mcp-probe-6 LIBRARIAN_AUTONOMOUS_WRITES=true); RC=$?
+PROPOSE6=$(mcp_call "$MCPSTORE6" propose_fix '{}' DESK_ROOT="$MCPDESK" DESK_NAME=mcp-probe-6 MCP_MODULES=librarian LIBRARIAN_AUTONOMOUS_WRITES=true); RC=$?
 echo "propose_fix: $PROPOSE6"
 check "6-tool surface: propose_fix call succeeds" $RC
 
-APPLY6=$(mcp_call "$MCPSTORE6" apply_fix '{}' DESK_ROOT="$MCPDESK" DESK_NAME=mcp-probe-6 LIBRARIAN_AUTONOMOUS_WRITES=true); RC=$?
+APPLY6=$(mcp_call "$MCPSTORE6" apply_fix '{}' DESK_ROOT="$MCPDESK" DESK_NAME=mcp-probe-6 MCP_MODULES=librarian LIBRARIAN_AUTONOMOUS_WRITES=true); RC=$?
 echo "apply_fix: $APPLY6"
 APPLIED_OUTCOME=$(printf '%s' "$APPLY6" | jq -r '.result.content[0].text' | jq -r '.outcomes[0].outcome // empty')
 [ "$RC" -eq 0 ] && [ "$APPLIED_OUTCOME" = "applied" ]
