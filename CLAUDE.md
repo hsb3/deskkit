@@ -117,6 +117,11 @@ The librarian lane has its own `librarian/Makefile` (`make -C librarian build|te
 `apply-fix` is deliberately **not** a target — it's supervised-only, run by hand, and every fix is
 reversible with `deskkit restore --by-path <path>`.
 
+The table above is `make` targets; `deskkit desks` and `deskkit config show|path|edit|set` are
+plain binary subcommands (no store opened) — see "Configuration resolution" below for what they
+show. `deskkit --help` groups the whole command menu into six sections instead of one alphabetic
+list.
+
 ## Architecture notes
 
 ### Generated and copied artifacts — edit the source, not the copy
@@ -174,19 +179,37 @@ guard and `init` do exactly this). Fail-closed behavior in `serve` paths needs a
 
 ## Configuration resolution
 
+Every resolved field wins on one of four legs, in this order: **env > per-desk
+`_knowledge/profile.*` > central config > built-in default** (`librarian/internal/core/config/config.go`).
+The central leg is `$XDG_CONFIG_HOME/deskkit/config.yaml` (falling back to `~/.config/deskkit/config.yaml`),
+a machine-wide file created 0600 in a 0700 dir via `deskkit config set/edit`. Only three fields
+read it: `LLM_PROVIDER` (`llm.provider`), `LLM_MODEL` (`llm.model`), and `DESK_NAME`
+(`default_desk`) — everything else stops at profile-or-default. `deskkit config show` prints
+every resolved value with the leg that won.
+
 **Librarian store / profile discovery** (first match wins):
 1. explicit `--dir` (overrides everything)
 2. `DESK_ROOT` + `DESK_NAME` env vars
 3. `_knowledge/profile.yaml` discovered by walk-up from cwd (a profile with `desk.name` +
    `root: "."` needs no env vars when you run `deskkit` inside the desk)
-4. no `--dir` and a resolvable `DESK_NAME` → store at `$XDG_DATA_HOME/deskkit/<DESK_NAME>/`
-5. unresolvable `DESK_NAME` and no `--dir` → **exit 1** (serve/migrate included)
+4. the central config's `default_desk`, when set and no profile/env supplied `DESK_NAME`
+5. no `--dir` and a resolvable `DESK_NAME` → store at `$XDG_DATA_HOME/deskkit/<DESK_NAME>/`
+6. unresolvable `DESK_NAME` and no `--dir` → **exit 1** (serve/migrate included)
 
 **LLM provider/key** (only `agent`/`chat`/MCP-driven calls need it):
-- provider: `LLM_PROVIDER` env → `profile.models` → `anthropic` (default)
-- key: the env var named by `LLM_API_KEY_ENV` / `secrets_ref.llm_api_key` → else per-provider
-  `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` / `GEMINI_API_KEY`
+- provider: `LLM_PROVIDER` env → `profile.models` → central `llm.provider` → `anthropic` (default)
+- model: `LLM_MODEL` env → `profile.models` → central `llm.model` → the built-in default model
+- key: the env var named by `LLM_API_KEY_ENV` / `secrets_ref.llm_api_key` (or the per-provider
+  default `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` / `GEMINI_API_KEY`) → else the central config's
+  `llm.api_key`. The key never lives on the `Config` struct — it resolves at use time
+  (`config.ResolveAPIKey`) — so setting it once via `deskkit config set llm.api_key <key>` is
+  enough to run `agent`/`chat` with zero env vars set.
 - `LIBRARIAN_AUTONOMOUS_WRITES=true` gates `apply_fix` (checked at execution time)
+
+`deskkit desks` lists the desks this machine has a store for (marking which one the cwd
+resolves to); `deskkit config show|path|edit|set` inspects/edits the central file above. Neither
+opens a store. `deskkit --help` groups the command menu into six sections (Setup & config,
+Inspect, Fix, Work graph, Agent, Admin) rather than one alphabetic list.
 
 ### No in-repo dogfooding (ruled 2026-07-22, "no dogfood")
 

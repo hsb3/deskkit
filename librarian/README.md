@@ -14,9 +14,14 @@ Full spec: `../docs/development/specs/pocket-librarian-v1-spec.md`.
 
 ## Quick start
 
+`./deskkit --help` groups the whole command menu into six sections (Setup & config, Inspect,
+Fix, Work graph, Agent, Admin) instead of one alphabetic list — a fast way to see what the
+binary can do before reading further.
+
 The binary needs `DESK_ROOT` (which desk) and `DESK_NAME` (a unique store name) — with no
 personal defaults, it refuses to run until it can resolve both. There are **two ways** to
-supply them; it walks up from the working directory and resolves in the order env > profile:
+supply them; it walks up from the working directory and resolves in the order env > profile
+(with `DESK_NAME` also falling back to the central config's `default_desk`, below):
 
 - **Profile (zero-export).** A `_knowledge/profile.yaml` in the desk supplies both —
   `desk.name` → `DESK_NAME`, and the folder that owns `_knowledge/` → `DESK_ROOT`. Run any
@@ -96,30 +101,71 @@ mv <old-store-dir> "${XDG_DATA_HOME:-$HOME/.local/share}/deskkit/$DESK_NAME"
 Otherwise, a store is a rebuildable cache — a fresh `sweep` at the canonical location
 reproduces the same file index, minus that store's revision history.
 
+See which desks this machine already has a store for with:
+
+```bash
+./deskkit desks
+```
+
+It lists every store dir under the XDG data home, marks the one the current directory resolves
+to, and opens no store itself; an empty machine says how to make the first one.
+
+## Machine-wide config
+
+`deskkit config` inspects and edits the central, machine-wide config file — the leg between the
+per-desk profile and the built-in default for a handful of fields (`llm.provider`, `llm.model`,
+`llm.api_key`, `default_desk`); see "Choosing the LLM and setting the API key" below for what
+reads it and in what order. It opens no store.
+
+```bash
+./deskkit config show    # every resolved setting, value, and the leg (env/profile/central/default) that won
+./deskkit config path    # the file's path, and whether it exists yet
+./deskkit config edit    # open it in $VISUAL or $EDITOR, creating it (0600 in a 0700 dir) first
+./deskkit config set llm.api_key sk-...   # write one key; secrets are masked back in the confirmation
+```
+
+`default_desk` lets `DESK_NAME` resolve on a machine with no profile and no env var set — the
+same central leg `LLM_PROVIDER`/`LLM_MODEL` use, so one file can carry both "which desk" and
+"which model" for a single-desk machine.
+
 ## Choosing the LLM and setting the API key
 
 Only the `agent` command (and an MCP client driving the tools) needs an LLM. `sweep`,
 `patrol`, `propose-fix`, `apply-fix`, `restore`, and `query` are LLM-free — they run with no
 provider configured and no API key set.
 
-Provider and model resolve with precedence **env var → profile → default**:
+Provider and model resolve with precedence **env var → profile → central config → default**:
 
-| Setting | Env var | Profile key (`_knowledge/profile.yaml`) | Default |
-|---|---|---|---|
-| Provider | `LLM_PROVIDER` | `models.provider` | `anthropic` |
-| Model | `LLM_MODEL` | `models.model` | `claude-opus-4-8` |
+| Setting | Env var | Profile key (`_knowledge/profile.yaml`) | Central config key | Default |
+|---|---|---|---|---|
+| Provider | `LLM_PROVIDER` | `models.provider` | `llm.provider` | `anthropic` |
+| Model | `LLM_MODEL` | `models.model` | `llm.model` | `claude-opus-4-8` |
+
+The central config is a machine-wide file at `$XDG_CONFIG_HOME/deskkit/config.yaml` (falling
+back to `~/.config/deskkit/config.yaml`), written 0600 in a 0700 dir and shared by every desk
+on the machine — below the per-desk profile in precedence, above the built-in default. Manage
+it with `deskkit config`, covered in "Machine-wide config" above.
 
 Each provider reads its key from a fixed env var by default — `anthropic` → `ANTHROPIC_API_KEY`,
 `openai` → `OPENAI_API_KEY`, `gemini` → `GEMINI_API_KEY`. A profile's `secrets_ref.llm_api_key`
 (or the `LLM_API_KEY_ENV` env var) can redirect this: set it to the NAME of the env var that
-actually holds the key, and that var is read instead of the provider default. A missing key
-fails loud with an actionable message naming the exact var it looked for; nothing silently
-falls back.
+actually holds the key, and that var is read instead of the provider default. If that env var
+is unset, the key falls back to the central config's `llm.api_key` — the ONE place the key may
+be stored at rest. A missing key fails loud with an actionable message naming the exact var it
+looked for; nothing silently falls back beyond that one central leg.
 
 ```bash
 export LLM_PROVIDER=anthropic     # or set models.provider in your profile
 export ANTHROPIC_API_KEY=sk-...
 ./deskkit agent "patrol the desk and summarize what you find"
+```
+
+Or skip the exports entirely and store the key once, machine-wide:
+
+```bash
+./deskkit config set llm.provider anthropic
+./deskkit config set llm.api_key sk-...
+./deskkit agent "patrol the desk and summarize what you find"   # zero env vars set
 ```
 
 `agent` runs the librarian's reasoning loop once over the tool set and exits (one-shot,
