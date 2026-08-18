@@ -8,7 +8,7 @@
     {
       "name": "deskkit",
       "source": "./plugins/deskkit",
-      "description": "The platform v1 proof surface: a composed mount of the profile, librarian, and PM tool families over the deskkit binary, plus the librarian-operator and pm-operator agents, the desk-shaping and PM skills, and a SessionStart cold-start briefing hook. Instantiates the agent integration contract. Personalize via the desk profile and desk_config, never by editing shipped definitions.",
+      "description": "Coding agents drift from a project's own conventions and lose track of where work stands between sessions. This plugin checks a desk's documents against its own rules and applies fixes, drives tasks through a document-gated work graph, and briefs a fresh session at cold start — over one MCP server, two operator agents, and a set of skills. Personalize via the desk profile and desk_config, never by editing shipped definitions.",
       "version": "0.8.0",
       "author": {
         "name": "Henry Burden"

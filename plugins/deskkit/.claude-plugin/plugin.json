@@ -1,5 +1,5 @@
 {
   "name": "deskkit",
   "version": "0.8.0",
-  "description": "The one plugin bundle this marketplace ships: one composed MCP server (the deskkit binary) mounting the profile, librarian, and PM tool families, plus the librarian-operator and pm-operator agents, a SessionStart cold-start briefing hook, and seven skills — desk-setup, conventions-standard, harvest-loop, brownfield-adoption, and the three pm-* skills. Instantiates the agent integration contract (docs/development/specs/agent-integration-contract-v1-spec.md). Personalize via the desk profile and desk_config, never by editing shipped definitions."
+  "description": "Coding agents drift from a project's own conventions and lose track of where work stands between sessions. This plugin checks a desk's documents against its own rules and applies fixes, drives tasks through a document-gated work graph, and briefs a fresh session at cold start — over one MCP server, two operator agents, and a set of skills. Personalize via the desk profile and desk_config, never by editing shipped definitions."
 }
