@@ -206,7 +206,7 @@ FAILCLOSED_MSG="refusing to serve on a non-loopback address"
 refused_cleanly() {
 	local vol="$1"
 	shift
-	local cname="deskkit-smoke-failclosed-$$-$RANDOM"
+	local cname="$C3"
 	docker run -d --name "$cname" "$@" -v "${vol}:/data" "$IMAGE" >/dev/null
 	sleep 3
 	local exitcode log
