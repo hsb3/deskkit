@@ -10,15 +10,14 @@ downloads, and environment-variable lore live in the developer track
 
 # Getting started
 
-desk-standard gives you two things that share one schema and one personalization model: a
-**Claude Code plugin** that stands up and maintains an executive desk, and a **deskkit**
-binary that indexes that desk and repairs convention violations under a byte-exact undo.
-Nothing you install carries a name, org, or repo — you personalize once, in
-`_knowledge/profile.yaml`, and never by editing a shipped file.
+desk-standard gives you the **deskkit** binary — it indexes your desk and repairs convention
+violations under a byte-exact undo — plus one **Claude Code plugin** that drives that same binary
+from a session and stands up and maintains the desk. Nothing you install carries a name, org, or
+repo — you personalize once, in `_knowledge/profile.yaml`, and never by editing a shipped file.
 
 This page gets you productive in one sitting, with **no build toolchain**: an install command, a
 guided desk setup, and `deskkit` run from inside your desk. Deeper guides: `plugin-guide.md` (the
-four skills) and `pm-guide.md` (the PM work graph). Everything terminal-heavy — building from
+desk skills) and `pm-guide.md` (the PM work graph). Everything terminal-heavy — building from
 source, environment overrides, JSON output — is the developer track, linked where it belongs.
 
 ![First sweep: index the desk, then see findings and orphans](../assets/sweep-and-findings.gif)
@@ -40,17 +39,19 @@ deskkit --version
 
 ## 2. Install the plugin
 
-This repo is its own Claude Code plugin marketplace. In a Claude Code session, add the marketplace
-and install the plugin:
+This repo is its own Claude Code plugin marketplace, with one plugin in it. In a Claude Code
+session, add the marketplace and install it:
 
 ```
 claude plugin marketplace add hsb3/desk-standard
-claude plugin install desk-standard@desk-standard
+claude plugin install desk-persona@desk-standard
 ```
 
-The install copies only the plugin bundle into the plugin cache, so the plugin is self-contained
-(its MCP server and schema ship inside it). Inside that session you now have the `desk-setup`,
-`conventions-standard`, and `harvest-loop` skills. See `plugin-guide.md` for when to reach for each.
+The plugin is the session-side surface over the `deskkit` binary you just installed — it mounts
+`deskkit mcp-serve`, so keep `deskkit` on your `PATH`. Inside that session you now have the
+`desk-setup`, `conventions-standard`, `harvest-loop`, and `brownfield-adoption` skills, the three
+`pm-*` skills, and the `librarian-operator` / `pm-operator` agents. See `plugin-guide.md` for when
+to reach for each.
 
 ## 3. Stand up your desk
 

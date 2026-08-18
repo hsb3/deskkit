@@ -4,33 +4,39 @@ Status: active
 
 # Development
 
-Two product lanes sit under one repo: the **plugin** (harness-pure TypeScript core + stdio MCP
-server, built/tested with `bun`) and the **librarian** (`deskkit`, a single Go binary).
-The **root `Makefile` is the canonical task interface** — `make help` lists every target; CI
+One product lane sits under this repo: **`deskkit`**, a single Go binary (`librarian/`) carrying the
+`profile`, `librarian`, and `pm` tool modules. Alongside it, `plugins/desk-persona/` is the Claude
+Code bundle that mounts that binary — authored in place, nothing generated. The **root `Makefile`
+is the canonical task interface** — `make help` lists every target; CI
 (`.github/workflows/ci.yml`) runs the same checks.
 
 ## Build
 
 ```bash
-make build      # build both lanes (plugin via bun/tsc, librarian via go — version-stamped)
-make install    # build + install the librarian binary to ~/.local/bin (override PREFIX=/usr/local)
-make setup      # install plugin deps + lefthook pre-commit hooks (first-time setup)
+make build      # build the deskkit binary (go — version-stamped)
+make install    # build + install it to ~/.local/bin (override PREFIX=/usr/local)
+make setup      # install the lefthook pre-commit hooks (first-time setup)
 ```
 
-The librarian's version is stamped from the root `VERSION` file via ldflags; a bare `go build`
-reports `dev`. See [README.md](README.md).
+The version is stamped from the root `VERSION` file via ldflags; a bare `go build` reports `dev`.
+Go 1.25 is the floor (PocketBase's `go.mod`); Node is needed only to run the `scripts/*.mjs` gates.
+See [install-and-build.md](install-and-build.md).
 
 ## Test & gates
 
-Run these before claiming any change done — they mirror CI:
+Run these before claiming any change done — they mirror CI. Run them **bare, never piped** — a pipe
+masks the exit code.
 
 | Command | What it checks |
 |---|---|
-| `make check` | neutrality lint (+ self-test), plugin core purity, actionlint |
-| `make test` | plugin `bun test` + librarian `go test ./...` |
+| `make check` | the repo gates: neutrality lint (+ self-test), the drift guards, doc-link integrity, shellcheck, actionlint |
+| `make test` | `go test ./...`, including the schema-embed drift guards |
 | `make verify` | the librarian integration gate (throwaway scratch desk; self-init, write-boundary, byte-exact restore, open-guard) |
-| `make package` | regenerate the marketplace plugin bundle + drift-guard it |
-| `node scripts/check-version-sync.mjs` | `VERSION` vs the three shipped manifests |
+| `make e2e` | the end-to-end system-behaviour suite on a throwaway desk (offline, no LLM key) |
+| `node scripts/check-version-sync.mjs` | `VERSION` vs the shipped manifests |
+
+`make package` generates nothing — it survives as an informational echo saying so, because the
+bundle under `plugins/` is authored in place.
 
 ## Demo media (VHS)
 
@@ -48,15 +54,15 @@ the default `make media` run stays offline. Requires `vhs` + `ttyd` (`brew insta
 
 ## Release
 
-Both products ship under one version. The full runbook is [README.md](README.md); in short:
-bump `VERSION` + the three manifests → move `[Unreleased]` CHANGELOG entries into a dated section
-→ `make release-prep` → `git tag v<version> && git push --tags`. `make version-status` flags
-unreleased drift; `check-changelog.mjs` gates a tag against a documented CHANGELOG section
-(ADR 0005, DESK-27).
+The binary and the bundle ship under one version: bump `VERSION` + the shipped manifests → move
+`[Unreleased]` CHANGELOG entries into a dated section → `make release-prep` →
+`git tag v<version> && git push --tags`. `make release-prep` aborts on the first failure and never
+auto-tags. `make version-status` flags unreleased drift; `check-changelog.mjs` gates a tag against
+a documented CHANGELOG section (ADR 0005, DESK-27).
 
 ## Canonical references
 
 - [`specs/pocket-librarian-v1-spec.md`](specs/pocket-librarian-v1-spec.md) — the librarian's build spec.
+- [`specs/pm-system-v1-spec.md`](specs/pm-system-v1-spec.md) — the PM system's build spec.
 - Architecture Decision Records — on the project board as `DECISION` tasks (cited from code
   and docs as a bare `ADR NNNN`; no path, no board id).
-- `../../_meta/build-brief.md` — the original build brief (repo shape, acceptance criteria).

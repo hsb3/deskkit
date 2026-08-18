@@ -9,8 +9,8 @@ honest. The distinction is the thing to internalize:
 
 - **Published + shipped surface** — documentation and code meant to be read and navigated: `docs/`,
   the root digests (`README.md`, `CLAUDE.md`, and its `AGENTS.md` symlink), and the code tree
-  (`plugin/`, `librarian/`, `schema/`, `plugins/`, `scripts/`, `kits/`). Every doc/media path cited
-  here MUST resolve to a file that exists. This is enforced.
+  (`librarian/`, `schema/`, `plugins/`, `scripts/`, `kits/`). Every doc/media path cited here MUST
+  resolve to a file that exists. This is enforced.
 - **Working desk** — point-in-time, hand-curated working state: `_meta/` (handoffs, plans, research,
   the `_meta/_archive/` freezer) and `.claude/` (agent config + memory). References here are
   provenance, not maintained navigation, so they are NOT gated (see "Why the working desk is not

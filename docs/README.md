@@ -8,7 +8,7 @@ Status: active
 ## Using — run a desk
 
 - [`usage/getting-started.md`](usage/getting-started.md) — install, fill your profile, build the librarian, first sweep + patrol.
-- [`usage/plugin-guide.md`](usage/plugin-guide.md) — the desk-standard plugin's skills as user journeys: when to reach for each, what you get.
+- [`usage/plugin-guide.md`](usage/plugin-guide.md) — the desk-shaping skills as user journeys: when to reach for each, what you get.
 - [`usage/librarian-guide.md`](usage/librarian-guide.md) — the daily loop: sweep → patrol → fix → byte-exact restore.
 - [`usage/pm-guide.md`](usage/pm-guide.md) — the PM work graph: enable it, the phase machine + gates, and the CLI / MCP / TUI / `desk-persona` surfaces.
 

@@ -1,49 +1,49 @@
 # desk-standard
 
-Profile-driven repo conventions and a self-repairing desk librarian, over one shared schema.
+Profile-driven repo conventions and a self-repairing desk librarian, in one binary.
 
 ## What this is
 
-Two products, one schema, one personalization model — nothing you install carries a name,
-org, repo, or issue number:
+One binary, one plugin, one schema, one personalization model — nothing you install carries a
+name, org, repo, or issue number:
 
-- **The desk-standard plugin** (Claude Code) — stands up and maintains an executive desk.
-  Four skills (`desk-setup`, `conventions-standard`, `harvest-loop`, `brownfield-adoption`)
-  over a harness-pure core (profile loading, schema validation, `{{profile.…}}` substitution,
-  `_knowledge/` indexing) behind a stdio MCP server (`profile_get`, `profile_validate`,
-  `template_render`, `knowledge_index`).
-- **deskkit** — a single Go binary (embedded PocketBase) that indexes a desk's files, flags
-  convention violations, and can propose + apply fixes under a record-original-first safety
-  boundary — every applied fix is byte-exact reversible via `restore`. One tool core surfaces
-  as a CLI, an MCP server (`restore` is deliberately CLI-only; `apply_fix` is gated behind an
-  env flag), and a chat TUI. The same binary carries the **PM module** — a document-gated work
-  graph (items move through a rigid phase machine; a phase advance is refused until the
-  document that phase requires validates), **on by default** — opt a desk out with
-  `PM_ENABLED=false`. See [docs/usage/pm-guide.md](docs/usage/pm-guide.md) and the composed
-  `desk-persona` plugin.
-- **schema v1** — the shared, product-neutral contract both products read as their
-  rule/structure source (`schema/`).
+- **deskkit** — a single Go binary (embedded PocketBase) that is the whole runtime. It indexes a
+  desk's files, flags convention violations, and can propose + apply fixes under a
+  record-original-first safety boundary — every applied fix is byte-exact reversible via
+  `restore`. Three modules feed one tool core: **profile** (personalization — `profile_get`,
+  `profile_validate`, `template_render`, `knowledge_index`), **librarian** (the sweep → patrol →
+  fix loop), and **PM** — a document-gated work graph (items move through a rigid phase machine;
+  a phase advance is refused until the document that phase requires validates), **on by default**,
+  opt a desk out with `PM_ENABLED=false`. The core surfaces as a CLI, an MCP server (`restore` is
+  deliberately CLI-only; `apply_fix` is gated behind an env flag), a chat TUI, and a browser
+  session page. See [docs/usage/pm-guide.md](docs/usage/pm-guide.md).
+- **The `desk-persona` plugin** (Claude Code) — the agent-facing surface over that same binary:
+  skills that stand up, check, evolve, and adopt an executive desk and drive the work graph, the
+  `librarian-operator` and `pm-operator` agents, a SessionStart briefing hook, and one MCP mount.
+  It ships no runtime of its own.
+- **schema v1** — the shared, product-neutral rule/structure contract (`schema/`); the binary
+  carries drift-guarded embedded copies of it.
 
-Both products are things you **install once and use in your own desks** — folders outside this
-repo. You personalize a desk by filling its `_knowledge/profile.yaml` (copied from the
-desk-setup scaffold's `_knowledge/profile.example.yaml`), never by editing a shipped skill,
-template, or tool. This repo is not itself a desk; it ships no repo-root `_knowledge/`.
+Both are things you **install once and use in your own desks** — folders outside this repo. You
+personalize a desk by filling its `_knowledge/profile.yaml` (copied from the desk-setup scaffold's
+`_knowledge/profile.example.yaml`), never by editing a shipped skill, template, or tool. This repo
+is not itself a desk; it ships no repo-root `_knowledge/`.
 
 ## Install
 
 ### The plugin
 
-This repo is its own Claude Code plugin marketplace (`.claude-plugin/marketplace.json`). From
-any project:
+This repo is its own Claude Code plugin marketplace (`.claude-plugin/marketplace.json`), with one
+plugin in it. From any project:
 
 ```bash
 claude plugin marketplace add hsb3/desk-standard
-claude plugin install desk-standard@desk-standard
+claude plugin install desk-persona@desk-standard
 ```
 
-The installed plugin is self-contained — its MCP server and schema ship inside the bundle, so
-there is nothing else to wire up. (For local development you can point Claude Code straight at
-the source tree with `claude --plugin-dir ./plugins/desk-standard`.)
+The plugin drives the `deskkit` binary, so install that too (next section) and make sure it is on
+your `PATH`. (For local development you can point Claude Code straight at the source tree with
+`claude --plugin-dir ./plugins/desk-persona`.)
 
 ### The `deskkit` binary
 
@@ -104,41 +104,24 @@ skills run the standing checks and the periodic improvement-log pass; the superv
 
 ## Structure
 
-Two similarly named top-level directories are a **source vs. distribution** split: `plugin/`
-(singular) is the TypeScript *source* lane; `plugins/` (plural) holds the *built bundles* a
-marketplace install actually copies — think `src/` vs `dist/`. The bundled
-`plugins/desk-standard/mcp/server.js` and schema copy are generated by `bun run package`
-(never hand-edited; a CI drift guard regenerates and fails on any diff).
-
 ```
-plugin/             TS source — harness-pure core + stdio MCP server (the plugin's engine)
-  core/             harness-pure TypeScript domain library
-  mcp/              stdio MCP server (profile_get, profile_validate, template_render, knowledge_index)
-  opencode/         frozen spike — not shipped in v1
-plugins/            marketplace-distributed bundles (a marketplace install copies only these)
-  desk-standard/    Claude Code adapter: manifest, .mcp.json, skills/, generated mcp/server.js
-  desk-persona/     composed librarian+PM bundle: agents, PM skills, SessionStart hook
-librarian/          deskkit source: Go binary, embedded PocketBase, MCP server + CLI + TUI
-schema/             schema v1 — shared by plugin/ and librarian/
-docs/               product specs, ADRs, and the getting-started / plugin / librarian guides
+librarian/          deskkit source: Go binary, embedded PocketBase, profile/librarian/pm
+                    modules, MCP server + CLI + TUI + web session page
+plugins/            the marketplace-distributed bundle (a marketplace install copies only this)
+  desk-persona/     the one bundle: skills, agents, SessionStart hook, .mcp.json —
+                    authored in place, nothing generated
+schema/             schema v1 — source of truth for the binary's embedded copies
+docs/               product specs, the charter, and the getting-started / plugin / librarian guides
 ```
 
 ## Scope of this build (v1)
 
 **Claude Code only.** OpenCode support is deferred to a separate common-core fan-out build
-(tracked in #12, parked until ≥ v1.0.0); `plugin/opencode/` holds a frozen, unwired adapter
-spike kept as reference for that build (see its README) and ships nothing.
+(tracked in #12, parked until ≥ v1.0.0); nothing for it ships today.
 
 Harness versions tested: Claude Code `2.1.204` · Go `1.25.0` (pinned — PocketBase's own
-`go.mod` floors it; a `go 1.23` directive will not compile the dependency graph) ·
-Bun `1.3.14` / Node `26.5.0` (either runs `plugin/`).
-
-Known, intentional gaps — not bugs:
-
-- **OpenCode adapter** — not built (see above).
-- **Hooks and agents surfaces (`desk-standard` plugin)** — the `desk-standard` plugin itself
-  ships skills only; no `hooks/` or `agents/` definitions. (The composed `desk-persona` plugin
-  does ship the `librarian-operator` + `pm-operator` agents and a SessionStart briefing hook.)
+`go.mod` floors it; a `go 1.23` directive will not compile the dependency graph). Node is needed
+only to run the repo's `scripts/*.mjs` gates; nothing shipped is built with it.
 
 ## Developing
 
@@ -148,15 +131,15 @@ developer track — start at [docs/development/](docs/development/) and
 version, from a clone:
 
 ```bash
-make setup    # bun install + git hooks
-make build    # both lanes: plugin + version-stamped librarian binary
-make test     # fast unit tests (bun test + go test)
+make setup    # git hooks (lefthook)
+make build    # the version-stamped deskkit binary
+make test     # fast unit tests (go test)
 make check    # repo gates (neutrality, drift guards, doc links, …)
 make verify   # librarian integration gate on a throwaway scratch desk
 ```
 
-The librarian lane also has its own `librarian/Makefile` (`make -C librarian build|test|sweep|patrol`)
-for iterating on the binary against a desk named by `DESK_ROOT`/`DESK_NAME`; `apply-fix` is
+The binary also has its own `librarian/Makefile` (`make -C librarian build|test|fmt|sweep|patrol`)
+for iterating against a desk named by `DESK_ROOT`/`DESK_NAME`; `apply-fix` is
 deliberately not a target — it's supervised-only, run by hand, and every fix is reversible with
 `deskkit restore --by-path <path>`. `make gui` there opens the embedded PocketBase admin
 console (`http://127.0.0.1:8090/_/`).
@@ -171,10 +154,10 @@ for the full index.
 **Using it** — install and run:
 
 - **[docs/usage/getting-started.md](docs/usage/getting-started.md)** — install, fill your profile, first sweep + patrol, meet the TUI.
-- **[docs/usage/plugin-guide.md](docs/usage/plugin-guide.md)** — the four skills as user journeys: when to reach for each, what you get.
+- **[docs/usage/plugin-guide.md](docs/usage/plugin-guide.md)** — the desk skills as user journeys: when to reach for each, what you get.
 - **[docs/usage/librarian-guide.md](docs/usage/librarian-guide.md)** — the daily loop: sweep → patrol → fix → byte-exact restore.
 - **[docs/usage/pm-guide.md](docs/usage/pm-guide.md)** — the PM work graph: enable it, the phase machine + gates, and the CLI / MCP / TUI / `desk-persona` plugin surfaces.
-- `plugin/README.md`, `plugins/desk-persona/README.md`, `schema/README.md`, `librarian/README.md` — per-product operator detail.
+- `plugins/desk-persona/README.md`, `schema/README.md`, `librarian/README.md` — operator detail per surface.
 
 **Developing it** — build, test, release:
 

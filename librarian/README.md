@@ -266,9 +266,10 @@ customization belongs in `_knowledge/` (the profile), never a DB prompt edit.
 
 ## Using it from an agent session (MCP)
 
-`mcp-serve` exposes the tool core over stdio MCP: `sweep`, `patrol`, `propose_fix`, and
-`query` always; `apply_fix` only when `LIBRARIAN_AUTONOMOUS_WRITES=true` (default false);
-`restore` is deliberately CLI-only. Wire it into a Claude Code project via `.mcp.json`:
+`mcp-serve` exposes the merged tool core over stdio MCP — every enabled module's tools on one
+process. From the librarian module: `sweep`, `patrol`, `propose_fix`, `query`, and
+`record_feedback` always; `apply_fix` only when `LIBRARIAN_AUTONOMOUS_WRITES=true` (default
+false); `restore` is deliberately CLI-only. Wire it into a project via `.mcp.json`:
 
 ```json
 {
@@ -281,6 +282,24 @@ customization belongs in `_knowledge/` (the profile), never a DB prompt edit.
   }
 }
 ```
+
+`MCP_MODULES` narrows one mount to the modules you name (comma-separated: `profile`, `librarian`,
+`pm`). Unset, every enabled module's tools are mounted; a name it cannot resolve is a fail-loud
+exit, never a silent fallback. The shipped plugin bundle sets `MCP_MODULES=profile,librarian,pm`.
+
+## The personalization surface (`profile` module)
+
+The binary always carries a `profile` module: four read-only tools that answer from the desk's
+FILES rather than the store — `profile_get` (resolve a dotted profile key), `profile_validate`
+(check the profile against schema v1, including the `x-contract-version` gate), `template_render`
+(substitute `{{profile.…}}` / `{{env.…}}` placeholders, fail-loud on an unresolvable one with no
+default), and `knowledge_index` (list the `_knowledge/` background files with size metadata, and
+inline content up to a byte budget).
+
+It is always enabled and owns no collections, no migrations, and no TUI view — an unpersonalized
+desk gets tools that say "this desk declares nothing" rather than tools that vanish. Validation
+runs against a `go:embed`ed copy of the schema, kept byte-identical to the repo-root
+`schema/profile.schema.yaml` by a test-enforced drift guard.
 
 ## The PM work graph (on by default)
 
@@ -310,7 +329,7 @@ appear:
 
 `PM_AUTONOMOUS_WRITES` (default `true`) gates whether agents get the write tools over MCP; the
 document gate is the real safety regardless. Full surface reference — every `pm` subcommand, the
-MCP tools, the TUI views, the `desk-pm` plugin, and the adoption path — is in
+MCP tools, the TUI views, the `desk-persona` plugin, and the adoption path — is in
 [`../docs/usage/pm-guide.md`](../docs/usage/pm-guide.md).
 
 ## Triggers — the wake layer under `serve`

@@ -27,40 +27,45 @@ configured from here.
 
 ## Project Overview
 
-**desk-standard is two products over one shared schema**, all identity-neutral — nothing shipped
-carries a person, org, repo, or issue number. A desk is personalized by filling its
-`_knowledge/profile.yaml` (copied from the desk-setup scaffold's `_knowledge/profile.example.yaml`),
-never by editing a shipped skill, template, or tool. This repo is NOT itself an exec desk — it ships
-no repo-root `_knowledge/`; the `_knowledge/` convention belongs to the desks the tools stand up.
+**desk-standard is one binary and one plugin bundle over one shared schema**, all identity-neutral
+— nothing shipped carries a person, org, repo, or issue number. A desk is personalized by filling
+its `_knowledge/profile.yaml` (copied from the desk-setup scaffold's
+`_knowledge/profile.example.yaml`), never by editing a shipped skill, template, or tool. This repo
+is NOT itself an exec desk — it ships no repo-root `_knowledge/`; the `_knowledge/` convention
+belongs to the desks the tools stand up.
 
-**Architecture — two lanes + one contract:**
+**Architecture — one runtime, one surface bundle, one contract:**
 
-- **`plugin/`** — a harness-pure TypeScript core behind a **stdio MCP server**
-  (`plugin/mcp/server.ts`; tools `profile_get`, `profile_validate`, `template_render`,
-  `knowledge_index`), distributed as the `desk-standard` Claude Code plugin (bundle at
-  `plugins/desk-standard/`) with four skills (`desk-setup`,
-  `conventions-standard`, `harvest-loop`, `brownfield-adoption`). "Harness-pure" = the core imports
-  no harness/runtime APIs (enforced — see the critical rule).
-- **`librarian/`** — **deskkit**, a single Go binary with an **embedded PocketBase** store. Indexes
-  a desk, flags rule violations, and proposes/applies fixes under a record-original-first boundary
-  (byte-exact reversible via `restore`). Surfaces over one tool core: **CLI**, an **MCP server**
-  (`deskkit mcp-serve`), a **chat TUI**, and a **browser session page** (`/desk/chat` on the
-  embedded serve). Admin console (`make gui`) serves PocketBase at
-  `http://127.0.0.1:8090/_/`. It also carries the **PM module** (a document-gated work graph),
-  on by default (opt out with `PM_ENABLED=false`).
-- **`schema/`** — schema v1: the product-neutral contract both lanes read.
+- **`librarian/`** — **deskkit**, a single Go binary with an **embedded PocketBase** store, and the
+  entire runtime. Three modules feed one tool core:
+  - **`profile`** (always on, pure-read, no collections) — desk personalization: `profile_get`,
+    `profile_validate`, `template_render`, `knowledge_index`. Validates against a `go:embed`ed
+    schema copy, including the `x-contract-version` gate (ADR 0009).
+  - **`librarian`** — indexes a desk, flags rule violations, proposes/applies fixes under a
+    record-original-first boundary (byte-exact reversible via `restore`).
+  - **`pm`** — a document-gated work graph, on by default (opt out with `PM_ENABLED=false`).
+
+  Surfaces over that one core: **CLI**, an **MCP server** (`deskkit mcp-serve`, narrowed by
+  `MCP_MODULES`), a **chat TUI**, and a **browser session page** (`/desk/chat` on the embedded
+  serve). Admin console (`make -C librarian gui`) serves PocketBase at `http://127.0.0.1:8090/_/`.
+- **`plugins/desk-persona/`** — the ONE Claude Code plugin this marketplace ships: the agent-facing
+  surface over that same binary. Seven skills (`desk-setup`, `conventions-standard`,
+  `harvest-loop`, `brownfield-adoption`, `pm-session-open`, `pm-advance-item`, `pm-triage`), two
+  agents (`librarian-operator`, `pm-operator`), a SessionStart briefing hook, and one `.mcp.json`
+  launching `deskkit mcp-serve` with `MCP_MODULES=profile,librarian,pm`. It ships no runtime of its
+  own.
+- **`schema/`** — schema v1: the product-neutral contract, and the single source of truth for the
+  copies embedded in the binary.
 
 **Project structure** (every top-level entry annotated):
 
 ```
-plugin/            TS lane — harness-pure core + stdio MCP server (the desk-standard plugin's engine)
-  core/            harness-pure domain library (profile, schema validation, templating, indexing)
-  mcp/             stdio MCP server entry (server.ts)
-plugins/           the marketplace-distributed bundles (a marketplace install copies ONLY these)
-  desk-standard/   marketplace adapter: manifest, skills/, GENERATED mcp/server.js + schema copy
-  desk-persona/    the composed librarian+PM bundle: librarian-operator + pm-operator agents, 3 PM skills, SessionStart hook
-librarian/         Go lane — the deskkit binary; embedded PocketBase; CLI/MCP/TUI; verify.sh gate
-schema/            schema v1 — shared rule/structure source for both lanes
+librarian/         the deskkit binary — embedded PocketBase; profile/librarian/pm modules;
+                   CLI/MCP/TUI/web surfaces; verify.sh + e2e gates
+plugins/           the marketplace-distributed bundle (a marketplace install copies ONLY this)
+  desk-persona/    the only bundle: 7 skills, librarian-operator + pm-operator agents,
+                   SessionStart hook, .mcp.json — authored in place, nothing generated
+schema/            schema v1 — the source of truth for the binary's embedded copies
 docs/              specs, the CHARTER, and using/developing guides (ADRs live on the board)
 scripts/           repo-wide gate scripts (*.mjs) + record-media.sh
 tests/             signpost only — suites live with their products; see tests/README.md
@@ -69,18 +74,18 @@ kits/ + kits.yaml  SOP template library + its drift-guarded manifest
                    atelier.local.md (handoff lives on the DESK board, not in a file)
 .github/           CI workflows + issue/PR templates + dependabot
 Makefile           the canonical task interface — `make help` lists targets
-VERSION            single source of truth for the release version (both products ship off it)
+VERSION            single source of truth for the release version (binary + bundle ship off it)
 ```
 
 ## The one rule that matters: identity-neutrality
 
-**Nothing under `plugin/` or `librarian/` may hardcode a deployment identity** — no person, org,
-repo name, or bare issue reference (`#123`). This is the product's core promise and the failure
-that rots worst: a hardcoded identity ships inside a distributed binary/plugin and can't be pulled
-back. It is enforced in CI, not by convention:
+**Nothing under `librarian/`, `plugins/`, or `kits/` may hardcode a deployment identity** — no
+person, org, repo name, or bare issue reference (`#123`). This is the product's core promise and
+the failure that rots worst: a hardcoded identity ships inside a distributed binary/plugin and
+can't be pulled back. It is enforced in CI, not by convention:
 
 ```
-# scope = plugin/ + librarian/ recursively; docs/ and repo-root files are EXEMPT
+# scope = librarian/ + plugins/ + kits/ recursively; docs/ and repo-root files are EXEMPT
 node scripts/check-neutrality.mjs            # scans the shipped tree — FAILS on any hardcoded identity
 node scripts/check-neutrality.mjs --self-test  # proves the scanner still detects a seeded violation
 ```
@@ -96,15 +101,15 @@ the exit code and has let a failing gate through before (incident, 2026-07-17).
 | Command | What it does |
 |---|---|
 | `make help` | List all targets (default goal) |
-| `make setup` | `bun install` (plugin) + `lefthook install` (git hooks) |
-| `make build` | Build both lanes: plugin (`bun run build`) + librarian binary (version-stamped) |
-| `make test` | Fast unit tests: plugin `bun test` + librarian `go test ./...` |
-| `make check` | Repo gates: neutrality + self-test, kit-drift, prompt-drift, tool-surface drift + self-test, scaffold frontmatter, textfield-max, query-kind drift + self-test, doc-link integrity + self-test, plugin core-purity, shellcheck, actionlint, workflow SHA-pin drift + self-test, profile-root drift + self-test |
-| `make verify` | Librarian integration gate — `librarian/verify.sh` (61 checks, throwaway scratch desk) |
+| `make setup` | `lefthook install` (git hooks) — there is no package-manager step |
+| `make build` | Build the `deskkit` binary (version-stamped) |
+| `make test` | Fast unit tests: `go test ./...` in `librarian/` |
+| `make check` | Repo gates: neutrality + self-test, kit-drift, prompt-drift, tool-surface drift + self-test, scaffold frontmatter, persona drift, textfield-max, query-kind drift + self-test, doc-link integrity + self-test, shellcheck, actionlint, workflow SHA-pin drift + self-test, profile-root drift + self-test |
+| `make verify` | Librarian integration gate — `librarian/verify.sh` (throwaway scratch desk) |
 | `make e2e` | End-to-end system-behaviour suite — whole system (cold-start → profile → librarian → PM → surfaces → release-shaped) on a throwaway desk; offline, no LLM key (`librarian/e2e/e2e.sh`) |
-| `make package` | Regenerate the marketplace bundle (`plugins/desk-standard/` artifacts) |
+| `make package` | Informational no-op — the bundle under `plugins/` is authored in place, nothing is generated |
 | `make install` | Build + install the `deskkit` binary to `~/.local/bin` (override `PREFIX=`) |
-| `node scripts/check-version-sync.mjs` | Assert root `VERSION` matches the shipped plugin manifests |
+| `node scripts/check-version-sync.mjs` | Assert root `VERSION` matches the shipped manifests |
 | `make version-status` | Advisory (non-blocking): unreleased product changes since the last tag |
 | `make release-prep` | Pre-tag gate (see order below) |
 
@@ -114,24 +119,27 @@ reversible with `deskkit restore --by-path <path>`.
 
 ## Architecture notes
 
-### Generated artifacts — never hand-edit
+### Copied artifacts — edit the source, not the copy
 
-| File | Regenerate with | Guard |
+**Nothing under `plugins/` is generated.** The marketplace bundle is authored in place; `make
+package` generates nothing and only says so. What still needs care is the handful of files that
+are *copies of a canonical source*:
+
+| File | Source of truth | Guard |
 |---|---|---|
-| `plugins/desk-standard/mcp/server.js` | `cd plugin && bun run package` (`make package`) | CI `git diff --exit-code` |
-| `plugins/desk-standard/schema/profile.schema.yaml` | same (copied from `schema/`) | CI `git diff --exit-code` |
-| `plugins/desk-standard/schema/references.yaml` | same (copied from `schema/`) | CI `git diff --exit-code` |
+| `librarian/internal/core/schema/profile.schema.yaml` | `schema/profile.schema.yaml` — `go:embed` can't reach outside the Go module, so the binary carries a copy | `TestProfileSchemaEmbeddedCopy_MatchesRepoRoot` (`make test`) |
+| `librarian/internal/core/schema/references.yaml` | `schema/references.yaml` — same reason | `TestReferencesEmbeddedCopy_MatchesRepoRoot` (`make test`) |
 | `kits/` tree | authored, but `kits.yaml` must match it | `node scripts/check-kits.mjs` |
 
-The marketplace install copies **only** `plugins/desk-standard/`, so the bundled `server.js` must be
-self-contained — that's why it's committed and drift-guarded.
+Edit the repo-root `schema/` file first, then re-copy it into `librarian/internal/core/schema/`;
+the guards are byte-for-byte and fail loudly on a one-sided edit.
 
 ### Architectural rules and their enforcing checks
 
 | Rule | Enforced by |
 |---|---|
 | Identity-neutrality (shipped tree) | `scripts/check-neutrality.mjs` (+ `--self-test`) |
-| `plugin/core` stays harness-pure (no harness imports) | `plugin` `bun run check:purity` → `scripts/check-core-purity.mjs` |
+| Embedded schema copies stay byte-identical to `schema/` | `TestProfileSchemaEmbeddedCopy_MatchesRepoRoot` / `TestReferencesEmbeddedCopy_MatchesRepoRoot` (`make test`) |
 | `VERSION` == shipped manifests | `scripts/check-version-sync.mjs` |
 | `kits.yaml` == `kits/` tree | `scripts/check-kits.mjs` |
 | Prompt copies byte-identical (embed ↔ spec quote; ADR 0015) | `scripts/check-prompt-drift.mjs` |
@@ -143,7 +151,7 @@ self-contained — that's why it's committed and drift-guarded.
 | Librarian Go tree stays gofmt-clean | `gofmt -l` via `make -C librarian fmt` (CI librarian lane) |
 | A tagged release has a CHANGELOG section | `scripts/check-changelog.mjs` (release gate) |
 | Every workflow `uses:` stays SHA-pinned (no mutable `@vN` tag) | `scripts/check-workflow-pins.mjs` (+ `--self-test`) |
-| Profile root (`_knowledge`) pinned identically across schema/TS/Go | `scripts/check-profile-root.mjs` (+ `--self-test`) |
+| Profile root (`_knowledge`) pinned identically in `schema/paths.yaml` and the Go constant | `scripts/check-profile-root.mjs` (+ `--self-test`) |
 | Shell entry points stay lint-clean (install.sh, verify.sh, dogfood-*.sh, sandbox/*, record-media, e2e/*) | `shellcheck` (CI + `make check`) |
 | Every cited doc/media path on the published+shipped surface resolves (no dangling links; incident 2026-07-24) | `scripts/check-doc-links.mjs` (+ `--self-test`) |
 
@@ -180,7 +188,7 @@ guard and `init` do exactly this). Fail-closed behavior in `serve` paths needs a
 ### No in-repo dogfooding (ruled 2026-07-22, "no dogfood")
 
 This repo does not register its own MCP servers on itself — there is no root `.mcp.json` and
-none should be added. The tools this repo builds (the librarian, the PM module, the desk-standard
+none should be added. The tools this repo builds (the `deskkit` binary and the `desk-persona`
 plugin) are for coordinating *other* desks; that standard doesn't apply reflexively to the repo
 that builds it, and the coordination tooling must live outside it — on a desk built to operate on
 this repo, e.g. the paired executive desk (DESK-21 §0). In-repo verification instead
@@ -204,7 +212,8 @@ the librarian's supervised-write boundary wherever it runs.
   `make check`) fails on any dangling doc/media citation across the published+shipped surface, so a
   move that forgets a citation is caught — see `docs/development/docs-layout.md` for the full layout
   contract (what lives where, what's load-bearing, and how the working desk differs).
-- **Toolchain floors:** Go `1.25` (PocketBase's `go.mod` floors it), Bun `1.3.14`.
+- **Toolchain floor:** Go `1.25` (PocketBase's `go.mod` floors it). Node is needed only to run the
+  `scripts/*.mjs` gates — nothing shipped is built with it.
 
 ## Documentation
 
