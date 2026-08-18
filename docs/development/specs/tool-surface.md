@@ -255,14 +255,14 @@ Drop `MCP_MODULES` and the same env yields 21 (unset = all). Set `MCP_MODULES=""
 name) on a resolved desk and the process **exits 1** with an actionable stderr line — proving the
 fail-loud contract rather than a silent fallback.
 
-> **Drift-guard note.** Every count above is **enforced, not just documented**. The ADR-0016
-> guard has two halves: `TestToolSurfaceDoc_MCPCounts`
-> (`librarian/internal/core/mcp/tool_surface_doc_test.go`, on the `go test ./...` lane) parses the
-> tables in this doc and re-derives each number from the real `toolcore` gate over the registered
-> `profile` + `librarian` + `pm` specs — the live totals (9 / 10 / 21 / 22) and both gated mounts
-> (`MCP_MODULES=pm` → 12, `MCP_MODULES=profile` → 4), the mounts by tool NAME as well as count so a
-> tool changing modules is caught. `scripts/check-tool-surface.mjs` (on `make check`) pins the CLI
-> base count and asserts that Go test's presence.
+> **Drift-guard note.** Every count above is **enforced, not just documented**. The ADR-0016 guard
+> lives in `librarian/internal/core/mcp/tool_surface_doc_test.go` on the `go test ./...` (`make
+> test`) lane: it parses the tables in this doc and re-derives each number from source.
+> `TestToolSurfaceDoc_MCPCounts` covers the MCP counts against the real `toolcore` gate over the
+> registered `profile` + `librarian` + `pm` specs — the live totals (9 / 10 / 21 / 22) and both
+> gated mounts (`MCP_MODULES=pm` → 12, `MCP_MODULES=profile` → 4), the mounts by tool NAME as well
+> as count so a tool changing modules is caught. `TestToolSurfaceDoc_CLICount` covers the CLI base
+> count against the command registrations in `librarian/cmd/deskkit/main.go`.
 
 **Librarian CLI (surface 1)** — `deskkit --help` (and again with `PM_ENABLED=true`).
 

@@ -31,14 +31,23 @@ honest. The distinction is the thing to internalize:
 
 | Spec | Read by |
 |---|---|
-| `docs/development/specs/pocket-librarian-v1-spec.md` | `scripts/check-prompt-drift.mjs` (byte-identical prompt fence, ADR 0015) and `scripts/check-query-kinds.mjs` (§5.6 kind list) |
-| `docs/development/specs/tool-surface.md` | `scripts/check-tool-surface.mjs` (JS half) and `librarian/internal/core/mcp/tool_surface_doc_test.go` (Go half, on `make test`) — ADR 0016 |
+| `docs/development/specs/pocket-librarian-v1-spec.md` | `scripts/check-query-kinds.mjs` (§5.6 kind list) |
+| `docs/development/specs/tool-surface.md` | `librarian/internal/core/mcp/tool_surface_doc_test.go` (CLI + gated MCP counts, on `make test`) — ADR 0016 |
 | `docs/development/specs/agent-integration-contract-v1-spec.md` | cited by `plugins/desk-persona` and the neutrality allowlist (`schema/neutrality-lint.allow`) |
 | `docs/development/specs/pm-system-v1-spec.md`, `docs/development/specs/element-model-v2-draft.md` | cited across code, plans, and ADRs; the element-model draft is the live target of the phase-machine reconciliation |
 
 If you move one of these, repoint its reader **in the same change** — the reader hard-codes the path
 (a `join(...)` in the `.mjs`, a `filepath.Join(...)` in the Go test), so a stale path fails the gate
 loudly (ENOENT), which is the good outcome.
+
+## Specs cite code — they never byte-quote it
+
+A spec names the **path plus the symbol** (`librarian/templates/librarian-system-prompt.txt`,
+`func systemPrompt`) and lets the reader open the file. It does not reproduce the source in a fenced
+block. A second copy in prose rots the moment the first one changes, and the only way to hold it
+honest is a byte-identical drift guard per copy — a gate whose whole subject is a duplication the
+spec never needed. Illustrative excerpts that are clearly labelled as sketches are fine; a block
+claiming to be "kept verbatim" is not.
 
 ## The rule
 

@@ -1,12 +1,12 @@
 #!/usr/bin/env node
-// Kit-manifest drift guard. The SOP kit library lives under kits/, indexed by the root
-// kits.yaml manifest (desk decision 0013 S4(a); ported per desk-standard #49). This guard fails
-// if the manifest and the on-disk tree disagree in EITHER direction:
+// Kit-manifest drift guard: without it, a kit added, renamed, or emptied on disk could silently
+// diverge from the shipped kits.yaml index (desk decision 0013 S4(a)) — a desk consumer would
+// resolve a kit reference to a missing or wrong file with no signal.
+// This guard fails if the manifest and the on-disk kits/ tree disagree in EITHER direction:
 //   - a manifest kit whose dir is missing, or that lists a file not on disk   → "missing"
 //   - a kit dir on disk not named in the manifest                            → "untracked dir"
 //   - a *.md file on disk under kits/ not listed by its kit's `files`         → "untracked file"
-// So removing a kit/file/manifest row, or dropping a stray file in, is a red build that NAMES
-// the drift. Runs under plain Node (no deps), like the other scripts/ guards.
+// Runs under plain Node (no deps), like the other scripts/ guards.
 //
 //   node scripts/check-kits.mjs   scan; exit 1 on any drift, exit 0 when manifest == tree
 

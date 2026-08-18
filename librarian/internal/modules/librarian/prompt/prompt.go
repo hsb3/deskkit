@@ -8,8 +8,8 @@
 // not survive a store rebuild/re-seed, and clearing the row so the embed re-seeds is the
 // intended "reset to shipped" path, not data loss. The only durable customization path is
 // _knowledge/ personalization (the profile) — never a DB prompt edit, never an edit to this
-// shipped artifact. (Its byte-identity to the spec's "kept verbatim" quote is drift-guarded
-// by scripts/check-prompt-drift.mjs.)
+// shipped artifact. The spec (§6.1) cites this file as the canonical source rather than
+// quoting it, so there is nothing here to keep byte-identical.
 //
 // The run-time RESOLVER (systemPrompt: load the active row, fall back to the embedded
 // default, interpolate DESK_NAME/paths) is part of the agent-loop slice, not the spine —

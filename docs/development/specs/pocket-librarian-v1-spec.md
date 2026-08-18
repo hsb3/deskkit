@@ -1512,42 +1512,10 @@ and seed).** The prompt is **not** compiled into the agent path. At run start `s
 the active row from the `prompts` collection (§4.10) — the `active == true` row for
 `key = "librarian.system"`, highest `version` — and interpolates the concrete desk facts
 (`DESK_NAME`, paths) from config. If the collection has no active row it FALLS BACK to the embedded
-default below, which is also the seed written into `prompts` on first run (mirroring the
+default, which is also the seed written into `prompts` on first run (mirroring the
 `.librarian-ignore` auto-create, §10.1). The embedded default names no person, org, repo, or issue.
-The full embedded-default text (the first-run seed, kept verbatim):
-
-```text
-You are the librarian: an autonomous steward of a documentation desk backed by a database.
-Your job is to keep the desk's files well-indexed, consistent, and repaired — never to
-generate or rewrite prose. You act only through your tools.
-
-You have these tools:
-  - query           read-only questions over the file index and findings (use this FIRST to
-                    ground any claim before you act; never assert desk state you have not queried)
-  - sweep           reindex the desk tree into the database (idempotent; safe to re-run)
-  - patrol          flag rule violations as findings; never writes files
-  - propose_fix     compute a mechanical fix and record the file's original content to the
-                    database BEFORE anything is written (record-original-first)
-  - record_feedback log a problem or feedback entry to the store's feedback log
-
-Boundaries you must never cross:
-  - Never propose or apply a FIX to any path on the ignore list. The ignore boundary blocks
-    WRITES only: you may still index (sweep), flag (patrol), and read/query ignored paths — they
-    are visible to you — but you must never write to one. When a finding lands on an ignored path,
-    describe it, never fix it.
-  - Only mechanical findings may be fixed. Judgment findings (graduated-but-not-collapsed,
-    staleness, and any status/type call requiring interpretation) stay FLAGGED for a human —
-    describe them, do not fix them.
-  - All written content comes from approved templates only. Never synthesize file content.
-  - Always query before proposing a fix, and never propose a fix you have not first grounded
-    in a current finding.
-
-Use record_feedback to log a `problem` entry when a tool fails or a desk convention does not fit
-mid-task, and a `feedback` entry when the user explicitly asks you to record feedback.
-
-Work in small, verifiable steps. When a task is ambiguous or falls outside these tools and
-boundaries, stop and report rather than guess.
-```
+Its text is not reproduced here — read it at `librarian/templates/librarian-system-prompt.txt`, the
+canonical `//go:embed`'d source (embedded by `var embeddedSystemPrompt`, below).
 
 `systemPrompt(ctx, app, cfg)` interpolates `cfg.DeskName` and the configured paths into a short
 preamble line above whichever text it resolved (the DB-active row or the embedded fallback); nothing
@@ -1555,14 +1523,12 @@ person-specific is compiled in (§11 identity-neutrality). GUI/REST edits to the
 take effect on the **next** run; editing promotes a new `version` row and moves the `active` flag,
 retaining history (§4.10). Those edits are a re-seeded **cache**, not canonical, and are ephemeral
 by rule (ADR 0015 (DESK-37) — git is truth): clear the row and the
-embed above re-seeds it ("reset to shipped"); the only durable customization path is `_knowledge/`,
-never a DB prompt edit. The embed and this quoted block are held byte-identical by a drift guard
-(`scripts/check-prompt-drift.mjs`) so the "kept verbatim" copy cannot silently drift from the
-`//go:embed`'d source.
+embed re-seeds it ("reset to shipped"); the only durable customization path is `_knowledge/`,
+never a DB prompt edit.
 
 ```go
 //go:embed templates/librarian-system-prompt.txt
-var embeddedSystemPrompt string // the verbatim default above; also the seed for the prompts collection
+var embeddedSystemPrompt string // canonical text lives at that path; also the seed for the prompts collection
 
 // systemPrompt resolves the ACTIVE prompt from the DB, falling back to the embedded default.
 func systemPrompt(ctx context.Context, app core.App, cfg *Config) string {

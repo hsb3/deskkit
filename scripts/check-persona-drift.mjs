@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Persona drift guard (#119, ADR 0014(a) + ADR 0015). The composed `desk-persona` bundle's
+// Persona drift guard (ADR 0014(a) + ADR 0015). The composed `desk-persona` bundle's
 // librarian-operator agent is a GENERATED artifact: its persona body is a version-controlled copy
 // of exactly one authored source, so it cannot silently diverge from that source. This guard is
 // the repo's generated-artifact pattern (regenerate + compare) applied to that agent:
