@@ -108,7 +108,7 @@ func TestCommandGroups_RegisteredInOrder(t *testing.T) {
 }
 
 // TestCommandGroups_KeepFlatCommandIndent guards the grouped help's two-space command indent:
-// the integration gate greps `deskkit --help` for '^  chat ' (librarian/verify.sh), so grouping
+// the integration gate greps `deskkit --help` for '^  chat ' (verify.sh), so grouping
 // must not re-indent command lines.
 func TestCommandGroups_KeepFlatCommandIndent(t *testing.T) {
 	app := buildFullRoot(t)

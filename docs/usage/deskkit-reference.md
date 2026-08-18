@@ -17,7 +17,10 @@ content before any write, so every change can be reversed byte-exact. It is iden
 nothing about a person, org, repo, or desk is hardcoded. `DESK_ROOT`, `DESK_NAME`, path
 conventions, model id, and provider all come from environment/config.
 
-Full spec: [`../development/specs/pocket-librarian-v1-spec.md`](../development/specs/pocket-librarian-v1-spec.md).
+Design background — the build spec this module was written against, kept as a record of that
+build rather than a description of today's binary:
+[`../development/specs/pocket-librarian-v1-spec.md`](../development/specs/pocket-librarian-v1-spec.md).
+This page is the current surface.
 
 ## Quick start
 
@@ -61,7 +64,7 @@ supply them; it walks up from the working directory and resolves in the order en
 The `make` targets run from the repo root, so they take the environment form:
 
 ```bash
-make build          # go build -> ./deskkit
+make build           # build the web/ SPA (npm), then go build -> ./deskkit
 make sweep           # index the desk tree
 make patrol          # flag rule violations (dry-run; never writes)
 make findings        # or: summary / adoption / orphans / uncollapsed
@@ -263,12 +266,19 @@ once the binary itself was built with `make build`'s Node step (a binary built w
 placeholder page instead). One visit is enough:
 
 ```bash
-./deskkit serve       # then open http://127.0.0.1:8090/
+./deskkit serve      # then open http://127.0.0.1:8090/
 ```
 
 v1 screens: **chat** (the same multi-turn agent loop as `chat`/the REPL above) and a **read-only
-browse** of documents (files), findings, agent runs with their messages, and PM items. Writes
-stay on the CLI/MCP tool core — nothing in the SPA calls a write tool. The former standalone
+browse** of documents (files), findings, agent runs with their messages, and PM items.
+
+The chat screen on a fresh session — the composer, with a question typed but not yet sent. No
+conversation has happened here; sending needs an LLM key configured as above, and the browse
+screens are shown in the root [`README.md`](../../README.md):
+
+![The deskkit browser chat screen: an empty transcript with a question typed into the composer, not yet sent](../assets/spa-chat.png)
+
+Writes stay on the CLI/MCP tool core — nothing in the SPA calls a write tool. The former standalone
 `/desk/chat` page (a single Go route serving embedded HTML) is removed; the URL still works,
 because the SPA's index fallback serves the same shell there, like any other client-side route.
 `POST /desk/chat/stream` and `POST /desk/chat/reset` are unchanged: same gated tool set and

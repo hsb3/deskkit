@@ -1,31 +1,14 @@
 #!/bin/bash
-# verify.sh — the deskkit Phase-1 verify gate (spec §9.4), adapted to the
-# single-binary Go CLI: build, migrate, seed the spec's four concrete fixtures (§9.4 table)
-# into a THROWAWAY scratch desk under mktemp (never a real desk), then drive the tool chain
-# sweep -> patrol -> propose-fix -> apply-fix -> restore, asserting the record-original-first
-# safety boundary (decision 0014) end to end. Numbered PASS/FAIL lines; non-zero exit on any
-# failure. Run by the operator/CI, never asserted by the agent (spec §9.4 note).
+# verify.sh — the deskkit verify gate: build, migrate, seed fixtures into a THROWAWAY scratch
+# desk under mktemp (never a real desk), then drive sweep -> patrol -> propose-fix -> apply-fix
+# -> restore, asserting the record-original-first safety boundary end to end. Numbered PASS/FAIL
+# lines; non-zero exit on any failure. Operator/CI-run, never asserted by the agent.
 #
-# Known gaps vs the spec text (see HANDOFF for detail; do not silently "fix" by inventing
-# flags):
-#   - The spec's dead-store-refusal trigger `LIBRARIAN_FAULT_INJECT=revision-store-down`
-#     (§9.2/§9.4 check 10) is NOT implemented in the current Go tree (verified: no match
-#     anywhere in the tree). This script substitutes a filesystem-permission fault
-#     (chmod the store tree read-only) to force the same revisions-insert failure and
-#     proves the same invariant (rc != 0, no fs write) without inventing the env flag.
-#   - `serve` is never started here: none of the checks in this gate's brief require a live
-#     HTTP server, and starting/stopping one only adds process-management risk. `make serve`
-#     / `make gui` remain the way to exercise `serve` manually.
-#   - `query live_files` does not expose a per-file checksum (only path/dir_kind/doctype/
-#     status/graduated_to/git_last_commit — see internal/tools/query.go fileBrief). The
-#     "per-path checksum set" reproducibility check (§9.4 check 7) is therefore proven by an
-#     independent shasum snapshot of the scratch desk tree (mirroring sweep's own file-walk
-#     pruning), not by reading checksums back out of the CLI.
-# The idiom `<condition>; check "<desc>" $?` recurs throughout this harness: a test condition is
-# evaluated purely for its exit status, which is then fed to check() as pass/fail. SC2319 ("$? after
-# a condition usually means you wanted the command before it") structurally misfires on that
-# intentional pattern at every call site, so it is disabled file-wide below; every OTHER lint rule
-# stays enforced.
+# No check here needs a live HTTP server, so `serve` is never started; `make serve` / `make gui`
+# exercise it manually.
+#
+# `<condition>; check "<desc>" $?` is this harness's idiom at every call site, and SC2319
+# structurally misfires on it — that ONE rule is off file-wide; every other rule stays enforced.
 # shellcheck disable=SC2319
 set -uo pipefail
 cd "$(dirname "$0")" || exit 1
@@ -48,12 +31,10 @@ check() { # check <description> <rc: 0=pass, nonzero=fail>
 
 sha() { shasum -a 256 "$1" | awk '{print $1}'; }
 
-# snapshot mirrors internal/tools/sweep.go's walkDeskFiles pruning (skip .git/, logs/, and
-# any pb_*-prefixed dir or file) so it is an independent oracle for "the same files with the
-# same bytes", not a re-read of the DB the tools themselves populate.
-# .librarian-ignore is also pruned: it is expected infrastructure auto-created by the FIRST
-# tool invocation (after the as-seeded snapshot), not desk drift — including it would fail
-# the as-seeded and rebuild comparisons for a file the tools are supposed to create.
+# snapshot mirrors sweep's walkDeskFiles pruning (.git/, logs/, pb_*) so it stays an independent
+# oracle for "the same files with the same bytes", not a re-read of the DB the tools populate.
+# .librarian-ignore prunes too: the first tool invocation creates it, so counting it would fail
+# the as-seeded and rebuild comparisons.
 snapshot() {
   # Portable across GNU/BSD find+xargs: no `xargs -r` (GNU-only "no run if empty" — BSD
   # xargs lacks it and would otherwise invoke shasum with zero args, which reads stdin and
@@ -71,20 +52,17 @@ snapshot() {
 
 WORK=$(mktemp -d "${TMPDIR:-/tmp}/deskkit-verify.XXXXXX")
 
-# Hermetic store home (ADR 0002 §2): point XDG_DATA_HOME at a throwaway scratch for the WHOLE
-# run. Every store-touching command now resolves its store to
-# $XDG_DATA_HOME/deskkit/<DESK_NAME> when no --dir is passed, so exporting a scratch
-# XDG_DATA_HOME guarantees NO check — including the new resolution/guard checks below — can ever
-# touch the operator's real ~/.local/share store. Exported so every child process inherits it.
+# Hermetic store home: with no --dir a store resolves to $XDG_DATA_HOME/deskkit/<DESK_NAME>, so
+# a scratch XDG_DATA_HOME exported for the WHOLE run keeps every check off the operator's real
+# ~/.local/share store. Exported so every child process inherits it.
 XDG_DATA_HOME=$(mktemp -d "${TMPDIR:-/tmp}/deskkit-xdg.XXXXXX")
 export XDG_DATA_HOME
 # The main run drives the "verify-desk" desk; with no --dir its store resolves to this dir.
 STORE="$XDG_DATA_HOME/deskkit/verify-desk"
 
-# Section 13's own scratch dirs are declared (empty) here, before the EXIT trap is installed,
-# so ONE trap covers the whole script — including a SIGINT mid-section-13, after these are
-# mktemp'd in section 13 but before that section finishes. Each is guarded with an empty-string
-# check in cleanup() since they are unset for most of the run.
+# Later sections' scratch dirs are declared (empty) before the EXIT trap is installed, so ONE
+# trap covers the whole script even on a SIGINT between their mktemp and their section's end;
+# cleanup() empty-string-guards each because they are unset for most of the run.
 XDG2=""
 DESK2=""
 DIR3=""
@@ -107,11 +85,10 @@ cleanup() {
 }
 trap cleanup EXIT
 
-# run_lib inherits the exported scratch XDG_DATA_HOME above; it passes NO --dir on purpose, so
-# the run exercises the ADR 0002 §2 XDG default-resolution path end to end.
+# run_lib passes NO --dir on purpose: the run must exercise XDG default store resolution.
 run_lib() { DESK_ROOT="$WORK" DESK_NAME="verify-desk" ./"$BIN" "$@"; }
 
-# Single-writer guard (spec §2.7): refuse to blow away the store out from under a live `serve`.
+# Single-writer guard: refuse to blow away the store out from under a live `serve`.
 if [ -f .deskkit.pid ] && kill -0 "$(cat .deskkit.pid)" 2>/dev/null; then
   echo "FATAL: a serve process is running (pid $(cat .deskkit.pid)) — run 'make stop' first." >&2
   exit 1
@@ -125,22 +102,20 @@ rm -rf "$STORE"
 go build -o "$BIN" ./cmd/deskkit
 check "build ./$BIN" $?
 
-# --- 0b. self-initialization (ADR 0003) ---------------------------------------------------
-# A tool command against a store that was never `migrate up`'d must succeed by auto-applying
-# the app migrations at the requireConfig choke point, NOT leak the bare sql.ErrNoRows. Uses a
-# DISTINCT desk name so its store is a fresh, never-migrated location under the scratch XDG home
-# (cleaned by the EXIT trap); DESK_ROOT reuses $WORK (still empty here). Regression guard for the
-# uninitialized-store leak.
+# --- 0b. self-initialization ----------------------------------------------------------------
+# A tool command against a never-`migrate up`'d store must auto-apply the app migrations at the
+# requireConfig choke point, not leak a bare sql.ErrNoRows. A DISTINCT desk name keeps this store
+# fresh and never-migrated under the scratch XDG home.
 DESK_ROOT="$WORK" DESK_NAME="verify-selfinit-desk" ./"$BIN" query summary > /dev/null 2>&1
 check "self-init: query on a never-migrated store succeeds (ADR 0003)" $?
 
-# --- 1. migrate: applies + is idempotent (spec §9.4 check 2) -----------------------------
+# --- 1. migrate: applies + is idempotent ---------------------------------------------------
 run_lib migrate up > /dev/null 2>&1
 check "migrate up" $?
 run_lib migrate up > /dev/null 2>&1
 check "migrate up is idempotent (second run is a no-op)" $?
 
-# --- 2. seed the spec §9.4 fixture table verbatim ------------------------------------------
+# --- 2. seed the rule fixtures --------------------------------------------------------------
 mkdir -p "$WORK/tasks" "$WORK/analyses" "$WORK/_structure/decisions"
 
 # F-R1: missing frontmatter, correctly placed under tasks/ -> R1 only.
@@ -200,7 +175,7 @@ R3_DST="tasks/r3-fixture-type-task.md"
 R1_PATH="tasks/r1-fixture-missing-fm.md"
 IGN_PATH="_structure/decisions/9999-ignore-fixture.md"
 
-# --- 3. sweep indexes the fixtures + is idempotent (spec §9.4 checks 3, 6) ----------------
+# --- 3. sweep indexes the fixtures + is idempotent -------------------------------------------
 SWEEP1=$(run_lib sweep)
 RC=$?
 check "sweep runs" $RC
@@ -215,7 +190,7 @@ DELETED2=$(echo "$SWEEP2" | jq -r '.soft_deleted')
 [ "$CREATED2" -eq 0 ] && [ "$UPDATED2" -eq 0 ] && [ "$DELETED2" -eq 0 ]
 check "re-running sweep changes nothing (created=$CREATED2 updated=$UPDATED2 soft_deleted=$DELETED2)" $?
 
-# --- 4. patrol produces the expected findings (spec §9.4 check 9) ------------------------
+# --- 4. patrol produces the expected findings ------------------------------------------------
 PATROL1=$(run_lib patrol)
 RC=$?
 check "patrol runs" $RC
@@ -226,7 +201,7 @@ N_R5=$(echo "$PATROL1" | jq -r '.by_rule.R5 // 0')
 [ "$N_R1" -ge 2 ] && [ "$N_R3" -ge 1 ] && [ "$N_R5" -ge 1 ]
 check "patrol found >=2 R1 (F-R1+F-IGN), >=1 R3 (F-R3), >=1 R5 judgment (F-R5): R1=$N_R1 R3=$N_R3 R5=$N_R5" $?
 
-# --- 5. every query kind exits 0 with non-empty output (spec §9.4 check 5) ---------------
+# --- 5. every query kind exits 0 with non-empty output ---------------------------------------
 for kind in live_files recent orphans uncollapsed findings summary adoption; do
   OUT=$(run_lib query "$kind" 2>&1)
   RC=$?
@@ -236,8 +211,8 @@ done
 
 N_UNCOLLAPSED_BEFORE=$(run_lib query uncollapsed | jq -r '.count')
 
-# --- 5b. finding id round-trips through query -> findings dispose (issue: finding briefs must
-# carry the record id, so `findings dispose <id>` is reachable from the CLI alone) -------------
+# --- 5b. finding id round-trips through query -> findings dispose: briefs must carry the record
+# id, or `findings dispose <id>` is unreachable from the CLI alone -----------------------------
 FINDINGS_JSON=$(run_lib query findings)
 FIRST_FINDING_ID=$(echo "$FINDINGS_JSON" | jq -r '[.by_rule[][] | .id] | .[0] // empty')
 [ -n "$FIRST_FINDING_ID" ]
@@ -264,14 +239,14 @@ FINDINGS_INCLUDE_DISPOSED=$(run_lib query findings --include-disposed)
 echo "$FINDINGS_INCLUDE_DISPOSED" | jq -e --arg id "$FIRST_FINDING_ID" '([.by_rule[][] | .id] | index($id)) != null' > /dev/null
 check "query findings --include-disposed still lists the disposed id" $?
 
-# Restore to 'open' so the mechanical-vs-judgment uncollapsed-count comparison later in this
-# gate (§8, "F-R5's judgment finding is untouched by apply-fix") is unaffected by this detour.
+# Restore to 'open': section 8's uncollapsed-count comparison must not see this detour.
 run_lib findings dispose "$FIRST_FINDING_ID" --as open > /dev/null
 check "findings dispose <id> --as open restores it (keeps later uncollapsed counts stable)" $?
 
-# --- 6. dead-store refusal (spec §9.2/§9.4 check 10 — see the header note: the documented
-# LIBRARIAN_FAULT_INJECT env flag is not implemented, so a filesystem-permission fault stands
-# in for it) --------------------------------------------------------------------------------
+# --- 6. dead-store refusal: chmod the store tree read-only to force the revisions insert to
+# fail, and assert rc != 0 with no filesystem write ------------------------------------------
+# The permission fault stands in for the spec's LIBRARIAN_FAULT_INJECT=revision-store-down, which
+# is documented but not implemented anywhere in this tree — don't "restore" the env flag.
 chmod -R -w "$STORE"
 run_lib propose-fix --run "$RUN_ID" > /dev/null 2>&1
 RC=$?
@@ -298,7 +273,7 @@ check "propose-fix refuses the ignored F-IGN path (outcome=$OUT_IGN)" $?
 [ "$(sha "$WORK/$R1_PATH")" = "$SHA_R1_ORIG" ] && [ "$(sha "$WORK/$R3_SRC")" = "$SHA_R3_ORIG" ]
 check "propose-fix performed no filesystem write" $?
 
-# --- 8. apply-fix: commit the recorded revisions (spec §9.4 checks 11-17) ----------------
+# --- 8. apply-fix: commit the recorded revisions ---------------------------------------------
 APPLY_OUT=$(run_lib apply-fix --run "$RUN_ID")
 RC=$?
 check "apply-fix runs" $RC
@@ -334,7 +309,7 @@ N_UNCOLLAPSED_AFTER=$(run_lib query uncollapsed | jq -r '.count')
 [ "$N_UNCOLLAPSED_AFTER" -eq "$N_UNCOLLAPSED_BEFORE" ]
 check "F-R5's judgment finding is untouched by apply-fix (mechanical-only): $N_UNCOLLAPSED_AFTER == $N_UNCOLLAPSED_BEFORE" $?
 
-# --- 9. restore reverses both fixes byte-identically (spec §9.4 checks 18-19) ------------
+# --- 9. restore reverses both fixes byte-identically -----------------------------------------
 RESTORE_R3_OUT=$(run_lib restore --by-path "$R3_SRC")
 RC=$?
 check "restore --by-path $R3_SRC runs" $RC
@@ -355,7 +330,7 @@ SNAP_RESTORED=$(snapshot)
 diff <(echo "$SNAP_SEEDED") <(echo "$SNAP_RESTORED") > /dev/null
 check "whole scratch-desk tree matches its as-seeded state after both restores" $?
 
-# --- 10. rebuild-from-scratch reproduces the file count + checksum set (§9.4 check 7) ----
+# --- 10. rebuild-from-scratch reproduces the file count + checksum set -----------------------
 chmod -R u+w "$STORE" 2>/dev/null || true
 rm -rf "$STORE"
 run_lib migrate up > /dev/null 2>&1
@@ -368,25 +343,21 @@ SNAP_REBUILT=$(snapshot)
 diff <(echo "$SNAP_SEEDED") <(echo "$SNAP_REBUILT") > /dev/null
 check "rebuild reproduces the same per-path checksum set (independent shasum oracle)" $?
 
-# --- 11. error-exit check: restore --by-path on a path with no revision (spec's fail-loud
-# discipline; not itself in the numbered §9.4 list but required by this brief) ------------
+# --- 11. error-exit check: restore --by-path on a path with no revision fails loudly ---------
 run_lib restore --by-path "does/not/exist.md" > /dev/null 2>&1
 RC=$?
 [ "$RC" -ne 0 ]
 check "restore --by-path nonexistent exits non-zero (rc=$RC)" $?
 
-# --- 12. interactive surface is registered (key-free: --help never opens a Session, so this
-# needs no LLM provider, no API key, and no running serve) --------------------------------
+# --- 12. interactive surface is registered — key-free, since --help never opens a Session ----
 ./"$BIN" chat --help > /dev/null 2>&1
 check "chat --help exits 0 (interactive session subcommand is registered)" $?
 
 ./"$BIN" --help 2>&1 | grep -q '^  chat '
 check "root --help lists the chat command" $?
 
-# --- 13. store-location resolution + desk open-guard (ADR 0002 §2/§3) ---------------------
+# --- 13. store-location resolution + desk open-guard -----------------------------------------
 # Self-contained: its own throwaway XDG home + desk roots, isolated from the main run's store.
-# XDG2/DESK2/DIR3 are declared (empty) up top, next to the main WORK/XDG_DATA_HOME scratch
-# dirs, so the single EXIT trap removes them too — no separate cleanup13 trap/call needed.
 XDG2=$(mktemp -d "${TMPDIR:-/tmp}/deskkit-xdg2.XXXXXX")
 DESK2=$(mktemp -d "${TMPDIR:-/tmp}/deskkit-desk2.XXXXXX")
 DIR3=$(mktemp -d "${TMPDIR:-/tmp}/deskkit-dir3.XXXXXX")
@@ -402,9 +373,8 @@ XDG_DATA_HOME="$XDG2" DESK_ROOT="$DESK2" DESK_NAME="desk-one" ./"$BIN" sweep > /
 check "no --dir: sweep populates the XDG-resolved store" $?
 
 # (ii) reopen the SAME physical store dir with a different DESK_NAME -> refused, error names
-# both desks. DESK_NAME is itself the store's dir name, so the mismatch the guard defends
-# against (ADR 0002 §3) is a copy-pasted --dir / env pointing a second desk at the first's
-# store; --dir at desk-one's store while configuring "desk-two" reproduces exactly that.
+# both desks. DESK_NAME is the store's own dir name, so the mismatch the guard defends against
+# is a copy-pasted --dir pointing a second desk at the first's store, reproduced here.
 STORE_ONE="$XDG2/deskkit/desk-one"
 GUARD_OUT=$(DESK_ROOT="$DESK2" DESK_NAME="desk-two" ./"$BIN" query summary --dir "$STORE_ONE" 2>&1)
 RC=$?
@@ -419,10 +389,9 @@ RC=$?
 [ "$RC" -eq 0 ] && [ -f "$DIR3/data.db" ] && [ ! -d "$XDG2/deskkit/desk-three" ]
 check "--dir overrides the XDG default (store lands at the explicit dir, not XDG)" $?
 
-# --- 14. legacy store-home auto-migration (D2b, spec §2.10) -------------------------------
-# A pre-rename store at $XDG/pocket-librarian/<DESK_NAME>/ must move to $XDG/deskkit/<DESK_NAME>/
-# on startup — exactly one logged line, contents intact. Fresh-XDG runs (section 13 (i)) already
-# prove the no-old-home case is a silent no-op.
+# --- 14. legacy store-home auto-migration -----------------------------------------------------
+# A store at $XDG/pocket-librarian/<DESK_NAME>/ moves to $XDG/deskkit/<DESK_NAME>/ on startup:
+# exactly one logged line, contents intact. Section 13 (i) already covers the no-old-home no-op.
 XDG4=$(mktemp -d "${TMPDIR:-/tmp}/deskkit-xdg4.XXXXXX")
 mkdir -p "$XDG4/pocket-librarian/legacy-desk"
 echo "legacy-marker" > "$XDG4/pocket-librarian/legacy-desk/marker.txt"
@@ -435,15 +404,11 @@ RC=$?
   && [ "$(echo "$MIG_OUT" | grep -c 'deskkit: migrated store')" -eq 1 ]
 check "legacy store auto-migrated to the deskkit home (one log line; contents intact)" $?
 
-# --- 15. content search + retrieval + orphans index/entry visibility (isolated scratch) ----
-# The query surfaces added in the recent content-index work — `query search` (keyword retrieval
-# over the swept file body), `query content` (fetch one file's stored body by path), and the
-# orphans `--show-index` flag (reveal the by-design-unreferenced index/entry files hidden from the
-# default view) — are exercised here against their OWN throwaway XDG home + desk, fully isolated
-# from the main run above: no propose-fix/apply-fix ever touches these fixtures, so the
-# record-original/restore reproducibility invariant (sections 9-10) is untouched. XDG5/DESK5 are
-# declared (empty) up top so the single EXIT trap removes them. The store self-initializes on the
-# first sweep (ADR 0003), so no explicit `migrate up` is needed here.
+# --- 15. content search + retrieval + orphans index/entry visibility (isolated scratch) -------
+# `query search`, `query content`, and orphans `--show-index` run against their OWN throwaway XDG
+# home + desk: no propose-fix/apply-fix touches these fixtures, so sections 9-10's
+# record-original/restore reproducibility invariant stays intact. The store self-initializes on
+# the first sweep, so no explicit `migrate up` is needed.
 XDG5=$(mktemp -d "${TMPDIR:-/tmp}/deskkit-xdg5.XXXXXX")
 DESK5=$(mktemp -d "${TMPDIR:-/tmp}/deskkit-desk5.XXXXXX")
 mkdir -p "$DESK5/tasks"

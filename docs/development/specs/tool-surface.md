@@ -1,15 +1,15 @@
 # Tool surface — the authoritative map
 
-_Enumerates every tool/command desk-standard exposes, across both surfaces, with the exact
-gate that controls each and the empirically-verified count per surface. This is the reference that
-replaces the informal (and wrong) "seven-tool core" shorthand._
+_Enumerates every tool/command deskkit exposes, across both of its tool-bearing surfaces, with the
+exact gate that controls each and the empirically-verified count per surface. This is the reference
+that replaces the informal (and wrong) "seven-tool core" shorthand._
 
 Status: active
-Date: 2026-07-20
+Date: 2026-07-20 (framing refreshed 2026-08-18 for the single-binary consolidation)
 
-desk-standard is **two products over one shared schema**. Tools reach a caller through two
-distinct surfaces, and the count differs on each — so "how many tools are there?" has no single
-answer without naming the surface and its gate:
+deskkit is **one binary and one plugin bundle over one shared schema**. Tools reach a caller
+through two distinct surfaces, and the count differs on each — so "how many tools are there?" has
+no single answer without naming the surface and its gate:
 
 1. **Librarian CLI** — the `deskkit` binary's Cobra subcommands (the fullest set).
 2. **Librarian MCP server** — `deskkit mcp-serve`, a *gated subset* of the tool core, model-facing.

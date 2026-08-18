@@ -8,6 +8,13 @@ plugin for the agent-facing surfaces._
 Status: Delivered in v0.7.0 (epic #55, slices D1–D8) — frozen build contract, retained for provenance. The shipped code + tests are authoritative; see §12 (test traceability), CHANGELOG `[0.7.0]`, and ADRs 0002 / 0008.
 Date: 2026-07-18 (delivered 2026-07-19)
 
+> **This describes the pre-consolidation architecture as it was planned and built.** Paths in the
+> tree diagrams and slice notes (`cmd/pocket-librarian/`, the `plugin/` TypeScript lane, a second
+> `desk-pm` plugin beside `desk-standard`) are the layout of the time, not of today's tree. The
+> repo now ships one Go module at the root (`cmd/deskkit/`, `internal/`) and one plugin bundle
+> (`plugins/deskkit/`). For today's shape see [`../CHARTER.md`](../CHARTER.md); this page is kept
+> as the record of the build, not rewritten to match the present.
+
 ## Table of contents
 
 1. [Overview, goals, non-goals](#1-overview-goals-non-goals)

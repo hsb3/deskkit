@@ -1,11 +1,10 @@
-// Command deskkit is the single Go binary that serves PocketBase, runs the agent
-// loop under `serve` (later slice), and exposes the librarian tool core as CLI subcommands. This
-// spine wires: pocketbase.New(), migratecmd (automigrate), the blank-imported migrations,
-// first-run seeding (ignore boundary + system prompt) on serve, and the Cobra subcommands
-// routed through the tools seam. Core + module wiring (spec §2.7): main builds the enabled
-// module set (librarian, always on; pm, ON by default — ADR 0008 amendment; opt out with
-// PM_ENABLED=false / profile modules.pm.enabled: false) via module.Register, which
-// merges each module's tools into the shared toolcore registry before any surface builds.
+// Command deskkit is the single Go binary: it serves PocketBase, runs the agent loop under
+// `serve`, and exposes the tool core as CLI subcommands. This spine wires pocketbase.New(),
+// migratecmd (automigrate), the blank-imported migrations, first-run seeding (ignore boundary +
+// system prompt) on serve, and the Cobra subcommands routed through the tools seam. main builds
+// the enabled module set (librarian always on; pm on unless PM_ENABLED=false or profile
+// modules.pm.enabled: false) via module.Register, which merges each module's tools into the
+// shared toolcore registry before any surface builds.
 package main
 
 import (
@@ -48,43 +47,35 @@ import (
 	"github.com/hsb3/deskkit/internal/modules/pm"
 	"github.com/hsb3/deskkit/internal/modules/profile"
 
-	// Blank-import registers the librarian's Go migrations (spec §4.11). The core-owned
-	// module_schema_versions meta migration self-registers via internal/core/migrate's own
-	// init() — that package is already imported normally above (for GuardDowngrade/
-	// StampModules), which is sufficient to run its init().
+	// Blank-import registers the librarian's Go migrations. The core-owned
+	// module_schema_versions meta migration self-registers from internal/core/migrate's init(),
+	// which the normal import above already runs.
 	_ "github.com/hsb3/deskkit/internal/modules/librarian/collections"
 )
 
-// version is stamped at build time via ldflags (-X main.version=<VERSION>), wired from the
-// repo-root VERSION file by the librarian Makefile and the release workflow. A bare `go build`
-// leaves the default "dev", so `deskkit --version` prints the real version only for
-// make/release builds.
+// version is stamped at build time via ldflags from the repo-root VERSION file. A bare
+// `go build` leaves "dev", so `deskkit --version` is truthful only for make/release builds.
 var version = "dev"
 
-// moduleReg holds the enabled module set (spec §2.7), populated once in main() by
-// module.Register before the app is constructed. OnServe (stamping + per-module hooks) and
-// requireConfig (stamping) both read it.
+// moduleReg holds the enabled module set, populated once in main() by module.Register before the
+// app is constructed. OnServe and requireConfig both read it.
 var moduleReg *module.Registry
 
 func main() {
-	// `init` scaffolds a desk profile with filesystem writes ONLY: it needs neither resolved
-	// config nor PocketBase, and — critically — must never trigger PocketBase's Bootstrap, which
-	// MkdirAll-creates a store data dir. Bootstrap runs for every KNOWN registered command
-	// (skipBootstrap only spares --help/--version/unknown), so a registered `init` reaching
-	// app.Start() would still materialize a stray pb_data. Handle it HERE, before the app exists,
-	// and exit. `init --help` / `init -h` are deliberately NOT matched (isInitInvocation returns
-	// false): they fall through to cobra, whose help path skips Bootstrap and prints the
-	// registered command's usage (init is also registered in registerToolCommands for discovery).
+	// `init` scaffolds a desk profile with filesystem writes ONLY, and must never trigger
+	// PocketBase's Bootstrap, which MkdirAll-creates a store data dir. Bootstrap runs for every
+	// KNOWN registered command (skipBootstrap only spares --help/--version/unknown), so a
+	// registered `init` reaching app.Start() would materialize a stray pb_data — handle it here,
+	// before the app exists. `init --help`/`-h` deliberately fall through to cobra instead: the
+	// help path skips Bootstrap and prints the registered command's usage.
 	if isInitInvocation(os.Args[1:]) {
 		os.Exit(runInit(os.Args[1:]))
 	}
 
-	// `desks` and `config` are read-only orientation commands over the XDG homes: they enumerate
-	// the store dirs / print the resolved configuration and open NO store. They are intercepted
-	// here for exactly the reason `init` is — PocketBase's skipBootstrap only spares
-	// --help/--version/an unknown command, so a normally-dispatched `desks` would still reach
-	// Bootstrap and MkdirAll a stray store dir just for asking which desks exist. Both stay
-	// registered on app.RootCmd below for discovery/`--help` (whose path skips Bootstrap).
+	// `desks` and `config` are read-only orientation commands that open NO store, intercepted for
+	// the same reason `init` is: a normally-dispatched `desks` would still reach Bootstrap and
+	// MkdirAll a stray store dir just for asking which desks exist. Both stay registered on
+	// app.RootCmd below for discovery and `--help`, whose path skips Bootstrap.
 	if isInterceptedInvocation(os.Args[1:], "desks") {
 		os.Exit(runIntercepted(newDesksCmd(), os.Args[1:]))
 	}
@@ -92,30 +83,25 @@ func main() {
 		os.Exit(runIntercepted(newConfigCmd(), os.Args[1:]))
 	}
 
-	// Config is resolved BEFORE the app is constructed: the store location is derived from
-	// DESK_NAME and seeds PocketBase's --dir default (ADR 0002 §2). config.Load has no
-	// PocketBase dependency, so this reorder is safe. serve/migrate (schema ops) may still run
-	// even before DESK_ROOT/DESK_NAME are fully set, but the store LOCATION must be resolvable —
-	// via DESK_NAME (→ the XDG default) or an explicit --dir (enforced just below). The tool
-	// subcommands additionally require full config (requireConfig).
+	// Config resolves BEFORE the app is constructed: the store location derives from DESK_NAME and
+	// seeds PocketBase's --dir default. serve/migrate still run without full config, but the store
+	// LOCATION must resolve — via DESK_NAME (the XDG default) or an explicit --dir, enforced just
+	// below. Tool subcommands additionally require full config (requireConfig).
 	cfg, cfgErr := config.Load()
 
-	// --dir is the explicit store override that wins over the XDG default (both `--dir <path>`
-	// and `--dir=<path>` forms). When present, the location is whatever the operator chose and
-	// the unresolved-location guard does not apply.
+	// --dir explicitly overrides the XDG default (both `--dir <path>` and `--dir=<path>`); when
+	// present the unresolved-location guard below does not apply.
 	explicitDir := hasDirFlag(os.Args[1:])
-	// `pm` is store-touching only when the pm module is enabled (spec §2.9): with PM off the
-	// group is not even registered, so guarding (and pre-creating the store dir for) an
-	// unknown command would be wrong.
+	// `pm` is store-touching only when the pm module is enabled: with PM off the group is not even
+	// registered, so guarding (and pre-creating a store dir for) an unknown command would be wrong.
 	storeTouching := isStoreTouchingInvocation(os.Args[1:]) ||
 		(firstSubcommand(os.Args[1:]) == "pm" && cfg != nil && cfg.PMEnabled)
-	// --no-input (root persistent flag; also registered on app.RootCmd below for help/usage) is
-	// read manually here because the first-run onramp is decided in main() BEFORE cobra parses
-	// flags. Non-TTY or --no-input => today's fail-closed behavior, byte-identical error.
+	// --no-input is read manually here because the first-run onramp is decided in main() BEFORE
+	// cobra parses flags. Non-TTY or --no-input means fail closed.
 	noInput := hasNoInputFlag(os.Args[1:])
 
-	// Absent --dir, the store defaults to $XDG_DATA_HOME/deskkit/<DESK_NAME>/ (falling
-	// back to ~/.local/share/...), replacing PocketBase's cwd/exe-relative pb_data (ADR 0002 §2).
+	// Absent --dir, the store defaults to $XDG_DATA_HOME/deskkit/<DESK_NAME>/ (falling back to
+	// ~/.local/share/...), replacing PocketBase's cwd/exe-relative pb_data.
 	var defaultDataDir string
 	var locErr error
 	if !explicitDir {
@@ -126,9 +112,8 @@ func main() {
 			// Pre-create the store dir 0700 so it is not group/world-readable — PocketBase's own
 			// bootstrap would otherwise MkdirAll it 0777. Only when actually about to open the
 			// store: a non-store command (e.g. --help) must not materialize a data dir.
-			// The D2b legacy-store auto-migration (spec §2.10) runs FIRST: a no-op unless the
-			// new home is absent and an old pocket-librarian/<DESK_NAME>/ store exists, so it
-			// must look before this MkdirAll materializes the new home.
+			// The legacy-store auto-migration runs FIRST: it is a no-op unless the new home is
+			// absent, so it must look before this MkdirAll materializes that home.
 			if storeTouching {
 				if mgErr := store.MigrateLegacyStoreDir(cfg.DeskName); mgErr != nil {
 					locErr = mgErr
@@ -139,23 +124,19 @@ func main() {
 		}
 	}
 
-	// Fail closed on an unresolvable store LOCATION. This narrows the old "serve/migrate run
-	// config-free" tolerance: they still run without full config, but the store LOCATION must
-	// now resolve (ADR 0002 §2) — no silent fallback to a cwd/exe-relative pb_data. Enforced
-	// HERE, before app.Start()/Bootstrap, because PocketBase opens (and MkdirAll-creates) the
-	// data dir during Bootstrap — earlier than any cobra PersistentPreRunE — so a post-Bootstrap
-	// guard would already have written the stray dir. Gated to real store-touching subcommands
-	// so it never breaks --help, `completion`, the bare usage output, or unknown-command errors.
+	// Fail closed on an unresolvable store LOCATION — no silent fallback to a cwd/exe-relative
+	// pb_data. Enforced HERE, before app.Start()/Bootstrap, because PocketBase opens (and
+	// MkdirAll-creates) the data dir during Bootstrap, earlier than any cobra PersistentPreRunE,
+	// so a post-Bootstrap guard would already have written the stray dir. Gated to real
+	// store-touching subcommands so it never breaks --help, `completion`, or usage output.
 	if locErr != nil && storeTouching {
-		// First-run onramp (interactive only): when the store LOCATION is unresolvable purely
-		// because config is missing (cfgErr, not a StoreDir/mkdir failure), offer to scaffold this
-		// folder as a desk instead of only erroring. This lives HERE, not in requireConfig, because
-		// this guard os.Exit's before cobra ever dispatches the store-touching command — so a prompt
-		// hooked in requireConfig would be unreachable for exactly the commands that hit this guard.
-		// On accept we init the cwd, re-resolve config, recompute the store location, and fall
-		// through so the original command proceeds seamlessly in this same process. On decline /
-		// non-TTY / --no-input, FirstRunDecision emits nothing and the fail-closed error below is
-		// byte-identical to before.
+		// First-run onramp (interactive only): when the location is unresolvable purely because
+		// config is missing (cfgErr, not a StoreDir/mkdir failure), offer to scaffold this folder as
+		// a desk. It lives HERE, not in requireConfig, because the guard os.Exit's before cobra ever
+		// dispatches the store-touching command — a prompt in requireConfig would be unreachable for
+		// exactly the commands that hit this guard. On accept, the cwd is init'd and config
+		// re-resolved so the original command proceeds in the same process; on decline / non-TTY /
+		// --no-input, FirstRunDecision emits nothing and the fail-closed error below stands.
 		if cfgErr != nil {
 			tty := isatty.IsTerminal(os.Stdin.Fd()) && isatty.IsTerminal(os.Stdout.Fd())
 			if accept, derr := setup.FirstRunDecision(os.Stdin, os.Stdout, tty, noInput); derr == nil && accept {
@@ -166,8 +147,7 @@ func main() {
 					os.Exit(1)
 				}
 				res.WriteSummary(os.Stdout)
-				// Re-resolve config now that the profile exists; recompute + pre-create the store
-				// location (0700, matching the guard above) so the requested command can continue.
+				// Recompute + pre-create the store location at 0700, matching the guard above.
 				if newCfg, nerr := config.Load(); nerr == nil {
 					cfg, cfgErr = newCfg, nil
 					if dir, serr := resolveStoreLocation(cfg, nil); serr != nil {
@@ -188,27 +168,19 @@ func main() {
 		}
 	}
 
-	// DefaultDataDir seeds the --dir flag default (override-if---dir-passed-else-XDG); empty
-	// falls back to PocketBase's exe-relative pb_data, reached only when --dir is passed (and
-	// overrides it) or for non-store commands. DefaultDev is deliberately always false — NOT
-	// pocketbase.New()'s own osutils.IsProbablyGoRun() go-run heuristic, which fires whenever
-	// os.Args[0] is prefixed by os.TempDir() (or the Go build-cache dir). That is not unique to
-	// `go run`: any release binary invoked from a path under the OS temp dir (e.g. built via
-	// `go build -o "$(mktemp -d)/deskkit"`, or a CI/packaging step that stages the binary there)
-	// silently lands in dev mode too, which dumps raw SQL debug lines to stdout (PocketBase's
-	// dev-mode QueryLogFunc/ExecLogFunc print via color.HiBlack, which writes to stdout, not
-	// stderr) — corrupting mcp-serve's JSON-RPC stdio stream and any tool command's printJSON
-	// output. `--dev` remains a real, independently registered PocketBase root flag
-	// (pocketbase.go's eagerParseFlags always adds --dev bool-vars against this default), so an
-	// operator doing real interactive development still opts in explicitly with `--dev`; only the
-	// implicit, path-based default is removed.
-	// Core + module wiring (spec §2.7): build the enabled module set and merge each module's
-	// tools into the shared toolcore registry BEFORE any surface (agent/mcp) builds and before
-	// the migration runner executes (RegisterProgrammatic wires any non-self-registered module
-	// migrations into PocketBase's global list). librarian is always enabled; pm is disabled
-	// unless PM_ENABLED. Safe with a nil cfg — Enabled tolerates it (profile and librarian ignore
-	// cfg, pm treats nil as off). A registration error is a collection-ownership collision (a
-	// build-time bug), so it is fatal.
+	// DefaultDataDir seeds the --dir flag default; empty falls back to PocketBase's exe-relative
+	// pb_data, reached only when --dir is passed (and overrides it) or for non-store commands.
+	//
+	// DefaultDev is deliberately always false, NOT pocketbase.New()'s own IsProbablyGoRun()
+	// heuristic: that fires whenever os.Args[0] sits under os.TempDir() or the Go build cache, so
+	// any release binary staged in a temp dir silently lands in dev mode, whose SQL debug lines go
+	// to STDOUT and corrupt mcp-serve's JSON-RPC stream and every tool command's JSON output.
+	// `--dev` stays a real root flag, so interactive development still opts in explicitly.
+	//
+	// The enabled module set is built here so each module's tools merge into the shared toolcore
+	// registry BEFORE any surface (agent/mcp) builds and before the migration runner executes.
+	// Safe with a nil cfg: profile and librarian ignore it, pm treats nil as off. A registration
+	// error is a collection-ownership collision — a build-time bug — so it is fatal.
 	reg, regErr := module.Register(cfg, profile.New(), librarian.New(), pm.New())
 	if regErr != nil {
 		log.Fatalf("deskkit: module registration: %v", regErr)
@@ -220,53 +192,47 @@ func main() {
 		DefaultDataDir: defaultDataDir,
 	})
 
-	// Override PocketBase's own RootCmd.Version (defaults to its embedded "(untracked)") with the
-	// ldflags-stamped repo version, so `deskkit --version` reports THIS binary's release.
+	// Override PocketBase's own RootCmd.Version so `deskkit --version` reports THIS binary.
 	app.RootCmd.Version = version
 
-	// --no-input suppresses the first-run onramp prompt (fail closed on unresolved config, for
-	// scripts/CI). Registered here so it appears in --help and cobra accepts it; the onramp
-	// decision in main() reads it manually from os.Args (it fires before cobra parses flags).
+	// Registered so it appears in --help and cobra accepts it; the onramp decision in main() reads
+	// it manually from os.Args, because that decision fires before cobra parses flags.
 	app.RootCmd.PersistentFlags().Bool("no-input", false, "never prompt; fail closed when config is unresolved (scripts/CI)")
 
-	// Automigrate on startup; also `deskkit migrate up`. See §11.3 open item 1:
-	// confirm the automigrate generated-migration behavior in the run environment. migrate is
-	// schema-only and deliberately skips the desk open-guard (ADR 0002 §3): it writes no desk
-	// rows, so running it against another desk's store is harmless.
+	// Automigrate on startup; also `deskkit migrate up`. migrate is schema-only and deliberately
+	// skips the desk open-guard: it writes no desk rows, so running it against another desk's
+	// store is harmless.
 	migratecmd.MustRegister(app, app.RootCmd, migratecmd.Config{
 		Automigrate: true,
 	})
 
-	// On serve start (after bootstrap/migrations): ensure the ignore boundary exists and
-	// seed the system prompt on first run (spec §10.1, §6.1). These run only under serve.
+	// On serve start, after bootstrap/migrations: ensure the ignore boundary exists and seed the
+	// system prompt on first run. These run only under serve.
 	app.OnServe().BindFunc(func(e *core.ServeEvent) error {
-		// Exposure mode, derived from the RESOLVED bind addresses — EVERY address the process will
-		// listen on, not just the one the dependency reports on the serve event (with --https set,
-		// that event address is the HTTPS one and hides a separate --http listener). A loopback bind
-		// keeps today's local UX byte-for-byte; any exposed address puts the whole process in
-		// "public mode" and switches on the auth prerequisites, route auth, and the same-origin CSRF
-		// rule. Derived from the exposure rather than a --public flag because a flag can be
-		// forgotten while still binding 0.0.0.0, which fails OPEN. --origins rides the same read so
-		// hardenPublicCORS can tell an operator's allowlist from the default wildcard.
+		// Exposure mode is derived from EVERY resolved bind address, not just the one the serve event
+		// reports: with --https set, that address is the HTTPS one and hides a separate --http
+		// listener. A loopback bind keeps the local UX; any exposed address puts the whole process in
+		// public mode (auth prerequisites, route auth, same-origin CSRF). Derived from the exposure
+		// rather than a --public flag, because a forgotten flag on an 0.0.0.0 bind fails OPEN.
+		// --origins rides the same read so hardenPublicCORS can tell an allowlist from the default
+		// wildcard.
 		serveAddrs, serveOrigins := serveAddrsAndOrigins(app.RootCmd, e.Server.Addr)
 		publicMode := isPublicBind(serveAddrs...)
 
 		// A self-contradictory --origins (bare "*" mixed with explicit origins) is fatal on a public
-		// bind rather than silently resolved either way — see ValidatePublicOrigins. Checked here,
-		// with the same os.Exit fail-closed shape as the auth gate below, so nothing ever binds.
+		// bind rather than silently resolved either way. Checked here, with the same os.Exit
+		// fail-closed shape as the auth gate below, so nothing ever binds.
 		if err := ValidatePublicOrigins(publicMode, serveOrigins); err != nil {
 			fmt.Fprintf(os.Stderr, "deskkit: %v\n", err)
 			os.Exit(1)
 		}
 
-		// Fail-closed auth prerequisites, FIRST — this hook runs before the dependency opens the
-		// tcp listener, so exiting here means nothing was ever bound. os.Exit rather than
-		// `return err` for the same reason the desk guard below does: serve is a system command
-		// registered inside app.Start(), which runs RootCmd.Execute() in a goroutine and DISCARDS
-		// its error, so a returned RunE error would print but still exit 0 — and, worse, a refusal
-		// that exits 0 is a refusal nothing downstream can detect. In public mode this call also
-		// PROVISIONS the PB_SUPERUSER_* account and then re-verifies one actually exists, so a
-		// rejected password fails the boot instead of logging into the void.
+		// Fail-closed auth prerequisites, FIRST: this hook runs before the listener opens, so exiting
+		// here means nothing was ever bound. os.Exit, never `return err` — serve is a system command
+		// registered inside app.Start(), which runs RootCmd.Execute() in a goroutine and DISCARDS its
+		// error, so a returned RunE error prints but still exits 0, and a refusal that exits 0 is one
+		// nothing downstream can detect. In public mode this call also PROVISIONS the PB_SUPERUSER_*
+		// account and re-verifies one exists, so a rejected password fails the boot.
 		superuserCreated, err := store.CheckServeAuthPrereqs(e.App, cfg, publicMode)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "deskkit: %v\n", err)
@@ -276,42 +242,30 @@ func main() {
 			app.Logger().Info("created superuser from PB_SUPERUSER_* env", "email", cfg.PBSuperuserEmail)
 		}
 
-		// Drop the dependency's default wildcard CORS middleware on a public bind — unless the
-		// operator supplied their own --origins allowlist, which the dependency binds into the very
-		// same middleware. Router-wide, so it covers /api/* as well as this binary's own routes; a
-		// no-op on a loopback bind. This must happen BEFORE e.Next(), which is what builds the mux
-		// from the router's current middleware set — see hardenPublicCORS.
+		// Drop the dependency's default wildcard CORS middleware on a public bind, unless the operator
+		// supplied an --origins allowlist, which the dependency binds into that very same middleware.
+		// Router-wide, so it covers /api/* too; a no-op on a loopback bind. Must happen BEFORE
+		// e.Next(), which builds the mux from the router's current middleware set.
 		hardenPublicCORS(e.Router, publicMode, serveOrigins)
 
-		// Embedded SPA — the binary's visual surface, served at `/` (admin console stays /_/,
-		// data API /api/). Registered outside the cfgErr gate below: the static shell and the
-		// loopback token bootstrap need only the store, not a resolved desk config. In public
-		// mode the bootstrap route is not registered at all; the shell still serves (the login
-		// form must load), while every data call behind it stays token-gated — the same
-		// shell-loads-data-doesn't stance as the admin console. See internal/core/spa.
+		// Embedded SPA at `/` (admin console stays /_/, data API /api/). Registered outside the cfgErr
+		// gate below: the static shell and the loopback token bootstrap need only the store, not a
+		// resolved desk config. In public mode the bootstrap route is not registered at all and the
+		// shell still serves, so the login form loads while every data call behind it stays
+		// token-gated — the admin console's shell-loads-data-doesn't stance.
 		spa.Register(e.Router, publicMode)
 
 		if cfgErr == nil {
-			// Desk open-guard (ADR 0002 §3): refuse to serve a store that already belongs to a
-			// different desk. gui re-execs `serve`, so it is covered here too.
-			//
-			// Print + os.Exit rather than `return err`: serve/superuser are PocketBase system
-			// commands registered inside app.Start(), which runs RootCmd.Execute() in a
-			// goroutine and discards its error (upstream: "leave to the commands to decide
-			// whether to print their error") — so a returned RunE error here would print via
-			// PocketBase's own error writer but the process would still exit 0. Every other
-			// guarded surface (requireConfig's cmdErr wrapper; the unresolved-location guard's
-			// direct os.Exit above) fails closed with a non-zero exit; mirror that here since
-			// normal RunE-error propagation is invisible for this command.
+			// Desk open-guard: refuse to serve a store that already belongs to a different desk.
+			// gui re-execs `serve`, so it is covered here too. Print + os.Exit, never `return err`,
+			// for the reason given at the auth-prereq gate above: a serve RunE error still exits 0.
 			if err := store.CheckDeskGuard(e.App, cfg.DeskName); err != nil {
 				fmt.Fprintf(os.Stderr, "deskkit: %v\n", err)
 				os.Exit(1)
 			}
-			// Module-schema versioning (spec §2.8): migrations have already run by OnServe, so
-			// GuardDowngrade refuses to serve a store a newer binary already migrated ahead, and
-			// StampModules records each enabled module's applied version by observation. In the D2
-			// zero-change envelope the librarian is the only enabled module and its version matches
-			// its highest migration, so the guard never trips; stamping is non-fatal bookkeeping.
+			// Migrations have already run by OnServe, so GuardDowngrade refuses to serve a store a
+			// newer binary already migrated ahead, and StampModules records each enabled module's
+			// applied version by observation. Stamping is non-fatal bookkeeping.
 			if err := migrate.GuardDowngrade(e.App, moduleReg.MigrateModules()); err != nil {
 				fmt.Fprintf(os.Stderr, "deskkit: %v\n", err)
 				os.Exit(1)
@@ -328,8 +282,8 @@ func main() {
 		if err := prompt.Seed(e.App); err != nil {
 			app.Logger().Error("seed system prompt", "err", err)
 		}
-		// First-run superuser auto-create (spec §10.3): only when both PB_SUPERUSER_* env
-		// vars are set; idempotent and non-fatal — a failure logs but never blocks serve.
+		// First-run superuser auto-create: only when both PB_SUPERUSER_* env vars are set;
+		// idempotent and non-fatal — a failure logs but never blocks serve.
 		if cfgErr == nil {
 			if created, err := store.EnsureSuperuser(e.App, cfg); err != nil {
 				app.Logger().Error("ensure superuser", "err", err)
@@ -344,16 +298,15 @@ func main() {
 		// each task (deterministic kinds call the tool directly; agentic kinds run the loop
 		// via the injected action below). Config is required for the tools, so gate on cfgErr.
 		if cfgErr == nil {
-			// Each enabled module wires its own serve-time record hooks + cron via RegisterHooks
-			// (the librarian module's wraps trigger.RegisterHooks + RegisterCron — identical to the
-			// pre-refactor direct calls). StartClaimer stays here in main because it needs
-			// agentAction (keeping it in the module would pull internal/agent into internal/trigger).
+			// Each enabled module wires its own serve-time record hooks + cron via RegisterHooks.
+			// StartClaimer stays in main because it needs agentAction: moving it into the module would
+			// pull the agent package into trigger.
 			for _, mod := range moduleReg.Enabled {
 				if err := mod.RegisterHooks(e.App, cfg); err != nil {
 					app.Logger().Error("register module hooks", "module", mod.Name(), "err", err)
 				}
-				// Realtime is serve-only (spec §5.4): core wires each enabled module's optional
-				// RealtimeSource capability here, so one-shot CLI commands never emit events.
+				// Realtime is serve-only: wiring each module's optional RealtimeSource here is what keeps
+				// one-shot CLI commands from emitting events.
 				if rs, ok := mod.(module.RealtimeSource); ok {
 					if err := rs.RegisterRealtime(e.App); err != nil {
 						app.Logger().Error("register module realtime", "module", mod.Name(), "err", err)
@@ -362,14 +315,11 @@ func main() {
 			}
 			trigger.StartClaimer(context.Background(), e.App, cfg, agentAction)
 
-			// Browser session surface (ADR 0001 option b): a custom Go route serving a
-			// self-contained page that drives the SAME multi-turn stewardship session the `chat`
-			// REPL exposes — the same *agent.Session, the same gated tool slice, the same write
-			// boundary. Serve-only, like the wake layer above; gated on cfgErr because the session
-			// factory needs resolved config. On a loopback bind it stays unauthenticated by design
-			// (loopback-bound, on-demand, single operator) — not wired to superuser auth. On a
-			// non-loopback bind (publicMode) web.Register puts every route behind RequireAuth and
-			// switches its origin guard to strict same-origin. See internal/.../web.
+			// Browser session surface: routes driving the SAME multi-turn session the `chat` REPL
+			// exposes — same *agent.Session, same gated tool slice, same write boundary. Serve-only and
+			// gated on cfgErr, because the session factory needs resolved config. A loopback bind stays
+			// unauthenticated by design (on-demand, single operator); on a non-loopback bind
+			// web.Register puts every route behind RequireAuth and switches to strict same-origin.
 			webCleanup := web.Register(e.Router, func(ctx context.Context) (web.Streamer, error) {
 				s, serr := agent.NewSession(ctx, app, cfg)
 				if serr != nil {
@@ -389,11 +339,10 @@ func main() {
 
 	registerToolCommands(app, cfg, cfgErr)
 
-	// PocketBase's Execute() runs RootCmd.Execute() in a goroutine and discards its
-	// error (upstream: "leave to the commands to decide whether to print their error"),
-	// so a failing RunE would exit 0. Wrap every registered subcommand's RunE — RECURSIVELY,
-	// since the `pm` group nests its commands a level down (spec §5.3) — to record the first
-	// error, and exit non-zero after Start() returns (post-cleanup).
+	// PocketBase's Execute() runs RootCmd.Execute() in a goroutine and discards its error, so a
+	// failing RunE would exit 0. Wrap every registered subcommand's RunE — RECURSIVELY, since the
+	// `pm` group nests a level down — to record the first error and exit non-zero after Start()
+	// returns, post-cleanup.
 	var cmdErr error
 	var wrapRunE func(cmds []*cobra.Command)
 	wrapRunE = func(cmds []*cobra.Command) {
@@ -415,20 +364,17 @@ func main() {
 	}
 	wrapRunE(app.RootCmd.Commands())
 
-	// serve/superuser + the display groups. Registering the two PocketBase system commands
-	// ourselves (what app.Start() would do) is what lets them carry a GroupID at all — Start()
-	// adds them after the last point a caller could set one. Deliberately AFTER wrapRunE, so
-	// their RunE stays unwrapped and their error handling is byte-identical to today's Start().
+	// serve/superuser + the display groups. Registering the two PocketBase system commands here
+	// (what app.Start() would do) is the only way they can carry a GroupID: Start() adds them
+	// after the last point a caller could set one. Deliberately AFTER wrapRunE, so their RunE
+	// stays unwrapped and their error handling matches Start()'s.
 	finalizeCommandTree(app)
 
-	// Unknown-subcommand guard. PocketBase's Execute() runs RootCmd.Execute() in a
-	// goroutine and DISCARDS its error, so cobra's own "unknown command" error would otherwise
-	// exit 0 — an unknown subcommand printed a message but silently succeeded. Detect an
-	// unrecognized (nested) subcommand HERE — after every command is registered (migratecmd,
-	// registerToolCommands, and finalizeCommandTree have populated RootCmd) and BEFORE
-	// app.Execute() dispatches — and fail closed with a non-zero exit. Mirrors the OnServe
-	// os.Exit(1) fail-closed pattern above: a returned RunE error is invisible for the
-	// goroutine-run Execute, so exit directly.
+	// Unknown-subcommand guard. Because Execute() discards RootCmd.Execute()'s error, cobra's own
+	// "unknown command" error would exit 0. Detect an unrecognized (nested) subcommand HERE —
+	// after every registration has populated RootCmd and BEFORE app.Execute() dispatches — and
+	// exit non-zero directly, since a returned RunE error is invisible for a goroutine-run
+	// Execute.
 	if name, unknown := unknownSubcommand(os.Args[1:], buildKnownCommandSet(app.RootCmd)); unknown {
 		fmt.Fprintf(os.Stderr, "deskkit: unknown command %q\nRun 'deskkit --help' for usage.\n", name)
 		os.Exit(1)
@@ -446,9 +392,9 @@ func main() {
 }
 
 // storeTouchingCommands are the subcommands that open the desk's store and therefore require a
-// resolvable store location (ADR 0002 §2). It is maintained here explicitly rather than derived
-// from RootCmd, because this guard runs in main() BEFORE the app (and its command tree) exists.
-// `init`, `desks`, and `config` are deliberately absent: they open no store.
+// resolvable store location. Maintained explicitly rather than derived from RootCmd, because
+// this guard runs in main() BEFORE the app (and its command tree) exists. `init`, `desks`, and
+// `config` are deliberately absent: they open no store.
 var storeTouchingCommands = map[string]bool{
 	"serve": true, "migrate": true, "superuser": true,
 	"sweep": true, "patrol": true, "propose-fix": true, "apply-fix": true,
@@ -457,8 +403,7 @@ var storeTouchingCommands = map[string]bool{
 }
 
 // Command display groups (`deskkit --help`). The IDs are internal; the Titles are printed
-// literally by cobra, trailing colon included. Declaring them as constants keeps the group of a
-// command a single named fact rather than a string repeated at each registration site.
+// literally by cobra, trailing colon included.
 const (
 	groupSetup   = "setup"
 	groupInspect = "inspect"
@@ -480,9 +425,9 @@ var commandGroups = []cobra.Group{
 }
 
 // commandGroupIDs maps a top-level command name to its display group. A command missing from
-// this map renders under cobra's "Additional Commands:" catch-all — which TestCommandGroups
-// fails on — so adding a subcommand means adding it here. help/completion are cobra built-ins
-// added during Execute(); they get their group from the two setters in applyCommandGroups.
+// this map renders under cobra's "Additional Commands:" catch-all, which the groups test fails
+// on, so adding a subcommand means adding it here. help/completion are cobra built-ins added
+// during Execute(); they get their group from the two setters in applyCommandGroups.
 var commandGroupIDs = map[string]string{
 	"init":   groupSetup,
 	"config": groupSetup,
@@ -512,11 +457,9 @@ var commandGroupIDs = map[string]string{
 
 // finalizeCommandTree completes the root command tree: it registers the two system commands
 // PocketBase would otherwise add inside Start() (so they can carry a group), then applies the
-// display groups. Called once from main() after every other registration — and by the groups
-// test, so the test asserts the tree main() actually builds.
-//
-// NewServeCommand's second argument is Start()'s `!hideStartBanner`; HideStartBanner is never
-// set on this app, so `true` reproduces today's banner behavior exactly.
+// display groups. Called once from main() after every other registration, and by the groups
+// test, so the test asserts the tree main() actually builds. NewServeCommand's second argument
+// is Start()'s `!hideStartBanner`.
 func finalizeCommandTree(app *pocketbase.PocketBase) {
 	app.RootCmd.AddCommand(pbcmd.NewSuperuserCommand(app))
 	app.RootCmd.AddCommand(pbcmd.NewServeCommand(app, true))
@@ -524,11 +467,9 @@ func finalizeCommandTree(app *pocketbase.PocketBase) {
 }
 
 // applyCommandGroups assigns each registered top-level command its display group and registers
-// the groups that ended up with at least one member (an empty group would render as a bare
-// heading — `pm` is absent when the module is gated off). Groups are assigned here, in one
-// place, rather than at each command's construction site: one table beats a GroupID field
-// scattered across fifteen literals, and cobra validates the result at Execute() time
-// (checkCommandGroups panics on an id that was never registered).
+// only the groups that ended up with a member — an empty group renders as a bare heading, and
+// `pm` is absent when the module is gated off. cobra validates the result at Execute() time:
+// checkCommandGroups panics on an id that was never registered.
 func applyCommandGroups(root *cobra.Command) {
 	used := map[string]bool{groupAdmin: true} // help/completion always land in Admin
 	for _, c := range root.Commands() {
@@ -542,13 +483,11 @@ func applyCommandGroups(root *cobra.Command) {
 			root.AddGroup(&cobra.Group{ID: g.ID, Title: g.Title})
 		}
 	}
-	// cobra's own help/completion commands. PocketBase suppresses both (a hidden replacement
-	// help command; DisableDefaultCmd for completion), so neither is LISTED — but the hidden
-	// help command is still a child with an empty GroupID, which alone makes cobra render an
-	// (empty) "Additional Commands:" heading. SetHelpCommandGroupID groups that existing
-	// command, which is what removes the heading; verified by deleting this line and watching
-	// TestCommandGroups_EveryCommandIsGrouped go red. The completion setter is the same
-	// arrangement for the day PocketBase stops disabling that command.
+	// PocketBase suppresses both of cobra's built-ins, so neither is LISTED — but the hidden help
+	// command is still a child with an empty GroupID, which alone makes cobra render an empty
+	// "Additional Commands:" heading. SetHelpCommandGroupID groups that existing command, which is
+	// what removes the heading. The completion setter is the same arrangement for the day
+	// PocketBase stops disabling that command.
 	root.SetHelpCommandGroupID(groupAdmin)
 	root.SetCompletionCommandGroupID(groupAdmin)
 }
@@ -596,11 +535,9 @@ func isStoreTouchingInvocation(args []string) bool {
 }
 
 // knownCommandSet is the recognized-command lookup the unknown-subcommand guard consults.
-// top is every top-level command + alias name; groups maps a command that HAS subcommands (pm,
-// findings, completion, migrate …) to the set of its child (+alias) names, so a nested unknown
-// like `pm frobnicate` or `findings frobnicate` is caught as well as a bare `frobnicate`.
-// groupValueFlags maps that same group name to the set of the GROUP COMMAND'S OWN value-taking
-// flags (its persistent flags, e.g. pm's --actor, plus any local ones) — see nextNonFlagToken.
+// top is every top-level command + alias name; groups maps each command that HAS subcommands to
+// its child (+alias) names, so a nested unknown like `pm frobnicate` is caught too.
+// groupValueFlags maps that same group name to the GROUP COMMAND'S OWN value-taking flags.
 type knownCommandSet struct {
 	top             map[string]bool
 	groups          map[string]map[string]bool
@@ -609,9 +546,8 @@ type knownCommandSet struct {
 
 // buildKnownCommandSet snapshots app.RootCmd — by then FULLY populated, since
 // finalizeCommandTree registers serve/superuser itself rather than leaving them to app.Start()
-// — into the lookup the guard needs. Called once in main() after all registration and before
-// app.Execute(); every command (including serve/superuser/migrate and their children) is read
-// from root.Commands(), so nothing has to be hardcoded here.
+// — into the lookup the guard needs. Every command is read from root.Commands(), so nothing is
+// hardcoded here.
 func buildKnownCommandSet(root *cobra.Command) knownCommandSet {
 	ks := knownCommandSet{
 		top: map[string]bool{}, groups: map[string]map[string]bool{},
@@ -630,11 +566,9 @@ func buildKnownCommandSet(root *cobra.Command) knownCommandSet {
 					children[a] = true
 				}
 			}
-			// groupCommandValueFlags (unlike globalValueFlags below) does not need an enumerated
-			// whitelist: by the time this runs (after registerToolCommands has populated
-			// app.RootCmd — see main()'s call order), the group command's own flag definitions
-			// already exist and can be consulted directly, so a future persistent flag on pm (or
-			// any other group) is picked up automatically.
+			// groupCommandValueFlags needs no enumerated whitelist (unlike globalValueFlags below):
+			// by the time this runs the group command's own flag definitions exist and are consulted
+			// directly, so a future persistent flag on any group is picked up automatically.
 			vf := groupCommandValueFlags(c)
 			for _, n := range names {
 				ks.groups[n] = children
@@ -645,20 +579,14 @@ func buildKnownCommandSet(root *cobra.Command) knownCommandSet {
 	return ks
 }
 
-// groupCommandValueFlags returns the "--name" form of every flag REGISTERED DIRECTLY ON c (its
-// own local flags plus its own persistent flags — not flags merged down from an ancestor, since
-// those already belong to some other group's own set) that requires an explicit value, i.e.
-// mirrors cobra's own hasNoOptDefVal check (unset NoOptDefVal = the flag is not a boolean-style
-// "presence is enough" flag, so the very next token is its value, never a subcommand name).
+// groupCommandValueFlags returns the "--name" form of every flag REGISTERED DIRECTLY ON c that
+// requires an explicit value, mirroring cobra's own hasNoOptDefVal check: an unset NoOptDefVal
+// means the very next token is the flag's value, never a subcommand name.
 //
-// Deliberately visits c.Flags() AND c.PersistentFlags() separately, even though the former would
-// normally already contain the latter after cobra merges them — because this runs from
-// buildKnownCommandSet in main(), BEFORE app.Start() calls RootCmd.Execute(), and cobra only
-// performs that merge lazily during Execute() (mergePersistentFlags). At this call site,
-// c.Flags() alone does NOT yet contain a persistent flag declared directly on c (confirmed:
-// TestBuildKnownCommandSet_GroupValueFlags calls this with no Execute() in between, exactly this
-// codepath's real ordering). The double-visit only ever sets the same map key twice when a merge
-// HAS already happened elsewhere — harmless — so do not "simplify" this to c.Flags() alone.
+// It visits c.Flags() AND c.PersistentFlags() separately on purpose. This runs BEFORE
+// RootCmd.Execute(), and cobra merges persistent flags into Flags() only lazily during Execute,
+// so at this call site c.Flags() alone does NOT contain a persistent flag declared on c. The
+// double-visit is harmless once a merge has happened — do not "simplify" it to c.Flags() alone.
 func groupCommandValueFlags(c *cobra.Command) map[string]bool {
 	vf := map[string]bool{}
 	collect := func(fs *pflag.FlagSet) {
@@ -674,15 +602,11 @@ func groupCommandValueFlags(c *cobra.Command) map[string]bool {
 }
 
 // nextNonFlagToken returns the first non-flag token in args at/after start (a group's nested
-// subcommand name), or ("", false) when only flags/nothing remain. valueFlags is that specific
-// group's OWN value-taking flags (groupCommandValueFlags via knownCommandSet.groupValueFlags):
-// a recognized "--flag value" pair (space form, not "--flag=value") skips the value token too,
-// so the group's OWN persistent flag (e.g. pm's --actor) passed BEFORE the leaf subcommand is
-// never mistaken for the nested subcommand name — the exact bug this closes: `pm --actor alice
-// create ...` used to report `unknown command "pm alice"` because "alice" (--actor's value) was
-// the first bare token this scan saw. A flag this group does NOT know about is unaffected and
-// keeps the prior (documented) shadowing behavior — see globalValueFlags's comment for why an
-// enumerated fallback can never be fully closed for genuinely unregistered flags.
+// subcommand name), or ("", false) when only flags/nothing remain. valueFlags is that group's
+// OWN value-taking flags: a recognized "--flag value" pair (space form, not "--flag=value")
+// skips the value token too, so a group persistent flag passed BEFORE the leaf subcommand is
+// never mistaken for the subcommand name. A flag this group does NOT know about still shadows
+// the token — see globalValueFlags for why an enumerated fallback cannot close that fully.
 func nextNonFlagToken(args []string, start int, valueFlags map[string]bool) (string, bool) {
 	for i := start; i < len(args); i++ {
 		a := args[i]
@@ -700,10 +624,8 @@ func nextNonFlagToken(args []string, start int, valueFlags map[string]bool) (str
 // unknownSubcommand reports the offending token and true when args name a command (or, under a
 // known command GROUP, a nested subcommand) that is not registered — the case the process must
 // exit non-zero on, since PocketBase discards cobra's own unknown-command error. It returns
-// ("", false) for: the bare invocation (cobra prints usage), any -h/--help/-v/--version request
-// (cobra short-circuits before dispatch), a known leaf command, a known group invoked bare, and a
-// known group + known child — so valid commands, flags, and the help/version fast paths are never
-// flagged. Pure and table-tested; the live set is built by buildKnownCommandSet.
+// ("", false) for the bare invocation, any -h/--help/-v/--version request, a known leaf command,
+// a known group invoked bare, and a known group + known child.
 func unknownSubcommand(args []string, known knownCommandSet) (string, bool) {
 	for _, a := range args {
 		switch a {
@@ -733,24 +655,19 @@ func unknownSubcommand(args []string, known knownCommandSet) (string, bool) {
 	return "", false
 }
 
-// globalValueFlags are every value-taking flag this manual pre-parse must recognize so its
-// value token is never mistaken for the subcommand name (the specific bug this list closes:
-// `--hooksDir /some/path serve` previously resolved firstSubcommand to "/some/path", which is
-// not in storeTouchingCommands, so isStoreTouchingInvocation silently returned false and
-// PocketBase's Bootstrap — which runs and MkdirAll-creates the (wrong, exe-relative) data dir
-// BEFORE cobra even reaches the "unknown flag" parse error for `serve` — proceeded unguarded).
+// globalValueFlags are every value-taking flag this manual pre-parse must recognize so its value
+// token is never mistaken for the subcommand name. Get this wrong and `--someflag /path serve`
+// resolves the subcommand to "/path", which is not store-touching, so the location guard is
+// skipped and PocketBase's Bootstrap MkdirAll-creates a stray exe-relative data dir before cobra
+// ever reports the bad flag.
 //
-// --dir/--encryptionEnv/--queryTimeout are pocketbase.go's actual registered root persistent
-// flags in THIS build (verified against the vendored source: eagerParseFlags in
-// github.com/pocketbase/pocketbase/pocketbase.go registers them on RootCmd — re-audit that
-// function on every dependency bump; migratecmd registers none).
-// --hooksDir/--hooksWatch/--hooksPool are NOT currently registered (the jsvm plugin that adds
-// them is not imported here) but are added defensively: they are real PocketBase-ecosystem
-// root flags a future dependency bump could wire in, and — as the bug above shows — an
-// UNREGISTERED flag is exactly as dangerous to this pre-parse as a registered one, since this
-// scan runs before app construction and cannot consult cobra's own flag definitions. This
-// remains an enumerated whitelist, not a structural fix: a genuinely novel unrecognized
-// value-flag not on this list could still shadow the subcommand token the same way.
+// --dir/--encryptionEnv/--queryTimeout are the root persistent flags eagerParseFlags registers
+// on RootCmd in this build — re-audit that function on every dependency bump; migratecmd
+// registers none. --hooksDir/--hooksWatch/--hooksPool are NOT registered (the jsvm plugin that
+// adds them is not imported) but are listed defensively: this scan runs before app construction
+// and cannot consult cobra's flag definitions, so an unregistered flag is exactly as dangerous
+// here as a registered one. It stays an enumerated whitelist, so a novel value-flag not listed
+// can still shadow the subcommand token.
 var globalValueFlags = map[string]bool{
 	"--dir": true, "--encryptionEnv": true, "--queryTimeout": true,
 	"--hooksDir": true, "--hooksWatch": true, "--hooksPool": true,
@@ -848,8 +765,8 @@ func stripNoInput(args []string) []string {
 }
 
 // newInitCmd builds the `init` subcommand: it scaffolds <dir>/_knowledge/profile.yaml (and, with
-// --with-env, <dir>/.env) so a folder works as a desk with zero exports. It is registered on the
-// app RootCmd for discovery/`init --help`, and executed standalone by runInit for the real run.
+// --with-env, <dir>/.env) so a folder works as a desk with zero exports. Registered on the app
+// RootCmd for discovery/`init --help`, executed standalone by runInit for the real run.
 // SilenceErrors/Usage keep the standalone execution's error reporting to runInit's single line.
 func newInitCmd() *cobra.Command {
 	var force, withEnv bool
@@ -885,54 +802,48 @@ func requireConfig(app core.App, cfg *config.Config, cfgErr error) (*config.Conf
 	if cfgErr != nil {
 		return nil, cfgErr
 	}
-	// Self-initialize the store (ADR 0003): one-shot tool commands do NOT trigger a migration
-	// run on their own (only serve and `migrate up` do), so a command against a never-initialized
-	// store would otherwise find no collections and leak sql.ErrNoRows. Apply pending app
-	// migrations idempotently here — before the desk-guard, so it consults now-existing (empty)
-	// collections and a first run passes by construction. Cheap (a _migrations check) once current.
+	// Self-initialize the store: only serve and `migrate up` trigger a migration run, so a one-shot
+	// tool command against a never-initialized store would find no collections and leak
+	// sql.ErrNoRows. Applied before the desk-guard, so that guard consults now-existing (empty)
+	// collections and a first run passes by construction. Cheap once current.
 	if err := app.RunAppMigrations(); err != nil {
 		return nil, fmt.Errorf("initialize store schema: %w", err)
 	}
-	// Module-schema versioning (spec §2.8) at the one-shot-command entry point too: guard against
-	// a store a newer binary migrated ahead, then stamp each enabled module's applied version by
-	// observation. In the D2 zero-change envelope this never trips (librarian only); stamping is
-	// non-fatal bookkeeping.
+	// Module-schema versioning at the one-shot-command entry point too: guard against a store a
+	// newer binary migrated ahead, then stamp each enabled module's applied version by observation.
+	// Stamping is non-fatal bookkeeping.
 	if err := migrate.GuardDowngrade(app, moduleReg.MigrateModules()); err != nil {
 		return nil, err
 	}
 	if err := migrate.StampModules(app, moduleReg.MigrateModules()); err != nil {
 		app.Logger().Error("stamp module schema versions", "err", err)
 	}
-	// Desk open-guard (ADR 0002 §3): refuse if this store already belongs to another desk.
-	// Checked before any seeding/write so a mismatched desk never mutates the wrong store; the
-	// choke point every tool + agent/chat/mcp-serve/gui RunE reaches first.
+	// Desk open-guard: refuse if this store already belongs to another desk. Checked before any
+	// seeding/write so a mismatched desk never mutates the wrong store; the choke point every tool
+	// + agent/chat/mcp-serve/gui RunE reaches first.
 	if err := store.CheckDeskGuard(app, cfg.DeskName); err != nil {
 		return nil, err
 	}
-	// "First run" auto-creation (spec §10.1) applies to every entry point, not just
-	// serve: one-shot CLI tools would otherwise fail closed on the missing default
-	// ignore file. A present-but-unreadable file still fails closed in desklib.
+	// First-run auto-creation applies to every entry point, not just serve: one-shot CLI tools
+	// would otherwise fail closed on the missing default ignore file. A present-but-unreadable
+	// file still fails closed in desklib.
 	if err := desklib.EnsureIgnoreFile(cfg.IgnoreConfig, cfg.DeskRoot); err != nil {
 		return nil, err
 	}
-	// Seed the editable system prompt on first run here too, not only under serve (spec
-	// §4.10): a desk driven purely via one-shot CLI + MCP would otherwise never materialize
-	// the prompts row, leaving "edit the system prompt in the DB" a silent no-op. Unlike the
-	// ignore boundary this is not a safety gate — the agent falls back to the embedded
-	// default — so a seed failure logs but never blocks the command (mirrors the serve hook).
+	// Seed the editable system prompt here too, not only under serve: a desk driven purely via
+	// one-shot CLI + MCP would never materialize the prompts row, leaving "edit the system prompt
+	// in the DB" a silent no-op. Not a safety gate — the agent falls back to the embedded default
+	// — so a seed failure logs but never blocks the command.
 	if err := prompt.Seed(app); err != nil {
 		app.Logger().Error("seed system prompt", "err", err)
 	}
 	return cfg, nil
 }
 
-// annotateLockErr adds a short hint to a SQLite "database is locked" failure — the shape
-// requireConfig's store-open/migration step (and PocketBase's own Bootstrap, reached from
-// app.Start() before any RunE) hits when another process, typically a concurrently running
-// `serve`, already holds the desk's store open. Detection is a simple case-insensitive
-// substring match on "locked" rather than a typed sqlite error, since the underlying error
-// crosses several wrapping layers (dbx, mattn/go-sqlite3) before reaching here; a non-lock
-// error is returned unchanged.
+// annotateLockErr adds a hint to a SQLite "database is locked" failure, which is what a store
+// open hits when another process — typically a concurrent `serve` — already holds the desk's
+// store. Detection is a case-insensitive substring match rather than a typed sqlite error,
+// because the underlying error crosses several wrapping layers before reaching here.
 func annotateLockErr(err error) error {
 	if err == nil || !strings.Contains(strings.ToLower(err.Error()), "locked") {
 		return err
@@ -941,25 +852,22 @@ func annotateLockErr(err error) error {
 }
 
 // registerToolCommands wires the librarian tool subcommands + gui onto the PocketBase RootCmd.
-// serve, migrate, and superuser are provided by PocketBase / migratecmd. Each tool command
-// routes through the same tools.* function the agent will call (spec §2.6, §3.3). Until the
-// tool-body slice lands these return ErrNotImplemented — expected for the spine.
+// serve, migrate, and superuser come from PocketBase / migratecmd. Each tool command routes
+// through the same tools.* function the agent calls.
 func registerToolCommands(app *pocketbase.PocketBase, cfg *config.Config, cfgErr error) {
-	// init — scaffold a desk profile (zero exports). Registered for discovery (`--help` listing)
-	// and `init --help`; the REAL run is intercepted in main() before app.Start() so it never
-	// triggers Bootstrap (see runInit). NOT added to storeTouchingCommands: it opens no store.
+	// init — scaffold a desk profile. Registered for discovery and `init --help`; the REAL run is
+	// intercepted in main() before app.Start() so it never triggers Bootstrap. NOT in
+	// storeTouchingCommands: it opens no store.
 	app.RootCmd.AddCommand(newInitCmd())
 
-	// desks / config — read-only orientation over the XDG homes (which desks exist; what the
-	// resolved configuration is and where each value came from). Registered here for discovery
-	// and `--help`; like `init`, the REAL run is intercepted in main() so neither materializes a
-	// store just for answering a question. Neither is store-touching.
+	// desks / config — read-only orientation over the XDG homes. Registered for discovery and
+	// `--help`; like `init`, the REAL run is intercepted in main() so neither materializes a store
+	// just for answering a question. Neither is store-touching.
 	app.RootCmd.AddCommand(newDesksCmd())
 	app.RootCmd.AddCommand(newConfigCmd())
 
-	// pm — the work-graph command group (spec §5.3), registered ONLY when the pm module is
-	// enabled (§2.9: with PM off, PM surfaces are absent; `deskkit pm` is then cobra's normal
-	// unknown-command error). See pm.go.
+	// pm — the work-graph command group, registered ONLY when the pm module is enabled; with PM
+	// off, `deskkit pm` is cobra's normal unknown-command error.
 	if cfg != nil && cfg.PMEnabled {
 		registerPMCommands(app, cfg, cfgErr)
 	}
@@ -1104,17 +1012,14 @@ func registerToolCommands(app *pocketbase.PocketBase, cfg *config.Config, cfgErr
 	queryCmd.Flags().BoolVar(&queryShowIndex, "show-index", false, "for `query orphans`: also show by-design-unreferenced index/entry files (CLAUDE.md, READMEs, INDEX.md)")
 	app.RootCmd.AddCommand(queryCmd)
 
-	// findings — supervised disposition lifecycle for patrol findings. `dispose` sets a
-	// finding's disposition (open|acknowledged|triaged|wont_fix), ORTHOGONAL to its state, so a
-	// live-only `query findings` stops surfacing an acknowledged/triaged/wont_fix item while it
-	// survives re-baseline: patrol dedupes on (file,rule,checksum) and inherits a prior non-open
-	// disposition (and its provenance) onto a re-created finding. Disposition is an
-	// owner-supervised action, so it is a CLI subcommand — deliberately NOT an MCP tool
-	// (§5.4/§5.5, like restore). tools.DisposeFinding normalizes the value (wont-fix -> wont_fix)
-	// and validates it, returning an error (routed through the wrapRunE non-zero exit) for an
-	// empty/invalid disposition or an unknown id. Optional --by/--reason record who/why (no baked
-	// default actor — an omitted --by simply leaves the finding's provenance anonymous); moving
-	// back to `open` clears any previously-recorded provenance.
+	// findings — supervised disposition lifecycle for patrol findings. A finding's disposition
+	// (open|acknowledged|triaged|wont_fix) is ORTHOGONAL to its state, so a live-only
+	// `query findings` stops surfacing a disposed item while it survives re-baseline: patrol
+	// dedupes on (file,rule,checksum) and inherits a prior non-open disposition, with its
+	// provenance, onto a re-created finding. Disposition is owner-supervised, so it is a CLI
+	// subcommand and deliberately NOT an MCP tool, like restore. tools.DisposeFinding normalizes
+	// and validates the value. Optional --by/--reason record who/why; there is no default actor,
+	// and moving back to `open` clears any recorded provenance.
 	findingsCmd := &cobra.Command{
 		Use:   "findings",
 		Short: "Manage patrol findings (disposition lifecycle)",
@@ -1140,9 +1045,9 @@ func registerToolCommands(app *pocketbase.PocketBase, cfg *config.Config, cfgErr
 	findingsCmd.AddCommand(disposeCmd)
 	app.RootCmd.AddCommand(findingsCmd)
 
-	// record-feedback — write one entry to the store-native feedback log. Routes through the
-	// same tools.RecordFeedback the agent/chat/MCP surfaces call (spec §2.6). DB-only write:
-	// unlike apply-fix it touches no desk file, so it carries no write gate.
+	// record-feedback — write one entry to the store-native feedback log, through the same
+	// tools.RecordFeedback the agent/chat/MCP surfaces call. DB-only write: unlike apply-fix it
+	// touches no desk file, so it carries no write gate.
 	var fbKind, fbSummary, fbDetail, fbContext, fbSource string
 	recordFeedbackCmd := &cobra.Command{
 		Use:   "record-feedback",
@@ -1173,11 +1078,8 @@ func registerToolCommands(app *pocketbase.PocketBase, cfg *config.Config, cfgErr
 	_ = recordFeedbackCmd.MarkFlagRequired("summary")
 	app.RootCmd.AddCommand(recordFeedbackCmd)
 
-	// agent <instruction> — Phase-1 MANUAL trigger for the eino ReAct loop (spec §6;
-	// agent_runs.trigger="manual"). One-shot separate process, like sweep/patrol: requires the
-	// DB already migrated (a prior `serve` or `migrate up`). INTERPRETATION (see handoff): the
-	// §3.3 CLI table lists no agent subcommand, but §8 Phase 1 requires a driveable loop and the
-	// trigger enum includes "manual"; confirm this surface against §8 Phase 1.
+	// agent <instruction> — the MANUAL trigger for the ReAct loop (agent_runs.trigger="manual").
+	// A one-shot separate process, like sweep/patrol.
 	agentCmd := &cobra.Command{
 		Use:   "agent <instruction>",
 		Short: "Run the agent loop once on an instruction (manual trigger)",
@@ -1199,14 +1101,11 @@ func registerToolCommands(app *pocketbase.PocketBase, cfg *config.Config, cfgErr
 	}
 	app.RootCmd.AddCommand(agentCmd)
 
-	// chat — interactive multi-turn stewardship session over the eino loop (ADR 0001: terminal
-	// surface first). On a real terminal this runs the full-screen TUI (internal/tui, ADR 0004);
-	// runChat below is the line-oriented REPL fallback used when stdio is piped or --plain is
-	// passed.
-	// Like `agent`, it self-initializes the store on first run via requireConfig (ADR 0003) — no
-	// prior `migrate up` or `serve` is required. Scope stays desk stewardship: the session
-	// inherits the gated tool set (restore never exposed; apply_fix only when
-	// LIBRARIAN_AUTONOMOUS_WRITES is set) and the data-backed system prompt — not a general chat.
+	// chat — interactive multi-turn stewardship session over the agent loop. On a real terminal it
+	// runs the full-screen TUI; runChat below is the line-oriented REPL fallback for piped stdio or
+	// --plain. Like `agent`, it self-initializes the store via requireConfig, so no prior
+	// `migrate up` or `serve` is required. The session inherits the gated tool set (restore never
+	// exposed; apply_fix only under LIBRARIAN_AUTONOMOUS_WRITES) and the data-backed system prompt.
 	chatCmd := &cobra.Command{
 		Use:   "chat",
 		Short: "Interactive multi-turn librarian session (full-screen TUI on a terminal; REPL when piped or --plain)",
@@ -1216,27 +1115,24 @@ func registerToolCommands(app *pocketbase.PocketBase, cfg *config.Config, cfgErr
 				return err
 			}
 			plain, _ := cmd.Flags().GetBool("plain")
-			// Route to the line REPL when --plain is set, or when either stdio end is not a
-			// terminal (piped input/output): the full-screen TUI requires an interactive TTY on
-			// both stdin AND stdout. requireConfig has already run (and printed any self-init /
-			// open-guard notice) above, so this decision — and any REPL prompt or the alternate
-			// screen — happens only after config is known good.
+			// Route to the line REPL when --plain is set or either stdio end is not a terminal: the
+			// full-screen TUI requires an interactive TTY on both stdin AND stdout. requireConfig has
+			// already run above, so nothing here draws before config is known good.
 			if plain || !isatty.IsTerminal(os.Stdin.Fd()) || !isatty.IsTerminal(os.Stdout.Fd()) {
 				return runChat(cmd.Context(), app, c)
 			}
-			// Resolve the color theme ONCE here, in the safe window before the Bubble Tea program
-			// starts — the "auto" path probes the terminal background (a query that would corrupt
-			// input if fired after the program's stdin reader is running; see ADR 0004). Precedence:
-			// --theme flag > LIBRARIAN_THEME env > auto-detect. Only consult the flag when the user
-			// set it, so an unset flag defers to the env override rather than shadowing it.
+			// Resolve the color theme ONCE here, in the safe window before the Bubble Tea program starts:
+			// the "auto" path probes the terminal background, and that query corrupts input if it fires
+			// after the program's stdin reader is running. Precedence: --theme > LIBRARIAN_THEME >
+			// auto-detect, consulting the flag only when set so an unset flag defers to the env override.
 			themeFlag := ""
 			if cmd.Flags().Changed("theme") {
 				// GetString only errors on an unregistered/wrong-type flag; "theme" is registered as a
 				// string below, so the error is structurally impossible here — discard it explicitly.
 				themeFlag, _ = cmd.Flags().GetString("theme") //nolint:errcheck // "theme" is a registered string flag
 			}
-			// Module TUI views (spec §5.3) are collected lazily against the LIVE app/config:
-			// the pm views when that module is enabled, none otherwise.
+			// Module TUI views are collected lazily against the LIVE app/config: the pm views when that
+			// module is enabled, none otherwise.
 			return tui.Run(cmd.Context(), app, c, tui.ResolveTheme(themeFlag), moduleReg.TUIViews(app, c))
 		},
 	}
@@ -1244,14 +1140,11 @@ func registerToolCommands(app *pocketbase.PocketBase, cfg *config.Config, cfgErr
 	chatCmd.Flags().String("theme", "auto", "color theme for the full-screen TUI: light, dark, or auto (detect the terminal background once at startup)")
 	app.RootCmd.AddCommand(chatCmd)
 
-	// mcp-serve — expose the tool core as an MCP stdio server (spec §7.2 outbound dual-surface;
-	// build-brief §5 / punch-list 4). The model-facing tool set is tools.AgentTools(cfg): the
-	// SAME §5.4 registration-time write gate as the eino loop (apply_fix only when
-	// LIBRARIAN_AUTONOMOUS_WRITES=true), and restore is NEVER exposed (§5.5, supervised CLI-only).
-	// Like the other one-shot tool commands it opens the DB directly; because it holds the DB open
-	// for the session, it MUST NOT run concurrently with `serve` (single-writer SQLite, §10.4).
-	// Termination: the stdio server returns when the MCP client closes stdin (EOF), the normal
-	// stdio-transport lifecycle.
+	// mcp-serve — expose the tool core as an MCP stdio server. The model-facing tool set carries
+	// the SAME registration-time write gate as the agent loop (apply_fix only when
+	// LIBRARIAN_AUTONOMOUS_WRITES=true), and restore is NEVER exposed: it stays supervised CLI-only.
+	// It holds the DB open for the whole session, so it MUST NOT run concurrently with `serve`
+	// (single-writer SQLite). The stdio server returns when the client closes stdin.
 	app.RootCmd.AddCommand(&cobra.Command{
 		Use:   "mcp-serve",
 		Short: "Expose the librarian tool core as an MCP stdio server (model-facing; the exposed tool set is gated per §5.4, distinct from the fuller CLI subcommand set)",
@@ -1270,12 +1163,10 @@ func registerToolCommands(app *pocketbase.PocketBase, cfg *config.Config, cfgErr
 		Use:   "gui",
 		Short: "Open the visual data browser (admin console) in a browser",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// Abort BEFORE opening a browser or spawning the serve child when config/the desk
-			// guard fails: gui previously only used requireConfig's error to pick a fallback URL
-			// and pressed on regardless, which meant a mismatched-desk store still popped a
-			// browser tab and re-exec'd `serve` (which then hit its own OnServe guard exit, but
-			// only after the browser had already opened against a store gui had no business
-			// touching). requireConfig runs the same desk-guard check as every other subcommand.
+			// Abort BEFORE opening a browser or spawning the serve child when config or the desk guard
+			// fails: otherwise a mismatched-desk store pops a browser tab and re-execs `serve`, which
+			// hits its own OnServe guard exit only after the browser opened against a store gui had no
+			// business touching. requireConfig runs the same desk-guard check as every other subcommand.
 			c, err := requireConfig(app, cfg, cfgErr)
 			if err != nil {
 				return err
@@ -1286,16 +1177,11 @@ func registerToolCommands(app *pocketbase.PocketBase, cfg *config.Config, cfgErr
 				return xerr
 			}
 			// Forward the resolved --dir to the child so it opens the EXACT SAME store gui just
-			// desk-guarded and is about to display in the browser (chosen over the alternative of
-			// having gui refuse an explicit --dir outright: forwarding is strictly more useful and
-			// gui otherwise behaves like every other subcommand w.r.t. --dir). --dir is a process
-			// flag, not an env var, so unlike DESK_ROOT/DESK_NAME/XDG_DATA_HOME (which DO inherit
-			// via exec.Command's default nil Env) it does NOT propagate to the child on its own.
-			// cmd.Flags().GetString("dir") reads cobra's own resolved value — the operator's
-			// explicit --dir when passed, or otherwise the XDG default this process's main()
-			// computed and handed to pocketbase.NewWithConfig as DefaultDataDir — so forwarding
-			// unconditionally (not only when --dir was passed explicitly) keeps parent and child
-			// aimed at the same store in both cases; there is no scenario where they should diverge.
+			// desk-guarded. --dir is a process flag, not an env var, so unlike
+			// DESK_ROOT/DESK_NAME/XDG_DATA_HOME (which inherit via exec.Command's nil Env) it does NOT
+			// propagate on its own. GetString("dir") reads cobra's resolved value — the explicit --dir
+			// when passed, else the XDG default main() handed to NewWithConfig — so forwarding it
+			// unconditionally keeps parent and child aimed at the same store either way.
 			dir, derr := cmd.Flags().GetString("dir")
 			if derr != nil {
 				return derr
@@ -1317,10 +1203,9 @@ func agentAction(ctx context.Context, app core.App, cfg *config.Config, trig, in
 	return err
 }
 
-// runChat drives a line-oriented REPL over one agent.Session. Each input line is one
-// conversational turn; the session's growing history keeps the exchange multi-turn (the model
-// sees prior turns). Exit with "exit", "quit", or EOF (Ctrl-D). The write boundary and the
-// stewardship scope are the Session's, inherited from the gated tool set — nothing here opens a
+// runChat drives a line-oriented REPL over one agent.Session. Each input line is one turn; the
+// session's growing history keeps the exchange multi-turn. Exit with "exit", "quit", or EOF.
+// The write boundary is the Session's, inherited from the gated tool set — nothing here opens a
 // new capability.
 func runChat(ctx context.Context, app core.App, cfg *config.Config) error {
 	sess, err := agent.NewSession(ctx, app, cfg)

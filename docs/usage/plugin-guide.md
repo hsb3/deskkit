@@ -106,16 +106,21 @@ elided here for width.)
 pre-existing folder under the standard.
 
 **What it does to your desk.** It owns the *procedure* and the *scaffold*, not the rules.
-It ships a deliberately **standard-free** skeleton in `assets/template/` — folders plus
-placeholder instrument files with no conventions prose baked in:
+It ships a deliberately **standard-free** skeleton in the skill's own `assets/template/` —
+folders plus placeholder instrument files with no conventions prose baked in. This is the tree
+the skill copies **into your desk**; none of these paths refer to this repository:
 
 ```
-CLAUDE.md                 # entry: orients only — placeholders for desk name / role / repos
-.gitignore                # the standard gitignore stanza (secrets kept keep-only)
-_meta/{README,HANDOFF,improvement-log}.md
-_meta/secrets/.gitkeep    # the one never-committed secrets home
-_structure/decisions/README.md
-_knowledge/README.md
+<your desk>/
+  CLAUDE.md                        # entry: orients only — placeholders for desk name / role / repos
+  .gitignore                       # the standard gitignore stanza (secrets kept keep-only)
+  _meta/README.md
+  _meta/HANDOFF.md
+  _meta/improvement-log.md
+  _meta/secrets/.gitkeep           # the one never-committed secrets home
+  _structure/decisions/README.md
+  _knowledge/README.md
+  _knowledge/profile.example.yaml  # copy to profile.yaml and fill — the one personalization file
 ```
 
 The **greenfield runbook** is ordered and verifies each step before the next: name and

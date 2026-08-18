@@ -5,33 +5,24 @@
 #
 #   curl -fsSL https://raw.githubusercontent.com/hsb3/deskkit/main/install.sh | bash
 #
-# It consumes the artifacts published by the release workflow
-# (.github/workflows/release.yml) on every `v*` tag:
+# It downloads the host's binary from the artifacts .github/workflows/release.yml publishes on
+# every `v*` tag, verifies the sha256 and FAILS LOUDLY on mismatch, then installs to a no-root
+# path:
 #
-#   - deskkit_<version>_<os>_<arch>   (the deskkit Go binary; release.yml line 127)
-#   - checksums.txt                            (sha256sum of every asset; release.yml line 153)
+#   - deskkit_<version>_<os>_<arch>   (the deskkit Go binary)
+#   - checksums.txt                   (sha256sum of every asset)
 #
-# The release workflow does not publish a separate plugin bundle asset — the Claude Code plugin
-# installs straight from this repo's own marketplace (`claude plugin marketplace add` /
-# `claude plugin install`), not from a downloaded tarball.
-#
-# This script (1) downloads the deskkit binary matching the host OS/arch, (2) verifies its
-# sha256 against checksums.txt and FAILS LOUDLY on mismatch, (3) installs it to a no-root path,
-# and (4) guides the Claude Code plugin install (marketplace add + install).
-#
-# NOTE (live e2e): releases are published (through v0.7.0). The repo went public on 2026-08-18,
-# so the public unauthenticated one-liner above should now resolve — that has not yet been run
-# end-to-end unauthenticated as part of this change. This script is shellcheck-clean and its
-# --dry-run plan is verified against the exact artifact strings in release.yml.
+# No plugin bundle asset is published — the Claude Code plugin installs from this repo's own
+# marketplace (`claude plugin marketplace add` / `claude plugin install`), never a tarball.
 #
 set -euo pipefail
 
 # ---- constants (kept in lock-step with .github/workflows/release.yml) -----------------------
 REPO="hsb3/deskkit"          # gh release lives here; also the plugin marketplace slug
-BINARY_NAME="deskkit"     # installed command name (release.yml line 128: -o deskkit)
-LEGACY_BINARY_NAME="pocket-librarian"  # asset name on releases <= v0.6.0 (pre-D2b rename)
-CHECKSUMS_FILE="checksums.txt"     # release.yml line 153
-PLUGIN_ID="deskkit@deskkit"  # `claude plugin install deskkit@deskkit`
+BINARY_NAME="deskkit"        # installed command name
+LEGACY_BINARY_NAME="pocket-librarian"  # asset name on releases <= v0.6.0, before the rename
+CHECKSUMS_FILE="checksums.txt"
+PLUGIN_ID="deskkit@deskkit"
 
 # ---- defaults (overridable by flag or env) --------------------------------------------------
 VERSION="${LIBRARIAN_VERSION:-latest}"   # a tag like v0.4.0, a bare 0.4.0, or "latest"
@@ -132,9 +123,8 @@ case "$OS" in darwin|linux) ;; *) die "invalid INSTALL_OS='$OS' (expected darwin
 case "$ARCH" in amd64|arm64) ;; *) die "invalid INSTALL_ARCH='$ARCH' (expected amd64 or arm64)." ;; esac
 
 # ---- resolve the release version ------------------------------------------------------------
-# The workflow tags releases `v<version>` (release.yml lines 32/195) but names the binary
-# artifact with the BARE version (release.yml line 125: deskkit_${version}_...).
-# So we track both: TAG (with the leading v, used in download URLs) and VERSION_BARE.
+# The workflow tags releases `v<version>` but names the binary artifact with the BARE version,
+# so both are tracked: TAG (leading v, used in download URLs) and VERSION_BARE.
 resolve_version() {
   if [ "$VERSION" = "latest" ]; then
     # Progress goes to STDERR, never stdout: this function's stdout IS the resolved tag
@@ -160,7 +150,6 @@ TAG="$(resolve_version)"
 VERSION_BARE="${TAG#v}"
 
 # ---- construct artifact names + URLs (must match release.yml exactly) ------------------------
-# release.yml line 125: out="deskkit_${version}_${goos}_${goarch}"
 ARTIFACT="${BINARY_NAME}_${VERSION_BARE}_${OS}_${ARCH}"
 BASE_URL="https://github.com/${REPO}/releases/download/${TAG}"
 BINARY_URL="${BASE_URL}/${ARTIFACT}"
@@ -198,9 +187,8 @@ install_binary() {
 
   info "  downloading ${ARTIFACT}"
   if ! curl -fL --retry 3 -o "${tmp}/${ARTIFACT}" "${BINARY_URL}"; then
-    # Releases up to v0.6.0 published the binary under its pre-rename name (D2b, spec §2.10).
-    # Fall back to that asset name so this script keeps working against them; the binary still
-    # installs as ${BINARY_NAME} — same tool, renamed.
+    # Releases <= v0.6.0 publish the binary under its pre-rename asset name; fall back to it.
+    # Either asset installs as ${BINARY_NAME} — same tool, renamed.
     warn "asset ${ARTIFACT} not found; trying the pre-rename asset name (releases <= v0.6.0)"
     ARTIFACT="${LEGACY_BINARY_NAME}_${VERSION_BARE}_${OS}_${ARCH}"
     BINARY_URL="${BASE_URL}/${ARTIFACT}"
@@ -213,8 +201,7 @@ install_binary() {
     || die "download failed: ${CHECKSUMS_URL}"
 
   step "Verify sha256"
-  # checksums.txt is produced by `sha256sum ./*` run inside dist/ (release.yml line 182),
-  # so each line is "<hash>  ./<artifact>". Match on the basename, tolerating the ./ prefix.
+  # checksums.txt lines are "<hash>  ./<artifact>" — match on basename, tolerating the ./ prefix.
   local expected actual
   expected="$(awk -v f="${ARTIFACT}" '{ n=$2; sub(/^\.\//,"",n); if (n==f) { print $1; exit } }' "${tmp}/${CHECKSUMS_FILE}")"
   [ -n "$expected" ] || die "no checksum entry for ${ARTIFACT} in ${CHECKSUMS_FILE}."

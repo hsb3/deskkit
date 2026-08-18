@@ -11,10 +11,11 @@ honest. The distinction is the thing to internalize:
   the root digests (`README.md`, `CLAUDE.md`, and its `AGENTS.md` symlink), and the code tree
   (`cmd/`, `internal/`, `templates/`, `schema/`, `plugins/`, `scripts/`, `kits/`, `web/`). Every
   doc/media path cited here MUST resolve to a file that exists. This is enforced.
-- **Working desk** — point-in-time, hand-curated working state: `_meta/` (handoffs, plans, research,
-  the `_meta/_archive/` freezer) and `.claude/` (agent config + memory). References here are
-  provenance, not maintained navigation, so they are NOT gated (see "Why the working desk is not
-  gated" below).
+- **Working desk** — point-in-time, hand-curated working state: `.claude/` (agent config + memory).
+  References here are provenance, not maintained navigation, so they are NOT gated (see "Why the
+  working desk is not gated" below). Handoffs, plans, and research live on the project board, not
+  in the tree — the `_meta/` folder that used to hold them was removed in 2026-08 and is in git
+  history.
 
 ## The `docs/` tree
 
@@ -65,17 +66,16 @@ drifting.
 
 ## Why the working desk is not gated
 
-`_meta/` and `.claude/` are excluded from the doc-link gate on purpose. Research notes are dated
-snapshots; plans are in-flight drafts that cite specs at authoring-time line numbers; archived docs
-are frozen. Their references are provenance, not navigation, so gating them would either force
-rewriting history or block CI on stale scratch. Instead, working-desk hygiene is a **curation
-discipline**, not a gate:
+`.claude/` is excluded from the doc-link gate on purpose. Memory notes are dated snapshots and
+agent config cites files at authoring-time paths; those references are provenance, not navigation,
+so gating them would either force rewriting history or block CI on stale scratch. Working-desk
+hygiene is a **curation discipline**, not a gate:
 
-- When a work sprint's research or plans are superseded, move them to `_meta/_archive/` (the freezer)
-  rather than leaving them to rot in place next to live material. `_meta/_archive/` is excluded from
-  every gate.
-- Genuinely-archival design docs (superseded proposals, completed research, old plan folders) belong
-  in `_meta/_archive/`, never in `docs/`. `docs/` is for material a reader is meant to navigate now.
-- The split that caused the 2026-07-24 incident — moving still-live build specs into `_meta/_archive/`
-  — is the anti-pattern this contract exists to prevent: if a gate or the shipped binary reads a file,
-  it is load-bearing and belongs on the published surface, not in the freezer.
+- Superseded research and plans get archived on the project board (or simply left in git history)
+  rather than rotting in the tree next to live material. Since `_meta/` was removed in 2026-08,
+  the repo carries no in-tree freezer at all.
+- Genuinely-archival design docs (superseded proposals, completed research, old plan folders) do
+  not belong in `docs/`. `docs/` is for material a reader is meant to navigate now.
+- The split that caused the 2026-07-24 incident — moving still-live build specs into an archive
+  folder — is the anti-pattern this contract exists to prevent: if a gate or the shipped binary
+  reads a file, it is load-bearing and belongs on the published surface, not in a freezer.

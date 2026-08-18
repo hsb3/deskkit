@@ -61,9 +61,9 @@ These are decided; open build detail lives in the roadmap and issues, not here.
   post-1.0 deferral into a pre-1.0 build lane, amending
   ADR 0001 (DESK-23)'s TUI-first deferral; the
   serving-stack call is made when that lane starts, not here.
-- **Public launch is deferred to ≥ 1.0.0.** The repo stays private until then; the public
-  `curl | bash` install path is expected to 404 by design until launch — install from the
-  private repo with authenticated `gh` in the meantime (see the root README).
+- **The repo is public** (since 2026-08-18), so the `curl | bash` install path off `main` works
+  today; `gh release download` stays a supported alternative for pinning a specific release
+  asset (see the root README).
 
 ## Where to go next
 

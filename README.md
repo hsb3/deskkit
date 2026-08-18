@@ -1,169 +1,114 @@
 # deskkit
 
-Profile-driven repo conventions and a self-repairing desk librarian, in one binary.
+**Point it at the folder where your notes, decisions, and status live. It indexes the tree, flags
+every convention violation, and repairs the mechanical ones — with an undo you can trust.**
 
-## What this is
+## Why this exists
 
-One binary, one plugin, one schema, one personalization model — nothing you install carries a
-name, org, repo, or issue number:
+A planning folder rots quietly. Frontmatter goes missing, a task ends up filed under `analyses/`,
+a journal entry gets a name nothing can sort. Each fix is mechanical and nobody makes them,
+because by hand it is tedious and by script it is frightening — a bulk rewrite across your own
+notes has no undo.
 
-- **deskkit** — a single Go binary (embedded PocketBase) that is the whole runtime. It indexes a
-  desk's files, flags convention violations, and can propose + apply fixes under a
-  record-original-first safety boundary — every applied fix is byte-exact reversible via
-  `restore`. Three modules feed one tool core: **profile** (personalization — `profile_get`,
-  `profile_validate`, `template_render`, `knowledge_index`), **librarian** (the sweep → patrol →
-  fix loop), and **PM** — a document-gated work graph (items move through a rigid phase machine;
-  a phase advance is refused until the document that phase requires validates), **on by default**,
-  opt a desk out with `PM_ENABLED=false`. The core surfaces as a CLI, an MCP server (`restore` is
-  deliberately CLI-only; `apply_fix` is gated behind an env flag), a chat TUI, and a browser
-  session page. See [docs/usage/pm-guide.md](docs/usage/pm-guide.md).
-- **The `deskkit` plugin** (Claude Code) — the agent-facing surface over that same binary:
-  skills that stand up, check, evolve, and adopt an executive desk and drive the work graph, the
-  `librarian-operator` and `pm-operator` agents, a SessionStart briefing hook, and one MCP mount.
-  It ships no runtime of its own.
-- **schema v1** — the shared, product-neutral rule/structure contract (`schema/`); the binary
-  carries drift-guarded embedded copies of it.
+deskkit makes those fixes and keeps the undo. It records a file's original bytes *before* it
+writes anything, so every applied fix reverses byte-exact with one command. Read-only by default:
+indexing and flagging never touch your files, and the one command that does is supervised — you
+run it by hand, and an agent only gets it behind an environment flag that is off by default.
 
-Both are things you **install once and use in your own desks** — folders outside this repo. You
-personalize a desk by filling its `_knowledge/profile.yaml` (copied from the desk-setup scaffold's
-`_knowledge/profile.example.yaml`), never by editing a shipped skill, template, or tool. This repo
-is not itself a desk; it ships no repo-root `_knowledge/`.
+## What you get today
+
+- **A conformance report you didn't have to write.** `sweep` indexes the tree, `patrol` flags
+  violations of six shared rules. Both are read-only and neither needs an API key.
+- **Mechanical repairs behind a two-step gate.** `propose-fix` plans the change and records the
+  original; `apply-fix` writes it; `restore` puts the exact bytes back. Judgment calls are flagged
+  for you, never auto-applied.
+- **A work graph that can't skip its paperwork.** Items move `queue → work → review → terminal`,
+  and a phase advance is refused until the document that phase requires validates.
+- **Four doors, one core.** A CLI, an MCP server for agent sessions, a terminal TUI, and a browser
+  UI — all served from the same single binary, with an embedded database. No services to run.
+- **Nothing you install carries your name.** You personalize a desk once, in its
+  `_knowledge/profile.yaml`; no shipped skill, template, or tool is ever edited.
+
+## What it looks like
+
+`deskkit serve` puts the whole store behind a browser UI at `http://127.0.0.1:8090/`. Below is a
+scratch desk of eighteen files, swept and patrolled.
+
+**Documents** — the indexed tree, with the parsed frontmatter and content of whatever you select:
+
+![The deskkit browser UI showing the indexed documents of a desk, with one analysis selected and its frontmatter, synopsis, and content in the detail pane](docs/assets/spa-documents.png)
+
+**Findings** — one row per rule violation, each with the detail and the fix that would be applied.
+`R1`–`R3` are mechanical and repairable; `R4`–`R6` are judgment calls left for you:
+
+![The findings view listing five patrol findings across rules R1 to R5, with the R3 finding selected showing its detail and proposed fix](docs/assets/spa-findings.png)
+
+**PM items** — the work graph, with each item's phase, court, and blocked state:
+
+![The PM items view listing seven work items with their type, phase, court, and priority, one selected showing its full record](docs/assets/spa-pm.png)
+
+The terminal path is the same core. `deskkit chat` opens a full-screen TUI over the same tools:
+
+![The deskkit chat TUI answering a question about the desk](docs/assets/chat.gif)
 
 ## Install
 
-### The plugin
+Download and verify the release binary for macOS or Linux (amd64 or arm64):
 
-This repo is its own Claude Code plugin marketplace (`.claude-plugin/marketplace.json`), with one
-plugin in it. From any project:
+```bash
+curl -fsSL https://raw.githubusercontent.com/hsb3/deskkit/main/install.sh | bash
+```
+
+Or build from source with Go 1.25+: `go install github.com/hsb3/deskkit/cmd/deskkit@latest`.
+
+For a Claude Code session, add the marketplace and install the plugin — it drives the same binary,
+so keep `deskkit` on your `PATH`:
 
 ```bash
 claude plugin marketplace add hsb3/deskkit
 claude plugin install deskkit@deskkit
 ```
 
-The plugin drives the `deskkit` binary, so install that too (next section) and make sure it is on
-your `PATH`. (For local development you can point Claude Code straight at the source tree with
-`claude --plugin-dir ./plugins/deskkit`.)
+## Your first five minutes
 
-### The `deskkit` binary
-
-The release workflow publishes a prebuilt `deskkit` binary for macOS and Linux (amd64 + arm64)
-on every `v*` tag — no Go toolchain needed.
-
-The bundled installer does download + sha256-verify + install in one step:
-`curl -fsSL https://raw.githubusercontent.com/hsb3/deskkit/main/install.sh | bash`.
-
-Or download the release asset directly with `gh`:
-
-```bash
-mkdir -p ~/.local/bin
-os=$(uname -s | tr '[:upper:]' '[:lower:]')                 # darwin | linux
-arch=$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/')   # amd64 | arm64
-gh release download --repo hsb3/deskkit \
-  --pattern "deskkit_*_${os}_${arch}" \
-  --output ~/.local/bin/deskkit --clobber
-chmod +x ~/.local/bin/deskkit
-deskkit --version
-```
-
-`gh release download` with no tag picks the latest release; make sure `~/.local/bin` is on
-your `PATH`.
-
-From a source checkout, `make install` builds and installs the version-stamped binary to
-`~/.local/bin` — see [docs/development/install-and-build.md](docs/development/install-and-build.md).
-Or install straight from source with Go: `go install github.com/hsb3/deskkit/cmd/deskkit@latest`.
-
-## Use it in your desk
-
-Everything below happens in **your desk** — a folder outside this repo — not in a checkout of
-this repository.
-
-**1. Stand up a desk.** In a Claude Code session with the plugin installed, ask for the
-`desk-setup` skill: it scaffolds a conformant desk and fills `_knowledge/profile.yaml` with
-your identifiers. Or start from a plain folder without the plugin:
+Run everything from **inside your desk** — a folder outside this repo. deskkit finds the profile
+by walking up from your working directory, so there is nothing to export:
 
 ```bash
 cd /path/to/your/desk
-deskkit init      # writes the minimal _knowledge/profile.yaml: desk name from the folder, root "."
+deskkit init      # writes the minimal _knowledge/profile.yaml
+deskkit sweep     # index the tree (the store self-creates on first run)
+deskkit patrol    # flag violations — read-only; never writes your files
+deskkit serve     # then open http://127.0.0.1:8090/
 ```
 
-**2. Sweep and patrol.** Run `deskkit` from inside the desk — it finds the profile by walking
-up from your working directory, so there are no environment variables to export:
-
-```bash
-cd /path/to/your/desk
-deskkit sweep     # index the desk tree (the store self-creates on first run)
-deskkit patrol    # flag convention violations — a dry run; never writes your files
-```
-
-**3. Go deeper.** `deskkit chat` opens the TUI (needs an LLM key — see
-[docs/usage/deskkit-reference.md](docs/usage/deskkit-reference.md)); the `conventions-standard` and `harvest-loop`
-skills run the standing checks and the periodic improvement-log pass; the supervised
-`propose-fix → apply-fix → restore` write loop is in
-[docs/usage/librarian-guide.md](docs/usage/librarian-guide.md). The full walkthrough is
+The full walkthrough, including the supervised fix loop, is
 [docs/usage/getting-started.md](docs/usage/getting-started.md).
 
-## Structure
+## What it is not
 
-```
-cmd/deskkit/        deskkit binary entry point
-internal/           core + profile, librarian, and pm modules, MCP server + CLI + TUI + web session page
-plugins/            the marketplace-distributed bundle (a marketplace install copies only this)
-  deskkit/          the one bundle: skills, agents, SessionStart hook, .mcp.json —
-                    authored in place, nothing generated
-schema/             schema v1 — source of truth for the binary's embedded copies
-docs/               product specs, the charter, and the getting-started / plugin / librarian guides
-```
+- **Claude Code only.** The plugin surface targets one harness; nothing for another ships today.
+- **Not a note-taking app.** No editor, no sync. It reads a folder you already keep.
+- **The browser UI is read-only apart from chat** — every write path stays on the CLI and the MCP
+  tools, deliberately.
+- **Rules are fixed at six.** `R1`–`R6` are what patrol knows; they are not yet user-authored.
+- **Pre-1.0.** Interfaces can still change between releases; see [CHANGELOG.md](CHANGELOG.md).
 
-## Scope of this build (v1)
+## Roadmap
 
-**Claude Code only.** OpenCode support is deferred to a separate common-core fan-out build
-(tracked in #12, parked until ≥ v1.0.0); nothing for it ships today.
-
-Harness versions tested: Claude Code `2.1.204` · Go `1.25.0` (pinned — PocketBase's own
-`go.mod` floors it; a `go 1.23` directive will not compile the dependency graph). Node is needed
-only to run the repo's `scripts/*.mjs` gates; nothing shipped is built with it.
-
-## Developing
-
-Building from source, running the gates, and the env-var / store-path lore live in the
-developer track — start at [docs/development/](docs/development/) and
-[docs/development/install-and-build.md](docs/development/install-and-build.md). The short
-version, from a clone:
-
-```bash
-make setup    # git hooks (lefthook)
-make build    # the version-stamped deskkit binary
-make test     # fast unit tests (go test)
-make check    # repo gates (neutrality, drift guards, doc links, …)
-make verify   # librarian integration gate on a throwaway scratch desk
-```
-
-`make build|test|fmt|sweep|patrol` iterate against a desk named by `DESK_ROOT`/`DESK_NAME`;
-`apply-fix` is deliberately not a target — it's supervised-only, run by hand, and every fix is
-reversible with `deskkit restore --by-path <path>`. `make gui` opens the embedded PocketBase
-admin console (`http://127.0.0.1:8090/_/`).
+- **OpenCode support** — a second harness from a common core, parked until ≥ 1.0.0
+  ([issue #12](https://github.com/hsb3/deskkit/issues/12)).
+- **The SOP kit library** (`kits/`) — the document-authoring kits are ported and their contract
+  lives in `schema/doctypes.yaml`, but nothing consumes them yet. Frozen until after 1.0.
+- Everything else is tracked in [the issue tracker](https://github.com/hsb3/deskkit/issues).
 
 ## Documentation
 
-The canonical page is **[docs/development/CHARTER.md](docs/development/CHARTER.md)** — what the project is and what's
-settled for 1.0.0; if anything here disagrees with it, the charter wins. Agents working in the repo
-start at **[CLAUDE.md](CLAUDE.md)**. Docs split into two tracks — see **[docs/README.md](docs/README.md)**
-for the full index.
-
-**Using it** — install and run:
-
-- **[docs/usage/getting-started.md](docs/usage/getting-started.md)** — install, fill your profile, first sweep + patrol, meet the TUI.
-- **[docs/usage/plugin-guide.md](docs/usage/plugin-guide.md)** — the desk skills as user journeys: when to reach for each, what you get.
-- **[docs/usage/librarian-guide.md](docs/usage/librarian-guide.md)** — the daily loop: sweep → patrol → fix → byte-exact restore.
-- **[docs/usage/pm-guide.md](docs/usage/pm-guide.md)** — the PM work graph: enable it, the phase machine + gates, and the CLI / MCP / TUI / `deskkit` plugin surfaces.
-- `plugins/deskkit/README.md`, `schema/README.md`, [docs/usage/deskkit-reference.md](docs/usage/deskkit-reference.md) — operator detail per surface.
-
-**Developing it** — build, test, release:
-
-- **[docs/development/](docs/development/)** — the contributor overview: build/test gates, media regeneration, and how to cut a release.
-- **[docs/pattern.md](docs/pattern.md)** — the single-binary shape (CLI + embedded store + MCP + web + plugin), the config ladder, and the auth model, reusable by a sibling application.
-- `docs/development/specs/pocket-librarian-v1-spec.md` — the librarian's product and technical spec.
-- `docs/development/specs/pm-system-v1-spec.md` — the PM system's product and technical spec (core+modules refactor, PM module, gates, surfaces, plugin).
-- Architecture decision records (interactive surface, multi-desk topology, store self-initialization, chat TUI, versioning policy, kit port, Charm v2 stack, PM core+modules architecture) live on the project board as `DECISION` tasks, not in this repo; docs and code cite them as `ADR NNNN`.
-- **[CHANGELOG.md](CHANGELOG.md)** — what changed in each release.
+- [Getting started](docs/usage/getting-started.md) — install, profile, first sweep and patrol.
+- [Librarian guide](docs/usage/librarian-guide.md) — sweep → patrol → fix → byte-exact restore.
+- [PM guide](docs/usage/pm-guide.md) — phases, gates, and every surface over the work graph.
+- [Plugin guide](docs/usage/plugin-guide.md) — the desk-shaping skills as journeys.
+- [Reference](docs/usage/deskkit-reference.md) — the full command, flag, and environment surface.
+- [Docs index](docs/README.md) · [Charter](docs/development/CHARTER.md) (canonical; it wins any
+  disagreement) · [Developing](docs/development/) · [CLAUDE.md](CLAUDE.md) (for agents in this
+  repo).

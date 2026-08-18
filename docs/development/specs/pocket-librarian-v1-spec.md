@@ -5,6 +5,15 @@ _The build spec for the single-binary Go agent that lives on the desk's PocketBa
 Status: active
 Date: 2026-07-15
 
+> **Read this as the build record, not as a description of today's tree.** The behavioral contract
+> below is live (§5.6's query-kind list is asserted by `scripts/check-query-kinds.mjs`, and the
+> desk-side path defaults such as `_meta/HANDOFF.md` and `_meta/secrets/` are still the shipped
+> defaults **for the desks deskkit stewards**). What has moved on since is the repo's own layout:
+> there is no `plugin/` TypeScript lane and no second MCP process — the four profile tools are the
+> Go `profile` module on the same `deskkit mcp-serve`, and the Go module sits at the repo root
+> (`cmd/deskkit/`, `internal/`). Corrections are marked inline where they bind. For today's shape
+> see [`../CHARTER.md`](../CHARTER.md).
+
 ## Table of contents
 
 1. [Overview, goals, non-goals, and migration from the Python PoC](#1-overview-goals-non-goals-and-migration-from-the-python-poc)

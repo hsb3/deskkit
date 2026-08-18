@@ -24,6 +24,7 @@ Status: active
 - Architecture Decision Records live on the project board as `DECISION` tasks (moved off disk
   2026-08-18); cited from docs and code as a bare `ADR NNNN`.
 
-Working-desk material — session handoffs, plans, research, archived docs — lives under
-[`../_meta/`](../_meta/), not here. It is point-in-time working state, curated by hand, not published
+Working-desk material — session handoffs, plans, research — lives on the project board, not in
+this repo (the `_meta/` tree that used to hold it was removed in 2026-08; it is in git history).
+The only working state still on disk is `.claude/` (agent config + memory), which is not published
 documentation; see [`development/docs-layout.md`](development/docs-layout.md) for the boundary.

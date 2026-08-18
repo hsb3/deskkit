@@ -1,16 +1,15 @@
-// Streaming engine for the interactive chat surface (spec §6, chat-TUI plan Part 1). A
-// Session drives the SAME eino ReAct loop as Turn()/Run(), but exposes a live event stream so
-// a caller (the TUI, or a future SSE route) can render tokens, tool steps, and terminal state
-// as they happen instead of blocking on a whole reply.
+// Streaming engine for the interactive chat surface. A Session drives the SAME ReAct loop as
+// Turn()/Run(), but exposes a live event stream so a caller can render tokens, tool steps, and
+// terminal state as they happen instead of blocking on a whole reply.
 //
-// Why tokens come from a callback, not the agent output stream: under the anthropic
-// StreamToolCallChecker (agent.go), react.Agent.Stream's output reader only releases the final
-// answer AFTER the checker reads ahead — a burst, not live tokens. Live tokens therefore come
-// from cbutils.ModelCallbackHandler.OnEndWithStreamOutput (an independent stream copy); the
-// agent output stream (ConcatMessageStream) is used only as the authoritative final message and
-// completion signal. Callbacks fire on agent goroutines, so a stream copy is drained by a
-// wg-tracked reader goroutine (never synchronously inside the callback, which would deadlock),
-// and wg.Wait() gates the terminal event so all tokens precede final|error.
+// Tokens come from a callback, not the agent output stream: under the anthropic
+// StreamToolCallChecker, react.Agent.Stream's output reader releases the final answer only AFTER
+// the checker reads ahead — a burst, not live tokens. Live tokens therefore come from
+// cbutils.ModelCallbackHandler.OnEndWithStreamOutput, an independent stream copy; the agent
+// output stream is used only as the authoritative final message and completion signal. Callbacks
+// fire on agent goroutines, so a stream copy is drained by a wg-tracked reader goroutine — never
+// synchronously inside the callback, which would deadlock — and wg.Wait() gates the terminal
+// event so all tokens precede final|error.
 package agent
 
 import (
@@ -40,11 +39,11 @@ const (
 	EventError     EventKind = "error"      // Err, Canceled, Partial
 )
 
-// Event is a flat, JSON-taggable record of one streaming occurrence. It is deliberately
-// serializable-only (no error values, no channels): the actual terminal error is preserved for
+// Event is a flat, JSON-taggable record of one streaming occurrence, deliberately
+// serializable-only: no error values, no channels. The actual terminal error is preserved for
 // in-process callers via the Session's unexported termErr field, so this type serializes cleanly
-// as the SSE payload for the browser session surface (internal/modules/librarian/web). Exactly
-// one terminal event (final|error) is emitted per turn, after which the channel closes.
+// as the browser surface's SSE payload. Exactly one terminal event (final|error) is emitted per
+// turn, after which the channel closes.
 type Event struct {
 	Kind     EventKind `json:"kind"`
 	Step     int       `json:"step,omitempty"`
@@ -58,11 +57,10 @@ type Event struct {
 	Canceled bool      `json:"canceled,omitempty"`
 	Partial  string    `json:"partial,omitempty"`
 
-	// Token accounting, set on the terminal event only (final|error). PromptTokens is the LAST
-	// model step's prompt count — that step's prompt already includes the full replayed history +
-	// tool results, so it IS the live thread's current context size; CompletionTokens sums the
-	// generated tokens across the turn's model steps; TotalTokens is their sum. Zero (omitted)
-	// when the provider reported no usage. Serializable-only, so this rides the future SSE payload.
+	// Token accounting, set on the terminal event only. PromptTokens is the LAST model step's
+	// prompt count — that prompt already includes the full replayed history + tool results, so it
+	// IS the live thread's current context size; CompletionTokens sums generated tokens across the
+	// turn's model steps; TotalTokens is their sum. Zero when the provider reported no usage.
 	PromptTokens     int `json:"prompt_tokens,omitempty"`
 	CompletionTokens int `json:"completion_tokens,omitempty"`
 	TotalTokens      int `json:"total_tokens,omitempty"`
@@ -73,15 +71,14 @@ var errSessionBusy = errors.New("session busy: a turn is already in progress")
 
 // StreamTurn drives one full ReAct loop over the running history and returns a buffered channel
 // (cap 64) of live events. Exactly one terminal event (final|error) is emitted, then the channel
-// is closed; the caller MUST drain to close (cancel ctx to abort — draining continues until the
-// terminal event lands), and must drain PROMPTLY: once the buffer fills, event sends block the
-// agent's own goroutines (tool callbacks and the token reader), stalling the loop until the
-// consumer catches up. Events are never dropped — a stalled consumer stalls the turn, it does
-// not corrupt the step record. The mutex-guarded busy flag rejects overlapping turns.
+// closes. The caller MUST drain to close — cancelling ctx aborts, but draining continues until
+// the terminal event lands — and must drain PROMPTLY: once the buffer fills, event sends block
+// the agent's own goroutines, stalling the loop until the consumer catches up. Events are never
+// dropped: a stalled consumer stalls the turn, it does not corrupt the step record. The
+// mutex-guarded busy flag rejects overlapping turns.
 //
-// Persistence and history semantics are identical to Turn() because Turn() is now a thin drain
-// over this method: one code path, so the REPL and the TUI share exactly the same transcript
-// behavior.
+// Turn() is a thin drain over this method, so persistence and history semantics are identical:
+// one code path, and the REPL and the TUI share exactly the same transcript behavior.
 func (s *Session) StreamTurn(ctx context.Context, userInput string) <-chan Event {
 	ch := make(chan Event, 64)
 
@@ -102,7 +99,7 @@ func (s *Session) StreamTurn(ctx context.Context, userInput string) <-chan Event
 	return ch
 }
 
-// runTurn is the single-goroutine engine behind StreamTurn (plan Part 1 flow steps 1-7).
+// runTurn is the single-goroutine engine behind StreamTurn.
 func (s *Session) runTurn(ctx context.Context, userInput string, ch chan<- Event) {
 	defer close(ch)
 	defer func() {
@@ -111,11 +108,10 @@ func (s *Session) runTurn(ctx context.Context, userInput string, ch chan<- Event
 		s.mu.Unlock()
 	}()
 
-	// Step 1 — per-turn hwm baseline (the persistence bug fix). Each turn's first model input
-	// is [system] + history + [userN]; the baseline is the count of those already-persisted
-	// leading messages so the first delta is exactly [userN]. On the very first turn (nothing
-	// persisted yet, rc.seq == 0) the baseline is 0 so the system row persists exactly once.
-	// See persist.go for the invariant this restores.
+	// Step 1 — per-turn hwm baseline. Each turn's first model input is [system] + history +
+	// [userN]; the baseline counts those already-persisted leading messages so the first delta is
+	// exactly [userN]. On the very first turn nothing is persisted yet (rc.seq == 0), so the
+	// baseline is 0 and the system row persists exactly once.
 	s.rc.mu.Lock()
 	firstTurn := s.rc.seq == 0
 	if firstTurn {
@@ -178,11 +174,10 @@ func (s *Session) runTurn(ctx context.Context, userInput string, ch chan<- Event
 	partial := te.partial()
 	canceled := ctx.Err() != nil || errors.Is(runErr, context.Canceled)
 
-	// A completed tool round buffered this turn (turnEvents fills s.rc.pending) is present only when
-	// the loop aborted right after a tool executed — MaxStep, cancellation, or another error — before
-	// the next model input carried the round into the transcript. Recovering it here closes the same
-	// audit-trail gap the one-shot Run() closes: the executed tool call is recorded even though the
-	// turn did not finish.
+	// A buffered tool round (turnEvents fills s.rc.pending) exists only when the loop aborted right
+	// after a tool executed — MaxStep, cancellation, or another error — before the next model input
+	// carried the round into the transcript. Recovering it here records the executed tool call even
+	// though the turn did not finish.
 	s.rc.mu.Lock()
 	hasPending := len(s.rc.pending) > 0
 	s.rc.mu.Unlock()
@@ -191,9 +186,8 @@ func (s *Session) runTurn(ctx context.Context, userInput string, ch chan<- Event
 	case hasPending:
 		// Flush the buffered round (assistant tool-call message + its tool result[s]). Its assistant
 		// message already carries this step's streamed content, so a separate partial row would
-		// duplicate it — skip the partial. Roll the in-turn user message out of the in-memory history
-		// (like the no-partial case) so the replayed alternation stays clean; the persisted transcript
-		// keeps the complete round.
+		// duplicate it. Roll the in-turn user message out of the in-memory history so the replayed
+		// alternation stays clean; the persisted transcript keeps the complete round.
 		s.rc.flushPending()
 		s.history = s.history[:preLen]
 		partial = "" // the round is fully captured in the transcript; nothing partial remains to render
@@ -210,8 +204,7 @@ func (s *Session) runTurn(ctx context.Context, userInput string, ch chan<- Event
 		s.last = pm
 	default:
 		// No partial and no buffered round: roll the history back to its pre-turn length so no
-		// dangling user message is left behind (this also fixes the dangling-user-message case on a
-		// failed Turn).
+		// dangling user message is left behind.
 		s.history = s.history[:preLen]
 	}
 
@@ -236,18 +229,17 @@ func (s *Session) runTurn(ctx context.Context, userInput string, ch chan<- Event
 	}
 }
 
-// turnEvents fans the eino model/tool callbacks of one turn into Event values on ch. Token
-// readers run on their own goroutines (tracked by wg); lastText accumulates the CURRENT model
-// step's text (reset per step) as the source of the cancel/error Partial. stepDone lets the
-// tool callback wait for the preceding step's tokens to flush, so tool events land strictly
-// between step-1 and step-2 tokens rather than racing them.
+// turnEvents fans one turn's model/tool callbacks into Event values on ch. Token readers run on
+// their own goroutines, tracked by wg; lastText accumulates the CURRENT model step's text, reset
+// per step, as the source of the cancel/error Partial. stepDone lets the tool callback wait for
+// the preceding step's tokens to flush, so tool events land strictly between step-1 and step-2
+// tokens rather than racing them.
 //
 // It also mirrors the current tool round into rc.pending so an abort right after a tool can flush
-// it (audit-trail integrity for the streaming path). stepAsst is the reconstructed assistant
-// message of the current step (built from the streamed chunks — the streaming model node fires
-// only OnEndWithStreamOutput, never OnEnd, so the round can't be captured the way the non-stream
-// captureHandler does); asstRecorded guards against pushing it twice when one step makes several
-// tool calls. rc may be nil (the buffering is then a no-op).
+// it. stepAsst is the current step's assistant message, reconstructed from the streamed chunks
+// because the streaming model node fires only OnEndWithStreamOutput and never OnEnd;
+// asstRecorded guards against pushing it twice when one step makes several tool calls. A nil rc
+// makes the buffering a no-op.
 type turnEvents struct {
 	ch           chan<- Event
 	rc           *runCtx
@@ -259,10 +251,10 @@ type turnEvents struct {
 	stepAsst     *schema.Message
 	asstRecorded bool
 
-	// Accumulated token usage across the turn's model steps (guarded by mu; folded in by each
-	// step's token reader as it drains). promptTokens holds the LAST step's prompt count (the
-	// current context size); completionTokens sums generated tokens across steps; totalTokens is
-	// their sum. Read once, after wg.Wait(), via usage().
+	// Accumulated token usage across the turn's model steps, guarded by mu and folded in by each
+	// step's token reader as it drains. promptTokens holds the LAST step's prompt count, the
+	// current context size; completionTokens sums generated tokens across steps. Read once, after
+	// wg.Wait(), via usage().
 	promptTokens     int
 	completionTokens int
 	totalTokens      int
@@ -310,7 +302,7 @@ func (te *turnEvents) usage() (prompt, completion, total int) {
 	return te.promptTokens, te.completionTokens, te.totalTokens
 }
 
-// handler builds the events callback (ChatModel stream output + Tool start/end/error).
+// handler builds the events callback: ChatModel stream output + Tool start/end/error.
 func (te *turnEvents) handler() callbacks.Handler {
 	modelHandler := &cbutils.ModelCallbackHandler{
 		// OnStart resets the per-step reconstruction state AND the pending-round buffer. The buffer
@@ -383,10 +375,10 @@ func (te *turnEvents) handler() callbacks.Handler {
 					te.mu.Unlock()
 				}
 				// Reconstruct this step's assistant message (content + any tool calls) from the streamed
-				// chunks, so a tool round aborted before the next model input can still be recovered into
-				// the transcript. Set before close(done) fires (deferred), so a tool callback that waits
-				// on stepDone observes it. A stream that errored part-way yields a partial content message
-				// with no tool call; recordPending only pushes it on a real tool OnEnd, so it is harmless.
+				// chunks, so a tool round aborted before the next model input is still recoverable into the
+				// transcript. Set before the deferred close(done) fires, so a tool callback waiting on
+				// stepDone observes it. A stream that errored part-way yields a partial content message with
+				// no tool call, which recordPending only pushes on a real tool OnEnd.
 				if len(chunks) > 0 {
 					if msg, err := schema.ConcatMessages(chunks); err == nil {
 						te.mu.Lock()
@@ -442,8 +434,8 @@ func (te *turnEvents) handler() callbacks.Handler {
 	return cbutils.NewHandlerHelper().ChatModel(modelHandler).Tool(toolHandler).Handler()
 }
 
-// toolName reads the tool name from the callback RunInfo (the tool node sets RunInfo.Name to
-// the invoked tool's name).
+// toolName reads the tool name from the callback RunInfo: the tool node sets RunInfo.Name to the
+// invoked tool's name.
 func toolName(info *callbacks.RunInfo) string {
 	if info == nil {
 		return ""

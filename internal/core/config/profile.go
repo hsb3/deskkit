@@ -13,8 +13,8 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// ProfileRootDir is the single profile-root directory name, pinned across both lanes by
-// scripts/check-profile-root.mjs; every functional path join to the personalization root flows from it.
+// ProfileRootDir is the single profile-root directory name. scripts/check-profile-root.mjs fails
+// if it diverges from schema/paths.yaml; every path join to the personalization root flows from it.
 const ProfileRootDir = "_knowledge"
 
 // DiscoverProfile walks up from startDir looking for a single personalization root

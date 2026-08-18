@@ -1,9 +1,8 @@
-// Package engine is the PM module's single transition path (spec §4.1): the code path every
-// surface (the D4 MCP/CLI/TUI tools) routes through. It owns the §4.1 refusal sequence
-// (machine → blocked → claim → gates → write + audit + cascade), the §3.5 cascade semantics,
-// the §3.6 optimistic-concurrency version token + claim TTL, and the §3.8 desk_config
-// loading. Documents are consulted ONLY through the core/schema seam (§2.5) — this package
-// never imports modules/librarian (test lane §10.5 guards that).
+// Package engine is the PM module's single transition path: the code path every surface
+// (MCP/CLI/TUI) routes through. It owns the refusal sequence (machine → blocked → claim → gates
+// → write + audit + cascade), the cascade semantics, the optimistic-concurrency version token +
+// claim TTL, and desk_config loading. Documents are consulted ONLY through the core/schema seam;
+// this package never imports modules/librarian, and a test guards that.
 package engine
 
 import (
@@ -22,8 +21,8 @@ import (
 	"github.com/hsb3/deskkit/internal/modules/pm/statemachine"
 )
 
-// Engine binds the store, config, and the injected document validator (module.Registry
-// captures it at registration; nil = documented gates fail closed, §2.5).
+// Engine binds the store, config, and the injected document validator (module.Registry captures
+// it at registration; a nil validator makes documented gates fail closed).
 type Engine struct {
 	App       core.App
 	Cfg       *config.Config
@@ -31,7 +30,7 @@ type Engine struct {
 }
 
 // Refusal re-exports the gates refusal type: every "no" this engine says is one of these,
-// carrying the exact human-readable reasons (R3.1); anything else is an internal error.
+// carrying the human-readable reasons. Anything else is an internal error.
 type Refusal = gates.Refusal
 
 func refuse(format string, args ...any) error {
@@ -44,23 +43,22 @@ func IsRefusal(err error) bool {
 	return errors.As(err, &r)
 }
 
-// Actor identifies who acts, for the §3.6 audit trail.
+// Actor identifies who acts, for the audit trail.
 type Actor struct {
-	Name             string // a human handle or an agent id; "" is recorded as-is (plain strings, R2.5)
+	Name             string // a human handle or an agent id; "" is recorded as-is
 	Kind             string // "human" | "agent"
 	DelegationParent string // parent agent/session id when acting under delegation
 }
 
-// deskConfig is the resolved per-desk workflow config (§3.8): stored row > shipped defaults.
+// deskConfig is the resolved per-desk workflow config: stored row > shipped defaults.
 type deskConfig struct {
 	rules    *gates.Config
 	labels   map[string]statemachine.Phase
 	claimTTL time.Duration
 }
 
-// loadDeskConfig resolves the desk's workflow config. A stored-but-invalid rules YAML is a
-// loud error (fail-loud, §4.2) — it never silently falls back to defaults, because that would
-// silently disable the desk's own gates.
+// loadDeskConfig resolves the desk's workflow config. A stored-but-invalid rules YAML is a loud
+// error, never a silent fallback to defaults: that would silently disable the desk's own gates.
 func (e *Engine) loadDeskConfig() (*deskConfig, error) {
 	dc := &deskConfig{
 		labels:   statemachine.DefaultStatusLabels(),
@@ -77,7 +75,7 @@ func (e *Engine) loadDeskConfig() (*deskConfig, error) {
 
 	rec, ferr := e.App.FindFirstRecordByFilter("desk_config", "desk = {:d}", map[string]any{"d": e.desk()})
 	if ferr != nil {
-		return dc, nil // no stored row: the shipped defaults apply (§4.2 seed)
+		return dc, nil // no stored row: the shipped defaults apply
 	}
 	if rulesYAML := rec.GetString("rules"); rulesYAML != "" {
 		parsed, perr := gates.ParseRules(rulesYAML)
@@ -106,35 +104,33 @@ func (e *Engine) desk() string {
 	return e.Cfg.DeskName
 }
 
-// CreateItemInput seeds one work item (§3.1). Phase defaults to queue.
+// CreateItemInput seeds one work item. Phase defaults to queue.
 type CreateItemInput struct {
-	// ID, when non-empty, pins the new record's id instead of auto-generating one. It exists
-	// for the deterministic import path (§8.1/§8.2 rebuild reproducibility): a manifest-derived
-	// id makes a rebuild byte-identical, ids included. It must be a valid PocketBase record id
-	// (15 chars of [a-z0-9]); the importer derives one that fits. "" keeps the normal
-	// auto-generated id, so every non-import caller is unaffected.
+	// ID, when non-empty, pins the new record's id instead of auto-generating one, so a
+	// manifest-derived id makes an import rebuild byte-identical. It must be a valid PocketBase
+	// record id (15 chars of [a-z0-9]). "" keeps the normal auto-generated id.
 	ID       string
 	Title    string
 	Type     string
 	Parent   string // parent item id; "" = a root
 	Court    string
 	Pointer  string
-	Body     string // long-form body: narrative, acceptance criteria, or spec, stored inline (§3.1)
+	Body     string // long-form body: narrative, acceptance criteria, or spec, stored inline
 	Severity string
 	Priority int
 	Actor    Actor
 }
 
-// CreateItem writes one items row. The root denormalization (§3.1) is derived from the
-// parent chain; a root item is its own subtree head (root left empty, mirroring parent).
+// CreateItem writes one items row. The root denormalization derives from the parent chain; a
+// root item is its own subtree head, leaving root empty to mirror parent.
 func (e *Engine) CreateItem(ctx context.Context, in CreateItemInput) (*core.Record, error) {
 	if strings.TrimSpace(in.Title) == "" {
 		return nil, refuse("cannot create an item without a title")
 	}
 	if in.Type != "" {
-		// Empty type stays legal (a scope call, ADR 0012): only a NON-EMPTY, unrecognized
-		// type is refused, so `type` remains optional across every caller-facing shape.
-		// A pure vocabulary read, so it fails before any transaction is opened.
+		// Empty type stays legal: only a NON-EMPTY, unrecognized type is refused, so `type` stays
+		// optional on every caller-facing shape. A pure vocabulary read, so it fails before any
+		// transaction opens.
 		vocab, verr := schema.Vocab()
 		if verr != nil {
 			return nil, verr
@@ -153,7 +149,7 @@ func (e *Engine) CreateItem(ctx context.Context, in CreateItemInput) (*core.Reco
 		}
 		rec := core.NewRecord(col)
 		if in.ID != "" {
-			rec.Id = in.ID // deterministic import id (§8.2); "" leaves PocketBase to auto-generate
+			rec.Id = in.ID // deterministic import id; "" leaves PocketBase to auto-generate
 		}
 		rec.Set("desk", txe.desk())
 		rec.Set("title", in.Title)
@@ -192,7 +188,7 @@ func (e *Engine) CreateItem(ctx context.Context, in CreateItemInput) (*core.Reco
 	return out, nil
 }
 
-// loadItem fetches an item by id, desk-scoped (§3.1 desk field; ADR 0002 discipline).
+// loadItem fetches an item by id, desk-scoped.
 func (e *Engine) loadItem(id string) (*core.Record, error) {
 	rec, err := e.App.FindRecordById("items", id)
 	if err != nil {
@@ -205,10 +201,9 @@ func (e *Engine) loadItem(id string) (*core.Record, error) {
 }
 
 // edgeGatedForAnyType reports whether rules binds at least one document requirement to edgeKey
-// for ANY known item type — i.e. whether SOME type on this desk would be gated
-// crossing this edge, regardless of the type of the item actually asking. rules.Gates values
-// are the gates package's unexported docRequirements, so this ranges rather than naming the
-// type; .Documents is an exported field and reads fine across the package boundary either way.
+// for ANY known item type — whether SOME type on this desk would be gated crossing this edge,
+// regardless of the asking item's type. rules.Gates values are an unexported type, so this
+// ranges rather than naming it.
 func edgeGatedForAnyType(rules *gates.Config, edgeKey string) bool {
 	for _, transitions := range rules.Gates {
 		if reqs, ok := transitions[edgeKey]; ok && len(reqs.Documents) > 0 {
@@ -218,8 +213,8 @@ func edgeGatedForAnyType(rules *gates.Config, edgeKey string) bool {
 	return false
 }
 
-// checkVersion enforces the §3.6 optimistic-concurrency token: every mutating call takes the
-// version its caller read and refuses on mismatch.
+// checkVersion enforces the optimistic-concurrency token: every mutating call takes the version
+// its caller read and refuses on mismatch.
 func checkVersion(rec *core.Record, version int) error {
 	if current := rec.GetInt("version"); current != version {
 		return &Refusal{Reasons: []string{fmt.Sprintf(
@@ -230,7 +225,7 @@ func checkVersion(rec *core.Record, version int) error {
 }
 
 // liveForeignClaim reports the holder of a live claim by someone other than actor ("" = none).
-// An expired claim is treated as free (§3.6).
+// An expired claim is treated as free.
 func liveForeignClaim(rec *core.Record, actor Actor, now time.Time) string {
 	holder := rec.GetString("claimed_by")
 	if holder == "" || holder == actor.Name {
@@ -247,14 +242,11 @@ func liveForeignClaim(rec *core.Record, actor Actor, now time.Time) string {
 func bump(rec *core.Record) { rec.Set("version", rec.GetInt("version")+1) }
 
 // txFailpoint, when non-nil, is invoked inside a mutating transaction immediately after the
-// primary record write and before the audit/cascade writes. It exists ONLY so tests can force a
-// mid-sequence failure and prove the load->version-check->mutate->save->audit->cascade sequence
-// commits or rolls back as one unit (§3.6). It is nil on every shipped path; production never
-// sets it. It is a plain package-level var with no synchronization: tests that set it must run
-// serially (the engine tests do) — a future t.Parallel() case must not touch it. The seam is
-// wired ONLY in transitionCore (the longest write sequence); the other RunInTransaction methods
-// share the same commit-or-rollback mechanics but have no forced-failure test — add a
-// runFailpoint() call there for parity if one is ever wanted.
+// primary record write and before the audit/cascade writes, so a test can force a mid-sequence
+// failure and prove load->version-check->mutate->save->audit->cascade commits or rolls back as
+// one unit. Nil on every shipped path. A plain package-level var with NO synchronization: a test
+// that sets it must run serially, so a t.Parallel() case must not touch it. Wired only in
+// transitionCore; the other RunInTransaction methods share the mechanics but have no such test.
 var txFailpoint func() error
 
 func runFailpoint() error {
@@ -264,26 +256,24 @@ func runFailpoint() error {
 	return nil
 }
 
-// withApp returns a tx-scoped copy of the engine bound to app (the RunInTransaction callback's
-// txApp). Every inner read AND write of a mutating method runs through this copy, so the
-// version-guard read and the write it authorizes share one transaction — closing the §3.6
-// check-then-act TOCTOU. Cfg/Validator are immutable and safely shared.
+// withApp returns a tx-scoped copy of the engine bound to the RunInTransaction callback's txApp.
+// Every inner read AND write of a mutating method runs through this copy, so the version-guard
+// read and the write it authorizes share one transaction, closing the check-then-act TOCTOU.
+// Cfg/Validator are immutable and safely shared.
 func (e *Engine) withApp(app core.App) *Engine {
 	return &Engine{App: app, Cfg: e.Cfg, Validator: e.Validator}
 }
 
-// pendingAudit is a gate_refused transitions row (§4.1) captured inside a transaction but written
-// AFTER it settles. A gate refusal mutates nothing, so its transaction rolls back; the row must
-// still persist (observable, not silent), which means writing it outside the rolled-back tx —
-// exactly the pre-transaction behavior (a single, non-atomic audit write; the refusal stands even
-// if that write fails).
+// pendingAudit is a gate_refused transitions row captured inside a transaction but written AFTER
+// it settles. A gate refusal mutates nothing, so its transaction rolls back, yet the row must
+// still persist — refusals are observable, not silent — so it is written outside the rolled-back
+// tx as a single non-atomic write. The refusal stands even if that write fails.
 type pendingAudit struct {
 	itemID, fromPhase, toPhase, event, detail string
 	actor                                     Actor
 }
 
-// audit appends one transitions row (§3.6 append-only; nothing in this engine ever updates
-// or deletes one).
+// audit appends one transitions row. Append-only: nothing in this engine updates or deletes one.
 func (e *Engine) audit(itemID, fromPhase, toPhase, event string, actor Actor, detail string) error {
 	col, err := e.App.FindCollectionByNameOrId("transitions")
 	if err != nil {
@@ -302,7 +292,7 @@ func (e *Engine) audit(itemID, fromPhase, toPhase, event string, actor Actor, de
 }
 
 // TransitionInput requests one legal phase transition — advance, demote, or reopen — via
-// (item, target phase); the machine derives the edge kind (§4.1, one generic tool).
+// (item, target phase); the machine derives the edge kind.
 type TransitionInput struct {
 	ItemID      string
 	TargetPhase string
@@ -310,10 +300,10 @@ type TransitionInput struct {
 	Actor       Actor
 }
 
-// Transition is THE §4.1 sequence. On success: phase written (status_label kept mapped,
-// §3.3), version bumped, a transitions row appended, the cascade scan run (§3.5). On a gate
-// refusal: a gate_refused transitions row is appended (observable, not silent) and the
-// *Refusal returned names exactly what is missing (R3.1).
+// Transition is THE transition sequence. On success: phase written with status_label kept mapped,
+// version bumped, a transitions row appended, the cascade scan run. On a gate refusal a
+// gate_refused transitions row is appended — observable, not silent — and the returned *Refusal
+// names exactly what is missing.
 func (e *Engine) Transition(ctx context.Context, in TransitionInput) (*core.Record, error) {
 	var out *core.Record
 	var pending *pendingAudit
@@ -326,8 +316,8 @@ func (e *Engine) Transition(ctx context.Context, in TransitionInput) (*core.Reco
 		out = rec
 		return nil
 	})
-	// The gate_refused row is written after the tx settles (§4.1): a refusal rolls the tx back,
-	// but the row must persist regardless.
+	// The gate_refused row is written after the tx settles: a refusal rolls the tx back, but the
+	// row must persist regardless.
 	if pending != nil {
 		_ = e.audit(pending.itemID, pending.fromPhase, pending.toPhase, pending.event, pending.actor, pending.detail)
 	}
@@ -337,11 +327,11 @@ func (e *Engine) Transition(ctx context.Context, in TransitionInput) (*core.Reco
 	return out, nil
 }
 
-// transitionCore runs THE §4.1 sequence and MUST be called on a tx-scoped engine (withApp) that
-// is already inside a transaction — it opens none of its own, so a caller can compose it with
-// further writes (SetStatusLabel's label pin) in the same atomic unit. On a gate refusal it
-// returns (nil, pendingAudit, *Refusal): the pendingAudit is the gate_refused row the caller must
-// write after the transaction settles; no mutation has occurred, so the tx safely rolls back.
+// transitionCore runs the transition sequence and MUST be called on a tx-scoped engine (withApp)
+// already inside a transaction — it opens none of its own, so a caller can compose it with
+// further writes in the same atomic unit. On a gate refusal it returns (nil, pendingAudit,
+// *Refusal): the caller writes that gate_refused row after the transaction settles, and since no
+// mutation occurred the tx safely rolls back.
 func (e *Engine) transitionCore(ctx context.Context, in TransitionInput) (*core.Record, *pendingAudit, error) {
 	item, err := e.loadItem(in.ItemID)
 	if err != nil {
@@ -356,39 +346,34 @@ func (e *Engine) transitionCore(ctx context.Context, in TransitionInput) (*core.
 		return nil, nil, refuse("%v", perr)
 	}
 
-	// 1. The machine admits the edge, else refuse before gates are even consulted (§3.2).
+	// 1. The machine admits the edge, else refuse before gates are even consulted.
 	event, legal := statemachine.Edge(from, to)
 	if !legal {
 		return nil, nil, refuse("no legal transition %s->%s", from, to)
 	}
-	// 2. Blocked refuses forward edges (§3.2: advance is refused while blocked).
+	// 2. Blocked refuses forward edges.
 	if item.GetBool("blocked") && event == statemachine.Advance {
 		return nil, nil, refuse("item %q is blocked; unblock it (or resolve its blockers) before advancing", item.Id)
 	}
-	// 3. A live foreign claim refuses advance/demote (§3.6/R2.6). Reopen too: it is a
-	// mutation of a claimed item all the same.
+	// 3. A live foreign claim refuses advance/demote, and reopen too: it mutates a claimed item
+	// all the same.
 	if holder := liveForeignClaim(item, in.Actor, time.Now()); holder != "" {
 		return nil, nil, refuse("item %q is claimed by %q until %s", item.Id, holder,
 			item.GetDateTime("claim_expires").Time().Format(time.RFC3339))
 	}
 	// 4. The gate engine evaluates whatever the desk's config binds to (type, edge) — forward
-	// edges by default, demote/reopen only when the config names them (§4.1 step 4).
+	// edges by default, demote/reopen only when the config names them.
 	dc, derr := e.loadDeskConfig()
 	if derr != nil {
 		return nil, nil, derr
 	}
 	edgeKey := statemachine.EdgeKey(from, to)
-	// 4a. An empty type must not become an undetectable way to skip a document gate:
-	// dc.rules.Effective binds per-type requirements by looking up item.GetString("type") as a
-	// map key, so a "" type can never match a per-type rule no matter what the config says —
-	// the item silently sails through an edge the desk DOES gate for its intended type. Rather
-	// than requiring `type` at create time (ADR 0012 deliberately keeps it optional there, and
-	// reversing that is a bigger, unrelated behavior change), this refuses the specific edge
-	// the desk's config gates for AT LEAST ONE known type when the item itself carries none —
-	// closing the loophole while leaving every already-typed item's gate evaluation untouched
-	// (Effective/traits below are reached exactly as before once a type is set, even one this
-	// desk never gates). Assigning ANY recognized type (via update_item) clears this refusal,
-	// even if that type turns out to be itself ungated on this edge.
+	// 4a. An empty type must not become an undetectable way to skip a document gate.
+	// dc.rules.Effective looks the item type up as a map key, so a "" type matches NO per-type
+	// rule whatever the config says, and the item would sail through an edge the desk does gate
+	// for its intended type. `type` stays optional at create time, so instead this refuses the
+	// specific edge the desk gates for at least one known type when the item carries none.
+	// Assigning any recognized type clears the refusal, even one itself ungated on this edge.
 	if item.GetString("type") == "" && edgeGatedForAnyType(dc.rules, edgeKey) {
 		msg := fmt.Sprintf(
 			"item %q has no type set, and %s is a gated edge for at least one item type on this desk; set a type before advancing",
@@ -404,9 +389,8 @@ func (e *Engine) transitionCore(ctx context.Context, in TransitionInput) (*core.
 		if errors.As(gerr, &r) {
 			msg := fmt.Sprintf("cannot %s %s item to %s: %s",
 				event, item.GetString("type"), to, strings.Join(r.Reasons, "; "))
-			// A refusal is recorded as a gate_refused transitions row (§4.1) — observable audit,
-			// deferred to the caller (written after the tx settles; the refusal still stands even
-			// if that write later fails).
+			// A refusal is recorded as a gate_refused transitions row, deferred to the caller and
+			// written after the tx settles; the refusal stands even if that write later fails.
 			return nil, &pendingAudit{
 				itemID: item.Id, fromPhase: string(from), toPhase: string(to),
 				event: "gate_refused", actor: in.Actor, detail: msg,
@@ -415,9 +399,9 @@ func (e *Engine) transitionCore(ctx context.Context, in TransitionInput) (*core.
 		return nil, nil, gerr
 	}
 
-	// 5. Success: write the new phase, keep the label mapped (§3.3), audit, cascade (§3.5). All
-	// through this tx-scoped engine, so the phase write, the audit row, and the cascade's
-	// side-writes commit or roll back together.
+	// 5. Success: write the new phase, keep the label mapped, audit, cascade. All through this
+	// tx-scoped engine, so the phase write, the audit row, and the cascade's side-writes commit
+	// or roll back together.
 	item.Set("phase", string(to))
 	if dc.labels[item.GetString("status_label")] != to {
 		item.Set("status_label", statemachine.DefaultLabelFor(to))
@@ -438,9 +422,9 @@ func (e *Engine) transitionCore(ctx context.Context, in TransitionInput) (*core.
 	return item, nil, nil
 }
 
-// fieldLookup resolves a trait predicate field (§4.2): a first-class item field, then the
-// properties overflow, then the pointed document's frontmatter through the seam's optional
-// FrontmatterReader (never by reading librarian collections).
+// fieldLookup resolves a trait predicate field: a first-class item field, then the properties
+// overflow, then the pointed document's frontmatter through the seam's optional
+// FrontmatterReader — never by reading librarian collections.
 func (e *Engine) fieldLookup(ctx context.Context, item *core.Record) gates.FieldLookup {
 	return func(field string) (string, bool) {
 		for _, f := range []string{"title", "type", "phase", "status_label", "court", "pointer", "severity"} {
@@ -465,8 +449,8 @@ func (e *Engine) fieldLookup(ctx context.Context, item *core.Record) gates.Field
 	}
 }
 
-// pointerResolver maps a gate rule's pointer spec to a document path (§4.2): "item" = the
-// item's own pointer; "note:<key>" = the body of the item's note with that key.
+// pointerResolver maps a gate rule's pointer spec to a document path: "item" = the item's own
+// pointer; "note:<key>" = the body of the item's note with that key.
 func (e *Engine) pointerResolver(item *core.Record) func(spec string) (string, error) {
 	return func(spec string) (string, error) {
 		switch {
@@ -491,7 +475,7 @@ func (e *Engine) pointerResolver(item *core.Record) func(spec string) (string, e
 	}
 }
 
-// --- blocked side-state (§3.2) ---
+// --- blocked side-state ---
 
 // Block sets the blocked flag, preserving the phase and recording restore_phase.
 func (e *Engine) Block(ctx context.Context, itemID string, version int, actor Actor, reason string) (*core.Record, error) {
@@ -505,9 +489,9 @@ func (e *Engine) Block(ctx context.Context, itemID string, version int, actor Ac
 		if err := checkVersion(item, version); err != nil {
 			return err
 		}
-		// A live foreign claim is authoritative over every direct mutation (ADR 0020): a
-		// non-holder is refused BEFORE the idempotent/terminal shortcuts, so the claim boundary
-		// wins even on a no-op block of an already-blocked item.
+		// A live foreign claim is authoritative over every direct mutation: a non-holder is refused
+		// BEFORE the idempotent/terminal shortcuts, so the claim boundary wins even on a no-op
+		// block of an already-blocked item.
 		if holder := liveForeignClaim(item, actor, time.Now()); holder != "" {
 			return refuse("item %q is claimed by %q until %s", item.Id, holder,
 				item.GetDateTime("claim_expires").Time().Format(time.RFC3339))
@@ -549,9 +533,9 @@ func (e *Engine) Unblock(ctx context.Context, itemID string, version int, actor 
 		if err := checkVersion(item, version); err != nil {
 			return err
 		}
-		// A live foreign claim is authoritative over every direct mutation (ADR 0020): a
-		// non-holder is refused BEFORE the idempotent shortcut, so the claim boundary wins even
-		// on a no-op unblock of an item that is not blocked.
+		// A live foreign claim is authoritative over every direct mutation: a non-holder is refused
+		// BEFORE the idempotent shortcut, so the claim boundary wins even on a no-op unblock of an
+		// item that is not blocked.
 		if holder := liveForeignClaim(item, actor, time.Now()); holder != "" {
 			return refuse("item %q is claimed by %q until %s", item.Id, holder,
 				item.GetDateTime("claim_expires").Time().Format(time.RFC3339))
@@ -588,12 +572,12 @@ func (e *Engine) setBlocked(item *core.Record, blocked bool) {
 	}
 	item.Set("blocked", false)
 	if rp := item.GetString("restore_phase"); rp != "" {
-		item.Set("phase", rp) // §3.2: return the item to the phase it held (normally a no-op)
+		item.Set("phase", rp) // return the item to the phase it held (normally a no-op)
 	}
 	item.Set("restore_phase", "")
 }
 
-// --- claims (§3.6) ---
+// --- claims ---
 
 // Claim sets claimed_by + claim_expires (TTL from desk_config / PM_CLAIM_TTL / 30m default).
 // A live foreign claim refuses; an expired one is free; re-claiming your own claim renews it.
@@ -669,11 +653,11 @@ func (e *Engine) Release(ctx context.Context, itemID string, version int, actor 
 	return out, nil
 }
 
-// --- dependency edges + cascade (§3.4, §3.5) ---
+// --- dependency edges + cascade ---
 
-// LinkInput creates one typed dependency edge. Kind accepts the §3.4 surface vocabulary
-// (blocks | is-blocked-by | relates-to); is-blocked-by is STORED as the inverse blocks edge
-// (canonical direction: the blocker is `from`), so the graph has one representation.
+// LinkInput creates one typed dependency edge. Kind accepts blocks | is-blocked-by |
+// relates-to; is-blocked-by is STORED as the inverse blocks edge, canonical direction being
+// blocker-as-`from`, so the graph has one representation.
 type LinkInput struct {
 	From      string
 	To        string
@@ -689,7 +673,7 @@ type LinkInput struct {
 func (e *Engine) Link(ctx context.Context, in LinkInput) (*core.Record, error) {
 	fromID, toID, kind := in.From, in.To, in.Kind
 	if kind == "is-blocked-by" {
-		fromID, toID, kind = in.To, in.From, "blocks" // canonicalize (§3.4)
+		fromID, toID, kind = in.To, in.From, "blocks" // canonicalize
 	}
 	switch kind {
 	case "blocks":
@@ -702,7 +686,7 @@ func (e *Engine) Link(ctx context.Context, in LinkInput) (*core.Record, error) {
 			return nil, refuse("a blocks edge needs cascade of auto, manual, auto-reopen, or permanent")
 		}
 	case "relates-to":
-		// non-gating informational link (§3.4); unblock_at/cascade are ignored
+		// non-gating informational link; unblock_at/cascade are ignored
 	default:
 		return nil, refuse("unknown dependency kind %q (blocks, is-blocked-by, relates-to)", in.Kind)
 	}
@@ -768,8 +752,8 @@ func (e *Engine) Link(ctx context.Context, in LinkInput) (*core.Record, error) {
 	return out, nil
 }
 
-// cascade is the §3.5 scan a phase change on A drives: every outgoing gating edge applies its
-// rule to its target B.
+// cascade is the scan a phase change on A drives: every outgoing gating edge applies its rule to
+// its target B.
 //
 //   - auto:        A reaching unblock_at clears B (one-shot; later regression does not re-block)
 //   - auto-reopen: like auto, and A regressing BELOW unblock_at re-blocks B (standing workstream)
@@ -800,8 +784,7 @@ func (e *Engine) cascade(ctx context.Context, blocker *core.Record, from, to sta
 				}
 			}
 		case "manual", "permanent":
-			// manual: surfacing "unblockable" is a read-side concern (D4 get_context);
-			// permanent: never auto-clears (§3.5).
+			// manual: surfacing "unblockable" is a read-side concern. permanent: never auto-clears.
 		}
 	}
 	return nil
@@ -827,7 +810,7 @@ func (e *Engine) tryAutoUnblock(ctx context.Context, targetID string, actor Acto
 	for _, edge := range incoming {
 		switch edge.GetString("cascade") {
 		case "manual", "permanent":
-			return nil // a manual/permanent gate keeps B blocked regardless (§3.5)
+			return nil // a manual/permanent gate keeps B blocked regardless
 		}
 		blocker, berr := e.App.FindRecordById("items", edge.GetString("from"))
 		if berr != nil {
@@ -848,7 +831,7 @@ func (e *Engine) tryAutoUnblock(ctx context.Context, targetID string, actor Acto
 		fmt.Sprintf("auto-unblocked: %q reached its release phase", causeID))
 }
 
-// reblock re-establishes B's blocked flag when an auto-reopen blocker regresses (§3.5).
+// reblock re-establishes B's blocked flag when an auto-reopen blocker regresses.
 func (e *Engine) reblock(ctx context.Context, targetID string, actor Actor, causeID string) error {
 	target, err := e.App.FindRecordById("items", targetID)
 	if err != nil {
@@ -869,7 +852,7 @@ func (e *Engine) reblock(ctx context.Context, targetID string, actor Actor, caus
 		fmt.Sprintf("auto-re-blocked: %q regressed below its release phase (cascade auto-reopen)", causeID))
 }
 
-// --- status labels (§3.3) ---
+// --- status labels ---
 
 // SetStatusLabel applies the friendly-vocabulary discipline: a label mapping to the item's
 // current phase is a plain field write; a label mapping to a DIFFERENT phase is a transition
@@ -884,9 +867,9 @@ func (e *Engine) SetStatusLabel(ctx context.Context, itemID, label string, versi
 		if err != nil {
 			return err
 		}
-		// This check serves the SAME-PHASE fast path below (plain label write, transitionCore
-		// never runs) and fails fast before the desk-config load. On the cross-phase path
-		// transitionCore re-checks the same tx-snapshot value — always agreeing, harmlessly.
+		// This serves the SAME-PHASE fast path below, where transitionCore never runs, and fails
+		// fast before the desk-config load. On the cross-phase path transitionCore re-checks the
+		// same tx-snapshot value, harmlessly.
 		if err := checkVersion(item, version); err != nil {
 			return err
 		}
@@ -927,7 +910,7 @@ func (e *Engine) SetStatusLabel(ctx context.Context, itemID, label string, versi
 		return nil
 	})
 	// A gate refusal from the cross-phase transition records its gate_refused row after the tx
-	// settles (§4.1), same as the direct Transition path.
+	// settles, same as the direct Transition path.
 	if pending != nil {
 		_ = e.audit(pending.itemID, pending.fromPhase, pending.toPhase, pending.event, pending.actor, pending.detail)
 	}
@@ -948,10 +931,10 @@ func jsonStringField(raw, field string) (string, bool) {
 	return s, ok
 }
 
-// AddNote attaches a phase-scoped keyed note (§3.7). A single insert would not strictly need a
-// transaction, but the tx keeps the note's `phase` snapshot consistent with the item read (a
-// non-tx read could record a stale phase if a transition lands in between) and keeps every
-// mutating method on the same withApp(txApp) discipline (§3.6).
+// AddNote attaches a phase-scoped keyed note. A single insert would not strictly need a
+// transaction, but the tx keeps the note's `phase` snapshot consistent with the item read — a
+// non-tx read could record a stale phase if a transition lands in between — and keeps every
+// mutating method on the same withApp(txApp) discipline.
 func (e *Engine) AddNote(ctx context.Context, itemID, key, body string, actor Actor) (*core.Record, error) {
 	var out *core.Record
 	txErr := e.App.RunInTransaction(func(txApp core.App) error {

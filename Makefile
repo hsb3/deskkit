@@ -1,40 +1,25 @@
 # deskkit — the canonical repo task interface. `make help` (the default) lists targets.
 #
-# One Go module sits at the repo root (github.com/hsb3/deskkit): the binary is cmd/deskkit, the
-# core + modules are internal/. These targets cover both the product lane (build/test/run the
-# binary) and the repo-wide gates (neutrality lint, version-sync, actionlint). CI
-# (`.github/workflows/ci.yml`) runs the same checks; the release workflow reuses this VERSION and
-# the same ldflags stamp.
+# Single-writer rule: the one-shot subcommands (sweep, patrol, propose-fix, findings/summary/
+# adoption/orphans/uncollapsed, apply-fix) open the on-disk SQLite store directly, so they must
+# NOT run while `serve` is up against the same store — run `make stop` first. `verify` manages
+# its own throwaway store home and is safe to run at any time.
 #
-# Single-writer rule (spec §2.7): the one-shot subcommands (sweep, patrol, propose-fix,
-# findings/summary/adoption/orphans/uncollapsed, and the supervised `apply-fix` CLI) open the
-# same on-disk SQLite store directly via native DAO. They must NOT run while `serve` is up
-# against the same store — run `make stop` first. `verify` is self-contained (it manages its own
-# throwaway XDG store home + scratch desk) and is safe to run at any time.
+# These targets pass no --dir, so each command resolves its store to
+# $XDG_DATA_HOME/deskkit/<DESK_NAME>/ and needs DESK_NAME resolvable (env or the desk's profile).
 #
-# Store location (ADR 0002 §2): with no --dir, every command below resolves its store to
-# $XDG_DATA_HOME/deskkit/<DESK_NAME>/ (fallback ~/.local/share/...). These targets pass no --dir,
-# so they use that canonical per-desk home and require DESK_NAME to be resolvable (env / the
-# desk's _knowledge/profile.*).
+# `apply-fix` is deliberately NOT a target: committing a fix to a REAL desk is supervised-only,
+# run by hand as `./deskkit apply-fix --run <run_id>` (optionally under sandbox-exec). Its write
+# path is exercised only inside `verify`.
 #
-# `apply-fix` is deliberately NOT a target (spec §9.5): committing a fix to the REAL desk is
-# supervised-only, run by hand as
-#   ./deskkit apply-fix --run <run_id>
-# (optionally under sandbox-exec — see sandbox/README.md). The throwaway-copy write path
-# (propose-fix -> apply-fix) is exercised only inside `verify`.
-#
-# `examples/` holds the two deliberately-manual walkthrough harnesses; see examples/README.md.
-# `example-agent-loop` drives the REAL in-binary eino agent loop (`deskkit agent`) against a
-# throwaway scratch desk using a real ANTHROPIC_API_KEY, so it MAKES REAL BILLED LLM CALLS and is
-# NOT part of `verify`/`make check`/CI (the calls cost money and aren't deterministic) — run it by
-# hand. `examples/pm-walkthrough.sh` is the free, offline counterpart and has no target: run it
-# directly.
+# `example-agent-loop` drives the real in-binary agent loop against a live API key, so it MAKES
+# REAL BILLED LLM CALLS and stays out of verify/check/CI. `examples/pm-walkthrough.sh` is the
+# free offline counterpart and has no target: run it directly.
 .DEFAULT_GOAL := help
 SHELL := /bin/bash
 
-# The single source of truth for the release version is the root VERSION file; `check-version-sync`
-# fails if the shipped manifests drift from it, and the binary is stamped from it via
-# `-ldflags -X main.version=<VERSION>` (a bare `go build ./...` leaves the default "dev").
+# The root VERSION file is the single source of truth; the binary is stamped from it, so a bare
+# `go build ./...` that skips these ldflags leaves the default "dev".
 VERSION := $(shell cat VERSION 2>/dev/null || echo dev)
 LDFLAGS := -X main.version=$(VERSION)
 
@@ -42,8 +27,8 @@ BIN     := deskkit
 PIDFILE := .deskkit.pid
 LOGFILE := serve.log
 
-# Install location. Mirrors install.sh's default (~/.local/bin — no root needed); override with
-# `make install PREFIX=/usr/local` to land the binary in $(PREFIX)/bin.
+# Install location, mirroring install.sh's default (no root needed); override with
+# `make install PREFIX=/usr/local`.
 PREFIX ?= $(HOME)/.local
 BINDIR := $(PREFIX)/bin
 
@@ -166,7 +151,7 @@ media: ## Record the demo media assets (scripts/record-media.sh)
 
 clean: stop ## Stop serve + remove build artifacts (binary, pidfile, serve log)
 	@rm -rf $(BIN) $(PIDFILE) $(LOGFILE)
-	@rm -rf pb_data  # legacy cwd-relative store from pre-ADR-0002 checkouts, if any lingers
+	@rm -rf pb_data
 	@echo "cleaned: binary, pidfile, serve log (+ any legacy ./pb_data)"
 	@echo "note: the canonical per-desk store lives at \$$XDG_DATA_HOME/deskkit/<DESK_NAME>/"
 	@echo "      (fallback ~/.local/share/...); it is persistent and NOT removed by clean — rm it by hand."
