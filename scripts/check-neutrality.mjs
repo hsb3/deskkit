@@ -6,7 +6,7 @@
 // the remedy for a flagged literal is always "move it into _knowledge/profile.yaml and
 // reference it via {{profile.<path>}}", never "delete the name".
 //
-// Scans the shipped surface — `plugin/`, `plugins/`, and `librarian/` — for two token families:
+// Scans the shipped surface — `plugins/`, `librarian/`, and `kits/` — for two token families:
 //   1. Profile-value occurrences (self-closing denylist): every real-identity scalar in
 //      _knowledge/profile.yaml (or, when only the example exists, the example's real values)
 //      is a denylist entry; any occurrence in a shipped file fails.
@@ -47,10 +47,11 @@ import { fileURLToPath } from "node:url";
 import { tmpdir } from "node:os";
 
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
-// The shipped, identity-bearing surface: the TS lane (plugin/), the distribution bundles
-// (plugins/), the librarian, and the ported SOP kit library (kits/ — the 0013 S4(a) template
-// surface). All carry the identity-neutrality constraint; scripts/ + CHANGELOG.md + docs/ are
-// authoring surfaces and stay outside.
+// The shipped, identity-bearing surface: the distribution bundles (plugins/), the librarian, and
+// the ported SOP kit library (kits/ — the 0013 S4(a) template surface). All carry the
+// identity-neutrality constraint; scripts/ + CHANGELOG.md + docs/ are authoring surfaces and stay
+// outside. `plugin` (the retired TS lane) stays listed deliberately: scanTree skips a missing dir,
+// so the entry costs nothing and re-arms the scan if that path ever comes back.
 const SCAN_DIRS = ["plugin", "plugins", "librarian", "kits"];
 const ALLOW_FILE = join("schema", "neutrality-lint.allow");
 

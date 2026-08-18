@@ -1,9 +1,9 @@
 # Pre-commit hooks that mirror CI's FAST gates so a violation surfaces before push. Install
-# with `lefthook install` (folded into `make setup`). Deliberately fast: no go test / bun test
-# / verify.sh here (those run in CI and via `make test` / `make verify`) — pre-commit stays
-# under a couple seconds so it never tempts a `--no-verify`.
+# with `lefthook install` (folded into `make setup`). Deliberately fast: no go test / verify.sh
+# here (those run in CI and via `make test` / `make verify`) — pre-commit stays under a couple
+# seconds so it never tempts a `--no-verify`.
 #
-# The path-scoped hooks (actionlint, plugin purity) only run when their lane changed; the
+# The path-scoped hook (actionlint) only runs when its lane changed; the
 # repo-wide gates (neutrality lint + self-test, version-sync) always run — they are cheap and
 # a drift in any file can trip them.
 pre-commit:
@@ -18,6 +18,3 @@ pre-commit:
     actionlint:
       glob: ".github/**"
       run: actionlint
-    plugin-purity:
-      glob: "plugin/**"
-      run: node plugin/scripts/check-core-purity.mjs

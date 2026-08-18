@@ -28,8 +28,8 @@ const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 // harvest-loop asset is copied by hand; the desk-setup one is the greenfield scaffold's actual
 // `_meta/improvement-log.md` seed, resolved via template_render (desk-standard #80).
 const INSTRUMENT_ASSETS = [
-  "plugins/desk-standard/skills/harvest-loop/assets/improvement-log.md",
-  "plugins/desk-standard/skills/desk-setup/assets/template/_meta/improvement-log.md",
+  "plugins/desk-persona/skills/harvest-loop/assets/improvement-log.md",
+  "plugins/desk-persona/skills/desk-setup/assets/template/_meta/improvement-log.md",
 ];
 
 // Universal frontmatter keys: schema/doctypes.yaml `universal: [type, status, created, updated,
