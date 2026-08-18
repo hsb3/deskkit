@@ -245,6 +245,8 @@ check "findings dispose <id> --as open restores it (keeps later uncollapsed coun
 
 # --- 6. dead-store refusal: chmod the store tree read-only to force the revisions insert to
 # fail, and assert rc != 0 with no filesystem write ------------------------------------------
+# The permission fault stands in for the spec's LIBRARIAN_FAULT_INJECT=revision-store-down, which
+# is documented but not implemented anywhere in this tree — don't "restore" the env flag.
 chmod -R -w "$STORE"
 run_lib propose-fix --run "$RUN_ID" > /dev/null 2>&1
 RC=$?
