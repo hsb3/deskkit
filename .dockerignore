@@ -1,0 +1,22 @@
+# Build context only needs librarian/ + VERSION + the container files at repo root
+# (see Dockerfile). Everything else here is excluded to keep the context small.
+.git
+.github
+.claude
+.claude-plugin
+docs
+kits
+plugin
+plugins
+schema
+scripts
+tests
+logs
+*.md
+.DS_Store
+install.sh
+lefthook.yml
+kits.yaml
+librarian/deskkit
+librarian/*.pid
+librarian/*.log
