@@ -46,7 +46,7 @@
     if (config.collection === 'agent_runs') {
       try {
         const res = await pb.collection('messages').getList(1, 200, {
-          filter: `run = "${rec.id}"`,
+          filter: pb.filter('run = {:id}', { id: rec.id }),
           sort: 'seq',
         })
         runMessages = res.items

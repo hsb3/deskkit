@@ -16,6 +16,7 @@ export default defineConfig({
     proxy: {
       '/api': 'http://127.0.0.1:8090',
       '/desk': 'http://127.0.0.1:8090',
+      '/_': 'http://127.0.0.1:8090',
     },
   },
 })
