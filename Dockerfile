@@ -21,11 +21,11 @@ COPY --from=build /out/deskkit /usr/local/bin/deskkit
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
-# The desk (files) and the PocketBase store both live under one volume mount so a redeploy
-# on the same volume keeps both. Baked-in identity-neutral defaults; override with
-# docker run -e DESK_ROOT=... -e DESK_NAME=... if the host needs different paths.
+# The desk (files) and the PocketBase store both live under /data so one volume mount (docker
+# run -v, or a platform volume) keeps both across a redeploy. No VOLUME directive: hosting
+# platforms that manage volumes themselves reject it, and every runner here mounts explicitly.
+# Baked-in identity-neutral defaults; override with docker run -e DESK_ROOT=... -e DESK_NAME=...
 ENV DESK_ROOT=/data/desk DESK_NAME=desk
-VOLUME /data
 EXPOSE 8090
 
 # Runs as root: the platform mounts a fresh named volume owned by root with no init system
