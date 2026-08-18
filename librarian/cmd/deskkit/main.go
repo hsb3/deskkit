@@ -43,6 +43,7 @@ import (
 
 	"github.com/hsb3/desk-standard/librarian/internal/modules/librarian"
 	"github.com/hsb3/desk-standard/librarian/internal/modules/pm"
+	"github.com/hsb3/desk-standard/librarian/internal/modules/profile"
 
 	// Blank-import registers the librarian's Go migrations (spec §4.11). The core-owned
 	// module_schema_versions meta migration self-registers via internal/core/migrate's own
@@ -193,10 +194,10 @@ func main() {
 	// tools into the shared toolcore registry BEFORE any surface (agent/mcp) builds and before
 	// the migration runner executes (RegisterProgrammatic wires any non-self-registered module
 	// migrations into PocketBase's global list). librarian is always enabled; pm is disabled
-	// unless PM_ENABLED. Safe with a nil cfg — Enabled tolerates it (librarian ignores cfg, pm
-	// treats nil as off). A registration error is a collection-ownership collision (a build-time
-	// bug), so it is fatal.
-	reg, regErr := module.Register(cfg, librarian.New(), pm.New())
+	// unless PM_ENABLED. Safe with a nil cfg — Enabled tolerates it (profile and librarian ignore
+	// cfg, pm treats nil as off). A registration error is a collection-ownership collision (a
+	// build-time bug), so it is fatal.
+	reg, regErr := module.Register(cfg, profile.New(), librarian.New(), pm.New())
 	if regErr != nil {
 		log.Fatalf("deskkit: module registration: %v", regErr)
 	}

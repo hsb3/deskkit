@@ -134,6 +134,24 @@ func scalarString(v any) string {
 	}
 }
 
+// ProfileScalar is the exported wrapper over profileScalar: it resolves a dotted path into the
+// profile tree and returns its scalar value as a string, or "" if absent, empty, or not a
+// scalar. Exported for the profile-module tools, which resolve the same dotted grammar the
+// {{profile.…}} substitution does and must not re-derive it.
+func ProfileScalar(profile map[string]any, dotted string) string {
+	return profileScalar(profile, dotted)
+}
+
+// IndexTree is the exported wrapper over indexTree: it walks parts into the profile tree and
+// returns whatever sits there (a scalar, a nested map, or nil). Exported so a caller that must
+// report the keys AVAILABLE under the deepest resolvable parent — not just the missing leaf —
+// can inspect the intermediate node.
+func IndexTree(m map[string]any, parts []string) any { return indexTree(m, parts) }
+
+// ScalarString is the exported wrapper over scalarString: it renders a profile leaf as its
+// substitutable scalar string, or "" for a map/list/nil.
+func ScalarString(v any) string { return scalarString(v) }
+
 // placeholderRe matches {{profile.<dotted.path>}} / {{env.<VAR>}} with an optional
 // `|| "default"` (M-05 substitution convention). Group 1 = kind, 2 = path/var,
 // 3 = the whole `|| "…"` clause (presence = has default), 4 = the default text.
