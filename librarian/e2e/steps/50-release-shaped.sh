@@ -3,9 +3,9 @@
 # 50 — release-shaped checks. Sourced by e2e.sh; helpers (check/note/section) and E2E_* state
 # come from lib.sh. Proves the repo's release invariants hold: VERSION stays the single
 # source of truth across shipped manifests and the changelog, the release ldflags stamp
-# actually reaches the binary, and the marketplace bundle stays self-contained (the
-# marketplace install copies only plugins/desk-standard/, so its committed artifacts must
-# already carry everything a fresh install needs).
+# actually reaches the binary, and the marketplace bundle stays self-contained (a marketplace
+# install copies only the bundle directory, so whatever it needs must already be inside it —
+# which now means the binary, launched by its .mcp.json, and no bundled JS/schema copies).
 
 section "50 · release-shaped checks"
 
@@ -28,13 +28,27 @@ printf '%s' "$OUT" | grep -qF "$V"
 check "stamped binary --version reports the release VERSION ($V)" $?
 note "unstamped suite binary reports dev (dk --version -> deskkit version dev); the ldflags stamp is what carries the release version"
 
-# --- marketplace bundle self-containment: only plugins/desk-standard/ is copied on install ---
-SERVER_JS="$E2E_REPO/plugins/desk-standard/mcp/server.js"
-PROFILE_SCHEMA="$E2E_REPO/plugins/desk-standard/schema/profile.schema.yaml"
-REFERENCES_YAML="$E2E_REPO/plugins/desk-standard/schema/references.yaml"
+# --- marketplace bundle: one bundle, self-contained, and free of generated JS/schema copies --
+# The tool surface it needs is the deskkit binary, so the bundle carries a .mcp.json launching
+# `deskkit mcp-serve` and NOT a bundled server.js or a copied schema — those existed only to
+# feed the retired TypeScript stdio server. Assert both halves: what must be there, and what
+# must not have come back.
+BUNDLE="$E2E_REPO/plugins/desk-persona"
 
-[ -f "$SERVER_JS" ] \
-  && [ "$(wc -c < "$SERVER_JS")" -gt 1000 ] \
-  && [ -f "$PROFILE_SCHEMA" ] \
-  && [ -f "$REFERENCES_YAML" ]
-check "marketplace bundle artifacts present + self-contained (server.js, profile.schema.yaml, references.yaml)" $?
+BUNDLE_DIRS=$(find "$E2E_REPO/plugins" -mindepth 1 -maxdepth 1 -type d | wc -l | tr -d ' ')
+if [ "$BUNDLE_DIRS" = "1" ] && [ -d "$BUNDLE" ]; then RC=0; else RC=1; fi
+check "plugins/ holds exactly one shipped bundle (desk-persona)" "$RC"
+
+[ -f "$BUNDLE/.mcp.json" ] \
+  && grep -q '"deskkit"' "$BUNDLE/.mcp.json" \
+  && grep -q '"mcp-serve"' "$BUNDLE/.mcp.json"
+check "bundle .mcp.json launches the deskkit binary (deskkit mcp-serve)" $?
+
+# JS in any module flavour (.js/.mjs/.cjs), and a schema copy ANYWHERE in the bundle — matched by
+# the canonical file NAMES rather than a schema/ path, so a copy dropped in another directory is
+# still caught while the desk-setup template's own profile.example.yaml stays legitimate.
+JS_COUNT=$(find "$E2E_REPO/plugins" \( -name '*.js' -o -name '*.mjs' -o -name '*.cjs' \) | wc -l | tr -d ' ')
+SCHEMA_COUNT=$(find "$E2E_REPO/plugins" \( -name 'profile.schema.yaml' -o -name 'references.yaml' \) | wc -l | tr -d ' ')
+[ "$JS_COUNT" = "0" ] && [ "$SCHEMA_COUNT" = "0" ]
+check "bundle is TS-free: no generated server.js and no bundled schema copies under plugins/" $?
+note "plugins/ .js files: $JS_COUNT; bundled schema yaml files: $SCHEMA_COUNT"

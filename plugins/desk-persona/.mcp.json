@@ -4,7 +4,7 @@
     "args": ["mcp-serve"],
     "env": {
       "PM_ENABLED": "true",
-      "MCP_MODULES": "librarian,pm"
+      "MCP_MODULES": "profile,librarian,pm"
     }
   }
 }

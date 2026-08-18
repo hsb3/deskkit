@@ -1,9 +1,7 @@
 #!/usr/bin/env node
 // Version-sync drift guard. The repo carries one canonical version in the root VERSION file;
 // the shipped manifests must agree with it:
-//   - plugins/desk-standard/.claude-plugin/plugin.json   (the installed desk-standard plugin)
-//   - plugin/package.json                               (the plugin build package)
-//   - plugins/desk-persona/.claude-plugin/plugin.json    (the installed desk-persona plugin)
+//   - plugins/desk-persona/.claude-plugin/plugin.json   (the installed desk-persona plugin)
 //   - .claude-plugin/marketplace.json                   (each plugins[].version in the marketplace)
 // Exits 1 (listing every disagreement) if any manifest differs from VERSION; exits 0 when all
 // match. Runs under plain Node (no deps), like the other scripts/ guards.
@@ -18,21 +16,6 @@ const canonical = readFileSync(join(REPO_ROOT, "VERSION"), "utf8").trim();
 
 // Each source: a label, its file, and an extractor pulling the version string out of the parsed JSON.
 const SOURCES = [
-  {
-    label: "plugins/desk-standard/.claude-plugin/plugin.json",
-    file: "plugins/desk-standard/.claude-plugin/plugin.json",
-    pick: (j) => j.version,
-  },
-  {
-    label: "plugin/package.json",
-    file: "plugin/package.json",
-    pick: (j) => j.version,
-  },
-  {
-    label: ".claude-plugin/marketplace.json (desk-standard plugins[].version)",
-    file: ".claude-plugin/marketplace.json",
-    pick: (j) => marketplaceVersion(j, "desk-standard"),
-  },
   {
     label: "plugins/desk-persona/.claude-plugin/plugin.json",
     file: "plugins/desk-persona/.claude-plugin/plugin.json",

@@ -7,18 +7,15 @@
 // the exact class of bug ADR 0015 names as the live proof the split was ungoverned (a stale
 // six-tool spec quote shipped against a five-tool embed with nothing to catch it).
 //
-// It mirrors the existing packaged-artifacts drift guard (.github/workflows/ci.yml "Plugin —
-// packaged artifacts drift guard": `bun run package` then `git diff --exit-code -- ../plugins/desk-standard/`)
-// — fail red naming the file, don't reinvent a diff format. One governed mechanism per
-// version-controlled prompt copy. Runs under plain Node (no deps), like the other scripts/
-// guards (check-kits.mjs, check-scaffold-frontmatter.mjs).
+// It follows the repo's generated-artifact pattern (regenerate/compare, fail red naming the file
+// — don't reinvent a diff format). One governed mechanism per version-controlled prompt copy.
+// Runs under plain Node (no deps), like the other scripts/ guards (check-kits.mjs,
+// check-scaffold-frontmatter.mjs).
 //
 //   node scripts/check-prompt-drift.mjs   scan; exit 1 on drift, exit 0 when the copies agree
 //
-// Forward note: when the ADR 0014 desk-persona bundle lands (tracked separately), its
-// bundle-markdown prompt copies join prompt governance — either by extending this file's copy
-// list or via the bundle's own regenerate+diff guard. The requirement is one governed
-// mechanism per copy, not one script.
+// The desk-persona bundle's own markdown prompt copies are governed separately, by
+// check-persona-drift.mjs. The requirement is one governed mechanism per copy, not one script.
 
 import { readFileSync } from "node:fs";
 import { dirname, join, relative } from "node:path";

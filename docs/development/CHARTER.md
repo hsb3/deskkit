@@ -10,29 +10,37 @@ Status: active (2026-07-19)
 
 ## What this is
 
-**Two products over one shared schema, one personalization model.** Nothing that ships carries
-a person, org, repo, or issue number — identity is injected at use time, never baked in.
+**One binary and one plugin bundle over one shared schema, one personalization model.** Nothing
+that ships carries a person, org, repo, or issue number — identity is injected at use time, never
+baked in.
 
-- **`plugin/`** — the desk-standard Claude Code plugin: a harness-pure TypeScript core (profile
-  loading, schema validation, `{{profile.…}}` substitution, `_knowledge/` indexing) behind a
-  stdio MCP server, wrapped as a plugin with four skills.
-- **`librarian/`** — **deskkit**, a single Go binary (embedded PocketBase) that indexes a desk,
-  flags convention violations, and proposes/applies fixes under a record-original-first boundary
-  (every applied fix is byte-exact reversible via `restore`). It also carries the **PM module**,
-  a document-gated work graph. Surfaces: CLI, MCP server, and a chat TUI over one tool core.
-  (Named `pocket-librarian` through v0.6.0; renamed **deskkit** in v0.7.0 — the binary is
-  `deskkit`.)
-- **`schema/`** — schema v1: the product-neutral contract both `plugin/` and `librarian/` read.
+- **`librarian/`** — **deskkit**, a single Go binary (embedded PocketBase) and the whole runtime.
+  It indexes a desk, flags convention violations, and proposes/applies fixes under a
+  record-original-first boundary (every applied fix is byte-exact reversible via `restore`). Three
+  tool modules feed one tool core: **`profile`** (desk personalization — profile resolution,
+  schema-v1 validation, `{{profile.…}}` substitution, `_knowledge/` indexing), **`librarian`** (the
+  sweep/patrol/fix loop), and **`pm`** (a document-gated work graph). Surfaces: CLI, MCP server,
+  chat TUI, and a browser session page. (Named `pocket-librarian` through v0.6.0; renamed
+  **deskkit** in v0.7.0 — the binary is `deskkit`.)
+- **`plugins/desk-persona/`** — the one Claude Code plugin this marketplace ships: the agent-facing
+  surface over that same binary. Skills, the `librarian-operator` and `pm-operator` agents, a
+  SessionStart briefing hook, and one `.mcp.json` mounting `deskkit mcp-serve`. It is a surface,
+  not a second engine — it carries no runtime of its own.
+- **`schema/`** — schema v1: the product-neutral contract. The repo root is the single source of
+  truth; the binary carries `go:embed`ed copies, drift-guarded byte-for-byte against it.
 
 You personalize by filling `_knowledge/profile.yaml` (from `_knowledge/profile.example.yaml`) —
 never by editing a shipped skill, template, or tool.
 
+_Consolidated from two lanes to one: the TypeScript plugin lane was retired and its four
+personalization tools moved into the binary as the `profile` module (reverses ADR 0016)._
+
 ## What this governs
 
-- **Identity-neutrality is a hard invariant**, enforced in CI by the neutrality lint over
-  `plugin/` + `librarian/`. Shipped code names no deployment identity. (`docs/` and repo-root
-  files are exempt and may cite issues/identity freely.)
-- **One version, one repo.** Both products ship under the single root `VERSION`; a release tags
+- **Identity-neutrality is a hard invariant**, enforced in CI by the neutrality lint over the
+  shipped tree (`librarian/`, `plugins/`, `kits/`). Shipped code names no deployment identity.
+  (`docs/` and repo-root files are exempt and may cite issues/identity freely.)
+- **One version, one repo.** Everything ships under the single root `VERSION`; a release tags
   that one version (SemVer policy: ADR 0005 (DESK-27)).
 - **Decisions are ADRs**, append-only, filed on the project board as `DECISION` tasks and cited
   where they bind as a bare `ADR NNNN`.

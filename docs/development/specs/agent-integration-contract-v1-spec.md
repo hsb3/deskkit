@@ -8,6 +8,22 @@ and audits every tool-bearing surface against it._
 Status: active
 Date: 2026-07-20
 
+> **Correction (single-binary consolidation, reverses ADR 0016).** This document audits the tree
+> as it stood on 2026-07-20; two of the surfaces it names no longer exist under those paths, and a
+> reader should not go looking for them:
+>
+> - The **TS plugin MCP server** (`plugin/mcp/server.ts`, §2 row 2 / §5) is gone. Its four tools —
+>   `profile_get`, `profile_validate`, `template_render`, `knowledge_index` — are now the Go
+>   `profile` module on the same `deskkit mcp-serve` process. The verdicts stand as written; only
+>   the implementation moved.
+> - The **desk-pm mount** (`plugin/desk-pm/.mcp.json`) shipped as `plugins/desk-persona/.mcp.json`
+>   and now declares `MCP_MODULES=profile,librarian,pm`, composing all three families onto one
+>   mount rather than narrowing to `pm`. It is the marketplace's only bundle; the second bundle it
+>   references (`plugins/desk-standard/`) was retired and its skills folded in.
+>
+> The contract itself — the five parameters, the ratified asymmetries, and the `MCP_MODULES` gate
+> axis in §4 — is unchanged.
+
 ---
 
 ## 1. The contract, in one line

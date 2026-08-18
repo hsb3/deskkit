@@ -17,8 +17,9 @@
 // became the ONE authored PM source per surface themselves (ADR 0014(d)). With no second copy to
 // diverge from, a copy/compare guard for them would guard nothing; they are authored-in-place in
 // plugins/desk-persona/, alongside the bundle's other authored artifacts (.mcp.json, plugin.json,
-// hooks/, README.md). The plugin/desk-persona.test.ts bundle guard still holds them to the real
-// tool surface (no phantom / un-namespaced tool names).
+// hooks/, README.md). What holds those authored surfaces to the REAL tool surface (no phantom
+// tool names, no module silently dropped from the mount) is a separate guard on the go-test lane:
+// librarian/internal/core/mcp/bundle_shape_test.go.
 //
 // Usage (plain Node, no deps — like the other scripts/ guards):
 //   node scripts/check-persona-drift.mjs           compare on-disk vs regenerated; exit 1 on drift

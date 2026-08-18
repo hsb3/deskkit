@@ -1,25 +1,26 @@
-_The four desk-standard skills as user journeys: when to reach for each, what it does to your desk, and what you get — grounded in the shipped skill contracts and the MCP tools behind them._
+_The four desk-shaping skills as user journeys: when to reach for each, what it does to your desk, and what you get — grounded in the shipped skill contracts and the MCP tools behind them._
 Status: active
 Audience: **desk owners** — you run a desk; you are not building the products. Assumes no build
 toolchain and only a minimal terminal: the plugin's skills run inside a Claude Code session, with
 no tool JSON to type yourself.
 
-# The desk-standard plugin — four skills
+# The desk-shaping skills — four journeys
 
-The plugin gives Claude Code four skills that stand up, check, evolve, and adopt an
+The `desk-persona` plugin gives Claude Code four skills that stand up, check, evolve, and adopt an
 **executive desk** — a planning surface that oversees your projects and keeps decisions,
 analyses, status, and drafts out of the repos it watches. The payoff: a desk that conforms
 to one shared standard, personalized entirely from your `_knowledge/profile.yaml`, with
-**no identity ever hand-typed into a shipped file.**
+**no identity ever hand-typed into a shipped file.** (The same plugin also ships the three `pm-*`
+work-graph skills and two agents — those are `pm-guide.md`'s subject.)
 
 Your actual path is a **Claude Code session**: you ask for a skill by name (or Claude reaches
 for one on its own), and Claude drives the rest — you never type a tool call yourself. Under the
-skills sits a harness-pure core exposed as four MCP tools — `profile_get`, `profile_validate`,
-`template_render`, `knowledge_index` — that the skills call, behind the scenes, to resolve your
-profile and materialize scaffolding. This guide quotes their real output so you can see what a
-skill actually does before you run it; treat every transcript below as **what Claude sees**, not
-as something you type. For install, see `getting-started.md`; for the rules the skills enforce,
-the `conventions-standard` skill is the reference.
+skills sits the `deskkit` binary's **profile module**, four MCP tools — `profile_get`,
+`profile_validate`, `template_render`, `knowledge_index` — that the skills call, behind the
+scenes, to resolve your profile and materialize scaffolding. This guide quotes their real output
+so you can see what a skill actually does before you run it; treat every transcript below as
+**what Claude sees**, not as something you type. For install, see `getting-started.md`; for the
+rules the skills enforce, the `conventions-standard` skill is the reference.
 
 <!-- A recording of desk-setup running inside a Claude Code session would fit here; it
 requires an interactive harness, so it is left for a manual capture. -->
@@ -51,8 +52,8 @@ $ profile_get { "path": "identity.github.personal" }
 {"path":"identity.github.personal","value":"example-personal"}
 ```
 
-**`profile_validate`** checks the discovered profile against schema v1 and reports every
-violation — including unknown top-level keys:
+**`profile_validate`** checks the discovered profile against schema v1 and reports the
+violations, naming the offending key — including unknown top-level keys:
 
 ```console
 # a well-formed profile
@@ -198,9 +199,12 @@ is not installable in the environment, the skill degrades to a docs-driven mode 
 
 ## Notes on the transcripts
 
-The MCP-tool transcripts above were produced by invoking the shipped `plugin/core` tool
-handlers directly (via `bun`) against scratch desks with placeholder profiles; store paths
-are elided for width. The `claude plugin install` step and running the skills inside an
-interactive Claude Code session are covered in `getting-started.md` and are
+The MCP-tool transcripts above were produced by invoking the profile tools directly against
+scratch desks with placeholder profiles; store paths are elided for width. They were captured
+against the TypeScript implementation that preceded the Go `profile` module: the tool names,
+inputs, and output field names carried over unchanged, but a validation failure's exact wording now
+comes from the Go schema validator, so treat the error text above as illustrative rather than
+literal. The `claude plugin install` step and running
+the skills inside an interactive Claude Code session are covered in `getting-started.md` and are
 documented-not-rerun here (they require an interactive harness). Skill behavior is quoted
 from the shipped `SKILL.md` contracts.

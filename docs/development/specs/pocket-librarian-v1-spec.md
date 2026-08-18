@@ -1878,7 +1878,10 @@ external MCP server's tools). The librarian ALSO exposes its own tool core *outb
 call the librarian's tools directly by mounting it. *(Correction 2026-07-20, ADR 0016: the
 dual-format plugin's `plugin/mcp` boundary does NOT carry librarian tools today — it ships
 exactly the four profile/template/knowledge tools, per `docs/development/specs/tool-surface.md`; a designed proxy
-from that boundary to this server is the planned extension.)* This is the
+from that boundary to this server is the planned extension.)* *(Superseded — single-binary
+consolidation, reversing ADR 0016: that separate boundary no longer exists and the proxy was never
+built. The four tools are now the Go `profile` module registered on this same server, so there is
+one MCP process, not two.)* This is the
 one-binary "MCP server **and** CLI over a single tool core" pattern (the `hsb3/outlook-mcp`
 architecture): the CLI, the eino agent loop, and this MCP server are three surfaces over the **same**
 `tools.*` functions, with **zero logic duplication** (each MCP tool calls the same function the CLI

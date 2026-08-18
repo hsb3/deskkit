@@ -4,8 +4,8 @@ name: release
 # the root VERSION file (asserted in `gate`) — use `make release-prep` to run the gates and get
 # the exact `git tag … && git push --tags` line. The workflow re-runs the CI gates, cross-
 # compiles the librarian for darwin/linux × amd64/arm64 (pure-Go, CGO disabled — PocketBase
-# uses the modernc sqlite driver, so no cgo toolchain is needed), rebuilds the plugin bundle,
-# and publishes a GitHub release with the binaries, the bundle, and a sha256 checksums file.
+# uses the modernc sqlite driver, so no cgo toolchain is needed), and publishes a GitHub release
+# with the binaries and a sha256 checksums file.
 
 on:
   push:
@@ -32,7 +32,7 @@ jobs:
           expected="v${version}"
           if [ "${GITHUB_REF_NAME}" != "${expected}" ]; then
             echo "release: tag '${GITHUB_REF_NAME}' does not match VERSION ('${expected}')." >&2
-            echo "Bump VERSION + the three manifests (see check-version-sync) and re-tag." >&2
+            echo "Bump VERSION + the shipped manifests (see check-version-sync) and re-tag." >&2
             exit 1
           fi
           echo "tag ${GITHUB_REF_NAME} matches VERSION ${version}."
@@ -47,11 +47,6 @@ jobs:
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: '22'
-
-      - name: Set up Bun
-        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
-        with:
-          bun-version: '1.3.14'
 
       - name: Neutrality lint — scan the shipped tree
         run: node scripts/check-neutrality.mjs
@@ -79,28 +74,6 @@ jobs:
         run: |
           node scripts/check-workflow-pins.mjs
           node scripts/check-workflow-pins.mjs --self-test
-
-      - name: Install plugin deps
-        working-directory: plugin
-        run: bun install --frozen-lockfile
-
-      - name: Plugin — core purity
-        working-directory: plugin
-        run: bun run check:purity
-
-      - name: Plugin — packaged artifacts drift guard
-        working-directory: plugin
-        run: |
-          bun run package
-          git diff --exit-code -- claude-plugin/
-
-      - name: Plugin — tests
-        working-directory: plugin
-        run: bun run test
-
-      - name: Plugin — TypeScript build
-        working-directory: plugin
-        run: bun run build
 
       - name: Librarian — build
         working-directory: librarian
@@ -154,37 +127,9 @@ jobs:
           path: librarian/deskkit_*_${{ matrix.goos }}_${{ matrix.goarch }}
           if-no-files-found: error
 
-  # ---- build the marketplace plugin bundle ----
-  bundle:
-    needs: gate
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-
-      - name: Set up Bun
-        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
-        with:
-          bun-version: '1.3.14'
-
-      - name: Build plugin bundle
-        run: |
-          version="$(cat VERSION)"
-          cd plugin
-          bun install --frozen-lockfile
-          bun run package
-          tar -czf "../desk-standard-plugin_${version}.tar.gz" -C claude-plugin .
-          echo "built desk-standard-plugin_${version}.tar.gz"
-
-      - name: Upload bundle artifact
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: desk-standard-plugin-bundle
-          path: desk-standard-plugin_*.tar.gz
-          if-no-files-found: error
-
   # ---- publish the GitHub release ----
   publish:
-    needs: [binaries, bundle]
+    needs: [binaries]
     runs-on: ubuntu-latest
     permissions:
       contents: write

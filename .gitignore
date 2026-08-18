@@ -18,12 +18,10 @@
 # --- PocketBase runtime store (never committed; the real store lives under $XDG_DATA_HOME) ---
 pb_data/
 
-# --- Node / TS (plugin/opencode, plugins/desk-standard) ---
+# --- stray Node/JS artifacts (no JS lane ships from this repo; the scripts/ gates are dep-free) ---
 node_modules/
 dist/
 build/
-*.tsbuildinfo
-bun.lockb
 
 # --- OS / editor litter ---
 .DS_Store

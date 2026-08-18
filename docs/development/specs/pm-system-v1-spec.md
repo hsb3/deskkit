@@ -1019,6 +1019,12 @@ requirements-coverage acceptance criterion. Unqualified `Test…` names are Go t
 disposition is LATER, or which are architectural/doctrine (build- or policy-enforced rather
 than unit-tested), name the enforcing artifact and are called out in the note below the table.
 
+> **Correction (single-binary consolidation).** Three verifiers named below were retired with the
+> TypeScript lane and no longer exist: `plugin/desk-persona.test.ts` (R5.1, R5.3) and
+> `scripts/check-core-purity.mjs` (R5.5) — the latter's subject, a harness-pure TS core, is gone.
+> The Go tests named alongside them still run. R5.3 identity-neutrality remains enforced by
+> `scripts/check-neutrality.mjs` in `make check` and CI.
+
 | Req | MUST/SHOULD/LATER | Covered by | Verified by (test) |
 |---|---|---|---|
 | R1.1 serve concurrent non-issue threads | MUST | §1.1, §3.1 | `TestFixtures_ThroughBothSurfaces`, `TestRunner_ReplaysImportedItems` (`.../pm/scenario`) |

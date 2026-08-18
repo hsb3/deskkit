@@ -1,7 +1,7 @@
 # E2E system-behaviour suite
 
-_Purpose: prove desk-standard behaves as **one system** — the deskkit binary, both plugins, the
-librarian, and the PM module — by walking the whole chain on a throwaway desk._
+_Purpose: prove desk-standard behaves as **one system** — the deskkit binary, the shipped plugin
+bundle, the librarian, and the PM module — by walking the whole chain on a throwaway desk._
 Status: active
 
 ## Entry point
@@ -24,11 +24,11 @@ fail the run but are always printed — never silently passed.
 
 | Step | Link | Proves |
 |---|---|---|
-| 10 | cold-start + profile | `deskkit init` scaffolds a working desk; store self-initialises (ADR 0003); the scaffolded profile validates against schema v1 through the plugin MCP surface |
+| 10 | cold-start + profile | `deskkit init` scaffolds a working desk; store self-initialises (ADR 0003); the scaffolded profile validates against schema v1 through the MCP `profile_validate` tool |
 | 20 | librarian sweep → patrol → fix → restore | rule detection (R1/R3), record-original-first `propose-fix`, `apply-fix`, and byte-exact reversible `restore` (ADR 0014 boundary) |
 | 30 | PM graph | PM ships **default-on**; create → legal transition; the phase gate refuses illegal skips; blocking/cascade refuses a blocked item's advance |
-| 40 | plugin surfaces | the TS plugin MCP (4 core tools) and the Go librarian/PM MCP (17 default / 12 pm-gated) expose one tool core; skills + agents present; the SessionStart hook emits a cold-start briefing |
-| 50 | release-shaped | VERSION ↔ manifests sync, CHANGELOG coverage, ldflags version-stamping, marketplace-bundle self-containment |
+| 40 | shipped surfaces | one Go MCP server carries the whole tool core (21 default / 9 with PM off / 12 pm-gated / 4 profile-gated) and answers a real `tools/call`; skills + agents present; the SessionStart hook emits a cold-start briefing |
+| 50 | release-shaped | VERSION ↔ manifests sync, CHANGELOG coverage, ldflags version-stamping, and a single self-contained marketplace bundle with no generated JS/schema copies |
 
 ## What it deliberately does NOT cover (skip-with-notice)
 
@@ -48,7 +48,7 @@ notice. Exercise them by hand via `librarian/dogfood-agent.sh`.
 
 ```
 e2e.sh                driver: scratch lifecycle, build, source steps, summary/exit
-lib.sh                shared helpers (check/skip/note/section/dk/mcp_go/mcp_ts) + fixture seeder
+lib.sh                shared helpers (check/skip/note/section/dk/mcp_go) + fixture seeder
 steps/[0-9]*.sh       chain links, sourced in numeric order; each is one self-contained link
 ```
 

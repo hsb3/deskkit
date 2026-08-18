@@ -6,7 +6,7 @@
 //
 // Logic: compare the root VERSION to the latest `v*` git tag.
 //   VERSION >  last tag  → a release is staged; nudge if its CHANGELOG section is still missing.
-//   VERSION == last tag  → warn if plugin/ or librarian/ changed since the tag (unreleased work).
+//   VERSION == last tag  → warn if librarian/ changed since the tag (unreleased work).
 //   VERSION <  last tag  → warn (VERSION is behind the last tag — unexpected).
 // Degrades to a soft note when git history/tags aren't available (e.g. a shallow CI checkout).
 
@@ -82,7 +82,7 @@ if (c < 0) {
 // VERSION == last tag: any product change since the tag is unreleased work with no bump.
 let changed = [];
 try {
-  const out = git(["diff", "--name-only", `${lastTag}..HEAD`, "--", "plugin", "librarian"]);
+  const out = git(["diff", "--name-only", `${lastTag}..HEAD`, "--", "librarian"]);
   changed = out ? out.split("\n").filter(Boolean) : [];
 } catch {
   console.log(`version-status: (advisory) can't diff ${lastTag}..HEAD (shallow clone?) — skipping drift check.`);
@@ -92,8 +92,8 @@ try {
 if (changed.length === 0) {
   console.log(`version-status: OK — VERSION ${version} matches last tag ${lastTag}; no unreleased product changes.`);
 } else {
-  console.log(`version-status: ⚠ ${changed.length} file(s) under plugin/ or librarian/ changed since tag ${lastTag}, but VERSION is still ${version}.`);
-  console.log(`  → Unreleased user-facing work is accumulating. Bump VERSION + the three manifests and add a CHANGELOG entry before the next release.`);
+  console.log(`version-status: ⚠ ${changed.length} file(s) under librarian/ changed since tag ${lastTag}, but VERSION is still ${version}.`);
+  console.log(`  → Unreleased user-facing work is accumulating. Bump VERSION + the shipped manifests and add a CHANGELOG entry before the next release.`);
   console.log(`  (advisory only — this never fails the build.)`);
 }
 process.exit(0);

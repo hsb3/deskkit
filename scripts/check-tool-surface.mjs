@@ -1,24 +1,23 @@
 #!/usr/bin/env node
 // Tool-surface drift guard (the JS half). docs/development/specs/tool-surface.md is the repo's authoritative,
-// empirically-derived map of every tool-bearing surface (shipped by #94). ADR 0016 rules that
+// empirically-derived map of every tool-bearing surface. ADR 0016 rules that
 // "tool-surface truth lives in docs/development/specs/tool-surface.md, pinned by a drift guard (script or
 // generation) so counts can't rot again" — the way VERSION is pinned to the shipped manifests
 // (check-version-sync.mjs) and kits.yaml to the kits/ tree (check-kits.mjs). Before this guard,
 // the doc's own closing line ("re-run the probe … the numbers in this doc must match") was a
 // remember-to-do-it manual step with nothing behind it.
 //
-// This guard pins the two counts that are cheap and exact to derive in-language:
-//   - Plugin TS MCP server (4): the TOOLS array in plugin/core/tools.ts.
+// This guard pins the one count that is cheap and exact to derive in-language:
 //   - Librarian CLI (16 base): the AddCommand registrations in librarian/cmd/deskkit/main.go
 //     plus the framework system commands.
-// It cross-checks each against the number the doc states (§3 + the Summary table for TS; the
-// Summary table for the CLI). The gate-dependent Librarian MCP counts (5 / 6 / 17 / 18 and the
-// MCP_MODULES=pm → 12 mount) are NOT re-derived here on purpose: reimplementing Go's two-flag ×
-// module gate arithmetic in JS would be a second copy that can itself drift. Those are pinned by
-// the Go half — TestToolSurfaceDoc_MCPCounts in librarian/internal/core/mcp/tool_surface_doc_test.go
-// — which reads the same doc counts and asserts them against the real toolcore gate on the
-// `go test ./...` (make test) lane. This guard asserts that Go test's PRESENCE, so removing the
-// MCP-count guard fails `make check`.
+// It cross-checks that against the number the doc's Summary table states. The gate-dependent MCP
+// counts (the live 9 / 10 / 21 / 22 totals and the MCP_MODULES=pm → 12 / MCP_MODULES=profile → 4
+// mounts) are NOT re-derived here on purpose: reimplementing Go's two-flag × module gate
+// arithmetic in JS would be a second copy that can itself drift. Those are pinned by the Go half
+// — TestToolSurfaceDoc_MCPCounts in librarian/internal/core/mcp/tool_surface_doc_test.go — which
+// reads the same doc counts and asserts them against the real toolcore gate over the registered
+// profile + librarian + pm modules, on the `go test ./...` (make test) lane. This guard asserts
+// that Go test's PRESENCE, so removing the MCP-count guard fails `make check`.
 //
 // It pins COUNTS derived-vs-documented, not the doc's bytes — so an unrelated prose/row edit
 // (e.g. re-wording the `findings dispose` row) does NOT trip it; only a real count change does.
@@ -34,22 +33,14 @@ import { fileURLToPath } from "node:url";
 
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const DOC = join(REPO_ROOT, "docs", "development", "specs", "tool-surface.md");
-const TS_TOOLS = join(REPO_ROOT, "plugin", "core", "tools.ts");
 const CLI_MAIN = join(REPO_ROOT, "librarian", "cmd", "deskkit", "main.go");
-// The Go half that pins the gate-dependent Librarian MCP counts; its presence is asserted here.
+// The Go half that pins the gate-dependent MCP counts; its presence is asserted here.
 const GO_GUARD = join(REPO_ROOT, "librarian", "internal", "core", "mcp", "tool_surface_doc_test.go");
 const GO_GUARD_FUNC = "TestToolSurfaceDoc_MCPCounts";
 
 const rel = (p) => relative(REPO_ROOT, p).split("\\").join("/");
 
 // ───────────────────────────── source derivations ─────────────────────────────
-
-/** Count entries in the exported `TOOLS` array literal of plugin/core/tools.ts. */
-function deriveTsCount(src) {
-  const m = src.match(/export\s+const\s+TOOLS\s*:[^=]*=\s*\[([^\]]*)\]/);
-  if (!m) return null;
-  return m[1].split(",").map((s) => s.trim()).filter(Boolean).length;
-}
 
 /**
  * Derive the CLI "base" subcommand count from librarian/cmd/deskkit/main.go, mirroring how the
@@ -93,14 +84,6 @@ function firstIntInRow(line) {
   return null;
 }
 
-/** The TS server count the doc states: the §3 "Count: N" sentence and the Summary table row. */
-function parseDocTsCounts(md) {
-  const c = md.match(/\*\*Count:\s*(\d+)\*\*/);
-  const section = c ? Number(c[1]) : null;
-  const row = md.split("\n").find((l) => l.trim().startsWith("|") && /Plugin TS MCP server/.test(l));
-  return { section, summary: row ? firstIntInRow(row) : null };
-}
-
 /** The CLI base count the doc states in the Summary table ("16 base (+ pm group …)"). */
 function parseDocCliCount(md) {
   const row = md.split("\n").find((l) => l.trim().startsWith("|") && /Librarian CLI subcommands/.test(l));
@@ -114,25 +97,8 @@ function parseDocCliCount(md) {
  * = clean). Taking raw sources (not file paths) lets the self-test drive the SAME logic against
  * fixture content.
  */
-function checkAll({ tsSource, goSource, docMd, goGuardPresent }) {
+function checkAll({ goSource, docMd, goGuardPresent }) {
   const problems = [];
-
-  // --- Plugin TS MCP server (4) ---
-  const tsDerived = deriveTsCount(tsSource);
-  const tsDoc = parseDocTsCounts(docMd);
-  if (tsDerived === null) {
-    problems.push("TS surface: could not find the `TOOLS` array in plugin/core/tools.ts");
-  } else {
-    for (const [where, val] of [["§3 \"Count: N\"", tsDoc.section], ["Summary table row", tsDoc.summary]]) {
-      if (val === null) {
-        problems.push(`TS surface: could not parse the documented count (${where}) in docs/development/specs/tool-surface.md`);
-      } else if (val !== tsDerived) {
-        problems.push(
-          `TS surface: docs/development/specs/tool-surface.md ${where} says ${val}, but plugin/core/tools.ts TOOLS array has ${tsDerived}`,
-        );
-      }
-    }
-  }
 
   // --- Librarian CLI (16 base) ---
   const cli = deriveCliCount(goSource);
@@ -146,30 +112,29 @@ function checkAll({ tsSource, goSource, docMd, goGuardPresent }) {
     );
   }
 
-  // --- Gate-dependent Librarian MCP counts: pinned by the Go half; assert its presence ---
+  // --- Gate-dependent MCP counts: pinned by the Go half; assert its presence ---
   if (!goGuardPresent) {
     problems.push(
-      `MCP-count guard missing: the gate-dependent Librarian MCP counts (5/6/17/18, MCP_MODULES=pm → 12) are ` +
-        `pinned by ${rel(GO_GUARD)} (${GO_GUARD_FUNC}); that file/function is absent — restore it so the MCP ` +
-        `counts stay guarded on the go-test lane`,
+      `MCP-count guard missing: the gate-dependent MCP counts (the live 9/10/21/22 totals, MCP_MODULES=pm → 12, ` +
+        `MCP_MODULES=profile → 4) are pinned by ${rel(GO_GUARD)} (${GO_GUARD_FUNC}); that file/function is absent ` +
+        `— restore it so the MCP counts stay guarded on the go-test lane`,
     );
   }
 
-  return { problems, tsDerived, cli, tsDoc, cliDoc };
+  return { problems, cli, cliDoc };
 }
 
 // ───────────────────────────── modes ─────────────────────────────
 
 function runScan() {
-  for (const p of [DOC, TS_TOOLS, CLI_MAIN]) {
+  for (const p of [DOC, CLI_MAIN]) {
     if (!existsSync(p)) {
       console.error(`check-tool-surface: FAIL — expected file not found: ${rel(p)}`);
       process.exit(1);
     }
   }
   const goGuardPresent = existsSync(GO_GUARD) && readFileSync(GO_GUARD, "utf8").includes(GO_GUARD_FUNC);
-  const { problems, tsDerived, cli, tsDoc, cliDoc } = checkAll({
-    tsSource: readFileSync(TS_TOOLS, "utf8"),
+  const { problems, cli, cliDoc } = checkAll({
     goSource: readFileSync(CLI_MAIN, "utf8"),
     docMd: readFileSync(DOC, "utf8"),
     goGuardPresent,
@@ -186,9 +151,9 @@ function runScan() {
   }
 
   console.log(
-    `check-tool-surface: OK — TS server ${tsDerived} (doc §3=${tsDoc.section}, Summary=${tsDoc.summary}); ` +
-      `CLI ${cli.total} base = ${cli.add} AddCommand + ${cli.lateCount} pbLate + ${cli.migrate} migratecmd (doc=${cliDoc}); ` +
-      `MCP gated counts pinned by ${GO_GUARD_FUNC} on the go-test lane.`,
+    `check-tool-surface: OK — CLI ${cli.total} base = ${cli.add} AddCommand + ${cli.lateCount} pbLate + ` +
+      `${cli.migrate} migratecmd (doc=${cliDoc}); MCP gated counts (live totals + the MCP_MODULES mounts) ` +
+      `pinned by ${GO_GUARD_FUNC} on the go-test lane.`,
   );
 }
 
@@ -198,54 +163,51 @@ function runScan() {
  * doc edit, and PASSES when the doc matches. It also proves the Go-guard-presence assertion.
  */
 function runSelfTest() {
-  // A matched baseline: TS array of 4, CLI source deriving 16 (13 AddCommand + 2 pbLate + migrate),
-  // and a doc snippet whose counts agree.
-  const ts4 = "export const TOOLS: ToolDef<any, any>[] = [a, b, c, d];\n";
-  const ts5 = "export const TOOLS: ToolDef<any, any>[] = [a, b, c, d, e];\n";
-  const ts3 = "export const TOOLS: ToolDef<any, any>[] = [a, b, c];\n"; // one fewer → derives 3
+  // A matched baseline: CLI source deriving 16 (13 AddCommand + 2 pbLate + migrate), and a doc
+  // snippet whose count agrees.
   const go16 =
     Array.from({ length: 13 }, () => "\tapp.RootCmd.AddCommand(x)\n").join("") +
     'var pbLateCommands = []string{"serve", "superuser"}\n' +
     "\tmigratecmd.MustRegister(app, app.RootCmd, migratecmd.Config{})\n";
   const go17 = "\tapp.RootCmd.AddCommand(x)\n" + go16; // one extra AddCommand → derives 17
+  const go15 = go16.replace("\tapp.RootCmd.AddCommand(x)\n", ""); // one fewer → derives 15
   const docMatched = [
     "| Surface | Count | Gate |",
     "|---|---:|---|",
     "| Librarian CLI subcommands | 16 base (+ `pm` group under `PM_ENABLED`) | — |",
-    "| Plugin TS MCP server | 4 | none |",
-    "",
-    "**Count: 4**, fixed (no gate).",
+    "| Librarian MCP — default | 9 | none |",
     "",
   ].join("\n");
+  const docNoCliRow = ["| Surface | Count | Gate |", "|---|---:|---|", "| Librarian MCP — default | 9 | none |", ""].join("\n");
 
   const cases = [
     {
-      name: "TS tool added without a doc edit → RED (names TS)",
-      args: { tsSource: ts5, goSource: go16, docMd: docMatched, goGuardPresent: true },
-      wantFail: true,
-      wantMatch: /TS surface/,
-    },
-    {
-      name: "TS tool removed without a doc edit → RED (names TS)",
-      args: { tsSource: ts3, goSource: go16, docMd: docMatched, goGuardPresent: true },
-      wantFail: true,
-      wantMatch: /TS surface/,
-    },
-    {
       name: "CLI command added without a doc edit → RED (names CLI)",
-      args: { tsSource: ts4, goSource: go17, docMd: docMatched, goGuardPresent: true },
+      args: { goSource: go17, docMd: docMatched, goGuardPresent: true },
       wantFail: true,
       wantMatch: /CLI surface/,
     },
     {
+      name: "CLI command removed without a doc edit → RED (names CLI)",
+      args: { goSource: go15, docMd: docMatched, goGuardPresent: true },
+      wantFail: true,
+      wantMatch: /CLI surface/,
+    },
+    {
+      name: "doc's CLI row deleted → RED (unparseable documented count)",
+      args: { goSource: go16, docMd: docNoCliRow, goGuardPresent: true },
+      wantFail: true,
+      wantMatch: /could not parse/,
+    },
+    {
       name: "Go MCP-count guard removed → RED (names the missing Go guard)",
-      args: { tsSource: ts4, goSource: go16, docMd: docMatched, goGuardPresent: false },
+      args: { goSource: go16, docMd: docMatched, goGuardPresent: false },
       wantFail: true,
       wantMatch: /MCP-count guard missing/,
     },
     {
       name: "doc matches source → GREEN",
-      args: { tsSource: ts4, goSource: go16, docMd: docMatched, goGuardPresent: true },
+      args: { goSource: go16, docMd: docMatched, goGuardPresent: true },
       wantFail: false,
       wantMatch: null,
     },

@@ -14,11 +14,11 @@ do not need anything here.
 
 ## Build from source
 
-The librarian is a single Go binary (Go 1.25.0 is pinned — PocketBase's `go.mod` floors it). From
-a clone:
+`deskkit` is a single Go binary and the only thing built here (Go 1.25.0 is pinned — PocketBase's
+`go.mod` floors it; Node is needed only to run the repo's `scripts/*.mjs` gates). From a clone:
 
 ```console
-$ make build          # builds both lanes; the librarian binary lands at librarian/deskkit
+$ make build          # the binary lands at librarian/deskkit
 $ make install        # build + install deskkit to ~/.local/bin (override with PREFIX=/usr/local)
 $ deskkit --version
 deskkit version 0.8.0

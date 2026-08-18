@@ -5,9 +5,9 @@
 # in the order the cohesion lane prescribes:
 #
 #   cold-start (init) -> profile (validate/get) -> librarian sweep/patrol/propose-fix/apply-fix/
-#   restore -> PM graph create/transition/gate/block/cascade -> plugin surfaces (TS MCP, Go MCP,
-#   skills/agents, SessionStart hook) -> release-shaped checks (version sync, changelog, version
-#   stamp, marketplace bundle drift).
+#   restore -> PM graph create/transition/gate/block/cascade -> shipped surfaces (the Go MCP
+#   server's default + gated mounts, skills/agents, SessionStart hook) -> release-shaped checks
+#   (version sync, changelog, version stamp, marketplace bundle shape).
 #
 # Every step is a real assertion against real command output — nothing here is a self-report.
 # Steps that genuinely need an LLM key (the eino agent loop, the chat TUI) are SKIPPED with a
@@ -17,8 +17,8 @@
 # Usage:  bash librarian/e2e/e2e.sh          (from anywhere; it locates the repo from its path)
 #         DESKKIT_BIN=/path/to/deskkit bash librarian/e2e/e2e.sh   (reuse a prebuilt binary)
 #
-# It builds deskkit fresh (unless DESKKIT_BIN is set), runs bun for the TS MCP server, and shells
-# the SessionStart hook — all offline. No network, no real desk, no secrets.
+# It builds deskkit fresh (unless DESKKIT_BIN is set), drives that binary's MCP server over stdio,
+# and shells the SessionStart hook — all offline. No network, no real desk, no secrets.
 
 set -uo pipefail
 
