@@ -3,7 +3,7 @@ name: release
 # Cuts a tagged release. Trigger: pushing a tag `v<major>.<minor>.<patch>`. The tag MUST match
 # the root VERSION file (asserted in `gate`) — use `make release-prep` to run the gates and get
 # the exact `git tag … && git push --tags` line. The workflow re-runs the CI gates, cross-
-# compiles the librarian for darwin/linux × amd64/arm64 (pure-Go, CGO disabled — PocketBase
+# compiles the deskkit binary for darwin/linux × amd64/arm64 (pure-Go, CGO disabled — PocketBase
 # uses the modernc sqlite driver, so no cgo toolchain is needed), and publishes a GitHub release
 # with the binaries and a sha256 checksums file.
 
@@ -40,8 +40,8 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
         with:
-          go-version-file: librarian/go.mod
-          cache-dependency-path: librarian/go.sum
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
 
       - name: Set up Node
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
@@ -75,19 +75,16 @@ jobs:
           node scripts/check-workflow-pins.mjs
           node scripts/check-workflow-pins.mjs --self-test
 
-      - name: Librarian — build
-        working-directory: librarian
+      - name: Go — build
         run: go build ./...
 
-      - name: Librarian — vet
-        working-directory: librarian
+      - name: Go — vet
         run: go vet ./...
 
-      - name: Librarian — tests
-        working-directory: librarian
+      - name: Go — tests
         run: go test ./...
 
-      - name: Librarian — verify gate (integration; self-init, write-boundary, restore, open-guard)
+      - name: Go — verify gate (integration; self-init, write-boundary, restore, open-guard)
         run: make verify
 
   # ---- cross-compile the librarian binary for every target ----
@@ -105,25 +102,24 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
         with:
-          go-version-file: librarian/go.mod
-          cache-dependency-path: librarian/go.sum
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
 
       - name: Set up Node
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: '22'
 
-      - name: Build SPA (go:embed source for librarian/internal/core/spa/dist)
+      - name: Build SPA (go:embed source for internal/core/spa/dist)
         run: cd web && npm ci && npm run build
 
       - name: Cross-compile (CGO disabled, pure-Go)
-        working-directory: librarian
         env:
           CGO_ENABLED: '0'
           GOOS: ${{ matrix.goos }}
           GOARCH: ${{ matrix.goarch }}
         run: |
-          version="$(cat ../VERSION)"
+          version="$(cat VERSION)"
           out="deskkit_${version}_${{ matrix.goos }}_${{ matrix.goarch }}"
           go build -ldflags "-X main.version=${version}" -o "${out}" ./cmd/deskkit
           echo "built ${out}"
@@ -132,7 +128,7 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: deskkit_${{ matrix.goos }}_${{ matrix.goarch }}
-          path: librarian/deskkit_*_${{ matrix.goos }}_${{ matrix.goarch }}
+          path: deskkit_*_${{ matrix.goos }}_${{ matrix.goarch }}
           if-no-files-found: error
 
   # ---- publish the GitHub release ----

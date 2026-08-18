@@ -78,7 +78,7 @@ already uses (R5.4).
 
 R5.5 rules **one PocketBase app / binary / store per desk**, structured internally as
 **core + compile-time Go modules** (no runtime plugin loading). This section maps that ruling
-onto the *actual current package layout* under `librarian/` and names what moves where.
+onto the *actual current package layout* under the module root and names what moves where.
 
 ### 2.1 The ruling, restated as the target shape
 
@@ -98,11 +98,11 @@ onto the *actual current package layout* under `librarian/` and names what moves
 
 ### 2.2 Current layout (what exists today)
 
-The single Go module `github.com/hsb3/desk-standard/librarian` is today a flat `internal/` tree
+The single Go module `github.com/hsb3/deskkit` is today a flat `internal/` tree
 (verified against the repo):
 
 ```text
-librarian/
+. (module root)
 ├── cmd/pocket-librarian/main.go     # the spine: config.Load → StoreDir → pocketbase.NewWithConfig
 │                                     #   → migratecmd.MustRegister(Automigrate) → OnServe hook
 │                                     #   (deskguard, ignore-file, prompt seed, superuser,
@@ -139,7 +139,7 @@ Two facts about this layout drive the refactor:
 ### 2.3 Target layout (what the D2 refactor produces)
 
 ```text
-librarian/
+. (module root)
 ├── cmd/pocket-librarian/main.go      # the spine; wires core + the enabled module set
 │                                     #   (renamed to cmd/deskkit/ in D2b — AFTER the D2 gate; §2.10)
 ├── internal/
@@ -435,7 +435,7 @@ change to the shipped behavior it names.
   resolves and validates only the FILE part of the pointer, dropping the suffix via
   `sectionFilePart`; the heading names a location inside the document for a human reader, not
   part of the file's identity, so renaming a heading never breaks an already-gated pointer
-  (`librarian/internal/modules/librarian/module.go:96-175` — `Verdict`, whose doc comment at
+  (`internal/modules/librarian/module.go:96-175` — `Verdict`, whose doc comment at
   `:116-121` states the advisory rule explicitly; `:203-214` — `sectionFilePart`).
 - **Two forms fail closed, each with an actionable hint:**
   - A `://`-scheme-bearing pointer (a URL) is refused outright: `"pointer %q is not a desk
@@ -444,13 +444,13 @@ change to the shipped behavior it names.
     stripped — only `§` delimits a section anchor — and fails closed, naming the supported `§`
     form instead of leaving a bare not-found (`module.go:136-138`).
 - **Pinned by tests:** `TestVerdict_ToleratesSectionAnchorSuffix`
-  (`librarian/internal/modules/librarian/module_test.go:198-258` — an absent heading still
+  (`internal/modules/librarian/module_test.go:198-258` — an absent heading still
   passes, a genuinely missing file still fails, a URL with a section anchor still fails) and
   `TestVerdict_HashAnchorNotStripped` (`module_test.go:260-292` — a `#`-anchored pointer fails
   closed and the failure names `§`).
 
 **Not the same question.** The gate config's `DocRequirement.Pointer` **selector**
-(`librarian/internal/modules/pm/gates/gates.go:25`; values `""`/`"item"` — the default, resolve
+(`internal/modules/pm/gates/gates.go:25`; values `""`/`"item"` — the default, resolve
 via the item's own `pointer` field — or `"note:<key>"`) answers *which document* a gate reads.
 The `items.pointer` field grammar defined above answers *where that document lives on disk*. A
 reader must not conflate "which document" with "where the document lives" — they are distinct
@@ -721,7 +721,7 @@ rest: a gated document missing it is refused exactly as one missing a doctype-sp
 `schema/doctypes.yaml` additionally names value-format expectations for the universal keys
 (`created`/`updated` as `YYYY-MM-DD` dates, `tags` as a kebab-array) — a stated part of the
 schema-v1 contract, but the current gate engine's `ValidateFrontmatter`
-(`librarian/internal/core/schema/doctypes.go`) checks key **presence**, not value **format**; a
+(`internal/core/schema/doctypes.go`) checks key **presence**, not value **format**; a
 malformed-but-present date or tag does not by itself fail the gate today (a deliberate, flagged
 v1 scope gap in that file, not an oversight). The librarian's existing validation (the same
 engine behind its patrol R-rules and the plugin's `profile_validate`) is the single source of the
@@ -1015,12 +1015,12 @@ edits to them (one owner per wave), disjoint-scope the module trees.
 Every requirement id → the section that covers it (or its LATER disposition), and the named
 test that verifies the shipped implementation. This table is the coverage contract for D6's
 requirements-coverage acceptance criterion. Unqualified `Test…` names are Go tests under
-`librarian/internal/`; the tree home is given where it is not the PM module engine. Rows whose
+`internal/`; the tree home is given where it is not the PM module engine. Rows whose
 disposition is LATER, or which are architectural/doctrine (build- or policy-enforced rather
 than unit-tested), name the enforcing artifact and are called out in the note below the table.
 
 > **Correction (single-binary consolidation).** Two verifiers were retired with the TypeScript lane
-> and have been struck from the table below: `plugin/desk-persona.test.ts` (R5.1, R5.3) and
+> and have been struck from the table below: `plugin/deskkit.test.ts` (R5.1, R5.3) and
 > `scripts/check-core-purity.mjs` (R5.5) — the latter's subject, a harness-pure TS core, is gone.
 > The Go tests named alongside them still run. R5.3 identity-neutrality remains enforced by
 > `scripts/check-neutrality.mjs` in `make check` and CI.

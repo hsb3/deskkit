@@ -16,7 +16,7 @@ back exactly.
 This guide walks the whole loop on a throwaway `example-desk`. Every transcript below is a
 real run captured against a scratch desk with a scratch store — never a real desk. For
 provider setup, the admin console, the MCP surface, and the sandbox, see the operator
-reference in `../../librarian/README.md`; this page is the daily-use story.
+reference in [`deskkit-reference.md`](deskkit-reference.md); this page is the daily-use story.
 
 ![The safety loop: propose a fix, apply it, restore it byte-exact](../assets/propose-apply-restore.gif)
 
@@ -282,11 +282,11 @@ export ANTHROPIC_API_KEY=sk-...
 ```
 
 Provider selection, key redirection via `secrets_ref.llm_api_key`, history bounds, and the
-gated tool set are documented in `../../librarian/README.md`.
+gated tool set are documented in [`deskkit-reference.md`](deskkit-reference.md).
 
 ## Health check — `verify.sh`
 
-`make verify` (or `bash verify.sh`, in `librarian/`) is the operator's end-to-end gate. It
+`make verify` (or `bash verify.sh`, from the repo root) is the operator's end-to-end gate. It
 builds the binary, seeds the spec's four fixtures into a throwaway scratch desk under its
 own scratch `XDG_DATA_HOME`, and drives the whole chain — sweep → patrol → propose-fix →
 apply-fix → restore — asserting the record-original-first boundary, byte-exact restore, and

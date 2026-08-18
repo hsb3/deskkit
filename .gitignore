@@ -9,11 +9,24 @@
 .env.*
 !.env.example
 
-# --- Go (librarian/) ---
-/librarian/librarian
-/librarian/dist/
+# --- Go (root module) ---
+# Built binary (root-anchored only — a bare "deskkit" would also ignore the cmd/deskkit/ source
+# directory). The pre-rename name stays ignored so stale binaries in existing checkouts don't
+# show up as untracked noise.
+/deskkit
+/pocket-librarian
+/dist/
 *.o
 *.test
+
+# Local operator-editable ignore boundary is auto-created under DESK_ROOT, not here, but guard
+# against a stray copy in the repo root.
+/.librarian-ignore
+
+# Makefile serve/stop runtime artifacts (old pidfile name kept for pre-rename checkouts).
+/.deskkit.pid
+/.pocket-librarian.pid
+/serve.log
 
 # --- PocketBase runtime store (never committed; the real store lives under $XDG_DATA_HOME) ---
 pb_data/
@@ -26,9 +39,9 @@ build/
 
 # --- SPA embed dir: the bare `dist/` rule above ignores it wholesale, which would also hide
 # the tracked .gitkeep that keeps go:embed compiling on a bare checkout — re-include just that ---
-!/librarian/internal/core/spa/dist/
-/librarian/internal/core/spa/dist/*
-!/librarian/internal/core/spa/dist/.gitkeep
+!/internal/core/spa/dist/
+/internal/core/spa/dist/*
+!/internal/core/spa/dist/.gitkeep
 
 # --- OS / editor litter ---
 .DS_Store

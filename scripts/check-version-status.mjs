@@ -6,7 +6,7 @@
 //
 // Logic: compare the root VERSION to the latest `v*` git tag.
 //   VERSION >  last tag  → a release is staged; nudge if its CHANGELOG section is still missing.
-//   VERSION == last tag  → warn if librarian/ changed since the tag (unreleased work).
+//   VERSION == last tag  → warn if the product tree changed since the tag (unreleased work).
 //   VERSION <  last tag  → warn (VERSION is behind the last tag — unexpected).
 // Degrades to a soft note when git history/tags aren't available (e.g. a shallow CI checkout).
 
@@ -79,10 +79,14 @@ if (c < 0) {
   process.exit(0);
 }
 
-// VERSION == last tag: any product change since the tag is unreleased work with no bump.
+// VERSION == last tag: any product change since the tag is unreleased work with no bump. The
+// product tree used to be entirely under librarian/; now the Go module sits at the repo root
+// alongside docs/scripts/etc, so the diff is scoped to the actual product paths instead of a
+// bare root diff (which would flag doc-only edits too).
+const PRODUCT_PATHS = ["cmd", "internal", "templates", "plugins", "schema", "web", "go.mod", "go.sum"];
 let changed = [];
 try {
-  const out = git(["diff", "--name-only", `${lastTag}..HEAD`, "--", "librarian"]);
+  const out = git(["diff", "--name-only", `${lastTag}..HEAD`, "--", ...PRODUCT_PATHS]);
   changed = out ? out.split("\n").filter(Boolean) : [];
 } catch {
   console.log(`version-status: (advisory) can't diff ${lastTag}..HEAD (shallow clone?) — skipping drift check.`);
@@ -92,7 +96,7 @@ try {
 if (changed.length === 0) {
   console.log(`version-status: OK — VERSION ${version} matches last tag ${lastTag}; no unreleased product changes.`);
 } else {
-  console.log(`version-status: ⚠ ${changed.length} file(s) under librarian/ changed since tag ${lastTag}, but VERSION is still ${version}.`);
+  console.log(`version-status: ⚠ ${changed.length} file(s) under the product tree (${PRODUCT_PATHS.join(", ")}) changed since tag ${lastTag}, but VERSION is still ${version}.`);
   console.log(`  → Unreleased user-facing work is accumulating. Bump VERSION + the shipped manifests and add a CHANGELOG entry before the next release.`);
   console.log(`  (advisory only — this never fails the build.)`);
 }

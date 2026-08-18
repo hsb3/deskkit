@@ -1,0 +1,10 @@
+{
+  "deskkit": {
+    "command": "deskkit",
+    "args": ["mcp-serve"],
+    "env": {
+      "PM_ENABLED": "true",
+      "MCP_MODULES": "profile,librarian,pm"
+    }
+  }
+}

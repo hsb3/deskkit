@@ -1,5 +1,9 @@
-# Build context only needs librarian/ + VERSION + the container files at repo root
-# (see Dockerfile). Everything else here is excluded to keep the context small.
+# Build context only needs cmd/ + internal/ + templates/ + web/ + VERSION + the container files
+# at repo root (see Dockerfile). Everything else here is excluded to keep the context small.
+#
+# Note on `*.md`: Docker ignore patterns do not cross `/`, so this excludes only repo-root
+# markdown (README.md, CLAUDE.md, ...). The `.md` files under templates/ are //go:embed sources
+# and MUST stay in the context — do not "fix" this to `**/*.md`.
 .git
 .github
 .claude
@@ -11,12 +15,20 @@ plugins
 schema
 scripts
 tests
+e2e
+sandbox
+examples
 logs
+# The host's node_modules must NOT enter the context: the webbuild stage runs `npm ci` (fetching
+# linux-musl binaries for rollup/esbuild) and then `COPY web/ ./`, which would otherwise overlay
+# the host's darwin binaries straight over them.
+web/node_modules
 *.md
 .DS_Store
 install.sh
+verify.sh
 lefthook.yml
 kits.yaml
-librarian/deskkit
-librarian/*.pid
-librarian/*.log
+/deskkit
+*.pid
+*.log

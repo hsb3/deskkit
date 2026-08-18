@@ -34,9 +34,9 @@ updates:
         patterns:
           - "*"
 
-  # Go (librarian lane) — go.mod lives under librarian/.
+  # Go (deskkit lane) — go.mod lives at the repo root.
   - package-ecosystem: "gomod"
-    directory: "/librarian"
+    directory: "/"
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 0

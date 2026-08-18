@@ -13,7 +13,7 @@
 //   2. Relative markdown links to a sibling or parent .md file — resolved against the citing file's dir.
 //
 // Scope: this gate enforces link integrity on the PUBLISHED + SHIPPED surface — docs/, the root
-// digests (README/CLAUDE/AGENTS), and the code tree (librarian/schema/plugins/scripts/kits).
+// digests (README/CLAUDE/AGENTS), and the code tree (cmd/internal/templates/schema/plugins/scripts/kits).
 // It deliberately skips the working desk (`_meta/`) and agent state (`.claude/`) — point-in-time
 // snapshots, in-flight drafts, and curated memory whose refs are provenance, not maintained
 // navigation — plus `CHANGELOG.md` (append-only) and test files (synthetic path fixtures). Keeping
@@ -37,7 +37,7 @@ const rel = (p) => relative(REPO_ROOT, p).split("\\").join("/");
 
 // Text files worth scanning for citations (prose, code comments, config, tapes).
 const SCAN_EXT = /\.(?:md|mdx|ts|tsx|js|mjs|cjs|go|sh|bash|json|ya?ml|tape|txt)$/i;
-const EXCLUDE_PREFIX = ["_meta/", ".claude/", "librarian/vendor/"];
+const EXCLUDE_PREFIX = ["_meta/", ".claude/", "vendor/"];
 const EXCLUDE_EXACT = new Set(["CHANGELOG.md"]);
 const EXCLUDE_FILE = /(?:_test\.go|\.test\.ts|\.spec\.ts|_test\.py|\.test\.js)$/;
 

@@ -27,7 +27,7 @@ configured from here.
 
 ## Project Overview
 
-**desk-standard is one binary and one plugin bundle over one shared schema**, all identity-neutral
+**deskkit is one binary and one plugin bundle over one shared schema**, all identity-neutral
 — nothing shipped carries a person, org, repo, or issue number. A desk is personalized by filling
 its `_knowledge/profile.yaml` (copied from the desk-setup scaffold's
 `_knowledge/profile.example.yaml`), never by editing a shipped skill, template, or tool. This repo
@@ -36,8 +36,9 @@ belongs to the desks the tools stand up.
 
 **Architecture — one runtime, one surface bundle, one contract:**
 
-- **`librarian/`** — **deskkit**, a single Go binary with an **embedded PocketBase** store, and the
-  entire runtime. Three modules feed one tool core:
+- **`cmd/deskkit` + `internal/`** — **deskkit**, a single Go binary with an **embedded PocketBase**
+  store, and the entire runtime. The Go module is the repo itself (`github.com/hsb3/deskkit`); there
+  is no container directory. Three modules feed one tool core:
   - **`profile`** (always on, pure-read, no collections) — desk personalization: `profile_get`,
     `profile_validate`, `template_render`, `knowledge_index`. Validates against a `go:embed`ed
     schema copy, including the `x-contract-version` gate (ADR 0009).
@@ -48,9 +49,9 @@ belongs to the desks the tools stand up.
   Surfaces over that one core: **CLI**, an **MCP server** (`deskkit mcp-serve`, narrowed by
   `MCP_MODULES`), a **chat TUI**, and a **browser SPA** at `/` on the embedded serve (chat, plus
   read-only browse of files/findings/agent runs/PM items; `/desk/chat` still resolves via the
-  SPA's index fallback). Admin console (`make -C librarian gui`) serves PocketBase at
+  SPA's index fallback). Admin console (`make gui`) serves PocketBase at
   `http://127.0.0.1:8090/_/`.
-- **`plugins/desk-persona/`** — the ONE Claude Code plugin this marketplace ships: the agent-facing
+- **`plugins/deskkit/`** — the ONE Claude Code plugin this marketplace ships: the agent-facing
   surface over that same binary. Seven skills (`desk-setup`, `conventions-standard`,
   `harvest-loop`, `brownfield-adoption`, `pm-session-open`, `pm-advance-item`, `pm-triage`), two
   agents (`librarian-operator`, `pm-operator`), a SessionStart briefing hook, and one `.mcp.json`
@@ -62,13 +63,22 @@ belongs to the desks the tools stand up.
 **Project structure** (every top-level entry annotated):
 
 ```
-librarian/         the deskkit binary — embedded PocketBase; profile/librarian/pm modules;
-                   CLI/MCP/TUI/web surfaces; verify.sh + e2e gates
+go.mod / go.sum    the ONE Go module, at the repo root: github.com/hsb3/deskkit
+cmd/deskkit/       the binary's main package — `go install github.com/hsb3/deskkit/cmd/deskkit@latest`
+internal/          the whole runtime: core/ (store, config, mcp, schema, spa embed) +
+                   modules/{profile,librarian,pm}
+templates/         canonical prompt/text sources (librarian-system-prompt.txt generates the
+                   librarian-operator agent) — inside the neutrality lint's scan scope
+verify.sh          the librarian integration gate (throwaway scratch desk) — `make verify`
+e2e/               end-to-end system-behaviour suite (throwaway desk, offline) — `make e2e`
+sandbox/           sandbox-exec wrappers for the supervised write path
+examples/          two manual walkthrough harnesses + their README; never in CI.
+                   pm-walkthrough.sh is free/offline; agent-loop.sh makes REAL billed LLM calls
 web/               the embedded SPA (Vite + Svelte + TypeScript + PocketBase JS SDK); `make build`
-                   builds it into librarian/internal/core/spa/dist/ via go:embed; never committed
+                   builds it into internal/core/spa/dist/ via go:embed; never committed
 plugins/           the marketplace-distributed bundle (a marketplace install copies ONLY this)
-  desk-persona/    the only bundle: 7 skills, librarian-operator + pm-operator agents,
-                   SessionStart hook, .mcp.json — authored in place, nothing generated
+  deskkit/         the only bundle: 7 skills, librarian-operator + pm-operator agents,
+                   SessionStart hook, .mcp.json — authored in place, one generated file
 schema/            schema v1 — the source of truth for the binary's embedded copies
 docs/              specs, the CHARTER, and using/developing guides (ADRs live on the board)
 scripts/           repo-wide gate scripts (*.mjs) + record-media.sh
@@ -83,19 +93,26 @@ VERSION            single source of truth for the release version (binary + bund
 
 ## The one rule that matters: identity-neutrality
 
-**Nothing under `librarian/`, `plugins/`, `kits/`, or `web/` may hardcode a deployment identity** — no
-person, org, repo name, or bare issue reference (`#123`). This is the product's core promise and
-the failure that rots worst: a hardcoded identity ships inside a distributed binary/plugin and
-can't be pulled back. It is enforced in CI, not by convention:
+**Nothing under `cmd/`, `internal/`, `templates/`, `e2e/`, `sandbox/`, `plugins/`, `kits/`, or `web/`
+may hardcode a deployment identity** — no person, org, repo name, or bare issue reference (`#123`).
+This is the product's core promise and the failure that rots worst: a hardcoded identity ships
+inside a distributed binary/plugin and can't be pulled back. It is enforced in CI, not by
+convention:
 
 ```
-# scope = librarian/ + plugins/ + kits/ + web/ recursively; docs/ and repo-root files are EXEMPT
+# scope = check-neutrality.mjs's SCAN_DIRS, recursively; docs/ and repo-root files are EXEMPT
 node scripts/check-neutrality.mjs            # scans the shipped tree — FAILS on any hardcoded identity
 node scripts/check-neutrality.mjs --self-test  # proves the scanner still detects a seeded violation
 ```
 
-The classic trip: a bare `#18`-style issue ref in a **Go comment or test** under `librarian/`
-fails the lint. Write issue-free comments there. In `docs/`, the spec's `#N` references are fine.
+The scan is directory-scoped, so repo-root files (`README.md`, `install.sh`, `verify.sh`,
+`go.mod`) are outside it — the module path `github.com/hsb3/deskkit` is
+additionally token-allowlisted in `schema/neutrality-lint.allow` because a Go module path is
+compile-time public API and cannot be templated.
+
+The classic trip: a bare `#18`-style issue ref in a **Go comment or test** under `internal/` or
+`cmd/` fails the lint. Write issue-free comments there. In `docs/`, the spec's `#N` references are
+fine.
 
 ## Commands
 
@@ -107,19 +124,24 @@ the exit code and has let a failing gate through before (incident, 2026-07-17).
 | `make help` | List all targets (default goal) |
 | `make setup` | `lefthook install` (git hooks) — there is no package-manager step |
 | `make build` | Build the SPA (`web/`, via npm) then the `deskkit` binary (version-stamped), embedding the SPA dist via `go:embed` |
-| `make test` | Fast unit tests: `go test ./...` in `librarian/` |
+| `make test` | Fast unit tests: `go test ./...` at the repo root |
 | `make check` | Repo gates: neutrality + self-test, kit-drift, scaffold frontmatter, persona drift, textfield-max, query-kind drift + self-test, doc-link integrity + self-test, shellcheck, actionlint, workflow SHA-pin drift + self-test, profile-root drift + self-test |
-| `make verify` | Librarian integration gate — `librarian/verify.sh` (throwaway scratch desk) |
-| `make e2e` | End-to-end system-behaviour suite — whole system (cold-start → profile → librarian → PM → surfaces → release-shaped) on a throwaway desk; offline, no LLM key (`librarian/e2e/e2e.sh`) |
+| `make verify` | Librarian integration gate — `verify.sh` (throwaway scratch desk) |
+| `make e2e` | End-to-end system-behaviour suite — whole system (cold-start → profile → librarian → PM → surfaces → release-shaped) on a throwaway desk; offline, no LLM key (`e2e/e2e.sh`) |
 | `make package` | Informational no-op — this target generates nothing; the bundle's one generated file is written by `node scripts/check-persona-drift.mjs --write` |
 | `make install` | Build + install the `deskkit` binary to `~/.local/bin` (override `PREFIX=`) |
 | `node scripts/check-version-sync.mjs` | Assert root `VERSION` matches the shipped manifests |
 | `make version-status` | Advisory (non-blocking): unreleased product changes since the last tag |
 | `make release-prep` | Pre-tag gate (see order below) |
 
-The librarian lane has its own `librarian/Makefile` (`make -C librarian build|test|fmt|sweep|patrol`; `fmt` is the gofmt gate, also run in CI);
-`apply-fix` is deliberately **not** a target — it's supervised-only, run by hand, and every fix is
-reversible with `deskkit restore --by-path <path>`.
+There is ONE Makefile, at the repo root — the old per-lane Makefile was folded into it, so
+its targets are now plain root targets: `make build|test|vet|fmt|spa|serve|stop|gui|sweep|patrol|
+propose-fix|findings|summary|adoption|orphans|uncollapsed|clean|example-agent-loop` (`fmt` is the
+gofmt gate, also run in CI). `apply-fix` is deliberately **not** a target — it's supervised-only,
+run by hand, and every fix is reversible with `deskkit restore --by-path <path>`.
+`make example-agent-loop` runs `examples/agent-loop.sh`, which makes REAL billed LLM calls and is
+never part of CI; its free, offline sibling `examples/pm-walkthrough.sh` has no target — run it
+directly. See `examples/README.md`.
 
 The table above is `make` targets; `deskkit desks` and `deskkit config show|path|edit|set` are
 plain binary subcommands (no store opened) — see "Configuration resolution" below for what they
@@ -131,19 +153,20 @@ list.
 ### Generated and copied artifacts — edit the source, not the copy
 
 **The marketplace bundle is authored in place with one exception:
-`plugins/desk-persona/agents/librarian-operator.md` is GENERATED** (it says so in a marker at its
+`plugins/deskkit/agents/librarian-operator.md` is GENERATED** (it says so in a marker at its
 top — never hand-edit it). `make package` generates nothing and only says so. What needs care is
 the handful of files that are *derived from a canonical source*:
 
 | File | Source of truth | Guard |
 |---|---|---|
-| `plugins/desk-persona/agents/librarian-operator.md` | `librarian/templates/librarian-system-prompt.txt` — regenerate with `node scripts/check-persona-drift.mjs --write` | `node scripts/check-persona-drift.mjs` (`make check`) |
-| `librarian/internal/core/schema/profile.schema.yaml` | `schema/profile.schema.yaml` — `go:embed` can't reach outside the Go module, so the binary carries a copy | `TestProfileSchemaEmbeddedCopy_MatchesRepoRoot` (`make test`) |
-| `librarian/internal/core/schema/references.yaml` | `schema/references.yaml` — same reason | `TestReferencesEmbeddedCopy_MatchesRepoRoot` (`make test`) |
+| `plugins/deskkit/agents/librarian-operator.md` | `templates/librarian-system-prompt.txt` — regenerate with `node scripts/check-persona-drift.mjs --write` | `node scripts/check-persona-drift.mjs` (`make check`) |
+| `internal/core/schema/profile.schema.yaml` | `schema/profile.schema.yaml` — `go:embed` can't reach outside the Go module, so the binary carries a copy | `TestProfileSchemaEmbeddedCopy_MatchesRepoRoot` (`make test`) |
+| `internal/core/schema/references.yaml` | `schema/references.yaml` — same reason | `TestReferencesEmbeddedCopy_MatchesRepoRoot` (`make test`) |
 | `kits/` tree | authored, but `kits.yaml` must match it | `node scripts/check-kits.mjs` |
 
-Edit the repo-root `schema/` file first, then re-copy it into `librarian/internal/core/schema/`;
-the guards are byte-for-byte and fail loudly on a one-sided edit.
+Edit the repo-root `schema/` file first, then re-copy it into `internal/core/schema/`;
+the guards are byte-for-byte and fail loudly on a one-sided edit. (The `go:embed`-can't-reach-out
+constraint survives the module move: `schema/` is a sibling of `internal/`, not a child of it.)
 
 ### Architectural rules and their enforcing checks
 
@@ -153,17 +176,17 @@ the guards are byte-for-byte and fail loudly on a one-sided edit.
 | Embedded schema copies stay byte-identical to `schema/` | `TestProfileSchemaEmbeddedCopy_MatchesRepoRoot` / `TestReferencesEmbeddedCopy_MatchesRepoRoot` (`make test`) |
 | `VERSION` == shipped manifests | `scripts/check-version-sync.mjs` |
 | `kits.yaml` == `kits/` tree | `scripts/check-kits.mjs` |
-| `docs/development/specs/tool-surface.md` counts (CLI + gated MCP) match source (ADR 0016) | `TestToolSurfaceDoc_*` in `librarian/internal/core/mcp/tool_surface_doc_test.go` (`make test`) |
+| `docs/development/specs/tool-surface.md` counts (CLI + gated MCP) match source (ADR 0016) | `TestToolSurfaceDoc_*` in `internal/core/mcp/tool_surface_doc_test.go` (`make test`) |
 | Scaffold instruments carry conformant frontmatter | `scripts/check-scaffold-frontmatter.mjs` |
 | Persona `librarian-operator` agent stays generated from the librarian prompt (ADR 0014/0015); PM surfaces are authored-in-place post-fold | `scripts/check-persona-drift.mjs` |
-| The shipped bundle's authored artifacts (`.mcp.json` modules, agent `tools:`, skill tool refs, inventory) name only real modules/tools | `TestBundle*` in `librarian/internal/core/mcp/bundle_shape_test.go` (`make test`) |
+| The shipped bundle's authored artifacts (`.mcp.json` modules, agent `tools:`, skill tool refs, inventory) name only real modules/tools | `TestBundle*` in `internal/core/mcp/bundle_shape_test.go` (`make test`) |
 | Content TextFields carry an explicit Max (ADR 0017) | `scripts/check-textfield-max.mjs` (+ `--self-test`) |
 | Spec query-kind list == CLI/MCP registry (types.go ↔ spec §5.6 ↔ query.go switch) | `scripts/check-query-kinds.mjs` (+ `--self-test`) |
-| Librarian Go tree stays gofmt-clean | `gofmt -l` via `make -C librarian fmt` (CI librarian lane) |
+| Go tree stays gofmt-clean | `gofmt -l` via `make fmt` (CI go lane) |
 | A tagged release has a CHANGELOG section | `scripts/check-changelog.mjs` (release gate) |
 | Every workflow `uses:` stays SHA-pinned (no mutable `@vN` tag) | `scripts/check-workflow-pins.mjs` (+ `--self-test`) |
 | Profile root (`_knowledge`) pinned identically in `schema/paths.yaml` and the Go constant | `scripts/check-profile-root.mjs` (+ `--self-test`) |
-| Shell entry points stay lint-clean (install.sh, verify.sh, dogfood-*.sh, sandbox/*, record-media, e2e/*) | `shellcheck` (CI + `make check`) |
+| Shell entry points stay lint-clean (install.sh, docker-entrypoint.sh, verify.sh, examples/*, sandbox/*, record-media, docker-smoke, e2e/*) | `shellcheck` via `make shellcheck` (CI + `make check`) |
 | Every cited doc/media path on the published+shipped surface resolves (no dangling links; incident 2026-07-24) | `scripts/check-doc-links.mjs` (+ `--self-test`) |
 
 ### Order-sensitive chains
@@ -174,7 +197,7 @@ the guards are byte-for-byte and fail loudly on a one-sided edit.
 3. `make check` then `make test` (the expensive lanes last)
 4. prints the tag/push commands — it never auto-tags.
 
-**PocketBase bootstraps before cobra** (librarian): `Execute()` calls `Bootstrap()` — which
+**PocketBase bootstraps before cobra**: `Execute()` calls `Bootstrap()` — which
 **creates the data dir** — before `RootCmd.Execute()` dispatches any `RunE`/`PreRunE`. Anything that
 must *prevent* store creation has to run in `main()` before the app starts (the argv-scan location
 guard and `init` do exactly this). Fail-closed behavior in `serve` paths needs a direct
@@ -183,7 +206,7 @@ guard and `init` do exactly this). Fail-closed behavior in `serve` paths needs a
 ## Configuration resolution
 
 Every resolved field wins on one of four legs, in this order: **env > per-desk
-`_knowledge/profile.*` > central config > built-in default** (`librarian/internal/core/config/config.go`).
+`_knowledge/profile.*` > central config > built-in default** (`internal/core/config/config.go`).
 The central leg is `$XDG_CONFIG_HOME/deskkit/config.yaml` (falling back to `~/.config/deskkit/config.yaml`),
 a machine-wide file created 0600 in a 0700 dir via `deskkit config set/edit`. Only three fields
 read it: `LLM_PROVIDER` (`llm.provider`), `LLM_MODEL` (`llm.model`), and `DESK_NAME`
@@ -227,7 +250,8 @@ token-mint route unregistered entirely (the SPA shows a login form instead), ser
 SPA shell without auth (shell loads, data doesn't — the admin-console stance),
 and switches the CSRF check to strict same-origin; CORS drops the framework's default wildcard
 unless an explicit `--origins` allowlist is set, in which case that allowlist is preserved (see
-`librarian/README.md`'s "Browser session" section and `docs/pattern.md` for the full model).
+`docs/usage/deskkit-reference.md`'s "Browser session" section and `docs/pattern.md` for the full
+model).
 
 `deskkit desks` lists the desks this machine has a store for (marking which one the cwd
 resolves to); `deskkit config show|path|edit|set` inspects/edits the central file above. Neither
@@ -237,11 +261,11 @@ Inspect, Fix, Work graph, Agent, Admin) rather than one alphabetic list.
 ### No in-repo dogfooding (ruled 2026-07-22, "no dogfood")
 
 This repo does not register its own MCP servers on itself — there is no root `.mcp.json` and
-none should be added. The tools this repo builds (the `deskkit` binary and the `desk-persona`
-plugin) are for coordinating *other* desks; that standard doesn't apply reflexively to the repo
-that builds it, and the coordination tooling must live outside it — on a desk built to operate on
-this repo, e.g. the paired executive desk (DESK-21 §0). In-repo verification instead
-runs through `make verify` (`librarian/verify.sh`, a throwaway scratch desk) and `make e2e`, both
+none should be added. The tools this repo builds (the `deskkit` binary and the `deskkit`
+plugin bundle) are for coordinating *other* desks; that standard doesn't apply reflexively to the
+repo that builds it, and the coordination tooling must live outside it — on a desk built to operate
+on this repo, e.g. the paired executive desk (DESK-21 §0). In-repo verification instead
+runs through `make verify` (`verify.sh`, a throwaway scratch desk) and `make e2e`, both
 of which stand up disposable desks rather than pointing the binary at this repo's own tree.
 `deskkit apply-fix` / `restore` stay `ask`-gated in `.claude/settings.json` regardless, matching
 the librarian's supervised-write boundary wherever it runs.

@@ -3,7 +3,7 @@
 #
 # The tapes are the source of truth; the GIFs are generated artifacts (never hand-edited —
 # re-run this script to regenerate them after any tape edit). This script is fully
-# self-contained: it builds the librarian, seeds a handful of throwaway scratch desks (one per
+# self-contained: it builds the deskkit binary, seeds a handful of throwaway scratch desks (one per
 # tape, isolated from each other so no tape's writes can bleed into another's demo), points
 # EVERY store-touching invocation at a scratch XDG_DATA_HOME + HOME so nothing can ever touch
 # the operator's real ~/.local/share/deskkit, pre-runs whatever setup each tape's demo
@@ -15,8 +15,7 @@ set -euo pipefail
 #TODO: update to output gifs to docs/assets/
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-LIB_DIR="$REPO_ROOT/librarian"
-BIN="$LIB_DIR/deskkit"
+BIN="$REPO_ROOT/deskkit"
 MEDIA_DIR="$REPO_ROOT/docs/assets"
 
 log() { printf 'record-media: %s\n' "$1"; }
@@ -25,7 +24,7 @@ command -v vhs >/dev/null 2>&1 || { echo "record-media: vhs not found on PATH (b
 command -v ttyd >/dev/null 2>&1 || { echo "record-media: ttyd not found on PATH (brew install ttyd)" >&2; exit 1; }
 
 log "building deskkit..."
-make -C "$LIB_DIR" build
+make -C "$REPO_ROOT" build
 
 # --- scratch setup ---------------------------------------------------------------------------
 # A fixed /tmp base (NOT ${TMPDIR:-/tmp}): the GIFs are committed, baked artifacts, and this
@@ -50,7 +49,7 @@ mkdir -p "$XDG_DATA_HOME"
 
 # deskkit on $PATH as a bare command — both for `Require deskkit` (checked by
 # vhs itself before it opens a shell) and so no tape needs to know the repo's on-disk layout.
-export PATH="$LIB_DIR:$PATH"
+export PATH="$REPO_ROOT:$PATH"
 
 seed_decision() { # seed_decision <path>
   mkdir -p "$(dirname "$1")"

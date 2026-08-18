@@ -30,7 +30,7 @@ Both are faces of **one Go tool core** (`internal/core/toolcore`), fed by the re
 
 ## 1. Librarian CLI subcommands (`deskkit`)
 
-Registered in `librarian/cmd/deskkit/main.go` (`registerToolCommands`, plus `finalizeCommandTree`
+Registered in `cmd/deskkit/main.go` (`registerToolCommands`, plus `finalizeCommandTree`
 for the PocketBase system commands and `migratecmd` for `migrate`). The CLI is the **only** surface
 that carries `restore` and the supervised `apply-fix`/`findings dispose` actions. `--help` renders
 them in labelled groups (Setup & config / Inspect / Fix / Work graph / Agent / Admin) rather than
@@ -67,7 +67,7 @@ Verify live: `deskkit --help` (the `pm` group shows by default; add `PM_ENABLED=
 
 Model-facing, so it uses the **§5.4 registration-time gate** (`internal/core/mcp/server.go` →
 `toolcore.ExposedTools(cfg)`); the per-tool gate flags live in
-`librarian/internal/modules/librarian/tools/specs.go` (`AgentDefault` / `AgentGated`). The gate has
+`internal/modules/librarian/tools/specs.go` (`AgentDefault` / `AgentGated`). The gate has
 two independent switches, so there are four combinations:
 
 | Environment | Tool count | Tools |
@@ -88,7 +88,7 @@ fresh desk's live MCP surface is the `PM_ENABLED=true` row (**21**, or **22** wi
 `LIBRARIAN_AUTONOMOUS_WRITES`) unless the desk opts out with `PM_ENABLED=false` (**9** / **10**).
 
 The 12 PM tools (present whenever the PM module is enabled — the default; from the PM module's
-specs under `librarian/internal/modules/pm/`):
+specs under `internal/modules/pm/`):
 
 | Tool | Writes | Notes |
 |---|---|---|
@@ -104,10 +104,10 @@ specs under `librarian/internal/modules/pm/`):
 | `claim_item` / `release_item` | yes | carry the optional actor fields below |
 
 Every write tool's input carries optional `actor` / `actor_kind` / `delegation_parent` fields
-(`librarian/internal/modules/pm/tools/types.go` `ActorFields`), recorded verbatim on the audit
+(`internal/modules/pm/tools/types.go` `ActorFields`), recorded verbatim on the audit
 row (pm-system-v1-spec.md §3.6); unset, they default to actor `"agent"`, kind `"agent"` — the
 model-facing surfaces are agent-driven by default. The CLI instead defaults its persistent
-`--actor` flag to `$USER` (else `"operator"`), kind `human` (`librarian/cmd/deskkit/pm.go`).
+`--actor` flag to `$USER` (else `"operator"`), kind `human` (`cmd/deskkit/pm.go`).
 
 **Gate rules that make the count differ from the CLI:**
 
@@ -164,7 +164,7 @@ The mount signal names the gated set, so the axis is legible in the host's log:
 
 The `profile` module reads a desk's personalization surfaces — the `_knowledge/profile.*` profile
 and the `_knowledge/` background folder — and contributes four **read-only** tools
-(`librarian/internal/modules/profile/tools/specs.go`). They are the Go home of the tool family
+(`internal/modules/profile/tools/specs.go`). They are the Go home of the tool family
 that previously ran as a separate TypeScript stdio server, so one binary now carries the
 whole surface.
 
@@ -256,13 +256,13 @@ name) on a resolved desk and the process **exits 1** with an actionable stderr l
 fail-loud contract rather than a silent fallback.
 
 > **Drift-guard note.** Every count above is **enforced, not just documented**. The ADR-0016 guard
-> lives in `librarian/internal/core/mcp/tool_surface_doc_test.go` on the `go test ./...` (`make
+> lives in `internal/core/mcp/tool_surface_doc_test.go` on the `go test ./...` (`make
 > test`) lane: it parses the tables in this doc and re-derives each number from source.
 > `TestToolSurfaceDoc_MCPCounts` covers the MCP counts against the real `toolcore` gate over the
 > registered `profile` + `librarian` + `pm` specs — the live totals (9 / 10 / 21 / 22) and both
 > gated mounts (`MCP_MODULES=pm` → 12, `MCP_MODULES=profile` → 4), the mounts by tool NAME as well
 > as count so a tool changing modules is caught. `TestToolSurfaceDoc_CLICount` covers the CLI base
-> count against the command registrations in `librarian/cmd/deskkit/main.go`.
+> count against the command registrations in `cmd/deskkit/main.go`.
 
 **Librarian CLI (surface 1)** — `deskkit --help` (and again with `PM_ENABLED=true`).
 

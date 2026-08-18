@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: 688b2df2-944b-44e6-95d9-abe6d3e20436
-  modified: 2026-08-18T09:51:51.319Z
+  modified: 2026-08-18T13:48:39.160Z
 ---
 
 Early user feedback (2026-07-23) was "the plugin is super-confusing — why two plugins and two MCP
@@ -13,7 +13,7 @@ servers? just make it one." Henry ruled two design decisions in response:
 
 1. **Consolidation target = "everything on deskkit."** Move the 4 TS profile tools (`profile_get`,
    `profile_validate`, `template_render`, `knowledge_index`) INTO the Go binary; retire the TS MCP
-   server (`plugin/mcp/server.ts` → `plugins/desk-standard/mcp/server.js`); ship ONE plugin with ONE
+   server (the `plugin/mcp/server.ts` → bundled-`server.js` lane, both since deleted); ship ONE plugin with ONE
    MCP server (`deskkit mcp-serve`, `MCP_MODULES=profile,librarian,pm`). This **reverses ADR 0016**
    (which chose to keep TS pure and reach librarian via a designed proxy) and **withdraws**
    `docs/development/ts-proxy-design.md` → needs a superseding ADR. Rationale: the Go binary is
@@ -30,7 +30,8 @@ servers? just make it one." Henry ruled two design decisions in response:
 **Why:** owner architecture ruling — record so it survives a clear and isn't re-litigated.
 
 **How to apply:** BOTH halves are now SHIPPED (2026-08-18): the collapse landed as PR #240
-(DESK-48 — profile tools in Go, one bundle at `plugins/desk-persona/`, `plugin/` deleted) and the
+(DESK-48 — profile tools in Go, one bundle, `plugin/` deleted; that bundle was renamed to
+`plugins/deskkit/` by DESK-56/ADR-on-DESK-64) and the
 central config as PR #241 (DESK-50 — `$XDG_CONFIG_HOME/deskkit/config.yaml`, 0600, precedence as
 ruled). The superseding ADR is **0022 (Accepted 2026-07-23)**, on the board as **DESK-43**. Do not
 re-open the two-plugin/ts-proxy architecture, and do not treat `plugin/` paths in older docs/memory

@@ -51,7 +51,7 @@ body:
       label: Dependencies & gates
       description: >-
         What this blocks on, and which repo gates fire for this change surface (CI:
-        neutrality lint, plugin bun test/build, librarian go build/vet/test). Be
+        neutrality lint, plugin bun test/build, go build/vet/test). Be
         explicit about gates that do NOT fire.
       value: |
         -

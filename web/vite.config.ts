@@ -8,7 +8,7 @@ export default defineConfig({
   build: {
     // emptyOutDir stays off so the tracked dist/.gitkeep survives; the Makefile's
     // spa target owns cleanup of stale build outputs.
-    outDir: '../librarian/internal/core/spa/dist',
+    outDir: '../internal/core/spa/dist',
     emptyOutDir: false,
   },
   server: {

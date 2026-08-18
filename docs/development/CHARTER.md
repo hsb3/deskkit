@@ -1,4 +1,4 @@
-_The canonical page for desk-standard: what it is, what it governs, and the direction settled
+_The canonical page for deskkit: what it is, what it governs, and the direction settled
 for 1.0.0._
 Status: active (2026-07-19)
 
@@ -14,7 +14,7 @@ Status: active (2026-07-19)
 that ships carries a person, org, repo, or issue number — identity is injected at use time, never
 baked in.
 
-- **`librarian/`** — **deskkit**, a single Go binary (embedded PocketBase) and the whole runtime.
+- **deskkit** — a single Go binary (embedded PocketBase) and the whole runtime.
   It indexes a desk, flags convention violations, and proposes/applies fixes under a
   record-original-first boundary (every applied fix is byte-exact reversible via `restore`). Three
   tool modules feed one tool core: **`profile`** (desk personalization — profile resolution,
@@ -22,7 +22,7 @@ baked in.
   sweep/patrol/fix loop), and **`pm`** (a document-gated work graph). Surfaces: CLI, MCP server,
   chat TUI, and a browser session page. (Named `pocket-librarian` through v0.6.0; renamed
   **deskkit** in v0.7.0 — the binary is `deskkit`.)
-- **`plugins/desk-persona/`** — the one Claude Code plugin this marketplace ships: the agent-facing
+- **`plugins/deskkit/`** — the one Claude Code plugin this marketplace ships: the agent-facing
   surface over that same binary. Skills, the `librarian-operator` and `pm-operator` agents, a
   SessionStart briefing hook, and one `.mcp.json` mounting `deskkit mcp-serve`. It is a surface,
   not a second engine — it carries no runtime of its own.
@@ -38,7 +38,8 @@ personalization tools moved into the binary as the `profile` module (reverses AD
 ## What this governs
 
 - **Identity-neutrality is a hard invariant**, enforced in CI by the neutrality lint over the
-  shipped tree (`librarian/`, `plugins/`, `kits/`). Shipped code names no deployment identity.
+  shipped tree (`cmd/`, `internal/`, `templates/`, `web/`, `plugins/`, `kits/`). Shipped code names
+  no deployment identity.
   (`docs/` and repo-root files are exempt and may cite issues/identity freely.)
 - **One version, one repo.** Everything ships under the single root `VERSION`; a release tags
   that one version (SemVer policy: ADR 0005 (DESK-27)).

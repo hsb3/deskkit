@@ -1,4 +1,4 @@
-_The documentation index for desk-standard, split into two tracks: **Using** (run a desk) and
+_The documentation index for deskkit, split into two tracks: **Using** (run a desk) and
 **Developing** (build the tools). The front door is the root [`README.md`](../README.md); the
 canonical direction is [`development/CHARTER.md`](development/CHARTER.md) (it wins any conflict)._
 Status: active
@@ -7,10 +7,11 @@ Status: active
 
 ## Using — run a desk
 
-- [`usage/getting-started.md`](usage/getting-started.md) — install, fill your profile, build the librarian, first sweep + patrol.
+- [`usage/getting-started.md`](usage/getting-started.md) — install, fill your profile, build the deskkit binary, first sweep + patrol.
 - [`usage/plugin-guide.md`](usage/plugin-guide.md) — the desk-shaping skills as user journeys: when to reach for each, what you get.
 - [`usage/librarian-guide.md`](usage/librarian-guide.md) — the daily loop: sweep → patrol → fix → byte-exact restore.
-- [`usage/pm-guide.md`](usage/pm-guide.md) — the PM work graph: enable it, the phase machine + gates, and the CLI / MCP / TUI / `desk-persona` surfaces.
+- [`usage/deskkit-reference.md`](usage/deskkit-reference.md) — the operator/runtime reference for the binary: quick start, store location, machine-wide config, the LLM/API key, chat, the browser session, MCP, and the supervised write path.
+- [`usage/pm-guide.md`](usage/pm-guide.md) — the PM work graph: enable it, the phase machine + gates, and the CLI / MCP / TUI / `deskkit` plugin surfaces.
 
 ## Developing — build the tools
 

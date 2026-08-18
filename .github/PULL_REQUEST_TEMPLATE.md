@@ -12,7 +12,7 @@
 
 <!-- How you verified. The repo's gates are the CI workflow's steps (.github/workflows/ci.yml). -->
 
-- [ ] the CI gate set passes locally (neutrality lint `node scripts/check-neutrality.mjs` + plugin `bun test`/`bun run build` + librarian `go build ./...`/`go vet ./...`/`go test ./...`)
+- [ ] the CI gate set passes locally (neutrality lint `node scripts/check-neutrality.mjs` + plugin `bun test`/`bun run build` + `go build ./...`/`go vet ./...`/`go test ./...`)
 - [ ] New/changed behavior covered by a test, or why not stated in Notes
 
 ## Notes

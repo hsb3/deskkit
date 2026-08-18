@@ -1,0 +1,37 @@
+// Bubble Tea messages that carry the streaming engine's events onto the model's single
+// goroutine. The engine (agent.Session.StreamTurn) runs the ReAct loop on its own goroutines
+// and pushes agent.Event values down a channel; pump.go turns each received value into one of
+// these messages, so every mutation of the model happens inside Update — race-free by
+// construction (the plan's "all model mutation on the bubbletea goroutine" invariant).
+package tui
+
+import "github.com/hsb3/deskkit/internal/modules/librarian/agent"
+
+// eventMsg wraps one live engine event (token, tool_start, tool_end, final, or error). The
+// terminal event (final|error) arrives as an eventMsg too; the channel-closed signal that
+// follows it is delivered separately as turnDoneMsg.
+type eventMsg struct {
+	ev agent.Event
+}
+
+// turnDoneMsg signals that the engine channel has closed — the turn is fully over and no
+// further events will arrive. It is the single place the model flips streaming off and
+// re-enables input, so it is emitted exactly once per turn (when <-ch reports !ok).
+type turnDoneMsg struct{}
+
+// toastExpireMsg clears the transient footer toast (a copy confirmation or error) after its
+// display window elapses. seq stamps the toast that scheduled it: a later toast bumps the model's
+// sequence, so a stale expiry for a superseded toast is ignored and never clears a newer one.
+type toastExpireMsg struct {
+	seq int
+}
+
+// editorFinishedMsg is delivered when the external editor spawned for the compose-in-$EDITOR hatch
+// exits (the callback of the tea.ExecProcess that ran it). path is the temp file the draft was
+// written to; err carries any failure spawning or running the editor. Update reads the composed
+// text back into the textarea on success, reports a toast on failure, and ALWAYS removes the temp
+// file — so the msg is the single place the round-trip is finalized on Bubble Tea's goroutine.
+type editorFinishedMsg struct {
+	path string
+	err  error
+}

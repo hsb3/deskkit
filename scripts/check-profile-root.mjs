@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Profile-root drift guard. The single personalization-root directory name lives in exactly one
 // canonical place — schema/paths.yaml's `profile_root` — and the product lane pins a constant to
-// that value (librarian config.ProfileRootDir). Nothing otherwise stops that constant drifting
+// that value (config.ProfileRootDir). Nothing otherwise stops that constant drifting
 // from the canonical value, which would silently split the shipped binary off the schema's root.
 // This asserts the two are byte-identical, so a rename is a one-definition change here plus the
 // constant. Runs under plain Node (no deps), like the other scripts/ guards.
@@ -20,7 +20,7 @@ const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 
 // Source of the canonical value and the lane's pinned constant (repo-relative labels for output).
 const CANONICAL_PATH = "schema/paths.yaml";
-const GO_PATH = "librarian/internal/core/config/profile.go";
+const GO_PATH = "internal/core/config/profile.go";
 
 // Extraction regexes. Canonical: an anchored `profile_root:` line (the `^` skips the commented
 // mention of the same key), optional quotes, value stops at whitespace/quote/`#`. Go: a

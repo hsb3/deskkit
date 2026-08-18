@@ -1,10 +1,10 @@
 <!-- Status header: one-line purpose + status, per house convention -->
-_Schema v1 — the single shared schema `plugin/` and `librarian/` both consume._
+_Schema v1 — the single shared schema the plugin bundle and the deskkit binary both consume._
 Status: active
 
 # schema/
 
-**What schema v1 is.** One shared, product-neutral schema both the desk-standard plugin
+**What schema v1 is.** One shared, product-neutral schema both the `deskkit` plugin bundle
 and the deskkit binary read as their single rule/structure source
 (`_meta/build-brief.md` §3.3(a); `_structure/decisions/0013` item 8). It is the seed of
 a single estate-wide schema (`0013` item 4).

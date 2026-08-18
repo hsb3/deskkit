@@ -12,7 +12,7 @@ The **PM module** is one of `deskkit`'s three tool modules, alongside `profile` 
 It is a document-gated work graph: work items move through a rigid phase machine, and a phase
 advance is **refused until the document that phase requires exists and validates** against schema
 v1. One binary, one per-desk store, three surfaces (CLI, MCP, TUI) over one engine — plus the
-Claude Code plugin (`desk-persona`).
+Claude Code plugin (`deskkit`).
 
 Design and rationale: `../development/specs/pm-system-v1-spec.md` and
 ADR 0008 (DESK-30).
@@ -207,7 +207,7 @@ recorded verbatim on the audit trail (§3.6 of the spec); left unset they defaul
 — the item's long-form narrative, acceptance criteria, or spec, stored inline; `get_item` returns
 it (the `list_items` summary shape omits it).
 
-Wire it into a Claude Code project (or use the `desk-persona` plugin, below):
+Wire it into a Claude Code project (or use the `deskkit` plugin, below):
 
 ```json
 {
@@ -241,16 +241,16 @@ inventing their own sentinel.
 deskkit pm update <id> --body ""  # clears body
 ```
 
-## The `desk-persona` plugin
+## The `deskkit` plugin
 
-The composed `desk-persona` Claude Code plugin (shared marketplace) turns the graph into an
+The composed `deskkit` Claude Code plugin (shared marketplace) turns the graph into an
 agent-facing layer over the PM MCP tools: session-open briefing, advance-an-item, and triage
 skills; a `pm-operator` agent that runs the graph over the twelve tools but never authors gate
 documents or writes a repo; and a `SessionStart` hook that injects `deskkit pm context` at session
 start (silent no-op when PM is off or `deskkit` is absent). It mounts these alongside the profile
 and librarian surfaces on one MCP server (`MCP_MODULES=profile,librarian,pm`). The data and runtime
 stay in the one binary — the plugin is the surface, not a second store. Details:
-`../../plugins/desk-persona/README.md`.
+`../../plugins/deskkit/README.md`.
 
 ## Adopting the PM graph on a real desk
 

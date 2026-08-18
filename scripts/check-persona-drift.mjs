@@ -1,10 +1,10 @@
 #!/usr/bin/env node
-// Persona drift guard (ADR 0014(a) + ADR 0015). The composed `desk-persona` bundle's
+// Persona drift guard (ADR 0014(a) + ADR 0015). The composed `deskkit` bundle's
 // librarian-operator agent is a GENERATED artifact: its persona body is a version-controlled copy
 // of exactly one authored source, so it cannot silently diverge from that source. This guard is
 // the repo's generated-artifact pattern (regenerate + compare) applied to that agent:
 //
-//   plugins/desk-persona/agents/librarian-operator.md   ← librarian/templates/librarian-system-prompt.txt
+//   plugins/deskkit/agents/librarian-operator.md   ← templates/librarian-system-prompt.txt
 //                                                          (the canonical librarian instruction; ADR 0015)
 //
 // The librarian agent is derived from the corrected 5-tool eino system prompt: its `tools:`
@@ -12,14 +12,14 @@
 // added to / removed from the canonical prompt changes the persona and trips this guard.
 //
 // The bundle's PM surfaces — pm-operator + the three pm-* skills — are NOT generated. When the
-// standalone `desk-pm` plugin was folded into desk-persona and retired (owner ruling 2026-07-21,
-// ADR 0014(a) one-bundle), those files stopped being copies of an upstream desk-pm source and
-// became the ONE authored PM source per surface themselves (ADR 0014(d)). With no second copy to
-// diverge from, a copy/compare guard for them would guard nothing; they are authored-in-place in
-// plugins/desk-persona/, alongside the bundle's other authored artifacts (.mcp.json, plugin.json,
-// hooks/, README.md). What holds those authored surfaces to the REAL tool surface (no phantom
-// tool names, no module silently dropped from the mount) is a separate guard on the go-test lane:
-// librarian/internal/core/mcp/bundle_shape_test.go.
+// standalone `desk-pm` plugin was folded into the one bundle (now `deskkit`) and retired (owner
+// ruling 2026-07-21, ADR 0014(a) one-bundle), those files stopped being copies of an upstream
+// desk-pm source and became the ONE authored PM source per surface themselves (ADR 0014(d)). With
+// no second copy to diverge from, a copy/compare guard for them would guard nothing; they are
+// authored-in-place in plugins/deskkit/, alongside the bundle's other authored artifacts
+// (.mcp.json, plugin.json, hooks/, README.md). What holds those authored surfaces to the REAL
+// tool surface (no phantom tool names, no module silently dropped from the mount) is a separate
+// guard on the go-test lane: internal/core/mcp/bundle_shape_test.go.
 //
 // Usage (plain Node, no deps — like the other scripts/ guards):
 //   node scripts/check-persona-drift.mjs           compare on-disk vs regenerated; exit 1 on drift
@@ -35,7 +35,7 @@ import { fileURLToPath } from "node:url";
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const r = (p) => readFileSync(join(REPO_ROOT, p), "utf8");
 
-const LIBRARIAN_PROMPT = "librarian/templates/librarian-system-prompt.txt";
+const LIBRARIAN_PROMPT = "templates/librarian-system-prompt.txt";
 
 // Parse the ordered tool list out of the canonical librarian prompt's "You have these tools:"
 // block — the list whose membership the frontmatter must track.
@@ -59,7 +59,7 @@ function librarianToolNames(prompt) {
 function buildLibrarianAgent() {
   const prompt = r(LIBRARIAN_PROMPT).replace(/\s+$/, "");
   const tools = librarianToolNames(prompt);
-  const toolLines = ["Read", ...tools.map((t) => `mcp__desk-persona__${t}`)]
+  const toolLines = ["Read", ...tools.map((t) => `mcp__deskkit__${t}`)]
     .map((t) => `  - ${t}`)
     .join("\n");
   const frontmatter = [
@@ -80,7 +80,7 @@ function buildLibrarianAgent() {
   ].join("\n");
   const header = [
     "<!-- GENERATED — do not hand-edit. This persona body is a version-controlled copy of the",
-    "     canonical librarian instruction (librarian/templates/librarian-system-prompt.txt, ADR 0015).",
+    "     canonical librarian instruction (templates/librarian-system-prompt.txt, ADR 0015).",
     "     Regenerate with:  node scripts/check-persona-drift.mjs --write",
     "     Drift is guarded by scripts/check-persona-drift.mjs (wired into `make check`). -->",
   ].join("\n");
@@ -90,7 +90,7 @@ function buildLibrarianAgent() {
 // The derived-file manifest: each target and how to (re)build its expected content from source.
 const DERIVED = [
   {
-    target: "plugins/desk-persona/agents/librarian-operator.md",
+    target: "plugins/deskkit/agents/librarian-operator.md",
     build: buildLibrarianAgent,
   },
 ];
@@ -103,7 +103,7 @@ if (write) {
     mkdirSync(dirname(abs), { recursive: true });
     writeFileSync(abs, build());
   }
-  console.log(`persona-drift: wrote ${DERIVED.length} generated file(s) under plugins/desk-persona/.`);
+  console.log(`persona-drift: wrote ${DERIVED.length} generated file(s) under plugins/deskkit/.`);
   process.exit(0);
 }
 
@@ -122,10 +122,10 @@ if (drifted.length > 0) {
   );
   for (const d of drifted) console.error(`  ${d}`);
   console.error(
-    "\nThe desk-persona librarian-operator agent is generated; edit the SOURCE (the eino prompt at",
+    "\nThe deskkit bundle's librarian-operator agent is generated; edit the SOURCE (the eino prompt at",
     `${LIBRARIAN_PROMPT}), then regenerate:  node scripts/check-persona-drift.mjs --write`,
   );
   process.exit(1);
 }
 
-console.log(`persona-drift: OK — ${DERIVED.length} generated desk-persona file(s) in sync with source.`);
+console.log(`persona-drift: OK — ${DERIVED.length} generated deskkit bundle file(s) in sync with source.`);

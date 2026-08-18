@@ -1,11 +1,11 @@
-_Contributor overview for desk-standard: how to build, test, regenerate media, and cut a release.
+_Contributor overview for deskkit: how to build, test, regenerate media, and cut a release.
 The docs index is [`../README.md`](../README.md)._
 Status: active
 
 # Development
 
-One product lane sits under this repo: **`deskkit`**, a single Go binary (`librarian/`) carrying the
-`profile`, `librarian`, and `pm` tool modules. Alongside it, `plugins/desk-persona/` is the Claude
+One product lane sits under this repo: **`deskkit`**, a single Go binary carrying the
+`profile`, `librarian`, and `pm` tool modules. Alongside it, `plugins/deskkit/` is the Claude
 Code bundle that mounts that binary — authored in place, nothing generated. The **root `Makefile`
 is the canonical task interface** — `make help` lists every target; CI
 (`.github/workflows/ci.yml`) runs the same checks.
@@ -44,7 +44,7 @@ The demo GIFs in [`../assets/`](../assets/) are **generated artifacts** — neve
 source `.tape` files live in [`../../scripts/vhs-tapes/`](../../scripts/vhs-tapes/), kept separate from the GIF output.
 
 ```bash
-make media      # rebuild the librarian, then drive vhs over every tape into ../assets/*.gif
+make media      # rebuild the deskkit binary, then drive vhs over every tape into ../assets/*.gif
 ```
 
 The recorder (`scripts/record-media.sh`) is hermetic: it seeds throwaway scratch desks under a

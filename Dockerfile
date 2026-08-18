@@ -1,4 +1,4 @@
-# Multi-stage build for the deskkit binary (librarian lane). See docs/pattern.md.
+# Multi-stage build for the deskkit binary. See docs/pattern.md.
 # Architecture-neutral: no hardcoded GOARCH/base-arch tag, so this builds on both
 # arm64 (local Apple Silicon Docker) and amd64 (typical hosting target).
 
@@ -8,17 +8,19 @@ WORKDIR /src/web
 COPY web/package.json web/package-lock.json ./
 RUN npm ci
 COPY web/ ./
-RUN mkdir -p /src/librarian/internal/core/spa/dist && npm run build
+RUN mkdir -p /src/internal/core/spa/dist && npm run build
 
 FROM golang:1.25-alpine AS build
 WORKDIR /src
 COPY VERSION VERSION
-COPY librarian/go.mod librarian/go.sum librarian/
-RUN cd librarian && go mod download
-COPY librarian/ librarian/
-COPY --from=webbuild /src/librarian/internal/core/spa/dist librarian/internal/core/spa/dist
-RUN cd librarian && CGO_ENABLED=0 go build \
-      -ldflags "-X main.version=$(cat ../VERSION)" \
+COPY go.mod go.sum ./
+RUN go mod download
+COPY cmd/ cmd/
+COPY internal/ internal/
+COPY templates/ templates/
+COPY --from=webbuild /src/internal/core/spa/dist internal/core/spa/dist
+RUN CGO_ENABLED=0 go build \
+      -ldflags "-X main.version=$(cat VERSION)" \
       -o /out/deskkit ./cmd/deskkit
 
 # alpine: smallest base that still ships a shell (docker-entrypoint.sh) and a way to fetch
