@@ -108,6 +108,14 @@ jobs:
           go-version-file: librarian/go.mod
           cache-dependency-path: librarian/go.sum
 
+      - name: Set up Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '22'
+
+      - name: Build SPA (go:embed source for librarian/internal/core/spa/dist)
+        run: cd web && npm ci && npm run build
+
       - name: Cross-compile (CGO disabled, pure-Go)
         working-directory: librarian
         env:

@@ -33,6 +33,7 @@ import (
 	"github.com/hsb3/desk-standard/librarian/internal/core/mcp"
 	"github.com/hsb3/desk-standard/librarian/internal/core/migrate"
 	"github.com/hsb3/desk-standard/librarian/internal/core/module"
+	"github.com/hsb3/desk-standard/librarian/internal/core/spa"
 	"github.com/hsb3/desk-standard/librarian/internal/core/store"
 	"github.com/hsb3/desk-standard/librarian/internal/modules/librarian/agent"
 	"github.com/hsb3/desk-standard/librarian/internal/modules/librarian/desklib"
@@ -281,6 +282,14 @@ func main() {
 		// no-op on a loopback bind. This must happen BEFORE e.Next(), which is what builds the mux
 		// from the router's current middleware set — see hardenPublicCORS.
 		hardenPublicCORS(e.Router, publicMode, serveOrigins)
+
+		// Embedded SPA — the binary's visual surface, served at `/` (admin console stays /_/,
+		// data API /api/). Registered outside the cfgErr gate below: the static shell and the
+		// loopback token bootstrap need only the store, not a resolved desk config. In public
+		// mode the bootstrap route is not registered at all; the shell still serves (the login
+		// form must load), while every data call behind it stays token-gated — the same
+		// shell-loads-data-doesn't stance as the admin console. See internal/core/spa.
+		spa.Register(e.Router, publicMode)
 
 		if cfgErr == nil {
 			// Desk open-guard (ADR 0002 §3): refuse to serve a store that already belongs to a

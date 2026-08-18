@@ -60,6 +60,18 @@ if [ -n "${DESKKIT_BIN:-}" ] && [ -x "${DESKKIT_BIN:-}" ]; then
   check "reuse prebuilt binary (DESKKIT_BIN=$DESKKIT_BIN)" 0
 else
   E2E_BIN="$E2E_BINDIR/deskkit"
+  # Build the embedded SPA before the Go build picks up its go:embed source, so step 45's web
+  # assertions see the real shell rather than the no-SPA placeholder. Guarded by `-n` (dry-run)
+  # so a tree that predates the `spa` Makefile target still builds — go:embed then just embeds
+  # whatever's already sitting in internal/core/spa/dist (its .gitkeep-only baseline), and the
+  # binary serves the placeholder page instead. First run needs network (npm ci populates
+  # web/node_modules); every run after that is offline (see README.md).
+  if make -C "$E2E_REPO/librarian" -n spa >/dev/null 2>&1; then
+    ( cd "$E2E_REPO/librarian" && make spa )
+    check "build the embedded SPA (librarian/Makefile spa -> internal/core/spa/dist)" $?
+  else
+    note "librarian/Makefile has no 'spa' target yet — building without it (placeholder page expected)"
+  fi
   ( cd "$E2E_REPO/librarian" && go build -o "$E2E_BIN" ./cmd/deskkit )
   check "build deskkit from ./librarian/cmd/deskkit" $?
 fi

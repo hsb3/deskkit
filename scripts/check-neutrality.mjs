@@ -52,14 +52,14 @@ const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 // identity-neutrality constraint; scripts/ + CHANGELOG.md + docs/ are authoring surfaces and stay
 // outside. `plugin` (the retired TS lane) stays listed deliberately: scanTree skips a missing dir,
 // so the entry costs nothing and re-arms the scan if that path ever comes back.
-const SCAN_DIRS = ["plugin", "plugins", "librarian", "kits"];
+const SCAN_DIRS = ["plugin", "plugins", "librarian", "kits", "web"];
 const ALLOW_FILE = join("schema", "neutrality-lint.allow");
 
 const EXCLUDE_DIR_NAMES = new Set(["node_modules", "dist", ".git"]);
 // Generated/dependency manifests + lockfiles: build inputs, not authored identity surface.
 const EXCLUDE_BASENAMES = new Set(["go.sum", "go.mod", "bun.lock", "package-lock.json", "pnpm-lock.yaml", "yarn.lock"]);
 const TEXT_EXT = new Set([
-  ".ts", ".tsx", ".js", ".mjs", ".cjs", ".go", ".md", ".txt",
+  ".ts", ".tsx", ".js", ".mjs", ".cjs", ".go", ".md", ".txt", ".svelte", ".html",
   ".yaml", ".yml", ".json", ".sh", ".toml",
 ]);
 

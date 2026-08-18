@@ -18,10 +18,17 @@
 # --- PocketBase runtime store (never committed; the real store lives under $XDG_DATA_HOME) ---
 pb_data/
 
-# --- stray Node/JS artifacts (no JS lane ships from this repo; the scripts/ gates are dep-free) ---
+# --- stray Node/JS artifacts (repo-root web/ ships inside the deskkit binary via go:embed; the
+#     scripts/ gates themselves stay dep-free) ---
 node_modules/
 dist/
 build/
+
+# --- SPA embed dir: the bare `dist/` rule above ignores it wholesale, which would also hide
+# the tracked .gitkeep that keeps go:embed compiling on a bare checkout — re-include just that ---
+!/librarian/internal/core/spa/dist/
+/librarian/internal/core/spa/dist/*
+!/librarian/internal/core/spa/dist/.gitkeep
 
 # --- OS / editor litter ---
 .DS_Store

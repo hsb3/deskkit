@@ -10,8 +10,11 @@ Status: active
 bash librarian/e2e/e2e.sh
 ```
 
-Runs offline against a fresh `mktemp` scratch desk (never a real store, no network, no secrets).
-Reuse a prebuilt binary to skip the Go build:
+Runs offline against a fresh `mktemp` scratch desk (never a real store, no network, no secrets)
+— with one exception: the build step also builds the embedded SPA (`librarian/Makefile`'s `spa`
+target), and the FIRST run on a machine needs network once, to `npm ci` into `web/node_modules`.
+Every run after that reuses the cached `node_modules` and stays fully offline.
+Reuse a prebuilt binary to skip the Go build (and the SPA build) entirely:
 
 ```
 DESKKIT_BIN=/path/to/deskkit bash librarian/e2e/e2e.sh
@@ -28,6 +31,7 @@ fail the run but are always printed — never silently passed.
 | 20 | librarian sweep → patrol → fix → restore | rule detection (R1/R3), record-original-first `propose-fix`, `apply-fix`, and byte-exact reversible `restore` (ADR 0014 boundary) |
 | 30 | PM graph | PM ships **default-on**; create → legal transition; the phase gate refuses illegal skips; blocking/cascade refuses a blocked item's advance |
 | 40 | shipped surfaces | one Go MCP server carries the whole tool core (21 default / 9 with PM off / 12 pm-gated / 4 profile-gated) and answers a real `tools/call`; skills + agents present; the SessionStart hook emits a cold-start briefing |
+| 45 | embedded web | starts its own `serve` against the scratch store; the embedded SPA shell at `/`, the `/desk/chat` SPA-index fallback, the loopback `/desk/bootstrap` token endpoint (refused cross-site), and the PocketBase REST API staying fail-closed until that token is presented |
 | 50 | release-shaped | VERSION ↔ manifests sync, CHANGELOG coverage, ldflags version-stamping, and a single self-contained marketplace bundle with no generated JS/schema copies |
 
 ## What it deliberately does NOT cover (skip-with-notice)
