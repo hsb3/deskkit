@@ -21,4 +21,5 @@ _Index format: one line per memory file — a markdown link to the topic file, t
 - [Scope vs worktree gate attribution](scope-vs-worktree-gate-attribution.md) — a RED repo-wide gate may come from uncommitted files OUTSIDE the reviewed diff; run live git status before attributing
 - [PM pointer overload + gate path](pm-pointer-overload-and-gate-path.md) — pointer field is overloaded (URL-mirror vs file-gate); the `://` reject lives in librarian/module.go, NOT pm/gates
 - [Parallel-brief scaffolding leak](parallel-brief-scaffolding-leak.md) — agent-authored .md batches can leak tool-call tags (`</content></invoke>`) at EOF; grep the whole set + raw-read last lines
+- [Railway UAT standing grant](railway-uat-standing-grant.md) — redeploy the hosted deskkit service without asking; it's the owner's UAT env and feeds his dev tasks
 - [Ruled ≠ shipped](ruled-not-shipped-overstatement.md) — an ADR Decision is a RULING, not a landed change; check build-plan/epic status before writing "fixed/shipped"

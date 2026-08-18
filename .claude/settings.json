@@ -12,15 +12,7 @@
       "Bash(node scripts/:*)",
       "Bash(shellcheck:*)",
       "Bash(actionlint:*)",
-      "Bash(deskkit:*)",
-      "mcp__plugin_kaneo_kaneo"
+      "Bash(deskkit:*)"
     ]
-  },
-  "enabledPlugins": {
-    "code-desk@dotfiles-agents": true,
-    "claude-code-expertise@dotfiles-agents": true,
-    "deep-research@dotfiles-agents": true,
-    "kaneo@dotfiles-agents": true
-  },
-  "autoMemoryDirectory": "~/Developer/deskkit/.claude/memory"
+  }
 }
