@@ -7,7 +7,12 @@ import (
 	"time"
 )
 
+// Every test that reaches Load (or LoadCentral) pins XDG_CONFIG_HOME to a temp dir. Without
+// it the central-config leg would read the developer's REAL ~/.config/deskkit/config.yaml and
+// these assertions would pass or fail depending on the machine.
+
 func TestLoadDotEnvNeverOverrides(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
 	dir := t.TempDir()
 	env := "PL_TEST_PRESET=fromfile\nPL_TEST_FILEONLY=fromfile\n# a comment\nexport PL_TEST_EXPORTED=exported\n"
 	if err := os.WriteFile(filepath.Join(dir, ".env"), []byte(env), 0o644); err != nil {
@@ -40,6 +45,9 @@ func TestLoadDotEnvNeverOverrides(t *testing.T) {
 func TestLoadRequiresDeskIdentity(t *testing.T) {
 	// With no env, no profile discoverable, and a cwd with no _knowledge/, Load must
 	// error on the required DESK_ROOT/DESK_NAME rather than invent a personal default.
+	// The empty XDG_CONFIG_HOME is load-bearing: a real central config with default_desk
+	// would legitimately resolve DESK_NAME and this test would flip on the developer's machine.
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
 	dir := t.TempDir()
 	restore := chdir(t, dir)
 	defer restore()
@@ -53,6 +61,7 @@ func TestLoadRequiresDeskIdentity(t *testing.T) {
 }
 
 func TestLoadEnvProvidesIdentity(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
 	dir := t.TempDir()
 	restore := chdir(t, dir)
 	defer restore()
@@ -82,6 +91,7 @@ func TestLoadEnvProvidesIdentity(t *testing.T) {
 // TestLoadContextWindow covers LLMContextWindow: env LLM_CONTEXT_WINDOW > profile
 // models.context_window > 0 (0 = unset; the TUI's per-model table default applies).
 func TestLoadContextWindow(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
 	dir := t.TempDir()
 	restore := chdir(t, dir)
 	defer restore()
@@ -143,6 +153,7 @@ func chdir(t *testing.T, dir string) func() {
 // PM ships default-on for 1.0), and PM_CLAIM_TTL (spec §3.6, default 30m). Both override
 // legs must still cleanly disable the module.
 func TestLoadPMGate(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
 	dir := t.TempDir()
 	restore := chdir(t, dir)
 	defer restore()

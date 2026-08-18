@@ -3,21 +3,21 @@
 // LLM_PROVIDER. The rest of the system depends only on the model.ToolCallingChatModel
 // interface — never on a concrete provider type (spec §6.2).
 //
-// Identity-neutral: API keys are read from the environment at construction time only, never
-// stored in Config (spec §6.3, §3.4). A required key that is unset fails LOUD with a clear
-// error (not a panic, not a deferred failure on first API call) so `agent` without a key
-// exits cleanly with an actionable message (Phase-1 acceptance).
+// Identity-neutral: API keys are read at construction time only, never stored in Config
+// (spec §6.3, §3.4). A required key that is unset fails LOUD with a clear error (not a panic,
+// not a deferred failure on first API call) so `agent` without a key exits cleanly with an
+// actionable message (Phase-1 acceptance).
 //
-// Key indirection: a profile may set secrets_ref.llm_api_key to the NAME of the env var that
-// holds the API key (surfaced as cfg.LLMAPIKeyEnv). When set, that named var is read instead
-// of the per-provider default (ANTHROPIC_API_KEY / OPENAI_API_KEY / GEMINI_API_KEY); when
-// unset the default var is used. Either way the secret VALUE lives only in the environment.
+// Key resolution: env, then the machine-wide central config's llm.api_key. On the env leg a
+// profile may set secrets_ref.llm_api_key to the NAME of the env var holding the key (surfaced
+// as cfg.LLMAPIKeyEnv); when set, that named var is read instead of the per-provider default
+// (ANTHROPIC_API_KEY / OPENAI_API_KEY / GEMINI_API_KEY). Either way the secret VALUE lives only
+// in the environment or in that 0600 central file — never in Config, and never in a log line.
 package provider
 
 import (
 	"context"
 	"fmt"
-	"os"
 
 	claude "github.com/cloudwego/eino-ext/components/model/claude"
 	gemini "github.com/cloudwego/eino-ext/components/model/gemini"
@@ -35,7 +35,7 @@ import (
 func NewChatModel(ctx context.Context, cfg *config.Config) (model.ToolCallingChatModel, error) {
 	switch cfg.LLMProvider {
 	case "anthropic":
-		key, envName := resolveAPIKey(cfg, "ANTHROPIC_API_KEY")
+		key, envName, _ := resolveAPIKey(cfg, "ANTHROPIC_API_KEY")
 		if key == "" {
 			return nil, missingKeyErr("anthropic", envName)
 		}
@@ -45,7 +45,7 @@ func NewChatModel(ctx context.Context, cfg *config.Config) (model.ToolCallingCha
 			MaxTokens: cfg.LLMMaxTokens,
 		})
 	case "openai":
-		key, envName := resolveAPIKey(cfg, "OPENAI_API_KEY")
+		key, envName, _ := resolveAPIKey(cfg, "OPENAI_API_KEY")
 		if key == "" {
 			return nil, missingKeyErr("openai", envName)
 		}
@@ -56,7 +56,7 @@ func NewChatModel(ctx context.Context, cfg *config.Config) (model.ToolCallingCha
 			MaxTokens: &maxTokens,   // *int on the OpenAI config
 		})
 	case "gemini":
-		key, envName := resolveAPIKey(cfg, "GEMINI_API_KEY")
+		key, envName, _ := resolveAPIKey(cfg, "GEMINI_API_KEY")
 		if key == "" {
 			return nil, missingKeyErr("gemini", envName)
 		}
@@ -75,22 +75,29 @@ func NewChatModel(ctx context.Context, cfg *config.Config) (model.ToolCallingCha
 	}
 }
 
-// resolveAPIKey returns the API key value and the NAME of the env var it was read from.
-// When the profile sets secrets_ref.llm_api_key (cfg.LLMAPIKeyEnv), that named var is used;
-// otherwise the per-provider default var name is used. The env var VALUE is read here and
-// never stored in Config (spec §6.3).
-func resolveAPIKey(cfg *config.Config, defaultEnv string) (key, envName string) {
+// resolveAPIKey resolves the LLM API key: the env var named by cfg.LLMAPIKeyEnv (the profile's
+// secrets_ref.llm_api_key indirection) or the per-provider default var, then the central
+// config's llm.api_key. envName is always the env var that WOULD hold the key, so the
+// fail-loud message can name it. source is "env", "central", or "" when unresolved.
+//
+// The key VALUE is never stored in Config (spec §6.3) — it is read here, at construction time,
+// and handed straight to the concrete component. A central config that cannot be read is
+// treated as absent: Load already reports that failure once at startup.
+func resolveAPIKey(cfg *config.Config, defaultEnv string) (key, envName, source string) {
 	envName = defaultEnv
 	if cfg.LLMAPIKeyEnv != "" {
 		envName = cfg.LLMAPIKeyEnv
 	}
-	return os.Getenv(envName), envName
+	key, source = config.ResolveAPIKey(envName)
+	return key, envName, source
 }
 
 // missingKeyErr builds the fail-loud message naming the exact env var that must be set —
-// the resolved indirection target when configured, else the per-provider default.
+// the resolved indirection target when configured, else the per-provider default — plus the
+// central-config route for an operator who would rather store the key once per machine.
 func missingKeyErr(provider, envName string) error {
 	return fmt.Errorf(
-		"LLM_PROVIDER=%s requires %s, which is not set; export it or add it to a discovered .env",
+		"LLM_PROVIDER=%s requires an API key: export %s (or add it to a discovered .env), "+
+			"or store it in the central config with `deskkit config set llm.api_key <value>`",
 		provider, envName)
 }
