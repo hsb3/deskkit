@@ -12,10 +12,22 @@
 // LIBRARIAN_AUTONOMOUS_WRITES is set. The compile-time assertion below pins that the surface
 // streams the real session type, never a fork.
 //
-// Auth posture: the route is unauthenticated, exactly like the TUI/REPL. Safety comes from the
-// server's loopback binding (the operator serves the DB on 127.0.0.1) — it is a local,
-// on-demand, single-operator surface, not a hosted service. It is deliberately NOT wired to the
-// superuser admin auth (which would disqualify it as a general surface, ADR 0001).
+// Auth posture: it depends on the RESOLVED BIND ADDRESS, which the caller classifies and passes
+// to Register as `public`.
+//
+//   - Loopback bind (the local default): the routes are unauthenticated, exactly like the
+//     TUI/REPL. Safety comes from the server's loopback binding (the operator serves the DB on
+//     127.0.0.1) — it is a local, on-demand, single-operator surface, not a hosted service. It is
+//     deliberately NOT wired to the superuser admin auth (which would disqualify it as a general
+//     surface, ADR 0001). This is the byte-for-byte historical behavior.
+//   - Non-loopback bind (public mode): all three routes require a valid auth token
+//     (apis.RequireAuth over the `users` and superusers collections), and the cross-origin guard
+//     switches from the loopback allowlist to a strict same-origin check against the request's own
+//     Host. No wildcard CORS is ever configured — a `*` policy would hand the surface to any page
+//     on the internet.
+//
+// The mode is derived from the exposure rather than from an opt-in flag because a flag can be
+// forgotten while still binding 0.0.0.0, which fails OPEN.
 package web
 
 import (
@@ -29,6 +41,7 @@ import (
 
 	_ "embed"
 
+	"github.com/pocketbase/pocketbase/apis"
 	"github.com/pocketbase/pocketbase/core"
 	"github.com/pocketbase/pocketbase/tools/router"
 
@@ -133,19 +146,40 @@ func (h *sessionHolder) close(ctx context.Context) {
 	h.reset(ctx)
 }
 
-// handler binds the routes to one shared session holder.
+// authCollections are the auth collections whose tokens satisfy the public-mode requirement:
+// `users` (the approval-gated collection the librarian's migration hardens — a member must be
+// both verified and operator-approved before it can even obtain a token) and the stock
+// superusers collection, so the operator's own admin token works without a second account.
+var authCollections = []string{"users", core.CollectionNameSuperusers}
+
+// handler binds the routes to one shared session holder. public mirrors Register's argument and
+// is what the origin guard consults per request.
 type handler struct {
 	holder *sessionHolder
+	public bool
 }
 
 // Register mounts the three session-surface routes on the serve router, all backed by one shared
 // session holder. Call it once under OnServe (the routes are serve-only, like the wake layer).
 // The returned cleanup finalizes the held session; wire it to app shutdown (best-effort).
-func Register(r *router.Router[*core.RequestEvent], newSession NewSessionFunc) (cleanup func(context.Context)) {
-	h := &handler{holder: &sessionHolder{newSess: newSession}}
-	r.GET(PathChat, h.page)
-	r.POST(PathStream, h.stream)
-	r.POST(PathReset, h.reset)
+//
+// public says the server is bound to a non-loopback address (see the package doc). It is false
+// for every local `deskkit serve`, and in that case this function's behavior — the three routes,
+// unauthenticated, loopback-origin-guarded — is byte-for-byte what it has always been. When true,
+// every route (the page included, so a browser cannot even load the shell unauthenticated) is
+// bound behind apis.RequireAuth.
+func Register(r *router.Router[*core.RequestEvent], newSession NewSessionFunc, public bool) (cleanup func(context.Context)) {
+	h := &handler{holder: &sessionHolder{newSess: newSession}, public: public}
+	routes := []*router.Route[*core.RequestEvent]{
+		r.GET(PathChat, h.page),
+		r.POST(PathStream, h.stream),
+		r.POST(PathReset, h.reset),
+	}
+	if public {
+		for _, rt := range routes {
+			rt.Bind(apis.RequireAuth(authCollections...))
+		}
+	}
 	return h.holder.close
 }
 
@@ -166,7 +200,7 @@ type streamRequest struct {
 // an agent.Event{Kind: error} frame — matching the streaming contract (exactly one terminal
 // event per turn).
 func (h *handler) stream(e *core.RequestEvent) error {
-	if !originAllowed(e.Request) {
+	if !originAllowed(e.Request, h.public) {
 		return e.JSON(http.StatusForbidden, crossOriginRejected)
 	}
 	e.Request.Body = http.MaxBytesReader(e.Response, e.Request.Body, maxRequestBody)
@@ -218,30 +252,40 @@ func (h *handler) stream(e *core.RequestEvent) error {
 
 // reset ends the current conversation. The next stream builds a fresh session.
 func (h *handler) reset(e *core.RequestEvent) error {
-	if !originAllowed(e.Request) {
+	if !originAllowed(e.Request, h.public) {
 		return e.JSON(http.StatusForbidden, crossOriginRejected)
 	}
 	h.holder.reset(e.Request.Context())
 	return e.NoContent(http.StatusNoContent)
 }
 
-// crossOriginRejected is the 403 body for a request whose Origin is not a loopback origin.
+// crossOriginRejected is the 403 body for a request whose Origin fails the guard.
 var crossOriginRejected = map[string]string{
-	"error": "cross-origin request rejected: this local surface accepts only same-machine (loopback) browser origins",
+	"error": "cross-origin request rejected: this surface accepts only same-origin browser requests",
 }
 
 // originAllowed is the cross-origin guard for the state-changing routes (POST stream + reset; the
-// GET page is a navigation and is not guarded). It does NOT add authentication — the posture stays
-// unauthenticated and loopback-bound; it closes only the browser cross-site vector (a page on
-// another origin silently POSTing to this local surface).
+// GET page is a navigation and is not guarded). On a loopback bind it does NOT add authentication —
+// the posture stays unauthenticated and loopback-bound; it closes only the browser cross-site vector
+// (a page on another origin silently POSTing to this local surface). On a public bind it runs
+// alongside the route-level RequireAuth as CSRF defense in depth.
 //
-// Rule: a request WITH an Origin header must name a loopback origin — an http/https scheme and a
-// host of 127.0.0.1, localhost, or ::1 (any port). Both the 127.0.0.1 and the localhost forms pass
-// regardless of which the operator browsed to (they are distinct origins). A request with NO Origin
-// header — curl and other non-browser tools, or a same-origin navigation — is allowed: absence
-// means it is not a browser cross-site request. Chosen over matching the request's own Host because
-// the loopback allowlist is simpler and inherently accepts both loopback host spellings.
-func originAllowed(r *http.Request) bool {
+// A request with NO Origin header — curl and other non-browser tools, or a same-origin navigation —
+// is allowed in both modes: absence means it is not a browser cross-site request. A present Origin
+// must always carry an http/https scheme.
+//
+// Loopback mode: the Origin's host must be 127.0.0.1, localhost, or ::1 (any port). Both the
+// 127.0.0.1 and the localhost forms pass regardless of which the operator browsed to (they are
+// distinct origins); the allowlist is simpler than a Host match and inherently accepts both
+// loopback spellings.
+//
+// Public mode: that allowlist would 403 every real request (the page is served from a public host),
+// so the rule becomes strict SAME-ORIGIN — the Origin's host:port must equal the request's own Host
+// header. That is the correct CSRF check for a hosted surface and, unlike a permissive CORS policy,
+// names no wildcard: an unknown third-party origin is still rejected. The comparison is on
+// u.Host (which includes the port when present) against r.Host, so a port mismatch is a rejection
+// rather than a silent pass.
+func originAllowed(r *http.Request, public bool) bool {
 	origin := r.Header.Get("Origin")
 	if origin == "" {
 		return true // not a browser cross-site request
@@ -252,6 +296,9 @@ func originAllowed(r *http.Request) bool {
 	}
 	if u.Scheme != "http" && u.Scheme != "https" {
 		return false
+	}
+	if public {
+		return u.Host != "" && u.Host == r.Host
 	}
 	switch u.Hostname() {
 	case "127.0.0.1", "localhost", "::1":
