@@ -82,8 +82,8 @@ func TestEnsureSuperuser_Idempotent(t *testing.T) {
 
 // TestEnsureSuperuser_NoopWhenBothUnset pins the one silent case that must survive: BOTH vars
 // unset is today's normal local UX (an identity-neutral binary never invents a credential, spec
-// §10.3) and must stay a no-op, not an error. The half-configured case is asserted separately
-// below — it used to land here as a silent no-op too, which is the regression that change closes.
+// §10.3) and must stay a no-op, not an error. The half-configured case is an error, asserted
+// separately below.
 func TestEnsureSuperuser_NoopWhenBothUnset(t *testing.T) {
 	app := newBootstrapApp(t)
 	before := len(func() []*core.Record {
@@ -248,7 +248,8 @@ func TestCheckServeAuthPrereqs(t *testing.T) {
 	})
 }
 
-// TestCheckServeAuthPrereqs_InstallerPlaceholderDoesNotCount is the BLOCKER-1 regression.
+// TestCheckServeAuthPrereqs_InstallerPlaceholderDoesNotCount pins that the installer placeholder
+// row never satisfies the public-serve gate.
 //
 // The dependency's first-run installer writes a `__pbinstaller@example.com` superuser row purely
 // to mint its one-time setup link — it is not an account anyone can log in as. A plain
@@ -282,12 +283,10 @@ func TestCheckServeAuthPrereqs_InstallerPlaceholderDoesNotCount(t *testing.T) {
 	}
 }
 
-// TestCheckServeAuthPrereqs_BadPasswordIsFatal is the BLOCKER-2 regression.
-//
-// The gate used to PASS on the env vars merely being non-empty, trusting a later, non-fatal
-// EnsureSuperuser to succeed. A password the dependency rejects then failed into a log row while
-// the public listener came up with no administrable account. The gate must verify the END STATE:
-// provision here, fatally, then re-count.
+// TestCheckServeAuthPrereqs_BadPasswordIsFatal pins that the public gate verifies the provisioned
+// END STATE, never the env input: a gate that passes on the vars merely being non-empty would let
+// a store-rejected password fail into a log row while the public listener came up with no
+// administrable account. The gate must provision here, fatally, then re-count.
 func TestCheckServeAuthPrereqs_BadPasswordIsFatal(t *testing.T) {
 	app := newBootstrapApp(t)
 	emptySuperusers(t, app)
