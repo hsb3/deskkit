@@ -1,9 +1,8 @@
 # Changelog
 
-All notable changes to this repository — both the **plugin** (Claude Code plugin + MCP server)
-and the **librarian** (`deskkit` Go binary; `pocket-librarian` through 0.6.0) — are recorded
-here. The two ship under one repo version (the root `VERSION` file); a release tags that
-single version.
+All notable changes to this repository — the **`deskkit` binary** (`pocket-librarian` through
+0.6.0) and the **`deskkit` Claude Code plugin bundle** — are recorded here. Both ship under one
+repo version (the root `VERSION` file); a release tags that single version.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html). See
@@ -11,7 +10,7 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html). See
 ADR 0005 (DESK-27)
 for why this policy exists.
 
-## [Unreleased]
+## [0.9.0] — 2026-08-18
 
 ### Added
 
@@ -50,6 +49,28 @@ for why this policy exists.
   (`getting-started.md`, `plugin-guide.md`, `librarian-guide.md`, `pm-guide.md`) now assume no
   build toolchain and no env-var exports for the core sweep/patrol/PM flow; build-from-source and
   env-var/store-path lore moved to a new `docs/development/install-and-build.md`.
+- **Central machine-wide config + a self-explanatory CLI** (DESK-50). New `deskkit config
+  show|path|edit|set` manages `$XDG_CONFIG_HOME/deskkit/config.yaml` (created 0600 in a 0700
+  dir) carrying `llm.provider`, `llm.model`, `llm.api_key`, and `default_desk`. Resolution per
+  field is env > per-desk profile > central config > built-in default, and `deskkit config show`
+  prints every resolved value with the leg that won — so `deskkit config set llm.api_key <key>`
+  once is enough to run `agent`/`chat` with zero env vars set. New `deskkit desks` lists the
+  desks this machine has a store for (marking the one the cwd resolves to), and `deskkit --help`
+  groups the command menu into six functional sections instead of one alphabetic list.
+- **Hardened serve on a non-loopback bind** (DESK-51). `serve`'s auth posture is derived from
+  every resolved bind address, never from a flag: a loopback bind keeps the unauthenticated
+  local UX; anything else (wildcard, bare `:PORT`, routable IP, or a hostname that can't be
+  proven loopback) makes the whole process public mode. Public mode refuses to open a listener
+  unless it can verify an administrable superuser exists (provisioned fatally from
+  `PB_SUPERUSER_EMAIL`/`PB_SUPERUSER_PASSWORD` and re-counted, excluding the framework's
+  installer-placeholder row), puts the chat session routes behind auth, leaves the loopback-only
+  token-mint route unregistered, switches CSRF to strict same-origin, and drops the framework's
+  default CORS wildcard unless an explicit `--origins` allowlist is set. The stock `users` auth
+  collection is now gated behind operator approval instead of shipping enabled.
+- **Container packaging with a scripted smoke proof** (DESK-51). A Dockerfile packages the
+  binary (SPA embedded) for hosted deploys, with a docker-smoke script proving serve + health
+  from the built image; the `VOLUME` directive was dropped because volume-managing platforms
+  reject it. The full deploy pattern is documented in `docs/pattern.md`.
 
 ### Fixed
 
@@ -65,9 +86,52 @@ for why this policy exists.
 - **Stale "desk-pm mount" label** (#181, #187). Renamed to "pm-only mount" across
   `docs/tool-surface.md`, the MCP server + its tests, and the e2e suite; the default-mount tool
   count corrected from the pre-PM-default-on `5` to the current `17`.
+- **`install.sh` corrupted artifact URLs when resolving `latest`** (DESK-56). `resolve_version()`
+  wrote its progress line to stdout inside `TAG="$(resolve_version)"`, so the line was captured
+  into `TAG` and corrupted every artifact name and download URL built from it — masked until now
+  because the stale repo slug 404ed first. Progress goes to stderr, the pinned slug is
+  `hsb3/deskkit`, and a failed tag resolution now names the real candidate causes (repo missing,
+  private/needs auth, or no published release) instead of guessing one.
+- **`make help` never listed `e2e`** (DESK-56) — the target-name pattern excluded digits.
+- **`.dockerignore` let a host `node_modules` into the build context** (DESK-56), so a darwin
+  host's modules could overlay the image's linux ones and break the container build.
+- **npm dependabot updater pointed at the deleted `plugin/` lane** (DESK-56). Because
+  `open-pull-requests-limit: 0` suppresses routine PRs it looked deliberate, but security
+  updates ignore that limit — so the SPA's npm deps, which ship inside the distributed binary
+  via `go:embed`, had no security-update coverage. Now pointed at `/web`.
+- **`examples/agent-loop.sh` asserted a pre-consolidation tool surface** (DESK-70). The harness
+  called `mcp-serve` without `MCP_MODULES`, mounting the full tool surface where it asserted the
+  old five-tool one — every model run carried two phantom failures, which nearly argued for
+  keeping the expensive default model from a bug. The harness now pins its mount and reports
+  19/19 against the current default.
 
 ### Changed
 
+- **One binary, one plugin bundle** (ADR 0022, DESK-48). The TypeScript lane (`plugin/`) is
+  deleted: its profile tools were ported to a new Go `profile` MCP module (`profile_get`,
+  `profile_validate`, `template_render`, `knowledge_index`) on the `deskkit` binary, and the two
+  marketplace bundles collapsed into one whose single `.mcp.json` launches `deskkit mcp-serve`
+  with `MCP_MODULES=profile,librarian,pm`. One runtime, one agent-facing bundle, one schema —
+  there is no second MCP server or Node runtime to install.
+- **Go module moved to the repo root; everything is named `deskkit`** (DESK-56, DESK-64). The
+  module path is now `github.com/hsb3/deskkit` (install from source with
+  `go install github.com/hsb3/deskkit/cmd/deskkit@latest`), the `librarian/` container directory
+  is retired (runtime at `internal/`, binary at `cmd/deskkit`), the bundle is `plugins/deskkit/`,
+  and the marketplace slug is `deskkit` — plugin install reads
+  `claude plugin marketplace add hsb3/deskkit` then `claude plugin install deskkit@deskkit`. The
+  GitHub repo itself was renamed `hsb3/desk-standard` → `hsb3/deskkit` and made public (the old
+  slug redirects). The two per-lane Makefiles merged into one root Makefile, and the operator
+  reference moved to `docs/usage/deskkit-reference.md`. Module *names* are unchanged:
+  `MCP_MODULES=profile,librarian,pm` still reads exactly that way.
+- **Gate diet** (DESK-49). The drift guards whose duplicated copies no longer exist
+  post-collapse were retired, and the tool-surface doc counts folded into a Go test
+  (`make test`) instead of a standalone script.
+- **Docs and comments made true of the one-binary system** (DESK-57, DESK-59, DESK-65, DESK-69).
+  README rebuilt as value + proof with real SPA screenshots; stale "two products" / private-repo
+  / TS-lane claims cleared across the published surface; `kits/README.md` documents the
+  add/edit/remove procedure; a comment-hygiene sweep trimmed narration across the Go tree and
+  shell entry points (prose only — zero executable lines changed); and the `agent` subcommand is
+  ratified as approved CLI surface in the tool-surface spec.
 - **Built-in default LLM model changed from `claude-opus-4-8` to `claude-haiku-4-5-20251001`**
   (DESK-67). The old pin was stale and the most expensive tier, for a workload (document
   linting, rule findings, mechanical fixes) that does not need it — every user who never sets
@@ -80,14 +144,6 @@ for why this policy exists.
   faster (28-32s vs 80-117s per run) and is the cheaper tier. This does not touch the
   resolution order (env > per-desk profile > central config > built-in default) — only the
   bottom leg's value.
-- **Plugin distribution bundles extracted to a top-level `plugins/` tree.** The two marketplace
-  bundles moved out of the TS lane's directory: `plugin/claude-plugin/` → `plugins/desk-standard/`
-  and `plugin/desk-persona/` → `plugins/desk-persona/`, leaving `plugin/` as purely the TS lane
-  (core, MCP server entry, opencode spike). The marketplace `source` paths in
-  `.claude-plugin/marketplace.json` changed accordingly — existing installs pick the new paths up
-  on the next marketplace refresh; plugin names, versions, and contents are unchanged. All gates
-  follow the move (`check-neutrality` now scans `plugins/` too; packaging, drift guards, e2e, and
-  docs re-pointed). Local dev flag is now `claude --plugin-dir ./plugins/desk-standard`.
 - **Repo-root `_knowledge/` instance removed** (#170, #84 second half; ADR 0021 §F5). Per the
   owner ruling on issue #170 (2026-07-21), the repo itself is not an exec desk, so it no longer
   ships a repo-root `_knowledge/` — the `_knowledge/` convention belongs only to the desks the
@@ -96,7 +152,7 @@ for why this policy exists.
   the `check-profile-root` drift guard, and every product string naming `_knowledge/profile.yaml`
   all stay exactly as they were). The canonical placeholder example profile now has a single home
   **with the desk-setup scaffold template**
-  (`plugins/desk-standard/skills/desk-setup/assets/template/_knowledge/profile.example.yaml`), so
+  (`plugins/deskkit/skills/desk-setup/assets/template/_knowledge/profile.example.yaml`), so
   copying the scaffold brings it into a new desk; the repo-facing docs (README, CLAUDE.md,
   getting-started) re-point there, and the repo-root `.gitignore` now ignores any local `_knowledge/`
   wholesale as a dogfooding artifact.
