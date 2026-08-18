@@ -25,7 +25,7 @@ setup: ## Install the git hooks (lefthook install)
 	@lefthook install
 	@echo "setup: lefthook pre-commit hooks installed."
 
-build: ## Build the librarian binary (go, version-stamped)
+build: ## Build the SPA (web/) + the librarian binary (go, version-stamped)
 	@$(MAKE) -C librarian build
 
 install: ## Build + install the librarian binary to ~/.local/bin (override PREFIX=/usr/local)

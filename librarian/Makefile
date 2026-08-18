@@ -40,14 +40,19 @@ BINDIR  := $(PREFIX)/bin
 VERSION  := $(shell cat ../VERSION 2>/dev/null || echo dev)
 LDFLAGS  := -X main.version=$(VERSION)
 
-.PHONY: help build install gui serve stop sweep patrol propose-fix findings summary \
+.PHONY: help spa build install gui serve stop sweep patrol propose-fix findings summary \
         adoption orphans uncollapsed verify dogfood-agent clean test vet fmt
 
 help: ## List targets
 	@grep -hE '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) \
 	  | awk -F':.*?## ' '{printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}'
 
-build: ## Build the deskkit binary (./deskkit), version-stamped from ../VERSION
+spa: ## Build the web/ SPA into internal/core/spa/dist (go:embed source; .gitkeep preserved)
+	@if [ ! -d ../web/node_modules ]; then cd ../web && npm ci; fi
+	@find internal/core/spa/dist -mindepth 1 -not -name .gitkeep -delete
+	@cd ../web && npm run build
+
+build: spa ## Build the SPA + the deskkit binary (./deskkit), version-stamped from ../VERSION
 	@go build -ldflags "$(LDFLAGS)" -o $(BIN) ./cmd/deskkit
 
 install: build ## Install the version-stamped binary to $(PREFIX)/bin (default ~/.local/bin; override PREFIX=...)

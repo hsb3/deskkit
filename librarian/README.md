@@ -250,58 +250,89 @@ README: `restore` is never exposed, `apply-fix` only runs when
 
 ### Browser session
 
-`serve` also mounts a self-contained session page at `http://127.0.0.1:8090/desk/chat` — a
-custom Go route serving a page embedded in the binary via `go:embed`, so there is no
-separate frontend build or toolchain needed at runtime (design origin:
-ADR 0001, option b). One visit is enough:
+`serve` mounts an SPA (Svelte + TypeScript, PocketBase JS SDK) at `http://127.0.0.1:8090/` — its
+production build is embedded in the binary via `go:embed`, so nothing extra is needed at runtime
+once the binary itself was built with `make build`'s Node step (a binary built with a bare
+`go build`, skipping that step, still compiles and runs — `/` then serves a small "not built"
+placeholder page instead). One visit is enough:
 
 ```bash
-./deskkit serve       # then open http://127.0.0.1:8090/desk/chat
+./deskkit serve       # then open http://127.0.0.1:8090/
 ```
 
-It drives the same multi-turn session and agent loop as `chat` — the same gated tool set
-and the same write boundary: `restore` is never reachable from this surface either, and
-`apply-fix` only runs when `LIBRARIAN_AUTONOMOUS_WRITES` is set (checked at execution
-time). History is bounded the same way as the REPL — the recent conversation is capped at
-40 messages — so a long session stays cheap rather than growing unbounded. Answers stream
-to the browser live, token by token, with tool steps shown, over Server-Sent Events, and a
-"New conversation" control resets the session.
+v1 screens: **chat** (the same multi-turn agent loop as `chat`/the REPL above) and a **read-only
+browse** of documents (files), findings, agent runs with their messages, and PM items. Writes
+stay on the CLI/MCP tool core — nothing in the SPA calls a write tool. The former standalone
+`/desk/chat` page (a single Go route serving embedded HTML) is removed; the URL still works,
+because the SPA's index fallback serves the same shell there, like any other client-side route.
+`POST /desk/chat/stream` and `POST /desk/chat/reset` are unchanged: same gated tool set and
+write boundary as `chat` (`restore` never reachable, `apply-fix` only when
+`LIBRARIAN_AUTONOMOUS_WRITES` is set, checked at execution time), same 40-message history cap,
+answers still stream to the browser live over Server-Sent Events.
 
-Auth on this route depends on the RESOLVED bind address, computed at serve time — never on a
-separate flag. On a loopback bind (`127.0.0.1`, `localhost`, `::1`, or empty meaning
-PocketBase's own default) the route stays unauthenticated, exactly like the TUI/REPL: its
-safety comes from the loopback binding itself, not a login, and it deliberately sits outside
-the PocketBase superuser admin login below (that gating would disqualify it as a general
-session surface). This is the byte-for-byte historical, still-default behavior.
+PocketBase's own admin console keeps living at `/_/` (see "The admin console" below); the raw
+API is under `/api/`.
 
-Binding `serve` to anything else — a wildcard address, a bare `:PORT` with no host, a routable
-IP, or a hostname that can't be proven loopback — switches the process into **public mode**:
-every route on this surface, the page included, requires a valid auth token from the `users` or
-superusers collection (`401` with no token at all; `403` for a valid token from some other
-auth collection — PocketBase's own `RequireAuth` distinguishes the two), and `serve` refuses to
-even start unless a superuser is guaranteed to exist (see the superuser env vars below). Both
-`--http` and `--https` are classified, not just whichever one the dependency happens to report
-on the serve event — one exposed listener makes the whole process public. A hostname that can't
-be proven loopback classifies as public, fail closed — this is derived from the bind addresses
-rather than a `--public` opt-in specifically because an opt-in flag can be forgotten while the
-process still binds a wildcard address, which fails open.
+**Auth: the SPA always holds a token — how it gets one depends on the RESOLVED bind address,
+computed at serve time, never a separate flag** (same derivation as everywhere else in this
+README):
+
+- **Loopback bind** (`127.0.0.1`, `localhost`, `::1`, or empty meaning PocketBase's own
+  default): `GET /desk/bootstrap` mints a superuser token for the SPA to hold on load, so the
+  local operator never sees a login form — a loopback-only route, origin-guarded against a
+  cross-site browser page quietly calling it, and not registered at all once the process is in
+  public mode. This is the same unauthenticated-by-binding posture the TUI/REPL always had.
+- **Public bind**: `/desk/bootstrap` does not exist on this process. The SPA's static shell
+  still loads without auth — the same posture as the admin console's own shell below: shell
+  loads, data doesn't — but instead of a chat screen it shows a login form, and authenticates
+  against the `_superusers` collection through the PocketBase JS SDK. Every domain collection
+  keeps its nil (superuser-only) API rules regardless of how the token was minted, so every data
+  call behind either shell needs one either way.
+
+Binding `serve` to anything else than loopback — a wildcard address, a bare `:PORT` with no
+host, a routable IP, or a hostname that can't be proven loopback — switches the process into
+**public mode**: the `/desk/chat/stream` and `/desk/chat/reset` endpoints require a valid auth
+token from the `users` or superusers collection (`401` with no token at all; `403` for a valid
+token from some other auth collection — PocketBase's own `RequireAuth` distinguishes the two),
+and `serve` refuses to even start unless a superuser is guaranteed to exist (see the superuser
+env vars below). Both `--http` and `--https` are classified, not just whichever one the
+dependency happens to report on the serve event — one exposed listener makes the whole process
+public. A hostname that can't be proven loopback classifies as public, fail closed — this is
+derived from the bind addresses rather than a `--public` opt-in specifically because an opt-in
+flag can be forgotten while the process still binds a wildcard address, which fails open.
 
 As a second layer (defense against a page on another site quietly driving your session from
-your browser), the state-changing endpoints — the turn/stream and the reset — reject a
-cross-origin browser request with a `403`. On a loopback bind, the check is the loopback-origin
-allowlist above (`127.0.0.1`, `localhost`, or `[::1]`, any port); on a public bind it switches to
-strict same-origin (the request's `Origin` must match its own `Host`), because the loopback
-allowlist would otherwise reject every real request to a hosted surface. Requests with no
-`Origin` header (curl and other non-browser tools) are unaffected in either mode. This check is
-CSRF defense in depth, not authentication by itself — on a public bind it runs alongside the
-route-level auth requirement above, and it is separate from the CORS header below.
+your browser), those same state-changing endpoints reject a cross-origin browser request with a
+`403`. On a loopback bind, the check is the loopback-origin allowlist above (`127.0.0.1`,
+`localhost`, or `[::1]`, any port); on a public bind it switches to strict same-origin (the
+request's `Origin` must match its own `Host`), because the loopback allowlist would otherwise
+reject every real request to a hosted surface. Requests with no `Origin` header (curl and other
+non-browser tools) are unaffected in either mode. This check is CSRF defense in depth, not
+authentication by itself — on a public bind it runs alongside the route-level auth requirement
+above, and it is separate from the CORS header below.
 
 CORS is handled separately from that same-origin check, and the two modes differ: on a public
 bind, the embedded store's own default CORS middleware — which otherwise answers every route
 with a wildcard `Access-Control-Allow-Origin` — is left unbound, so no
 `Access-Control-Allow-Origin` header is emitted at all (this surface is served same-origin and
-needs no cross-origin allowlist). On a loopback bind, that stock wildcard is left as it always
-was, matching the rule that local `serve` behavior stays unchanged.
+needs no cross-origin allowlist), unless an explicit `--origins` allowlist is set, in which case
+that allowlist is preserved. On a loopback bind, that stock wildcard is left as it always was,
+matching the rule that local `serve` behavior stays unchanged. See `../docs/pattern.md` for the
+full reusable model behind this section.
+
+### SPA dev workflow
+
+Iterating on the SPA doesn't need a Go rebuild each round-trip:
+
+```bash
+./deskkit serve            # backend + store on :8090, one terminal
+cd web && npm run dev      # Vite dev server with hot reload, another terminal
+```
+
+Vite proxies everything it doesn't own (`/api/`, `/desk/*`, `/_/`) to the running `serve`
+instance on `:8090`, so the dev server and the backend share one live store. `make build` (via
+`librarian/Makefile`'s `spa` target) does the real embedded build instead — `npm run build` into
+`internal/core/spa/dist/`, picked up by `go:embed` on the next `go build`.
 
 ## The admin console
 

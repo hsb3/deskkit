@@ -46,8 +46,10 @@ belongs to the desks the tools stand up.
   - **`pm`** — a document-gated work graph, on by default (opt out with `PM_ENABLED=false`).
 
   Surfaces over that one core: **CLI**, an **MCP server** (`deskkit mcp-serve`, narrowed by
-  `MCP_MODULES`), a **chat TUI**, and a **browser session page** (`/desk/chat` on the embedded
-  serve). Admin console (`make -C librarian gui`) serves PocketBase at `http://127.0.0.1:8090/_/`.
+  `MCP_MODULES`), a **chat TUI**, and a **browser SPA** at `/` on the embedded serve (chat, plus
+  read-only browse of files/findings/agent runs/PM items; `/desk/chat` still resolves via the
+  SPA's index fallback). Admin console (`make -C librarian gui`) serves PocketBase at
+  `http://127.0.0.1:8090/_/`.
 - **`plugins/desk-persona/`** — the ONE Claude Code plugin this marketplace ships: the agent-facing
   surface over that same binary. Seven skills (`desk-setup`, `conventions-standard`,
   `harvest-loop`, `brownfield-adoption`, `pm-session-open`, `pm-advance-item`, `pm-triage`), two
@@ -62,6 +64,8 @@ belongs to the desks the tools stand up.
 ```
 librarian/         the deskkit binary — embedded PocketBase; profile/librarian/pm modules;
                    CLI/MCP/TUI/web surfaces; verify.sh + e2e gates
+web/               the embedded SPA (Vite + Svelte + TypeScript + PocketBase JS SDK); `make build`
+                   builds it into librarian/internal/core/spa/dist/ via go:embed; never committed
 plugins/           the marketplace-distributed bundle (a marketplace install copies ONLY this)
   desk-persona/    the only bundle: 7 skills, librarian-operator + pm-operator agents,
                    SessionStart hook, .mcp.json — authored in place, nothing generated
@@ -79,13 +83,13 @@ VERSION            single source of truth for the release version (binary + bund
 
 ## The one rule that matters: identity-neutrality
 
-**Nothing under `librarian/`, `plugins/`, or `kits/` may hardcode a deployment identity** — no
+**Nothing under `librarian/`, `plugins/`, `kits/`, or `web/` may hardcode a deployment identity** — no
 person, org, repo name, or bare issue reference (`#123`). This is the product's core promise and
 the failure that rots worst: a hardcoded identity ships inside a distributed binary/plugin and
 can't be pulled back. It is enforced in CI, not by convention:
 
 ```
-# scope = librarian/ + plugins/ + kits/ recursively; docs/ and repo-root files are EXEMPT
+# scope = librarian/ + plugins/ + kits/ + web/ recursively; docs/ and repo-root files are EXEMPT
 node scripts/check-neutrality.mjs            # scans the shipped tree — FAILS on any hardcoded identity
 node scripts/check-neutrality.mjs --self-test  # proves the scanner still detects a seeded violation
 ```
@@ -102,7 +106,7 @@ the exit code and has let a failing gate through before (incident, 2026-07-17).
 |---|---|
 | `make help` | List all targets (default goal) |
 | `make setup` | `lefthook install` (git hooks) — there is no package-manager step |
-| `make build` | Build the `deskkit` binary (version-stamped) |
+| `make build` | Build the SPA (`web/`, via npm) then the `deskkit` binary (version-stamped), embedding the SPA dist via `go:embed` |
 | `make test` | Fast unit tests: `go test ./...` in `librarian/` |
 | `make check` | Repo gates: neutrality + self-test, kit-drift, scaffold frontmatter, persona drift, textfield-max, query-kind drift + self-test, doc-link integrity + self-test, shellcheck, actionlint, workflow SHA-pin drift + self-test, profile-root drift + self-test |
 | `make verify` | Librarian integration gate — `librarian/verify.sh` (throwaway scratch desk) |
@@ -216,9 +220,12 @@ account right there (rather than trusting a later non-fatal call) and re-counts 
 excluding the framework's own installer-placeholder row, which would otherwise satisfy a naive
 count with no real account behind it. Setting exactly one of that env pair is a loud fatal error
 in every mode. A self-contradictory `--origins` (a bare `*` mixed with explicit origins) also
-refuses to start on a public bind. Public mode puts the `/desk/chat` surface's three routes
-behind `apis.RequireAuth` (401 with no token, 403 for a token from the wrong auth collection)
-and switches its CSRF check to strict same-origin; CORS drops the framework's default wildcard
+refuses to start on a public bind. Public mode puts the two chat session routes
+(`/desk/chat/stream` + `/desk/chat/reset`) behind `apis.RequireAuth` (401 with no token, 403
+for a token from the wrong auth collection), leaves the loopback-only `/desk/bootstrap`
+token-mint route unregistered entirely (the SPA shows a login form instead), serves the static
+SPA shell without auth (shell loads, data doesn't — the admin-console stance),
+and switches the CSRF check to strict same-origin; CORS drops the framework's default wildcard
 unless an explicit `--origins` allowlist is set, in which case that allowlist is preserved (see
 `librarian/README.md`'s "Browser session" section and `docs/pattern.md` for the full model).
 
@@ -254,8 +261,10 @@ the librarian's supervised-write boundary wherever it runs.
   `make check`) fails on any dangling doc/media citation across the published+shipped surface, so a
   move that forgets a citation is caught — see `docs/development/docs-layout.md` for the full layout
   contract (what lives where, what's load-bearing, and how the working desk differs).
-- **Toolchain floor:** Go `1.25` (PocketBase's `go.mod` floors it). Node is needed only to run the
-  `scripts/*.mjs` gates — nothing shipped is built with it.
+- **Toolchain floor:** Go `1.25` (PocketBase's `go.mod` floors it). Node is needed both to run the
+  `scripts/*.mjs` gates and, now, to build the `web/` SPA that `make build` embeds into the
+  binary — a plain `go build` (skipping the SPA step) still compiles and runs, serving a
+  placeholder page at `/` instead of the SPA.
 
 ## Documentation
 

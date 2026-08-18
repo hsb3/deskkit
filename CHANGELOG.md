@@ -15,6 +15,21 @@ for why this policy exists.
 
 ### Added
 
+- **Embedded SPA v1** (DESK-52). `serve` now serves a Svelte + TypeScript single-page app (the
+  PocketBase JS SDK, built with Vite from a new repo-root `web/` tree) at `/`, replacing the old
+  standalone `/desk/chat` HTML page — that URL still resolves, via the SPA's own index fallback.
+  `make build` builds the SPA before the Go binary and embeds its dist via `go:embed`; a binary
+  built with a bare `go build` (no Node step) still compiles and runs, serving a small "not
+  built" placeholder at `/` instead. v1 ships a chat screen (unchanged `/desk/chat/stream` and
+  `/desk/chat/reset` endpoints underneath) plus a read-only browse of documents, findings, agent
+  runs with their messages, and PM items; writes stay on the CLI/MCP tool core. Auth: on a
+  loopback bind, a new loopback-only, origin-guarded `GET /desk/bootstrap` route mints the SPA a
+  superuser token so the local operator sees no login; a public bind has no bootstrap route and
+  the SPA instead shows a login form authenticating against `_superusers` via the SDK — resolving
+  the previously accepted limitation that a hosted `/desk/chat` was not browser-navigable. The
+  SPA's static shell loads without auth in both cases (same posture as the admin console's own
+  shell: shell loads, data doesn't) — every domain collection keeps its nil, superuser-only API
+  rules underneath either shell.
 - **`schema/` contract versioning** (#124; ADR 0009). `schema/doctypes.yaml` and
   `schema/profile.schema.yaml` carry an explicit version marker (`contract_version` /
   `x-contract-version`, both `1` today); both lanes' loaders reject an unrecognized version loud

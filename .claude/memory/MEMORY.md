@@ -12,7 +12,8 @@ _Index format: one line per memory file — a markdown link to the topic file, t
 - [Multi-worktree wave mechanics](multi-worktree-wave-mechanics.md) — hard-won mechanics for running parallel PR lanes via .claude/worktrees in this repo
 - [Plugin marketplace packaging](plugin-marketplace-packaging.md) — how Claude Code marketplace install constrains desk-standard packaging, and the bundle solution that landed
 - [No public/1.0.0 nagging](feedback-no-public-1.0.0-nagging.md) — don't prompt Henry about going public or cutting 1.0.0 (#87); his call, not a standing agenda item
-- [Consolidation: single binary](consolidation-single-binary-decision.md) — owner ruling to collapse two plugins/MCP servers into one on the Go binary (reverses ADR 0016) + central config stores the LLM key
+- [Consolidation: single binary](consolidation-single-binary-decision.md) — owner ruling to collapse two plugins/MCP servers into one on the Go binary (reverses ADR 0016) + central config stores the LLM key; SHIPPED 2026-08-18 (PRs #240/#241)
+- [App family domain split](app-family-domain-split.md) — deskkit = documents + agents, task-manager = tasks (auth donor), Kaneo is a stopgap; never frame deskkit as a Kaneo/board replacement
 - [Neutrality-lint blind spots](neutrality-lint-blindspots.md) — the D8 lint misses person names + qualified org/repo#issue inside its own scan scope; grep yourself, don't trust a green lint
 - [PocketBase serve swallows RunE errors](pocketbase-serve-swallows-runE-errors.md) — serve/superuser exit 0 on RunE failure; a printed `Error:` line ≠ nonzero exit — check `$?` directly
 - [TUI AdaptiveColor pre-warm](tui-adaptivecolor-prewarm.md) — chat-TUI no-terminal-query invariant holds only via bubbletea v1's tea_init.go pre-warm (gone in v2); re-verify on any bubbletea bump

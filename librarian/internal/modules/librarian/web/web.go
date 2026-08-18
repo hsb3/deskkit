@@ -1,9 +1,9 @@
-// Package web is the local browser session surface for the librarian: a custom Go route
-// mounted on the embedded PocketBase `serve` that serves a purpose-built, self-contained page
-// driving the SAME multi-turn stewardship session the `chat` REPL exposes. It is the deferred
-// follow-on recorded by ADR 0001 (interactive-surface: terminal first, PocketBase-served webapp
-// later) — option (b): a small custom Go route serving an embedded page, kept in the one binary
-// so the single-binary identity holds (no second toolchain, no separate frontend deploy).
+// Package web is the browser session API for the librarian: custom Go routes mounted on the
+// embedded PocketBase `serve` that drive the SAME multi-turn stewardship session the `chat`
+// REPL exposes. It began as ADR 0001's option (b) — a self-contained embedded page plus its
+// stream/reset endpoints. The page has since moved into the embedded SPA (the core spa
+// package serves the shell at `/`, and the old /desk/chat URL lands there via the SPA's index
+// fallback); what remains here is the session transport the SPA's chat screen POSTs to.
 //
 // The write boundary and the stewardship-lane boundary are INHERITED, not re-declared: this
 // surface opens no new tool or write path. Every turn runs over an *agent.Session, whose tool
@@ -20,7 +20,7 @@
 //     127.0.0.1) — it is a local, on-demand, single-operator surface, not a hosted service. It is
 //     deliberately NOT wired to the superuser admin auth (which would disqualify it as a general
 //     surface, ADR 0001). This is the byte-for-byte historical behavior.
-//   - Non-loopback bind (public mode): all three routes require a valid auth token
+//   - Non-loopback bind (public mode): both routes require a valid auth token
 //     (apis.RequireAuth over the `users` and superusers collections), and the cross-origin guard
 //     switches from the loopback allowlist to a strict same-origin check against the request's own
 //     Host. No wildcard CORS is ever configured — a `*` policy would hand the surface to any page
@@ -39,8 +39,6 @@ import (
 	"net/url"
 	"sync"
 
-	_ "embed"
-
 	"github.com/pocketbase/pocketbase/apis"
 	"github.com/pocketbase/pocketbase/core"
 	"github.com/pocketbase/pocketbase/tools/router"
@@ -48,12 +46,11 @@ import (
 	"github.com/hsb3/desk-standard/librarian/internal/modules/librarian/agent"
 )
 
-// Route paths. The page is a human destination (served as HTML); stream and reset are the
-// page's own fetch endpoints. Exported so tests and docs reference the same literals.
+// Route paths — the chat screen's fetch endpoints. Exported so tests and docs reference the
+// same literals. The former GET /desk/chat page route is gone: that URL now serves the SPA
+// shell through the spa package's index fallback.
 const (
-	// PathChat is the documented URL a person visits in one browser request.
-	PathChat = "/desk/chat"
-	// PathStream is the SSE endpoint the page POSTs each turn to.
+	// PathStream is the SSE endpoint the chat screen POSTs each turn to.
 	PathStream = "/desk/chat/stream"
 	// PathReset ends the current server-held conversation so the next turn starts fresh.
 	PathReset = "/desk/chat/reset"
@@ -62,9 +59,6 @@ const (
 // maxRequestBody caps a turn's request body. The surface is loopback and single-operator, but a
 // bound keeps a stray client from streaming an unbounded body into memory before the turn runs.
 const maxRequestBody = 1 << 20 // 1 MiB
-
-//go:embed assets/index.html
-var indexHTML []byte
 
 // Streamer is the slice of *agent.Session this surface depends on: drive one multi-turn
 // conversation as a live event stream, and finalize it. Keeping the dependency an interface is
@@ -159,19 +153,19 @@ type handler struct {
 	public bool
 }
 
-// Register mounts the three session-surface routes on the serve router, all backed by one shared
+// Register mounts the two session-API routes on the serve router, both backed by one shared
 // session holder. Call it once under OnServe (the routes are serve-only, like the wake layer).
 // The returned cleanup finalizes the held session; wire it to app shutdown (best-effort).
 //
 // public says the server is bound to a non-loopback address (see the package doc). It is false
-// for every local `deskkit serve`, and in that case this function's behavior — the three routes,
-// unauthenticated, loopback-origin-guarded — is byte-for-byte what it has always been. When true,
-// every route (the page included, so a browser cannot even load the shell unauthenticated) is
-// bound behind apis.RequireAuth.
+// for every local `deskkit serve`, and in that case this function's behavior — the routes,
+// unauthenticated, loopback-origin-guarded — is byte-for-byte what it has always been. When
+// true, both routes are bound behind apis.RequireAuth. (The SPA shell that fronts them is
+// static and served without auth by the spa package — shell loads, data doesn't, matching the
+// admin console's stance.)
 func Register(r *router.Router[*core.RequestEvent], newSession NewSessionFunc, public bool) (cleanup func(context.Context)) {
 	h := &handler{holder: &sessionHolder{newSess: newSession}, public: public}
 	routes := []*router.Route[*core.RequestEvent]{
-		r.GET(PathChat, h.page),
 		r.POST(PathStream, h.stream),
 		r.POST(PathReset, h.reset),
 	}
@@ -183,13 +177,7 @@ func Register(r *router.Router[*core.RequestEvent], newSession NewSessionFunc, p
 	return h.holder.close
 }
 
-// page serves the self-contained session page. No session is created here — the page loads with
-// no LLM key required; the session is built lazily on the first turn.
-func (h *handler) page(e *core.RequestEvent) error {
-	return e.Blob(http.StatusOK, "text/html; charset=utf-8", indexHTML)
-}
-
-// streamRequest is the turn request body the page POSTs.
+// streamRequest is the turn request body the chat screen POSTs.
 type streamRequest struct {
 	Message string `json:"message"`
 }

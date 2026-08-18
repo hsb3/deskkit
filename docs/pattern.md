@@ -159,11 +159,26 @@ would let self-service verification work.
 
 ### What public mode changes on the embedded web surface
 
-The browser session surface's three routes go from unauthenticated (loopback default) to
-requiring a valid token from the end-user or superuser auth collection, and a same-origin guard
-on the state-changing routes switches from a loopback-origin allowlist to strict same-origin
-(the request's `Origin` must match its own `Host`, checked in application code — a separate
-mechanism from CORS headers below).
+The embedded web surface is a single-page app served at `/`, its production build embedded in
+the binary — not a server-rendered page — so what "authenticated" means for it differs from a
+classic auth-gated route. The SPA's *shell* (its static HTML/JS/CSS) always loads: on a loopback
+bind, a loopback-only bootstrap route mints it a superuser token on load so the operator never
+sees a login screen; on a public bind that bootstrap route does not exist, and the shell instead
+renders a login form that authenticates against the store's own superuser/end-user auth
+collection through the client SDK. Either way, every data call the shell makes still needs that
+token — the domain collections' nil (superuser-only) API rules are unconditional and don't relax
+because the shell rendered. The state-changing routes underneath the shell (the chat
+turn/stream and the reset) go from unauthenticated (loopback default) to requiring a valid token
+from the end-user or superuser auth collection, and their same-origin guard switches from a
+loopback-origin allowlist to strict same-origin (the request's `Origin` must match its own
+`Host`, checked in application code — a separate mechanism from CORS headers below).
+
+**Reusable lesson for a sibling that also ships a client-rendered app off the same binary**: a
+bootstrap-token route is a substitute for a login screen, not for auth itself — it only ever
+runs on the bind the operator already trusts (loopback), and it must vanish entirely, not merely
+go unused, once the process no longer has that trust. Registering it unconditionally and relying
+on it "just not being called" in public mode is the same class of bug as the nil-rules trap
+below: a bypass in the code path someone forgot to look at is still a bypass.
 
 **CORS is a two-mode split, and it caught a real trap.** The embedded store's own default
 middleware answers every route with a wildcard `Access-Control-Allow-Origin` unless something
@@ -188,19 +203,22 @@ survive your own auth hardening silently**, because the header comes from the fr
 middleware, not from a line you wrote or a test you can see failing. Verify security headers
 against a live response, not against your own diff.
 
-Accuracy trap: the admin console's SPA shell is static HTML and returns 200 to a stranger — that
-is expected, not an opening. Every API call behind that shell is still superuser-gated and
-returns 403 unauthenticated. Describe the exposure precisely (shell loads, data doesn't), not as
-one status code.
+Accuracy trap: both SPA shells — the admin console's and the application's own — are static HTML
+and return 200 to a stranger; that is expected, not an opening. Every API call behind either
+shell is still superuser-gated and returns 403 unauthenticated. Describe the exposure precisely
+(shell loads, data doesn't), not as one status code.
 
-### Two accepted limitations
+### One accepted limitation
 
-1. Because the browser session page requires an auth token and a plain browser navigation sends
-   no `Authorization` header, **a bare browser visit to the hosted page returns 401.** The page
-   is reachable only by a client that sets the header itself. Making it directly browsable needs
-   a cookie- or token-bootstrap flow — a separate design decision, not part of this shape.
-2. Self-service email verification does not work without outbound mail configured (see above).
-   Approval is a manual admin-console step until SMTP is wired up.
+Self-service email verification does not work without outbound mail configured (see above).
+Approval is a manual admin-console step until SMTP is wired up.
+
+The sibling limitation this shape used to carry — a bare browser visit to the hosted app
+returning 401 because a plain navigation sends no `Authorization` header — is resolved by
+splitting the bootstrap: a loopback-only route mints the token invisibly where the bind itself is
+the trust boundary, and a public bind renders a login form instead of trying to smuggle a header
+into a navigation that can't carry one. A sibling that hits the same "how does a browser get a
+token with no header of its own" wall should look at this split before reaching for cookies.
 
 ## The deploy recipe
 

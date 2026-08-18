@@ -161,34 +161,6 @@ func postWithOrigin(t *testing.T, url, body, origin string) *http.Response {
 	return resp
 }
 
-// TestPageRoute_ServesHTML: DoD 1 — a running server serves the session page at the documented
-// URL with 200 + text/html, via the custom Go route registered by web.Register.
-func TestPageRoute_ServesHTML(t *testing.T) {
-	srv, _ := newTestServer(t, func(context.Context) (Streamer, error) {
-		return &fakeStreamer{}, nil // never called on the page route
-	})
-
-	resp, err := http.Get(srv.URL + PathChat)
-	if err != nil {
-		t.Fatalf("GET %s: %v", PathChat, err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		t.Fatalf("status = %d, want 200", resp.StatusCode)
-	}
-	if ct := resp.Header.Get("Content-Type"); !strings.HasPrefix(ct, "text/html") {
-		t.Fatalf("Content-Type = %q, want text/html…", ct)
-	}
-	b, _ := io.ReadAll(resp.Body)
-	body := string(b)
-	for _, marker := range []string{"<!doctype html", `id="messages"`, "deskkit"} {
-		if !strings.Contains(strings.ToLower(body), strings.ToLower(marker)) {
-			t.Fatalf("page body missing marker %q", marker)
-		}
-	}
-}
-
 // TestStreamRoute_SSEFrames: DoD 4 — a turn's events stream to the browser as SSE frames that
 // are exactly StreamTurn's JSON-tagged agent.Event values, in order, ending on the terminal
 // (final) event. The fake session is the provider stand-in (no live LLM).
@@ -390,16 +362,6 @@ func TestOriginGuard(t *testing.T) {
 		t.Fatalf("reset cross-origin: status = %d, want 403", rr.StatusCode)
 	}
 	rr.Body.Close()
-
-	// The GET page is a navigation and is NOT origin-guarded (loads regardless).
-	pr, err := http.Get(srv.URL + PathChat)
-	if err != nil {
-		t.Fatalf("GET page: %v", err)
-	}
-	if pr.StatusCode != http.StatusOK {
-		t.Fatalf("page route status = %d, want 200 (page must not be origin-guarded)", pr.StatusCode)
-	}
-	pr.Body.Close()
 }
 
 // TestSessionHolder_ResetWaitsForInFlightTurn: reset (and shutdown close) must never Close the
@@ -507,8 +469,8 @@ func requestWithHeaders(t *testing.T, method, url, body string, headers map[stri
 	return resp
 }
 
-// TestPublicMode_UnauthenticatedIs401: on a non-loopback bind, EVERY route — the page included —
-// refuses an unauthenticated request. This is the whole point of deriving the mode from the bind
+// TestPublicMode_UnauthenticatedIs401: on a non-loopback bind, both session routes
+// refuse an unauthenticated request. This is the whole point of deriving the mode from the bind
 // address: expose the port and the surface stops being open, with no flag to remember.
 func TestPublicMode_UnauthenticatedIs401(t *testing.T) {
 	srv, _, _ := newTestServerMode(t, func(context.Context) (Streamer, error) {
@@ -519,7 +481,6 @@ func TestPublicMode_UnauthenticatedIs401(t *testing.T) {
 	cases := []struct {
 		method, path, body string
 	}{
-		{http.MethodGet, PathChat, ""},
 		{http.MethodPost, PathStream, `{"message":"hi"}`},
 		{http.MethodPost, PathReset, ``},
 	}
@@ -542,15 +503,8 @@ func TestPublicMode_AuthenticatedPasses(t *testing.T) {
 			srv, _, app := newTestServerMode(t, func(context.Context) (Streamer, error) { return fake, nil }, true)
 			tok := authToken(t, app, collection, "member-"+collection+"@desk.test")
 
-			resp := requestWithHeaders(t, http.MethodGet, srv.URL+PathChat, "",
-				map[string]string{"Authorization": tok})
-			if resp.StatusCode != http.StatusOK {
-				t.Fatalf("authenticated page: status = %d, want 200", resp.StatusCode)
-			}
-			resp.Body.Close()
-
-			// Same-origin POST (the page's own fetch) is accepted and streams.
-			resp = requestWithHeaders(t, http.MethodPost, srv.URL+PathStream, `{"message":"hi"}`,
+			// Same-origin POST (the chat screen's fetch) is accepted and streams.
+			resp := requestWithHeaders(t, http.MethodPost, srv.URL+PathStream, `{"message":"hi"}`,
 				map[string]string{"Authorization": tok, "Origin": srv.URL})
 			if resp.StatusCode != http.StatusOK {
 				t.Fatalf("authenticated same-origin stream: status = %d, want 200", resp.StatusCode)
@@ -611,19 +565,13 @@ func TestPublicMode_OriginIsSameOriginNotWildcard(t *testing.T) {
 // response. Assert response headers only where the middleware under test is actually bound.
 
 // TestLoopbackMode_UnchangedByPublicPlumbing: the local posture is byte-for-byte what it was —
-// no token required on any of the three routes, and the loopback-origin allowlist still applies.
+// no token required on either route, and the loopback-origin allowlist still applies.
 // This is the "default local deskkit serve behavior unchanged" assertion.
 func TestLoopbackMode_UnchangedByPublicPlumbing(t *testing.T) {
 	fake := &fakeStreamer{events: scriptedTurn()}
 	srv, _, _ := newTestServerMode(t, func(context.Context) (Streamer, error) { return fake, nil }, false)
 
-	resp := requestWithHeaders(t, http.MethodGet, srv.URL+PathChat, "", nil)
-	if resp.StatusCode != http.StatusOK {
-		t.Fatalf("loopback page without a token: status = %d, want 200", resp.StatusCode)
-	}
-	resp.Body.Close()
-
-	resp = requestWithHeaders(t, http.MethodPost, srv.URL+PathStream, `{"message":"hi"}`,
+	resp := requestWithHeaders(t, http.MethodPost, srv.URL+PathStream, `{"message":"hi"}`,
 		map[string]string{"Origin": strings.Replace(srv.URL, "127.0.0.1", "localhost", 1)})
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("loopback stream from the localhost spelling: status = %d, want 200", resp.StatusCode)
