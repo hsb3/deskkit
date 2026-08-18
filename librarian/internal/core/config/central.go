@@ -181,14 +181,14 @@ func ResolveAPIKey(envName string) (key, source string) {
 }
 
 // MaskSecret renders a secret for display. It NEVER returns the full secret: an empty value
-// renders "(unset)", a value shorter than 8 characters renders "(set)" with no tail at all
-// (too short for a 4-char tail to be non-identifying), and anything longer exposes only its
-// last 4 characters.
+// renders "(unset)", a value of 8 characters or fewer renders "(set)" with no tail at all (at
+// that length a 4-char tail is at least HALF the secret — too much to be non-identifying), and
+// anything longer exposes only its last 4 characters.
 func MaskSecret(s string) string {
 	switch {
 	case s == "":
 		return "(unset)"
-	case len(s) < 8:
+	case len(s) <= 8:
 		return "(set)"
 	default:
 		return "(set, …" + s[len(s)-4:] + ")"

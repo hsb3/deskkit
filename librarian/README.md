@@ -125,8 +125,10 @@ reads it and in what order. It opens no store.
 ```
 
 `default_desk` lets `DESK_NAME` resolve on a machine with no profile and no env var set — the
-same central leg `LLM_PROVIDER`/`LLM_MODEL` use, so one file can carry both "which desk" and
-"which model" for a single-desk machine.
+same central leg `LLM_PROVIDER`/`LLM_MODEL` use. It does **not** on its own make an arbitrary
+directory a desk: `DESK_ROOT` has no central leg, so with only `default_desk` set the binary
+still reports "No desk resolves here". Pair it with a profile (or an exported `DESK_ROOT`) to
+name the desk once, machine-wide, and keep the model settings in the same file.
 
 ## Choosing the LLM and setting the API key
 

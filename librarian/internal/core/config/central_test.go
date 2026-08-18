@@ -147,6 +147,15 @@ func TestMaskSecret(t *testing.T) {
 	if got := MaskSecret(short); strings.Contains(got, "abc") || strings.Contains(got, "123") {
 		t.Errorf("MaskSecret(%q) = %q — a short secret must expose no tail", short, got)
 	}
+	// The boundary itself: at exactly 8 characters a 4-char tail is HALF the secret, which is as
+	// identifying as it is at 7. The cut-off has to include 8, not stop just below it.
+	boundary := "abcd1234"
+	if got := MaskSecret(boundary); got != "(set)" {
+		t.Errorf("MaskSecret(%q) = %q — an 8-char secret must expose no tail (a 4-char tail is half of it)", boundary, got)
+	}
+	if got := MaskSecret("abcde1234"); !strings.HasSuffix(got, "1234)") {
+		t.Errorf("MaskSecret on a 9-char secret = %q, want a last-4 tail (9 is the first length that gets one)", got)
+	}
 	long := "sk-test-0123456789abcdef"
 	got := MaskSecret(long)
 	if strings.Contains(got, long) {
@@ -347,8 +356,11 @@ func TestLoadToleratesMalformedCentral(t *testing.T) {
 	}
 }
 
-// Sources must be populated for every field Load resolves, so a display surface needs no
-// second lookup table.
+// Every source Load records must be one of the four legs. The keys are taken from Sources
+// ITSELF, never hand-listed: a hand-copied list silently stops covering a field the moment one
+// is added (it drifted to 22 of 24 exactly that way). The other half of this contract — that the
+// Sources key set and `config show`'s rows are the SAME set, in both directions — is asserted in
+// the cmd package, where the display table lives.
 func TestSourcesCoverResolvedFields(t *testing.T) {
 	deskDir := t.TempDir()
 	restore := chdir(t, deskDir)
@@ -361,18 +373,73 @@ func TestSourcesCoverResolvedFields(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, k := range []string{
-		"PB_URL", "DESK_ROOT", "DESK_NAME", "DECISIONS_DIR", "TASKS_DIR", "ANALYSES_DIR",
-		"JOURNAL_DIR", "SECRETS_DIR", "HANDOFF_PATH", "IGNORE_CONFIG", "LLM_PROVIDER",
-		"LLM_MODEL", "LLM_API_KEY_ENV", "LLM_MAX_TOKENS", "LLM_CONTEXT_WINDOW",
-		"AGENT_MAX_STEP", "LIBRARIAN_AUTONOMOUS_WRITES", "CLAIMER_POLL_INTERVAL",
-		"PM_ENABLED", "PM_CLAIM_TTL", "PM_AUTONOMOUS_WRITES", "PM_STALLED_DAYS",
-	} {
-		switch cfg.Sources[k] {
+	if len(cfg.Sources) == 0 {
+		t.Fatal("Load recorded no sources at all")
+	}
+	for k, source := range cfg.Sources {
+		switch source {
 		case SourceEnv, SourceProfile, SourceCentral, SourceDefault:
 		default:
-			t.Errorf("Sources[%q] = %q, want one of env/profile/central/default", k, cfg.Sources[k])
+			t.Errorf("Sources[%q] = %q, want one of env/profile/central/default", k, source)
 		}
+	}
+}
+
+// IGNORE_CONFIG has no leg of its own: absent an env var it is DERIVED from the resolved
+// DeskRoot. Its recorded source must therefore be the leg DESK_ROOT won on — a row whose value
+// visibly traces to the profile while the SOURCE column says "default" is exactly the
+// value/source disagreement Sources exists to make impossible.
+func TestIgnoreConfigSourceFollowsDeskRoot(t *testing.T) {
+	deskDir := t.TempDir()
+	restore := chdir(t, deskDir)
+	defer restore()
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	t.Setenv("DESK_NAME", "example-desk")
+	os.Unsetenv("IGNORE_CONFIG")
+
+	// DESK_ROOT from the profile => the derived IGNORE_CONFIG is sourced "profile".
+	os.Unsetenv("DESK_ROOT")
+	if err := os.MkdirAll(filepath.Join(deskDir, "_knowledge"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	profile := "desk:\n  name: example-desk\n  root: \".\"\n"
+	if err := os.WriteFile(filepath.Join(deskDir, "_knowledge", "profile.yaml"), []byte(profile), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := filepath.Join(cfg.DeskRoot, ".librarian-ignore"); cfg.IgnoreConfig != want {
+		t.Fatalf("IgnoreConfig = %q, want the DeskRoot-derived %q", cfg.IgnoreConfig, want)
+	}
+	if got, deskRoot := cfg.Sources["IGNORE_CONFIG"], cfg.Sources["DESK_ROOT"]; got != deskRoot {
+		t.Errorf("Sources[IGNORE_CONFIG] = %q but the path it was derived from came from %q",
+			got, deskRoot)
+	}
+
+	// DESK_ROOT from the env => the same derived value is sourced "env".
+	t.Setenv("DESK_ROOT", deskDir)
+	cfg, err = Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Sources["DESK_ROOT"] != SourceEnv {
+		t.Fatalf("setup: DESK_ROOT source = %q, want env", cfg.Sources["DESK_ROOT"])
+	}
+	if got := cfg.Sources["IGNORE_CONFIG"]; got != SourceEnv {
+		t.Errorf("Sources[IGNORE_CONFIG] = %q, want env (it is derived from an env-supplied DESK_ROOT)", got)
+	}
+
+	// An explicit IGNORE_CONFIG still reports its own env leg, not DESK_ROOT's.
+	t.Setenv("IGNORE_CONFIG", filepath.Join(deskDir, "custom-ignore"))
+	cfg, err = Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.IgnoreConfig != filepath.Join(deskDir, "custom-ignore") || cfg.Sources["IGNORE_CONFIG"] != SourceEnv {
+		t.Errorf("explicit IGNORE_CONFIG = %q (%s), want the env value (env)",
+			cfg.IgnoreConfig, cfg.Sources["IGNORE_CONFIG"])
 	}
 }
 

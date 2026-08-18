@@ -11,12 +11,15 @@ import (
 	"github.com/hsb3/desk-standard/librarian/internal/core/config"
 )
 
-// hermeticXDG points XDG_DATA_HOME at a throwaway scratch so no test can touch a real
-// ~/.local/share store, and returns that scratch dir (mirrors verify.sh's hermetic pattern).
+// hermeticXDG points BOTH XDG homes at throwaway scratch dirs and returns the data one (mirrors
+// verify.sh's hermetic pattern). Data home alone is not enough: config.Load also reads the
+// machine-wide config under XDG_CONFIG_HOME, so pinning only the data home leaves a test reading
+// whatever the developer happens to have in their real ~/.config/deskkit/config.yaml.
 func hermeticXDG(t *testing.T) string {
 	t.Helper()
 	xdg := t.TempDir()
 	t.Setenv("XDG_DATA_HOME", xdg)
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
 	return xdg
 }
 

@@ -168,10 +168,15 @@ func Load() (*Config, error) {
 	c.AgentMaxStep = r.envInt("AGENT_MAX_STEP", "", 12)
 	c.ClaimerPollInterval = r.envDuration("CLAIMER_POLL_INTERVAL", 5*time.Second)
 
-	// IGNORE_CONFIG default depends on the resolved DeskRoot; env still overrides.
+	// IGNORE_CONFIG default depends on the resolved DeskRoot; env still overrides. When the
+	// derived branch fires, the value traces to whatever leg supplied DESK_ROOT, so re-mark it
+	// with THAT source: pick already recorded "default" for IGNORE_CONFIG's own (absent) legs,
+	// and a displayed path that visibly came from the profile while the SOURCE column says
+	// "default" is the value/source disagreement this map exists to prevent.
 	c.IgnoreConfig = r.pick("IGNORE_CONFIG", "", "", "")
 	if c.IgnoreConfig == "" && c.DeskRoot != "" {
 		c.IgnoreConfig = filepath.Join(c.DeskRoot, ".librarian-ignore")
+		r.mark("IGNORE_CONFIG", r.sources["DESK_ROOT"])
 	}
 
 	var missing []string

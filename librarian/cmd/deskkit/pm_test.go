@@ -306,7 +306,7 @@ func TestPMActorBeforeLeaf_Subprocess(t *testing.T) {
 		t.Helper()
 		cmd := exec.Command(binPath, args...)
 		cmd.Dir = deskDir
-		cmd.Env = append(os.Environ(), "PM_ENABLED=true", "XDG_DATA_HOME="+xdgHome)
+		cmd.Env = append(os.Environ(), "PM_ENABLED=true", "XDG_DATA_HOME="+xdgHome, "XDG_CONFIG_HOME="+t.TempDir())
 		var outBuf, errBuf bytes.Buffer
 		cmd.Stdout = &outBuf
 		cmd.Stderr = &errBuf

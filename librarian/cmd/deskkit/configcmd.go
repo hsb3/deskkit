@@ -104,7 +104,11 @@ func newConfigSetCmd() *cobra.Command {
 			key, value := args[0], args[1]
 			c, err := config.LoadCentral()
 			if err != nil {
-				return err
+				// `set` must not rewrite a file it could not parse — that would silently discard
+				// whatever else the operator had in it. `edit` is the way out: it stats the path
+				// and hands the raw file to $EDITOR without ever parsing it. The error already
+				// names the file.
+				return fmt.Errorf("%w\nrepair it by hand with `deskkit config edit`, then re-run `deskkit config set`", err)
 			}
 			if err := c.Set(key, value); err != nil {
 				return err
@@ -191,11 +195,15 @@ func writeConfigShow(w io.Writer) error {
 	cfg, cfgErr := config.Load()
 	if cfgErr != nil {
 		central, lerr := config.LoadCentral()
+		centralNote := existsNote(centralPath)
 		if lerr != nil {
-			return lerr
+			// Both halves broken — no desk here AND an unparseable file — is EXACTLY when this
+			// command gets run, so it degrades the same way Load does (warn, treat as absent)
+			// instead of exiting 1 with nothing actionable. The marker names the file to fix.
+			central, centralNote = &config.Central{}, "(unparseable — fix it with `deskkit config edit`)"
 		}
 		fmt.Fprintf(w, "No desk resolves here: %v\n\n", cfgErr)
-		fmt.Fprintf(w, "Machine-wide config file: %s  %s\n\n", centralPath, existsNote(centralPath))
+		fmt.Fprintf(w, "Machine-wide config file: %s  %s\n\n", centralPath, centralNote)
 		tw := tabwriter.NewWriter(w, 0, 2, 2, ' ', 0)
 		fmt.Fprintf(tw, "KEY\tVALUE\n")
 		for _, key := range config.CentralKeys() {

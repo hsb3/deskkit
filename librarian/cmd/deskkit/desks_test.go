@@ -108,18 +108,7 @@ func TestDesksCmd_UnresolvableConfigIsNotFatal(t *testing.T) {
 	}
 }
 
-// TestDesksCmd_CreatesNoStore proves the interception contract: asking which desks exist must
-// not materialize a store directory.
-func TestDesksCmd_CreatesNoStore(t *testing.T) {
-	data := t.TempDir()
-	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
-	t.Setenv("XDG_DATA_HOME", data)
-	t.Setenv("DESK_ROOT", t.TempDir())
-	t.Setenv("DESK_NAME", "ghost")
-
-	runCmdOut(t, newDesksCmd())
-
-	if _, err := os.Stat(filepath.Join(data, "deskkit", "ghost")); err == nil {
-		t.Fatal("desks created a store directory; it must only read")
-	}
-}
+// The "desks creates no store" guarantee is NOT tested here. It comes from main()'s
+// interception, not from newDesksCmd(), so an in-process test of it cannot fail — see
+// TestReadOnlyCommandsCreateNoStore_Subprocess in configcmd_test.go, which runs the real binary
+// and covers `desks` alongside `config`.
