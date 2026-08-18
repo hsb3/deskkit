@@ -22,6 +22,8 @@ import (
 
 	"github.com/mattn/go-isatty"
 	"github.com/pocketbase/pocketbase"
+	// pbcmd is aliased: `cmd` is the parameter name of every RunE closure in this file.
+	pbcmd "github.com/pocketbase/pocketbase/cmd"
 	"github.com/pocketbase/pocketbase/core"
 	"github.com/pocketbase/pocketbase/plugins/migratecmd"
 	"github.com/spf13/cobra"
@@ -76,6 +78,19 @@ func main() {
 		os.Exit(runInit(os.Args[1:]))
 	}
 
+	// `desks` and `config` are read-only orientation commands over the XDG homes: they enumerate
+	// the store dirs / print the resolved configuration and open NO store. They are intercepted
+	// here for exactly the reason `init` is — PocketBase's skipBootstrap only spares
+	// --help/--version/an unknown command, so a normally-dispatched `desks` would still reach
+	// Bootstrap and MkdirAll a stray store dir just for asking which desks exist. Both stay
+	// registered on app.RootCmd below for discovery/`--help` (whose path skips Bootstrap).
+	if isInterceptedInvocation(os.Args[1:], "desks") {
+		os.Exit(runIntercepted(newDesksCmd(), os.Args[1:]))
+	}
+	if isInterceptedInvocation(os.Args[1:], "config") {
+		os.Exit(runIntercepted(newConfigCmd(), os.Args[1:]))
+	}
+
 	// Config is resolved BEFORE the app is constructed: the store location is derived from
 	// DESK_NAME and seeds PocketBase's --dir default (ADR 0002 §2). config.Load has no
 	// PocketBase dependency, so this reorder is safe. serve/migrate (schema ops) may still run
@@ -103,12 +118,8 @@ func main() {
 	var defaultDataDir string
 	var locErr error
 	if !explicitDir {
-		if cfgErr != nil {
-			locErr = fmt.Errorf(
-				"cannot resolve the store location: %w; set DESK_NAME (env or _knowledge/profile.*) or pass --dir <path>",
-				cfgErr)
-		} else if dir, derr := store.StoreDir(cfg.DeskName); derr != nil {
-			locErr = fmt.Errorf("cannot resolve the store location: %w; pass --dir <path>", derr)
+		if dir, derr := resolveStoreLocation(cfg, cfgErr); derr != nil {
+			locErr = derr
 		} else {
 			defaultDataDir = dir
 			// Pre-create the store dir 0700 so it is not group/world-readable — PocketBase's own
@@ -158,8 +169,8 @@ func main() {
 				// location (0700, matching the guard above) so the requested command can continue.
 				if newCfg, nerr := config.Load(); nerr == nil {
 					cfg, cfgErr = newCfg, nil
-					if dir, serr := store.StoreDir(cfg.DeskName); serr != nil {
-						locErr = fmt.Errorf("cannot resolve the store location: %w; pass --dir <path>", serr)
+					if dir, serr := resolveStoreLocation(cfg, nil); serr != nil {
+						locErr = serr
 					} else if mgErr := store.MigrateLegacyStoreDir(cfg.DeskName); mgErr != nil {
 						locErr = mgErr
 					} else if mkErr := os.MkdirAll(dir, 0o700); mkErr != nil {
@@ -350,20 +361,29 @@ func main() {
 	}
 	wrapRunE(app.RootCmd.Commands())
 
-	// Unknown-subcommand guard. PocketBase's app.Start() runs RootCmd.Execute() in a
+	// serve/superuser + the display groups. Registering the two PocketBase system commands
+	// ourselves (what app.Start() would do) is what lets them carry a GroupID at all — Start()
+	// adds them after the last point a caller could set one. Deliberately AFTER wrapRunE, so
+	// their RunE stays unwrapped and their error handling is byte-identical to today's Start().
+	finalizeCommandTree(app)
+
+	// Unknown-subcommand guard. PocketBase's Execute() runs RootCmd.Execute() in a
 	// goroutine and DISCARDS its error, so cobra's own "unknown command" error would otherwise
 	// exit 0 — an unknown subcommand printed a message but silently succeeded. Detect an
-	// unrecognized (nested) subcommand HERE — after every command is registered (migratecmd +
-	// registerToolCommands have populated RootCmd; serve/superuser are seeded explicitly because
-	// PocketBase only adds them inside Start()) and BEFORE app.Start() dispatches — and fail
-	// closed with a non-zero exit. Mirrors the OnServe os.Exit(1) fail-closed pattern above: a
-	// returned RunE error is invisible for the goroutine-run Execute, so exit directly.
+	// unrecognized (nested) subcommand HERE — after every command is registered (migratecmd,
+	// registerToolCommands, and finalizeCommandTree have populated RootCmd) and BEFORE
+	// app.Execute() dispatches — and fail closed with a non-zero exit. Mirrors the OnServe
+	// os.Exit(1) fail-closed pattern above: a returned RunE error is invisible for the
+	// goroutine-run Execute, so exit directly.
 	if name, unknown := unknownSubcommand(os.Args[1:], buildKnownCommandSet(app.RootCmd)); unknown {
 		fmt.Fprintf(os.Stderr, "deskkit: unknown command %q\nRun 'deskkit --help' for usage.\n", name)
 		os.Exit(1)
 	}
 
-	if err := app.Start(); err != nil {
+	// app.Execute(), not app.Start(): Start() is exactly "add superuser + serve, then Execute()",
+	// and finalizeCommandTree has already added those two (with their groups). Calling Start()
+	// here would register them a second time.
+	if err := app.Execute(); err != nil {
 		log.Fatal(annotateLockErr(err))
 	}
 	if cmdErr != nil {
@@ -372,14 +392,128 @@ func main() {
 }
 
 // storeTouchingCommands are the subcommands that open the desk's store and therefore require a
-// resolvable store location (ADR 0002 §2). serve/superuser are registered by PocketBase inside
-// Start(), migrate by migratecmd, the tool commands by registerToolCommands — so the set is
-// maintained here explicitly rather than derived from RootCmd (not fully populated pre-Start).
+// resolvable store location (ADR 0002 §2). It is maintained here explicitly rather than derived
+// from RootCmd, because this guard runs in main() BEFORE the app (and its command tree) exists.
+// `init`, `desks`, and `config` are deliberately absent: they open no store.
 var storeTouchingCommands = map[string]bool{
 	"serve": true, "migrate": true, "superuser": true,
 	"sweep": true, "patrol": true, "propose-fix": true, "apply-fix": true,
 	"restore": true, "query": true, "record-feedback": true, "agent": true, "chat": true,
 	"mcp-serve": true, "gui": true, "findings": true,
+}
+
+// Command display groups (`deskkit --help`). The IDs are internal; the Titles are printed
+// literally by cobra, trailing colon included. Declaring them as constants keeps the group of a
+// command a single named fact rather than a string repeated at each registration site.
+const (
+	groupSetup   = "setup"
+	groupInspect = "inspect"
+	groupFix     = "fix"
+	groupWork    = "work"
+	groupAgent   = "agent"
+	groupAdmin   = "admin"
+)
+
+// commandGroups is the help's section order: cobra renders groups in AddGroup call order, so
+// this slice IS the display order.
+var commandGroups = []cobra.Group{
+	{ID: groupSetup, Title: "Setup & config:"},
+	{ID: groupInspect, Title: "Inspect:"},
+	{ID: groupFix, Title: "Fix:"},
+	{ID: groupWork, Title: "Work graph:"},
+	{ID: groupAgent, Title: "Agent:"},
+	{ID: groupAdmin, Title: "Admin:"},
+}
+
+// commandGroupIDs maps a top-level command name to its display group. A command missing from
+// this map renders under cobra's "Additional Commands:" catch-all — which TestCommandGroups
+// fails on — so adding a subcommand means adding it here. help/completion are cobra built-ins
+// added during Execute(); they get their group from the two setters in applyCommandGroups.
+var commandGroupIDs = map[string]string{
+	"init":   groupSetup,
+	"config": groupSetup,
+
+	"desks":           groupInspect,
+	"sweep":           groupInspect,
+	"patrol":          groupInspect,
+	"query":           groupInspect,
+	"findings":        groupInspect,
+	"record-feedback": groupInspect,
+	"gui":             groupInspect,
+
+	"propose-fix": groupFix,
+	"apply-fix":   groupFix,
+	"restore":     groupFix,
+
+	"pm": groupWork,
+
+	"agent":     groupAgent,
+	"chat":      groupAgent,
+	"mcp-serve": groupAgent,
+
+	"serve":     groupAdmin,
+	"migrate":   groupAdmin,
+	"superuser": groupAdmin,
+}
+
+// finalizeCommandTree completes the root command tree: it registers the two system commands
+// PocketBase would otherwise add inside Start() (so they can carry a group), then applies the
+// display groups. Called once from main() after every other registration — and by the groups
+// test, so the test asserts the tree main() actually builds.
+//
+// NewServeCommand's second argument is Start()'s `!hideStartBanner`; HideStartBanner is never
+// set on this app, so `true` reproduces today's banner behavior exactly.
+func finalizeCommandTree(app *pocketbase.PocketBase) {
+	app.RootCmd.AddCommand(pbcmd.NewSuperuserCommand(app))
+	app.RootCmd.AddCommand(pbcmd.NewServeCommand(app, true))
+	applyCommandGroups(app.RootCmd)
+}
+
+// applyCommandGroups assigns each registered top-level command its display group and registers
+// the groups that ended up with at least one member (an empty group would render as a bare
+// heading — `pm` is absent when the module is gated off). Groups are assigned here, in one
+// place, rather than at each command's construction site: one table beats a GroupID field
+// scattered across fifteen literals, and cobra validates the result at Execute() time
+// (checkCommandGroups panics on an id that was never registered).
+func applyCommandGroups(root *cobra.Command) {
+	used := map[string]bool{groupAdmin: true} // help/completion always land in Admin
+	for _, c := range root.Commands() {
+		if id, ok := commandGroupIDs[c.Name()]; ok {
+			c.GroupID = id
+			used[id] = true
+		}
+	}
+	for _, g := range commandGroups {
+		if used[g.ID] && !root.ContainsGroup(g.ID) {
+			root.AddGroup(&cobra.Group{ID: g.ID, Title: g.Title})
+		}
+	}
+	// cobra's own help/completion commands. PocketBase suppresses both (a hidden replacement
+	// help command; DisableDefaultCmd for completion), so neither is LISTED — but the hidden
+	// help command is still a child with an empty GroupID, which alone makes cobra render an
+	// (empty) "Additional Commands:" heading. SetHelpCommandGroupID groups that existing
+	// command, which is what removes the heading; verified by deleting this line and watching
+	// TestCommandGroups_EveryCommandIsGrouped go red. The completion setter is the same
+	// arrangement for the day PocketBase stops disabling that command.
+	root.SetHelpCommandGroupID(groupAdmin)
+	root.SetCompletionCommandGroupID(groupAdmin)
+}
+
+// resolveStoreLocation answers WHERE this desk's store lives, with no side effects: no mkdir, no
+// legacy-store migration, no PocketBase. main() pairs it with those side effects on the startup
+// path; the read-only `desks` and `config show` surfaces call it for the location alone. One
+// function so the two can never disagree about the answer.
+func resolveStoreLocation(cfg *config.Config, cfgErr error) (string, error) {
+	if cfgErr != nil {
+		return "", fmt.Errorf(
+			"cannot resolve the store location: %w; set DESK_NAME (env or _knowledge/profile.*) or pass --dir <path>",
+			cfgErr)
+	}
+	dir, err := store.StoreDir(cfg.DeskName)
+	if err != nil {
+		return "", fmt.Errorf("cannot resolve the store location: %w; pass --dir <path>", err)
+	}
+	return dir, nil
 }
 
 // hasDirFlag reports whether an explicit --dir override is present (both `--dir <path>` and
@@ -419,23 +553,15 @@ type knownCommandSet struct {
 	groupValueFlags map[string]map[string]bool
 }
 
-// pbLateCommands are the subcommands PocketBase registers INSIDE app.Start() (after the guard
-// runs), so app.RootCmd.Commands() does not list them at guard time and they must be seeded
-// explicitly — otherwise the guard would flag a legitimate `serve`/`superuser` as unknown. This
-// mirrors the same hardcoding already carried in storeTouchingCommands. migrate is NOT here: it
-// is registered by migratecmd.MustRegister BEFORE the guard, so it self-populates (with its own
-// up/down/… children) via app.RootCmd.Commands().
-var pbLateCommands = []string{"serve", "superuser"}
-
-// buildKnownCommandSet snapshots app.RootCmd (fully populated except for pbLateCommands) into the
-// lookup the guard needs. Called once in main() after all registration and before app.Start().
+// buildKnownCommandSet snapshots app.RootCmd — by then FULLY populated, since
+// finalizeCommandTree registers serve/superuser itself rather than leaving them to app.Start()
+// — into the lookup the guard needs. Called once in main() after all registration and before
+// app.Execute(); every command (including serve/superuser/migrate and their children) is read
+// from root.Commands(), so nothing has to be hardcoded here.
 func buildKnownCommandSet(root *cobra.Command) knownCommandSet {
 	ks := knownCommandSet{
 		top: map[string]bool{}, groups: map[string]map[string]bool{},
 		groupValueFlags: map[string]map[string]bool{},
-	}
-	for _, name := range pbLateCommands {
-		ks.top[name] = true
 	}
 	for _, c := range root.Commands() {
 		names := append([]string{c.Name()}, c.Aliases...)
@@ -615,29 +741,34 @@ func hasNoInputFlag(args []string) bool {
 	return false
 }
 
-// isInitInvocation reports whether os.Args invokes `init` for real execution (not `init --help`
-// / `-h`, which fall through to cobra's Bootstrap-skipping help path).
-func isInitInvocation(args []string) bool {
+// isInterceptedInvocation reports whether os.Args invokes `name` for REAL execution — the
+// signal to run it standalone in main(), before PocketBase's Bootstrap can create a store dir.
+// `name --help` / `-h` deliberately returns false: those fall through to cobra, whose help path
+// skips Bootstrap and prints the registered command's usage.
+func isInterceptedInvocation(args []string, name string) bool {
 	for _, a := range args {
 		switch a {
 		case "-h", "--help":
 			return false
 		}
 	}
-	return firstSubcommand(args) == "init"
+	return firstSubcommand(args) == name
 }
 
-// runInit executes `init` as a standalone cobra command BEFORE the PocketBase app exists, so it
-// never triggers Bootstrap (no stray store dir). It returns the process exit code. The trailing
-// args (init's own flags + the optional dir) are everything after the `init` token; the global
-// --no-input token is stripped since it belongs to the root, not init.
-func runInit(args []string) int {
+// isInitInvocation reports whether os.Args invokes `init` for real execution (not `init --help`
+// / `-h`, which fall through to cobra's Bootstrap-skipping help path).
+func isInitInvocation(args []string) bool { return isInterceptedInvocation(args, "init") }
+
+// runIntercepted executes one command standalone BEFORE the PocketBase app exists, so it never
+// triggers Bootstrap (no stray store dir). It returns the process exit code. The trailing args
+// (the command's own flags/subcommand/operands) are everything after the command's own token;
+// the global --no-input token is stripped since it belongs to the root, not the subcommand.
+func runIntercepted(cmd *cobra.Command, args []string) int {
 	idx := subcommandIndex(args)
 	var tail []string
 	if idx >= 0 {
 		tail = args[idx+1:]
 	}
-	cmd := newInitCmd()
 	cmd.SetArgs(stripNoInput(tail))
 	if err := cmd.Execute(); err != nil {
 		fmt.Fprintf(os.Stderr, "deskkit: %v\n", err)
@@ -645,6 +776,9 @@ func runInit(args []string) int {
 	}
 	return 0
 }
+
+// runInit executes `init` standalone (see runIntercepted) and returns the process exit code.
+func runInit(args []string) int { return runIntercepted(newInitCmd(), args) }
 
 // stripNoInput removes the root persistent --no-input token from a subcommand's args: the
 // standalone init command below does not define it and would otherwise reject it as unknown.
@@ -761,6 +895,13 @@ func registerToolCommands(app *pocketbase.PocketBase, cfg *config.Config, cfgErr
 	// and `init --help`; the REAL run is intercepted in main() before app.Start() so it never
 	// triggers Bootstrap (see runInit). NOT added to storeTouchingCommands: it opens no store.
 	app.RootCmd.AddCommand(newInitCmd())
+
+	// desks / config — read-only orientation over the XDG homes (which desks exist; what the
+	// resolved configuration is and where each value came from). Registered here for discovery
+	// and `--help`; like `init`, the REAL run is intercepted in main() so neither materializes a
+	// store just for answering a question. Neither is store-touching.
+	app.RootCmd.AddCommand(newDesksCmd())
+	app.RootCmd.AddCommand(newConfigCmd())
 
 	// pm — the work-graph command group (spec §5.3), registered ONLY when the pm module is
 	// enabled (§2.9: with PM off, PM surfaces are absent; `deskkit pm` is then cobra's normal
@@ -1073,7 +1214,7 @@ func registerToolCommands(app *pocketbase.PocketBase, cfg *config.Config, cfgErr
 	// does not depend on PocketBase serve-command internals; single-writer rule holds).
 	app.RootCmd.AddCommand(&cobra.Command{
 		Use:   "gui",
-		Short: "Serve the DB and open the admin GUI in a browser",
+		Short: "Open the visual data browser (admin console) in a browser",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Abort BEFORE opening a browser or spawning the serve child when config/the desk
 			// guard fails: gui previously only used requireConfig's error to pick a fallback URL
