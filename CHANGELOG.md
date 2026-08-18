@@ -68,6 +68,18 @@ for why this policy exists.
 
 ### Changed
 
+- **Built-in default LLM model changed from `claude-opus-4-8` to `claude-haiku-4-5-20251001`**
+  (DESK-67). The old pin was stale and the most expensive tier, for a workload (document
+  linting, rule findings, mechanical fixes) that does not need it — every user who never sets
+  `LLM_MODEL`/`models.model`/`llm.model` gets this model. Measured before pinning rather than
+  assumed: three `examples/agent-loop.sh` runs each of `claude-haiku-4-5-20251001` and
+  `claude-sonnet-5` plus one `claude-opus-4-8` baseline (18 August 2026). Haiku passed 17/19
+  checks on all three runs (the 2 residual failures are a harness bug, DESK-70, unrelated to
+  model choice); Sonnet passed 17/19 twice but 16/19 once, with a genuine tool-calling flake
+  (`agent run (no writes) exits 0` failed for real, not the harness bug). Haiku was also 2.5-4x
+  faster (28-32s vs 80-117s per run) and is the cheaper tier. This does not touch the
+  resolution order (env > per-desk profile > central config > built-in default) — only the
+  bottom leg's value.
 - **Plugin distribution bundles extracted to a top-level `plugins/` tree.** The two marketplace
   bundles moved out of the TS lane's directory: `plugin/claude-plugin/` → `plugins/desk-standard/`
   and `plugin/desk-persona/` → `plugins/desk-persona/`, leaving `plugin/` as purely the TS lane

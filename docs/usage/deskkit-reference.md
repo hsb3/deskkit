@@ -150,7 +150,7 @@ Provider and model resolve with precedence **env var → profile → central con
 | Setting | Env var | Profile key (`_knowledge/profile.yaml`) | Central config key | Default |
 |---|---|---|---|---|
 | Provider | `LLM_PROVIDER` | `models.provider` | `llm.provider` | `anthropic` |
-| Model | `LLM_MODEL` | `models.model` | `llm.model` | `claude-opus-4-8` |
+| Model | `LLM_MODEL` | `models.model` | `llm.model` | `claude-haiku-4-5-20251001` |
 
 The central config is a machine-wide file at `$XDG_CONFIG_HOME/deskkit/config.yaml` (falling
 back to `~/.config/deskkit/config.yaml`), written 0600 in a 0700 dir and shared by every desk

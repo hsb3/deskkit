@@ -140,7 +140,7 @@ func Load() (*Config, error) {
 		SecretsDir:   r.pick("SECRETS_DIR", ps("desk.paths.secrets"), "", "_meta/secrets"),
 		HandoffPath:  r.pick("HANDOFF_PATH", ps("desk.paths.handoff"), "", "_meta/HANDOFF.md"),
 		LLMProvider:  r.pick("LLM_PROVIDER", ps("models.provider"), central.LLM.Provider, "anthropic"),
-		LLMModel:     r.pick("LLM_MODEL", ps("models.model"), central.LLM.Model, "claude-opus-4-8"),
+		LLMModel:     r.pick("LLM_MODEL", ps("models.model"), central.LLM.Model, "claude-haiku-4-5-20251001"),
 		// secrets_ref.llm_api_key names (never contains) the env var holding the API key.
 		// Env still wins so an operator can override the indirection without a profile edit.
 		LLMAPIKeyEnv: r.pick("LLM_API_KEY_ENV", ps("secrets_ref.llm_api_key"), "", ""),
