@@ -1,7 +1,7 @@
 name: ci
 
 # The repo's build/graduation gate. One aggregate job (`ci`) runs the product lane — the
-# librarian (Go binary) — plus the D8 identity-neutrality lint (M-05 surface iii), which fails
+# deskkit Go module — plus the D8 identity-neutrality lint (M-05 surface iii), which fails
 # the build on any hardcoded deployment identity. The single job name keeps one check to mark
 # required at phase end.
 
@@ -29,8 +29,8 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
         with:
-          go-version-file: librarian/go.mod
-          cache-dependency-path: librarian/go.sum
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
 
       - name: Set up Node
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
@@ -55,7 +55,7 @@ jobs:
         run: node scripts/check-kits.mjs
 
       # Tool-surface drift (docs/development/specs/tool-surface.md's CLI + MCP counts vs source) is
-      # guarded entirely on the go-test lane below — see librarian/internal/core/mcp/
+      # guarded entirely on the go-test lane below — see internal/core/mcp/
       # tool_surface_doc_test.go. No workflow step here.
 
       # TextField explicit-Max recurrence guard (ADR 0017 slice C): fails on any content TextField
@@ -93,7 +93,7 @@ jobs:
           node scripts/check-doc-links.mjs --self-test
 
       # Advisory only (never fails the build): nudges when user-facing changes have piled up
-      # under librarian/ since the last v* tag without a VERSION bump. The hard gate
+      # under the product tree since the last v* tag without a VERSION bump. The hard gate
       # (a documented CHANGELOG section for the tagged version) lives in release.yml.
       - name: Version-status advisory (non-blocking)
         run: node scripts/check-version-status.mjs
@@ -121,24 +121,21 @@ jobs:
           node scripts/check-workflow-pins.mjs
           node scripts/check-workflow-pins.mjs --self-test
 
-      # ---- librarian lane ----
-      - name: Librarian — build
-        working-directory: librarian
+      # ---- Go lane ----
+      - name: Go — build
         run: go build ./...
 
-      - name: Librarian — vet
-        working-directory: librarian
+      - name: Go — vet
         run: go vet ./...
 
-      # gofmt formatting gate: fail if any file under librarian/ is not gofmt-clean. Uses the
-      # librarian Makefile's `fmt` target (gofmt -l over the tree, fail-on-nonempty) so the gate
-      # logic lives in one place; mirrors how `vet` above is a standing Go-lane check.
-      - name: Librarian — gofmt (formatting gate)
-        run: make -C librarian fmt
+      # gofmt formatting gate: fail if any file in the module is not gofmt-clean. Uses the root
+      # Makefile's `fmt` target (gofmt -l over the tree, fail-on-nonempty) so the gate logic
+      # lives in one place; mirrors how `vet` above is a standing Go-lane check.
+      - name: Go — gofmt (formatting gate)
+        run: make fmt
 
-      - name: Librarian — tests
-        working-directory: librarian
+      - name: Go — tests
         run: go test ./...
 
-      - name: Librarian — verify gate (integration; self-init, write-boundary, restore, open-guard)
+      - name: Go — verify gate (integration; self-init, write-boundary, restore, open-guard)
         run: make verify

@@ -1,38 +1,132 @@
-# desk-standard — the canonical repo task interface. `make help` (the default) lists targets.
+# deskkit — the canonical repo task interface. `make help` (the default) lists targets.
 #
-# One product lane sits under this root: the librarian (a single Go binary, built/tested via its
-# own librarian/Makefile). These root targets fan out to that lane plus the repo-wide gates
-# (neutrality lint, version-sync, actionlint). CI (`.github/workflows/ci.yml`) runs the same
-# checks; the release workflow reuses this VERSION and the librarian ldflags stamp.
+# One Go module sits at the repo root (github.com/hsb3/deskkit): the binary is cmd/deskkit, the
+# core + modules are internal/. These targets cover both the product lane (build/test/run the
+# binary) and the repo-wide gates (neutrality lint, version-sync, actionlint). CI
+# (`.github/workflows/ci.yml`) runs the same checks; the release workflow reuses this VERSION and
+# the same ldflags stamp.
 #
-# The single source of truth for the release version is the root VERSION file; `check-version
-# -sync` fails if the shipped manifests drift from it, and the librarian binary is stamped from
-# it (see librarian/Makefile).
+# Single-writer rule (spec §2.7): the one-shot subcommands (sweep, patrol, propose-fix,
+# findings/summary/adoption/orphans/uncollapsed, and the supervised `apply-fix` CLI) open the
+# same on-disk SQLite store directly via native DAO. They must NOT run while `serve` is up
+# against the same store — run `make stop` first. `verify` is self-contained (it manages its own
+# throwaway XDG store home + scratch desk) and is safe to run at any time.
+#
+# Store location (ADR 0002 §2): with no --dir, every command below resolves its store to
+# $XDG_DATA_HOME/deskkit/<DESK_NAME>/ (fallback ~/.local/share/...). These targets pass no --dir,
+# so they use that canonical per-desk home and require DESK_NAME to be resolvable (env / the
+# desk's _knowledge/profile.*).
+#
+# `apply-fix` is deliberately NOT a target (spec §9.5): committing a fix to the REAL desk is
+# supervised-only, run by hand as
+#   ./deskkit apply-fix --run <run_id>
+# (optionally under sandbox-exec — see sandbox/README.md). The throwaway-copy write path
+# (propose-fix -> apply-fix) is exercised only inside `verify`.
+#
+# `examples/` holds the two deliberately-manual walkthrough harnesses; see examples/README.md.
+# `example-agent-loop` drives the REAL in-binary eino agent loop (`deskkit agent`) against a
+# throwaway scratch desk using a real ANTHROPIC_API_KEY, so it MAKES REAL BILLED LLM CALLS and is
+# NOT part of `verify`/`make check`/CI (the calls cost money and aren't deterministic) — run it by
+# hand. `examples/pm-walkthrough.sh` is the free, offline counterpart and has no target: run it
+# directly.
 .DEFAULT_GOAL := help
 SHELL := /bin/bash
 
+# The single source of truth for the release version is the root VERSION file; `check-version-sync`
+# fails if the shipped manifests drift from it, and the binary is stamped from it via
+# `-ldflags -X main.version=<VERSION>` (a bare `go build ./...` leaves the default "dev").
 VERSION := $(shell cat VERSION 2>/dev/null || echo dev)
+LDFLAGS := -X main.version=$(VERSION)
 
-.PHONY: help setup build install test check shellcheck verify e2e package media clean version-status release-prep
+BIN     := deskkit
+PIDFILE := .deskkit.pid
+LOGFILE := serve.log
 
+# Install location. Mirrors install.sh's default (~/.local/bin — no root needed); override with
+# `make install PREFIX=/usr/local` to land the binary in $(PREFIX)/bin.
 PREFIX ?= $(HOME)/.local
+BINDIR := $(PREFIX)/bin
+
+.PHONY: help setup spa build install gui serve stop sweep patrol propose-fix findings summary \
+        adoption orphans uncollapsed test vet fmt check shellcheck verify e2e example-agent-loop \
+        package media clean version-status release-prep
 
 help: ## List targets
-	@grep -hE '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) \
+	@# 0-9 in the class is load-bearing: without it `e2e` never appears in the listing.
+	@grep -hE '^[a-zA-Z0-9_-]+:.*?## ' $(MAKEFILE_LIST) \
 	  | awk -F':.*?## ' '{printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}'
 
 setup: ## Install the git hooks (lefthook install)
 	@lefthook install
 	@echo "setup: lefthook pre-commit hooks installed."
 
-build: ## Build the SPA (web/) + the librarian binary (go, version-stamped)
-	@$(MAKE) -C librarian build
+spa: ## Build the web/ SPA into internal/core/spa/dist (go:embed source; .gitkeep preserved)
+	@if [ ! -d web/node_modules ]; then cd web && npm ci; fi
+	@find internal/core/spa/dist -mindepth 1 -not -name .gitkeep -delete
+	@cd web && npm run build
 
-install: ## Build + install the librarian binary to ~/.local/bin (override PREFIX=/usr/local)
-	@$(MAKE) -C librarian install PREFIX="$(PREFIX)"
+build: spa ## Build the SPA (web/) + the deskkit binary (./deskkit), version-stamped from VERSION
+	@go build -ldflags "$(LDFLAGS)" -o $(BIN) ./cmd/deskkit
 
-test: ## Fast tests: librarian (go test ./...)
-	@$(MAKE) -C librarian test
+install: build ## Build + install the version-stamped deskkit binary to $(PREFIX)/bin (override PREFIX=/usr/local)
+	@mkdir -p "$(BINDIR)"
+	@install -m 0755 $(BIN) "$(BINDIR)/$(BIN)"
+	@echo "installed $(BIN) $(VERSION) -> $(BINDIR)/$(BIN)"
+	@command -v $(BIN) >/dev/null 2>&1 || echo "note: $(BINDIR) is not on your PATH — add it to use '$(BIN)' as a bare command."
+
+gui: build ## Serve the DB and open the admin GUI in a browser
+	@./$(BIN) gui
+
+serve: build ## Start PocketBase serve in the background (pidfile-tracked; see `stop`)
+	@if [ -f $(PIDFILE) ] && kill -0 "$$(cat $(PIDFILE))" 2>/dev/null; then \
+	  echo "serve already running (pid $$(cat $(PIDFILE)))"; \
+	else \
+	  nohup ./$(BIN) serve > $(LOGFILE) 2>&1 & echo $$! > $(PIDFILE); \
+	  sleep 1; \
+	  echo "serve started (pid $$(cat $(PIDFILE))); logs: $(LOGFILE)"; \
+	fi
+
+stop: ## Stop the running serve process (via its pid file) — required before any one-shot write command
+	@if [ -f $(PIDFILE) ]; then \
+	  if kill "$$(cat $(PIDFILE))" 2>/dev/null; then echo "serve stopped (pid $$(cat $(PIDFILE)))"; \
+	  else echo "no process for recorded pid (stale pidfile)"; fi; \
+	  rm -f $(PIDFILE); \
+	else \
+	  pkill -f './$(BIN) serve' 2>/dev/null && echo "serve stopped" || echo "no serve running"; \
+	fi
+
+sweep: build ## Re-index the desk tree into the files collection (read-only; not while serve is up)
+	@./$(BIN) sweep
+
+patrol: build ## Dry-run rule patrol R1-R6 -> findings + one patrol_log row (never writes files)
+	@./$(BIN) patrol
+
+propose-fix: build ## Plan mechanical fixes (R1/R2/R3) and record originals to revisions (no fs writes)
+	@./$(BIN) propose-fix
+
+findings: build ## Show open findings, grouped by rule (query findings)
+	@./$(BIN) query findings
+
+summary: build ## Show the file + open-findings summary counts (query summary)
+	@./$(BIN) query summary
+
+adoption: build ## Show the apply-fix adoption log (query adoption)
+	@./$(BIN) query adoption
+
+orphans: build ## Show .md files with no doctype / not under a meta prefix (query orphans)
+	@./$(BIN) query orphans
+
+uncollapsed: build ## Show open R5 judgment findings — graduated-but-not-collapsed docs (query uncollapsed)
+	@./$(BIN) query uncollapsed
+
+test: ## Fast unit tests: go test ./...
+	@go test ./...
+
+vet: ## go vet ./...
+	@go vet ./...
+
+fmt: ## Check gofmt formatting (fails and lists files if any need formatting)
+	@bash -c 'out="$$(gofmt -l .)"; if [ -n "$$out" ]; then echo "$$out"; exit 1; fi'
 
 check: ## Repo gates: neutrality lint + self-test, kit-manifest drift, scaffold frontmatter, persona drift, textfield-max, query-kind drift + self-test, doc-link integrity + self-test, shellcheck, actionlint, workflow SHA-pin drift + self-test, profile-root drift + self-test
 	@node scripts/check-neutrality.mjs
@@ -53,13 +147,16 @@ check: ## Repo gates: neutrality lint + self-test, kit-manifest drift, scaffold 
 	@node scripts/check-profile-root.mjs --self-test
 
 shellcheck: ## Lint every shell entry point (the single list — CI and the release gate call this target)
-	@shellcheck install.sh docker-entrypoint.sh librarian/verify.sh librarian/dogfood-agent.sh librarian/dogfood-pm.sh librarian/sandbox/*.sh scripts/record-media.sh scripts/docker-smoke.sh librarian/e2e/e2e.sh librarian/e2e/lib.sh librarian/e2e/steps/*.sh
+	@shellcheck install.sh docker-entrypoint.sh verify.sh examples/*.sh sandbox/*.sh scripts/record-media.sh scripts/docker-smoke.sh e2e/e2e.sh e2e/lib.sh e2e/steps/*.sh
 
-verify: ## Run the librarian Phase-1 verify gate (throwaway scratch desk; never a real store)
-	@bash librarian/verify.sh
+verify: ## Run the Phase-1 verify gate against a throwaway scratch desk (never a real store)
+	@bash verify.sh
 
 e2e: ## Run the end-to-end system-behaviour suite (whole system, throwaway desk; offline, no LLM key)
-	@bash librarian/e2e/e2e.sh
+	@bash e2e/e2e.sh
+
+example-agent-loop: build ## Manual walkthrough: drive the REAL agent LLM loop end-to-end (REAL BILLED CALLS; needs ANTHROPIC_API_KEY; never in CI)
+	@bash examples/agent-loop.sh
 
 package: ## No-op: the marketplace bundle under plugins/ is authored in place, nothing is generated
 	@echo "package: nothing to generate — the marketplace bundle under plugins/ is authored in place."
@@ -67,9 +164,12 @@ package: ## No-op: the marketplace bundle under plugins/ is authored in place, n
 media: ## Record the demo media assets (scripts/record-media.sh)
 	@bash scripts/record-media.sh
 
-clean: ## Remove the librarian build artifacts
-	@$(MAKE) -C librarian clean
-	@echo "cleaned: librarian artifacts."
+clean: stop ## Stop serve + remove build artifacts (binary, pidfile, serve log)
+	@rm -rf $(BIN) $(PIDFILE) $(LOGFILE)
+	@rm -rf pb_data  # legacy cwd-relative store from pre-ADR-0002 checkouts, if any lingers
+	@echo "cleaned: binary, pidfile, serve log (+ any legacy ./pb_data)"
+	@echo "note: the canonical per-desk store lives at \$$XDG_DATA_HOME/deskkit/<DESK_NAME>/"
+	@echo "      (fallback ~/.local/share/...); it is persistent and NOT removed by clean — rm it by hand."
 
 version-status: ## Advisory (non-blocking): unreleased product changes since the last tag vs VERSION
 	@node scripts/check-version-status.mjs

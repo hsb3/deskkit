@@ -20,9 +20,11 @@ updates:
     cooldown:
       default-days: 7
 
-  # Node (TS lane) — the package.json/lockfile live under plugin/, not the root.
+  # Node (SPA lane) — the package.json/lockfile live under web/, not the root. These deps
+  # ship INSIDE the distributed binary (the built dist is go:embed'ed), so security
+  # coverage here is coverage of a shipped artifact.
   - package-ecosystem: "npm"
-    directory: "/plugin"
+    directory: "/web"
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 0
@@ -34,9 +36,9 @@ updates:
         patterns:
           - "*"
 
-  # Go (librarian lane) — go.mod lives under librarian/.
+  # Go (deskkit lane) — go.mod lives at the repo root.
   - package-ecosystem: "gomod"
-    directory: "/librarian"
+    directory: "/"
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 0

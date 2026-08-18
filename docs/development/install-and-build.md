@@ -18,7 +18,7 @@ do not need anything here.
 `go.mod` floors it; Node is needed only to run the repo's `scripts/*.mjs` gates). From a clone:
 
 ```console
-$ make build          # the binary lands at librarian/deskkit
+$ make build          # the binary lands at ./deskkit
 $ make install        # build + install deskkit to ~/.local/bin (override with PREFIX=/usr/local)
 $ deskkit --version
 deskkit version 0.8.0
@@ -39,7 +39,7 @@ The release workflow publishes a `deskkit` binary for macOS and Linux (amd64 + a
 mkdir -p ~/.local/bin
 os=$(uname -s | tr '[:upper:]' '[:lower:]')                 # darwin | linux
 arch=$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/')   # amd64 | arm64
-gh release download --repo hsb3/desk-standard \
+gh release download --repo hsb3/deskkit \
   --pattern "deskkit_*_${os}_${arch}" \
   --output ~/.local/bin/deskkit --clobber
 chmod +x ~/.local/bin/deskkit
@@ -55,7 +55,7 @@ The two env vars are the **override**, not the requirement, and they win over th
 
 | Variable    | What it sets             | When you need it                                                                                                     |
 | ----------- | ------------------------ | -------------------------------------------------------------------------------------------------------------------- |
-| `DESK_ROOT` | the desk tree to steward | running the binary from outside the desk tree (e.g. a dev build from `librarian/`), or a bare folder with no profile |
+| `DESK_ROOT` | the desk tree to steward | running the binary from outside the desk tree (e.g. a dev build from the repo root), or a bare folder with no profile |
 | `DESK_NAME` | the unique store name    | same — and it must be unique across your desks                                                                       |
 
 ```bash
@@ -74,4 +74,4 @@ On an interactive terminal you don't even have to set these: any store-touching 
 config can't resolve offers to scaffold the folder as a desk (`Set up this folder as a desk?
 [Y/n]`) and continues on accept. `--no-input` (or a non-TTY, e.g. CI) skips the prompt and keeps
 the fail-closed error. Operator detail — provider/key resolution, the admin console, the MCP
-surface — is in [`../../librarian/README.md`](../../librarian/README.md).
+surface — is in [`../usage/deskkit-reference.md`](../usage/deskkit-reference.md).

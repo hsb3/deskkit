@@ -10,7 +10,7 @@ downloads, and environment-variable lore live in the developer track
 
 # Getting started
 
-desk-standard gives you the **deskkit** binary — it indexes your desk and repairs convention
+This project gives you the **deskkit** binary — it indexes your desk and repairs convention
 violations under a byte-exact undo — plus one **Claude Code plugin** that drives that same binary
 from a session and stands up and maintains the desk. Nothing you install carries a name, org, or
 repo — you personalize once, in `_knowledge/profile.yaml`, and never by editing a shipped file.
@@ -30,7 +30,7 @@ source, environment overrides, JSON output — is the developer track, linked wh
 mkdir -p ~/.local/bin
 os=$(uname -s | tr '[:upper:]' '[:lower:]')                 # darwin | linux
 arch=$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/')   # amd64 | arm64
-gh release download --repo hsb3/desk-standard \
+gh release download --repo hsb3/deskkit \
   --pattern "deskkit_*_${os}_${arch}" \
   --output ~/.local/bin/deskkit --clobber
 chmod +x ~/.local/bin/deskkit
@@ -43,8 +43,8 @@ This repo is its own Claude Code plugin marketplace, with one plugin in it. In a
 session, add the marketplace and install it:
 
 ```
-claude plugin marketplace add hsb3/desk-standard
-claude plugin install desk-persona@desk-standard
+claude plugin marketplace add hsb3/deskkit
+claude plugin install deskkit@deskkit
 ```
 
 The plugin is the session-side surface over the `deskkit` binary you just installed — it mounts
@@ -94,7 +94,7 @@ the mechanical findings under a byte-exact undo, the daily loop is in `librarian
 `deskkit chat` opens the full-screen terminal UI — an interactive session over the same tools, and
 the home for the PM work-graph views. (Unlike `sweep`/`patrol`, `chat` talks to a model, so it
 needs an LLM key set once — the default provider reads `ANTHROPIC_API_KEY`, or point your profile's
-`models` + `secrets_ref.llm_api_key` at your key. Details in `../../librarian/README.md`.)
+`models` + `secrets_ref.llm_api_key` at your key. Details in `deskkit-reference.md`.)
 
 You don't have to memorize anything to find your way around:
 

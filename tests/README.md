@@ -13,9 +13,9 @@ entry points.
 
 | Suite | Location | Runner | What it covers |
 |---|---|---|---|
-| Plugin (TS) | `plugin/{core,mcp,opencode,desk-persona}` | `bun test` (69 tests) | Harness-pure core, MCP tool surface, schema validation, PM tool parity, composed desk-persona bundle (agents/skills/hook). |
-| Librarian (Go) | `librarian/...` (`*_test.go`) | `go test ./...` (314 tests) | Store, write-boundary, PM engine, CLI/MCP surfaces, regression guards. |
-| Integration gate | `librarian/verify.sh` | `bash librarian/verify.sh` | End-to-end sweep → patrol → propose-fix → apply-fix → restore, store self-init, XDG store home, desk open-guard (currently 55 checks; the script prints its own `N passed` summary). |
+| Plugin (TS) | `plugin/{core,mcp,opencode,deskkit}` | `bun test` (69 tests) | Harness-pure core, MCP tool surface, schema validation, PM tool parity, composed deskkit bundle (agents/skills/hook). |
+| deskkit (Go) | `...` (`*_test.go`, repo root) | `go test ./...` (314 tests) | Store, write-boundary, PM engine, CLI/MCP surfaces, regression guards. |
+| Integration gate | `verify.sh` (repo root) | `bash verify.sh` | End-to-end sweep → patrol → propose-fix → apply-fix → restore, store self-init, XDG store home, desk open-guard (currently 55 checks; the script prints its own `N passed` summary). |
 
 ## Canonical entry points
 
@@ -23,7 +23,7 @@ Run these from the repo root — the Makefile is the task interface (`make help`
 
 ```bash
 make test     # fast unit tests, both lanes: plugin (bun) + librarian (go test ./...)
-make verify   # the librarian integration gate (librarian/verify.sh, throwaway scratch desk)
+make verify   # the librarian integration gate (verify.sh, throwaway scratch desk)
 ```
 
 `make check` (neutrality lint + kit-drift + core purity + actionlint) and
@@ -32,5 +32,5 @@ runs the same checks. See [`../CLAUDE.md`](../CLAUDE.md) for the full command su
 one rule that matters (identity-neutrality).
 
 > **Why no test files here:** hoisting suites to a root `tests/` would split each product's
-> tests from its source and its language toolchain (Go modules under `librarian/`, bun under
+> tests from its source and its language toolchain (the Go module at the repo root, bun under
 > `plugin/`). The standard requires the directory to exist, not that every suite move into it.

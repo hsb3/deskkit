@@ -6,7 +6,8 @@
 // the remedy for a flagged literal is always "move it into _knowledge/profile.yaml and
 // reference it via {{profile.<path>}}", never "delete the name".
 //
-// Scans the shipped surface — `plugins/`, `librarian/`, and `kits/` — for two token families:
+// Scans the shipped surface — `plugins/`, the Go tree (`cmd/`, `internal/`, `templates/`, `e2e/`,
+// `sandbox/`), `kits/`, and `web/` — for two token families:
 //   1. Profile-value occurrences (self-closing denylist): every real-identity scalar in
 //      _knowledge/profile.yaml (or, when only the example exists, the example's real values)
 //      is a denylist entry; any occurrence in a shipped file fails.
@@ -26,7 +27,7 @@
 //
 // ── Deliberate deviation from the spec's literal pattern list (documented for review) ──
 // m-05 lists a bare, scheme-less `github.com/owner/repo` pattern. In a Go repo that form is
-// the *import-path* form: `github.com/hsb3/desk-standard/librarian/...` (the module's own,
+// the *import-path* form: `github.com/hsb3/deskkit/...` (the module's own,
 // token-scoped-allowlisted, hosting path — schema/neutrality-lint.allow) and every third-party
 // dependency (`github.com/pocketbase/pocketbase`, …) are
 // bare `github.com/o/r`. Matching it flags hundreds of legitimate imports, making D8's
@@ -47,12 +48,15 @@ import { fileURLToPath } from "node:url";
 import { tmpdir } from "node:os";
 
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
-// The shipped, identity-bearing surface: the distribution bundles (plugins/), the librarian, and
-// the ported SOP kit library (kits/ — the 0013 S4(a) template surface). All carry the
-// identity-neutrality constraint; scripts/ + CHANGELOG.md + docs/ are authoring surfaces and stay
-// outside. `plugin` (the retired TS lane) stays listed deliberately: scanTree skips a missing dir,
-// so the entry costs nothing and re-arms the scan if that path ever comes back.
-const SCAN_DIRS = ["plugin", "plugins", "librarian", "kits", "web"];
+// The shipped, identity-bearing surface: the distribution bundles (plugins/), the Go tree that
+// used to live entirely under librarian/ (cmd/, internal/, templates/, e2e/, sandbox/ — listed
+// individually now that the module sits at the repo root, so this replacement covers exactly
+// what the old single "librarian" entry covered recursively, no coverage loss), and the ported
+// SOP kit library (kits/ — the 0013 S4(a) template surface). All carry the identity-neutrality
+// constraint; scripts/ + CHANGELOG.md + docs/ are authoring surfaces and stay outside. `plugin`
+// (the retired TS lane) stays listed deliberately: scanTree skips a missing dir, so the entry
+// costs nothing and re-arms the scan if that path ever comes back.
+const SCAN_DIRS = ["plugin", "plugins", "cmd", "internal", "templates", "e2e", "sandbox", "kits", "web"];
 const ALLOW_FILE = join("schema", "neutrality-lint.allow");
 
 const EXCLUDE_DIR_NAMES = new Set(["node_modules", "dist", ".git"]);

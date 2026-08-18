@@ -6,7 +6,7 @@ no tool JSON to type yourself.
 
 # The desk-shaping skills — four journeys
 
-The `desk-persona` plugin gives Claude Code four skills that stand up, check, evolve, and adopt an
+The `deskkit` plugin gives Claude Code four skills that stand up, check, evolve, and adopt an
 **executive desk** — a planning surface that oversees your projects and keeps decisions,
 analyses, status, and drafts out of the repos it watches. The payoff: a desk that conforms
 to one shared standard, personalized entirely from your `_knowledge/profile.yaml`, with

@@ -36,7 +36,7 @@ import { tmpdir } from "node:os";
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const COLLECTIONS_DIR = join(
   REPO_ROOT,
-  "librarian", "internal", "modules", "librarian", "collections",
+  "internal", "modules", "librarian", "collections",
 );
 
 // (1) permanently-short structural fields — bare field names, exempt across every collection.

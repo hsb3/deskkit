@@ -9,8 +9,8 @@ honest. The distinction is the thing to internalize:
 
 - **Published + shipped surface** — documentation and code meant to be read and navigated: `docs/`,
   the root digests (`README.md`, `CLAUDE.md`, and its `AGENTS.md` symlink), and the code tree
-  (`librarian/`, `schema/`, `plugins/`, `scripts/`, `kits/`). Every doc/media path cited here MUST
-  resolve to a file that exists. This is enforced.
+  (`cmd/`, `internal/`, `templates/`, `schema/`, `plugins/`, `scripts/`, `kits/`, `web/`). Every
+  doc/media path cited here MUST resolve to a file that exists. This is enforced.
 - **Working desk** — point-in-time, hand-curated working state: `_meta/` (handoffs, plans, research,
   the `_meta/_archive/` freezer) and `.claude/` (agent config + memory). References here are
   provenance, not maintained navigation, so they are NOT gated (see "Why the working desk is not
@@ -21,7 +21,7 @@ honest. The distinction is the thing to internalize:
 | Path | Holds | Load-bearing? |
 |---|---|---|
 | `docs/README.md` | The docs index, split Using vs Developing | no |
-| `docs/usage/` | User guides: `getting-started`, `librarian-guide`, `pm-guide`, `plugin-guide` | no |
+| `docs/usage/` | User guides: `getting-started`, `librarian-guide`, `deskkit-reference` (the operator/runtime reference for the binary, as opposed to `librarian-guide`'s daily-loop walkthrough), `pm-guide`, `plugin-guide` | no |
 | `docs/development/` | Contributor docs: `CHARTER.md` (canonical direction), `README.md`, `install-and-build.md`, this file | no |
 | `docs/development/specs/` | The build specs — see the load-bearing table below | **YES** |
 | — | Architecture Decision Records moved to the project board as `DECISION` tasks (2026-08-18); nothing under `docs/` holds them now | cited widely as a bare `ADR NNNN` — never as a path or a board id |
@@ -32,8 +32,8 @@ honest. The distinction is the thing to internalize:
 | Spec | Read by |
 |---|---|
 | `docs/development/specs/pocket-librarian-v1-spec.md` | `scripts/check-query-kinds.mjs` (§5.6 kind list) |
-| `docs/development/specs/tool-surface.md` | `librarian/internal/core/mcp/tool_surface_doc_test.go` (CLI + gated MCP counts, on `make test`) — ADR 0016 |
-| `docs/development/specs/agent-integration-contract-v1-spec.md` | cited by `plugins/desk-persona` and the neutrality allowlist (`schema/neutrality-lint.allow`) |
+| `docs/development/specs/tool-surface.md` | `internal/core/mcp/tool_surface_doc_test.go` (CLI + gated MCP counts, on `make test`) — ADR 0016 |
+| `docs/development/specs/agent-integration-contract-v1-spec.md` | cited by `plugins/deskkit` and the neutrality allowlist (`schema/neutrality-lint.allow`) |
 | `docs/development/specs/pm-system-v1-spec.md`, `docs/development/specs/element-model-v2-draft.md` | cited across code, plans, and ADRs; the element-model draft is the live target of the phase-machine reconciliation |
 
 If you move one of these, repoint its reader **in the same change** — the reader hard-codes the path
@@ -42,7 +42,7 @@ loudly (ENOENT), which is the good outcome.
 
 ## Specs cite code — they never byte-quote it
 
-A spec names the **path plus the symbol** (`librarian/templates/librarian-system-prompt.txt`,
+A spec names the **path plus the symbol** (`templates/librarian-system-prompt.txt`,
 `func systemPrompt`) and lets the reader open the file. It does not reproduce the source in a fenced
 block. A second copy in prose rots the moment the first one changes, and the only way to hold it
 honest is a byte-identical drift guard per copy — a gate whose whole subject is a duplication the

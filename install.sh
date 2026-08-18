@@ -1,35 +1,37 @@
 #!/usr/bin/env bash
 #
-# install.sh — one-shot installer for desk-standard's two deliverables.
+# install.sh — one-shot installer for the deskkit binary, plus guidance for the Claude Code
+# plugin install.
 #
-#   curl -fsSL https://raw.githubusercontent.com/hsb3/desk-standard/main/install.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/hsb3/deskkit/main/install.sh | bash
 #
 # It consumes the artifacts published by the release workflow
 # (.github/workflows/release.yml) on every `v*` tag:
 #
-#   - deskkit_<version>_<os>_<arch>   (the librarian Go binary; release.yml line 125)
-#   - desk-standard-plugin_<version>.tar.gz    (the plugin bundle;        release.yml line 154)
-#   - checksums.txt                            (sha256sum of every asset; release.yml line 182)
+#   - deskkit_<version>_<os>_<arch>   (the deskkit Go binary; release.yml line 127)
+#   - checksums.txt                            (sha256sum of every asset; release.yml line 153)
 #
-# This script (1) downloads the librarian binary matching the host OS/arch, (2) verifies its
+# The release workflow does not publish a separate plugin bundle asset — the Claude Code plugin
+# installs straight from this repo's own marketplace (`claude plugin marketplace add` /
+# `claude plugin install`), not from a downloaded tarball.
+#
+# This script (1) downloads the deskkit binary matching the host OS/arch, (2) verifies its
 # sha256 against checksums.txt and FAILS LOUDLY on mismatch, (3) installs it to a no-root path,
 # and (4) guides the Claude Code plugin install (marketplace add + install).
 #
-# NOTE (live e2e): releases are published (through v0.7.0), but this repo stays PRIVATE until
-# v1.0.0 — so the public unauthenticated one-liner above 404s by design until then. Install today
-# with the authenticated `gh release download` path (README "Install the deskkit binary" /
-# docs/usage/getting-started.md). This script is shellcheck-clean and its --dry-run plan is verified
-# against the exact artifact strings in release.yml; a full unauthenticated end-to-end run happens
-# once the repo is public.
+# NOTE (live e2e): releases are published (through v0.7.0). The repo went public on 2026-08-18,
+# so the public unauthenticated one-liner above should now resolve — that has not yet been run
+# end-to-end unauthenticated as part of this change. This script is shellcheck-clean and its
+# --dry-run plan is verified against the exact artifact strings in release.yml.
 #
 set -euo pipefail
 
 # ---- constants (kept in lock-step with .github/workflows/release.yml) -----------------------
-REPO="hsb3/desk-standard"          # gh release lives here; also the plugin marketplace slug
-BINARY_NAME="deskkit"     # installed command name (release.yml line 126: -o deskkit)
+REPO="hsb3/deskkit"          # gh release lives here; also the plugin marketplace slug
+BINARY_NAME="deskkit"     # installed command name (release.yml line 128: -o deskkit)
 LEGACY_BINARY_NAME="pocket-librarian"  # asset name on releases <= v0.6.0 (pre-D2b rename)
-CHECKSUMS_FILE="checksums.txt"     # release.yml line 182
-PLUGIN_ID="desk-standard@desk-standard"  # `claude plugin install desk-standard@desk-standard`
+CHECKSUMS_FILE="checksums.txt"     # release.yml line 153
+PLUGIN_ID="deskkit@deskkit"  # `claude plugin install deskkit@deskkit`
 
 # ---- defaults (overridable by flag or env) --------------------------------------------------
 VERSION="${LIBRARIAN_VERSION:-latest}"   # a tag like v0.4.0, a bare 0.4.0, or "latest"
@@ -50,7 +52,7 @@ die()   { printf 'error: %s\n' "$*" >&2; exit 1; }
 
 usage() {
   cat <<EOF
-install.sh — install the desk-standard librarian binary and guide the plugin install.
+install.sh — install the deskkit binary and guide the plugin install.
 
 Usage:
   install.sh [options]
@@ -135,12 +137,15 @@ case "$ARCH" in amd64|arm64) ;; *) die "invalid INSTALL_ARCH='$ARCH' (expected a
 # So we track both: TAG (with the leading v, used in download URLs) and VERSION_BARE.
 resolve_version() {
   if [ "$VERSION" = "latest" ]; then
-    info "Resolving latest release of ${REPO} via the GitHub API..."
+    # Progress goes to STDERR, never stdout: this function's stdout IS the resolved tag
+    # (`TAG="$(resolve_version)"`), so an `info` here would be captured into TAG and corrupt
+    # every artifact name and URL built from it.
+    printf '%s\n' "Resolving latest release of ${REPO} via the GitHub API..." >&2
     local api tag
     api="https://api.github.com/repos/${REPO}/releases/latest"
     # Parse tag_name without requiring jq.
     tag="$(curl -fsSL "$api" | grep -m1 '"tag_name"' | sed -E 's/.*"tag_name"[[:space:]]*:[[:space:]]*"([^"]+)".*/\1/' || true)"
-    [ -n "$tag" ] || die "could not resolve the latest release tag from ${api} (no release published yet?). Pin one with --version."
+    [ -n "$tag" ] || die "could not resolve the latest release tag from ${api} (repo missing, private/needs auth, or has no published release yet?). Pin one with --version."
     printf '%s' "$tag"
   else
     # Accept either "v0.4.0" or "0.4.0" from the user; normalise to a v-prefixed tag.
@@ -176,7 +181,7 @@ $DRY_RUN && info "  mode:        DRY RUN (no downloads, no writes)"
 
 # ---- download + verify + install ------------------------------------------------------------
 install_binary() {
-  step "Download librarian binary"
+  step "Download deskkit binary"
   if $DRY_RUN; then
     info "  [dry-run] curl -fL -o <tmp>/${ARTIFACT} ${BINARY_URL}"
     info "  [dry-run] curl -fL -o <tmp>/${CHECKSUMS_FILE} ${CHECKSUMS_URL}"
@@ -282,5 +287,5 @@ step "Done"
 if $DRY_RUN; then
   info "Dry run complete — nothing was downloaded or written."
 else
-  info "librarian installed at ${DEST}. Next: fill _knowledge/profile.yaml and see docs/usage/getting-started.md."
+  info "deskkit installed at ${DEST}. Next: fill _knowledge/profile.yaml and see docs/usage/getting-started.md."
 fi

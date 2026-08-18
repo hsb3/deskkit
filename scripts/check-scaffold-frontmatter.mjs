@@ -27,10 +27,10 @@ const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 // skill asset is designed to be copied (or template_render-materialized) verbatim into a desk
 // as a real (non-template) document. The two improvement-log.md copies are siblings — the
 // harvest-loop asset is copied by hand; the desk-setup one is the greenfield scaffold's actual
-// `_meta/improvement-log.md` seed, resolved via template_render (desk-standard #80).
+// `_meta/improvement-log.md` seed, resolved via template_render.
 const INSTRUMENT_ASSETS = [
-  "plugins/desk-persona/skills/harvest-loop/assets/improvement-log.md",
-  "plugins/desk-persona/skills/desk-setup/assets/template/_meta/improvement-log.md",
+  "plugins/deskkit/skills/harvest-loop/assets/improvement-log.md",
+  "plugins/deskkit/skills/desk-setup/assets/template/_meta/improvement-log.md",
 ];
 
 // Universal frontmatter keys: schema/doctypes.yaml `universal: [type, status, created, updated,

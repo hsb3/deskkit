@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 // Version-sync drift guard: without it, a shipped manifest could silently disagree with the root
 // VERSION, so the marketplace listing and an installed plugin advertise two different version numbers:
-//   - plugins/desk-persona/.claude-plugin/plugin.json   (the installed desk-persona plugin)
-//   - .claude-plugin/marketplace.json                   (each plugins[].version in the marketplace)
+//   - plugins/deskkit/.claude-plugin/plugin.json         (the installed deskkit plugin)
+//   - .claude-plugin/marketplace.json                    (each plugins[].version in the marketplace)
 // Exits 1 (listing every disagreement) if any manifest differs from VERSION; exits 0 when all
 // match. Runs under plain Node (no deps), like the other scripts/ guards.
 
@@ -17,14 +17,14 @@ const canonical = readFileSync(join(REPO_ROOT, "VERSION"), "utf8").trim();
 // Each source: a label, its file, and an extractor pulling the version string out of the parsed JSON.
 const SOURCES = [
   {
-    label: "plugins/desk-persona/.claude-plugin/plugin.json",
-    file: "plugins/desk-persona/.claude-plugin/plugin.json",
+    label: "plugins/deskkit/.claude-plugin/plugin.json",
+    file: "plugins/deskkit/.claude-plugin/plugin.json",
     pick: (j) => j.version,
   },
   {
-    label: ".claude-plugin/marketplace.json (desk-persona plugins[].version)",
+    label: ".claude-plugin/marketplace.json (deskkit plugins[].version)",
     file: ".claude-plugin/marketplace.json",
-    pick: (j) => marketplaceVersion(j, "desk-persona"),
+    pick: (j) => marketplaceVersion(j, "deskkit"),
   },
 ];
 

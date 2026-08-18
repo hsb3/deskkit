@@ -1,4 +1,4 @@
-# desk-standard
+# deskkit
 
 Profile-driven repo conventions and a self-repairing desk librarian, in one binary.
 
@@ -17,7 +17,7 @@ name, org, repo, or issue number:
   opt a desk out with `PM_ENABLED=false`. The core surfaces as a CLI, an MCP server (`restore` is
   deliberately CLI-only; `apply_fix` is gated behind an env flag), a chat TUI, and a browser
   session page. See [docs/usage/pm-guide.md](docs/usage/pm-guide.md).
-- **The `desk-persona` plugin** (Claude Code) — the agent-facing surface over that same binary:
+- **The `deskkit` plugin** (Claude Code) — the agent-facing surface over that same binary:
   skills that stand up, check, evolve, and adopt an executive desk and drive the work graph, the
   `librarian-operator` and `pm-operator` agents, a SessionStart briefing hook, and one MCP mount.
   It ships no runtime of its own.
@@ -37,27 +37,29 @@ This repo is its own Claude Code plugin marketplace (`.claude-plugin/marketplace
 plugin in it. From any project:
 
 ```bash
-claude plugin marketplace add hsb3/desk-standard
-claude plugin install desk-persona@desk-standard
+claude plugin marketplace add hsb3/deskkit
+claude plugin install deskkit@deskkit
 ```
 
 The plugin drives the `deskkit` binary, so install that too (next section) and make sure it is on
 your `PATH`. (For local development you can point Claude Code straight at the source tree with
-`claude --plugin-dir ./plugins/desk-persona`.)
+`claude --plugin-dir ./plugins/deskkit`.)
 
 ### The `deskkit` binary
 
 The release workflow publishes a prebuilt `deskkit` binary for macOS and Linux (amd64 + arm64)
 on every `v*` tag — no Go toolchain needed.
 
-**While this repo is private,** download the release asset with an authenticated `gh` (the
-public `install.sh` one-liner below only works once the repo is public):
+The bundled installer does download + sha256-verify + install in one step:
+`curl -fsSL https://raw.githubusercontent.com/hsb3/deskkit/main/install.sh | bash`.
+
+Or download the release asset directly with `gh`:
 
 ```bash
 mkdir -p ~/.local/bin
 os=$(uname -s | tr '[:upper:]' '[:lower:]')                 # darwin | linux
 arch=$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/')   # amd64 | arm64
-gh release download --repo hsb3/desk-standard \
+gh release download --repo hsb3/deskkit \
   --pattern "deskkit_*_${os}_${arch}" \
   --output ~/.local/bin/deskkit --clobber
 chmod +x ~/.local/bin/deskkit
@@ -67,10 +69,9 @@ deskkit --version
 `gh release download` with no tag picks the latest release; make sure `~/.local/bin` is on
 your `PATH`.
 
-**Once the repo is public,** the bundled installer does download + sha256-verify + install in
-one step: `curl -fsSL https://raw.githubusercontent.com/hsb3/desk-standard/main/install.sh | bash`.
 From a source checkout, `make install` builds and installs the version-stamped binary to
 `~/.local/bin` — see [docs/development/install-and-build.md](docs/development/install-and-build.md).
+Or install straight from source with Go: `go install github.com/hsb3/deskkit/cmd/deskkit@latest`.
 
 ## Use it in your desk
 
@@ -96,7 +97,7 @@ deskkit patrol    # flag convention violations — a dry run; never writes your 
 ```
 
 **3. Go deeper.** `deskkit chat` opens the TUI (needs an LLM key — see
-[librarian/README.md](librarian/README.md)); the `conventions-standard` and `harvest-loop`
+[docs/usage/deskkit-reference.md](docs/usage/deskkit-reference.md)); the `conventions-standard` and `harvest-loop`
 skills run the standing checks and the periodic improvement-log pass; the supervised
 `propose-fix → apply-fix → restore` write loop is in
 [docs/usage/librarian-guide.md](docs/usage/librarian-guide.md). The full walkthrough is
@@ -105,10 +106,10 @@ skills run the standing checks and the periodic improvement-log pass; the superv
 ## Structure
 
 ```
-librarian/          deskkit source: Go binary, embedded PocketBase, profile/librarian/pm
-                    modules, MCP server + CLI + TUI + web session page
+cmd/deskkit/        deskkit binary entry point
+internal/           core + profile, librarian, and pm modules, MCP server + CLI + TUI + web session page
 plugins/            the marketplace-distributed bundle (a marketplace install copies only this)
-  desk-persona/     the one bundle: skills, agents, SessionStart hook, .mcp.json —
+  deskkit/          the one bundle: skills, agents, SessionStart hook, .mcp.json —
                     authored in place, nothing generated
 schema/             schema v1 — source of truth for the binary's embedded copies
 docs/               product specs, the charter, and the getting-started / plugin / librarian guides
@@ -138,11 +139,10 @@ make check    # repo gates (neutrality, drift guards, doc links, …)
 make verify   # librarian integration gate on a throwaway scratch desk
 ```
 
-The binary also has its own `librarian/Makefile` (`make -C librarian build|test|fmt|sweep|patrol`)
-for iterating against a desk named by `DESK_ROOT`/`DESK_NAME`; `apply-fix` is
-deliberately not a target — it's supervised-only, run by hand, and every fix is reversible with
-`deskkit restore --by-path <path>`. `make gui` there opens the embedded PocketBase admin
-console (`http://127.0.0.1:8090/_/`).
+`make build|test|fmt|sweep|patrol` iterate against a desk named by `DESK_ROOT`/`DESK_NAME`;
+`apply-fix` is deliberately not a target — it's supervised-only, run by hand, and every fix is
+reversible with `deskkit restore --by-path <path>`. `make gui` opens the embedded PocketBase
+admin console (`http://127.0.0.1:8090/_/`).
 
 ## Documentation
 
@@ -156,8 +156,8 @@ for the full index.
 - **[docs/usage/getting-started.md](docs/usage/getting-started.md)** — install, fill your profile, first sweep + patrol, meet the TUI.
 - **[docs/usage/plugin-guide.md](docs/usage/plugin-guide.md)** — the desk skills as user journeys: when to reach for each, what you get.
 - **[docs/usage/librarian-guide.md](docs/usage/librarian-guide.md)** — the daily loop: sweep → patrol → fix → byte-exact restore.
-- **[docs/usage/pm-guide.md](docs/usage/pm-guide.md)** — the PM work graph: enable it, the phase machine + gates, and the CLI / MCP / TUI / `desk-persona` plugin surfaces.
-- `plugins/desk-persona/README.md`, `schema/README.md`, `librarian/README.md` — operator detail per surface.
+- **[docs/usage/pm-guide.md](docs/usage/pm-guide.md)** — the PM work graph: enable it, the phase machine + gates, and the CLI / MCP / TUI / `deskkit` plugin surfaces.
+- `plugins/deskkit/README.md`, `schema/README.md`, [docs/usage/deskkit-reference.md](docs/usage/deskkit-reference.md) — operator detail per surface.
 
 **Developing it** — build, test, release:
 

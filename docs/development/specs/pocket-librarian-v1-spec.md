@@ -265,12 +265,12 @@ restart `serve`. This is the same constraint that governs coexistence with the P
 
 ### 2.8 Repository layout
 
-The single Go module (module path `github.com/hsb3/desk-standard/librarian`, §3.1) is laid out so the
+The single Go module (module path `github.com/hsb3/deskkit`, §3.1) is laid out so the
 six tool implementations, the provider adapter, the migrations, `main`, and config each have one
 home. `internal/` keeps them un-importable from outside the module.
 
 ```text
-librarian/
+. (module root)
 ├── cmd/deskkit/
 │   └── main.go              # entry: pocketbase.New(), migratecmd, hooks, route, cron,
 │                            #   CLI (cobra) wiring, agent registration (§2.4, §4.11, §6)
@@ -332,7 +332,7 @@ own gitignore entry.
 | cobra | `github.com/spf13/cobra` | CLI subcommands (bundled with PocketBase's `RootCmd`). |
 | dbx | `github.com/pocketbase/dbx` | `dbx.Params` for filter binding. |
 
-Module path: **`github.com/hsb3/desk-standard/librarian`** — graduated from the identity-neutral
+Module path: **`github.com/hsb3/deskkit`** — graduated from the identity-neutral
 `github.com/example/pocket-librarian` placeholder used pre-publication; a Go module path is
 compile-time public API and cannot be routed through `_knowledge/profile.yaml` like an ordinary
 hardcoded identifier (schema/neutrality-lint.allow carries the token-scoped sanctioned-escape
@@ -341,7 +341,7 @@ entries for it). Nothing else in the code references it.
 ### 3.2 Dependency list (`go.mod` direct requires)
 
 ```
-module github.com/hsb3/desk-standard/librarian
+module github.com/hsb3/deskkit
 
 go 1.25 // resolved floor: PocketBase v0.39.6 go.mod declares go 1.25.0 (verified). Use a 1.25.x toolchain.
 
@@ -656,7 +656,7 @@ Collections are defined in Go migrations under `migrations/` and blank-imported 
 import (
     "github.com/pocketbase/pocketbase"
     "github.com/pocketbase/pocketbase/plugins/migratecmd"
-    _ "github.com/hsb3/desk-standard/librarian/migrations" // blank-import registers all migrations
+    _ "github.com/hsb3/deskkit/migrations" // blank-import registers all migrations
 )
 
 func main() {
@@ -1514,7 +1514,7 @@ the active row from the `prompts` collection (§4.10) — the `active == true` r
 (`DESK_NAME`, paths) from config. If the collection has no active row it FALLS BACK to the embedded
 default, which is also the seed written into `prompts` on first run (mirroring the
 `.librarian-ignore` auto-create, §10.1). The embedded default names no person, org, repo, or issue.
-Its text is not reproduced here — read it at `librarian/templates/librarian-system-prompt.txt`, the
+Its text is not reproduced here — read it at `templates/librarian-system-prompt.txt`, the
 canonical `//go:embed`'d source (embedded by `var embeddedSystemPrompt`, below).
 
 `systemPrompt(ctx, app, cfg)` interpolates `cfg.DeskName` and the configured paths into a short
@@ -2336,7 +2336,7 @@ Each is a default chosen to make the spec build-ready with zero clarifications.
   provider, and GitHub handles all come from config + env; nothing is hardcoded to a person, org,
   repo, or issue. The module path used a placeholder owner (`github.com/example/pocket-librarian`)
   pre-publication; it has since graduated to the real hosting path
-  (`github.com/hsb3/desk-standard/librarian`, §3.1) because a Go module path is compile-time
+  (`github.com/hsb3/deskkit`, §3.1) because a Go module path is compile-time
   public API and cannot be routed through `_knowledge/profile.yaml` like an ordinary hardcoded
   identifier — the sanctioned, token-scoped exception is recorded in
   `schema/neutrality-lint.allow`.
@@ -2376,7 +2376,7 @@ Each is a default chosen to make the spec build-ready with zero clarifications.
   `(?<![\w&])#\d+` is matched as `#\d+` with a preceding-byte rejection check. **Why:** faithful
   port under Go's regex engine.
 - **Decision: default module path `github.com/example/pocket-librarian`, graduated to
-  `github.com/hsb3/desk-standard/librarian`.** **Why:** identity-neutral placeholder pre-publication;
+  `github.com/hsb3/deskkit`.** **Why:** identity-neutral placeholder pre-publication;
   the team substituted the real owner at graduation (a mechanical `go.mod` + import-path rewrite).
   A Go module path is compile-time public API, so it cannot follow the ordinary
   `_knowledge/profile.yaml` remedy — the sanctioned, token-scoped exception lives in
