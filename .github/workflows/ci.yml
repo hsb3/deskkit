@@ -105,7 +105,7 @@ jobs:
       # the media recorder) were never linted in any workflow — a broken install.sh could ship. The
       # ubuntu-latest runner image ships shellcheck, so no install step is needed.
       - name: Shellcheck — shell entry points
-        run: shellcheck install.sh librarian/verify.sh librarian/dogfood-agent.sh librarian/dogfood-pm.sh librarian/sandbox/*.sh scripts/record-media.sh
+        run: make shellcheck
 
       # actionlint: previously pre-commit / `make check` only, so a bypassed push escaped it. Built
       # with the Go toolchain already set up above (no new third-party action to pin and maintain).

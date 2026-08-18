@@ -239,6 +239,49 @@ func main() {
 	// On serve start (after bootstrap/migrations): ensure the ignore boundary exists and
 	// seed the system prompt on first run (spec §10.1, §6.1). These run only under serve.
 	app.OnServe().BindFunc(func(e *core.ServeEvent) error {
+		// Exposure mode, derived from the RESOLVED bind addresses — EVERY address the process will
+		// listen on, not just the one the dependency reports on the serve event (with --https set,
+		// that event address is the HTTPS one and hides a separate --http listener). A loopback bind
+		// keeps today's local UX byte-for-byte; any exposed address puts the whole process in
+		// "public mode" and switches on the auth prerequisites, route auth, and the same-origin CSRF
+		// rule. Derived from the exposure rather than a --public flag because a flag can be
+		// forgotten while still binding 0.0.0.0, which fails OPEN. --origins rides the same read so
+		// hardenPublicCORS can tell an operator's allowlist from the default wildcard.
+		serveAddrs, serveOrigins := serveAddrsAndOrigins(app.RootCmd, e.Server.Addr)
+		publicMode := isPublicBind(serveAddrs...)
+
+		// A self-contradictory --origins (bare "*" mixed with explicit origins) is fatal on a public
+		// bind rather than silently resolved either way — see ValidatePublicOrigins. Checked here,
+		// with the same os.Exit fail-closed shape as the auth gate below, so nothing ever binds.
+		if err := ValidatePublicOrigins(publicMode, serveOrigins); err != nil {
+			fmt.Fprintf(os.Stderr, "deskkit: %v\n", err)
+			os.Exit(1)
+		}
+
+		// Fail-closed auth prerequisites, FIRST — this hook runs before the dependency opens the
+		// tcp listener, so exiting here means nothing was ever bound. os.Exit rather than
+		// `return err` for the same reason the desk guard below does: serve is a system command
+		// registered inside app.Start(), which runs RootCmd.Execute() in a goroutine and DISCARDS
+		// its error, so a returned RunE error would print but still exit 0 — and, worse, a refusal
+		// that exits 0 is a refusal nothing downstream can detect. In public mode this call also
+		// PROVISIONS the PB_SUPERUSER_* account and then re-verifies one actually exists, so a
+		// rejected password fails the boot instead of logging into the void.
+		superuserCreated, err := store.CheckServeAuthPrereqs(e.App, cfg, publicMode)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "deskkit: %v\n", err)
+			os.Exit(1)
+		}
+		if superuserCreated {
+			app.Logger().Info("created superuser from PB_SUPERUSER_* env", "email", cfg.PBSuperuserEmail)
+		}
+
+		// Drop the dependency's default wildcard CORS middleware on a public bind — unless the
+		// operator supplied their own --origins allowlist, which the dependency binds into the very
+		// same middleware. Router-wide, so it covers /api/* as well as this binary's own routes; a
+		// no-op on a loopback bind. This must happen BEFORE e.Next(), which is what builds the mux
+		// from the router's current middleware set — see hardenPublicCORS.
+		hardenPublicCORS(e.Router, publicMode, serveOrigins)
+
 		if cfgErr == nil {
 			// Desk open-guard (ADR 0002 §3): refuse to serve a store that already belongs to a
 			// different desk. gui re-execs `serve`, so it is covered here too.
@@ -314,15 +357,17 @@ func main() {
 			// self-contained page that drives the SAME multi-turn stewardship session the `chat`
 			// REPL exposes — the same *agent.Session, the same gated tool slice, the same write
 			// boundary. Serve-only, like the wake layer above; gated on cfgErr because the session
-			// factory needs resolved config. Unauthenticated by design (loopback-bound, on-demand,
-			// single operator) — not wired to superuser auth. See internal/.../web.
+			// factory needs resolved config. On a loopback bind it stays unauthenticated by design
+			// (loopback-bound, on-demand, single operator) — not wired to superuser auth. On a
+			// non-loopback bind (publicMode) web.Register puts every route behind RequireAuth and
+			// switches its origin guard to strict same-origin. See internal/.../web.
 			webCleanup := web.Register(e.Router, func(ctx context.Context) (web.Streamer, error) {
 				s, serr := agent.NewSession(ctx, app, cfg)
 				if serr != nil {
 					return nil, serr // return a nil interface on error, never a typed-nil session
 				}
 				return s, nil
-			})
+			}, publicMode)
 			e.App.OnTerminate().BindFunc(func(te *core.TerminateEvent) error {
 				webCleanup(context.Background())
 				return te.Next()

@@ -63,7 +63,7 @@ jobs:
       # Mirror the branch-CI lint gates so the release gate stays a strict superset of CI's
       # blocking checks (a tag cut from a stale local main must not skip them).
       - name: Shellcheck — shell entry points
-        run: shellcheck install.sh librarian/verify.sh librarian/sandbox/*.sh scripts/record-media.sh
+        run: make shellcheck
 
       - name: Actionlint — workflow lint
         run: |

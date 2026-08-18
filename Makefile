@@ -13,7 +13,7 @@ SHELL := /bin/bash
 
 VERSION := $(shell cat VERSION 2>/dev/null || echo dev)
 
-.PHONY: help setup build install test check verify e2e package media clean version-status release-prep
+.PHONY: help setup build install test check shellcheck verify e2e package media clean version-status release-prep
 
 PREFIX ?= $(HOME)/.local
 
@@ -45,12 +45,15 @@ check: ## Repo gates: neutrality lint + self-test, kit-manifest drift, scaffold 
 	@node scripts/check-query-kinds.mjs --self-test
 	@node scripts/check-doc-links.mjs
 	@node scripts/check-doc-links.mjs --self-test
-	@shellcheck install.sh librarian/verify.sh librarian/dogfood-agent.sh librarian/dogfood-pm.sh librarian/sandbox/*.sh scripts/record-media.sh librarian/e2e/e2e.sh librarian/e2e/lib.sh librarian/e2e/steps/*.sh
+	@$(MAKE) --no-print-directory shellcheck
 	@actionlint
 	@node scripts/check-workflow-pins.mjs
 	@node scripts/check-workflow-pins.mjs --self-test
 	@node scripts/check-profile-root.mjs
 	@node scripts/check-profile-root.mjs --self-test
+
+shellcheck: ## Lint every shell entry point (the single list — CI and the release gate call this target)
+	@shellcheck install.sh docker-entrypoint.sh librarian/verify.sh librarian/dogfood-agent.sh librarian/dogfood-pm.sh librarian/sandbox/*.sh scripts/record-media.sh scripts/docker-smoke.sh librarian/e2e/e2e.sh librarian/e2e/lib.sh librarian/e2e/steps/*.sh
 
 verify: ## Run the librarian Phase-1 verify gate (throwaway scratch desk; never a real store)
 	@bash librarian/verify.sh

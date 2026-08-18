@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/pocketbase/pocketbase/apis"
+	pbcore "github.com/pocketbase/pocketbase/core"
 	"github.com/pocketbase/pocketbase/tests"
 
 	"github.com/hsb3/desk-standard/librarian/internal/modules/librarian/agent"
@@ -80,6 +81,15 @@ func scriptedTurn() []agent.Event {
 // The factory is called by the handler to build a (fake) session; factoryCalls counts creations.
 func newTestServer(t *testing.T, factory NewSessionFunc) (*httptest.Server, func(context.Context)) {
 	t.Helper()
+	srv, cleanup, _ := newTestServerMode(t, factory, false)
+	return srv, cleanup
+}
+
+// newTestServerMode is newTestServer with the exposure mode as an explicit argument, plus the
+// app handle the public-mode tests need to mint a real auth token. public=false reproduces the
+// historical local posture exactly.
+func newTestServerMode(t *testing.T, factory NewSessionFunc, public bool) (*httptest.Server, func(context.Context), *tests.TestApp) {
+	t.Helper()
 	app, err := tests.NewTestApp()
 	if err != nil {
 		t.Fatalf("tests.NewTestApp: %v", err)
@@ -90,7 +100,7 @@ func newTestServer(t *testing.T, factory NewSessionFunc) (*httptest.Server, func
 	if err != nil {
 		t.Fatalf("apis.NewRouter: %v", err)
 	}
-	cleanup := Register(r, factory)
+	cleanup := Register(r, factory, public)
 
 	mux, err := r.BuildMux()
 	if err != nil {
@@ -98,7 +108,7 @@ func newTestServer(t *testing.T, factory NewSessionFunc) (*httptest.Server, func
 	}
 	srv := httptest.NewServer(mux)
 	t.Cleanup(srv.Close)
-	return srv, cleanup
+	return srv, cleanup, app
 }
 
 // parseSSE splits an event-stream body into its decoded agent.Event frames.
@@ -451,4 +461,173 @@ func TestWriteBoundary_NoWritePaths(t *testing.T) {
 		}
 		resp.Body.Close()
 	}
+}
+
+// --- public mode (a non-loopback bind) ---
+
+// authToken mints a real auth token for a record in the named collection, so the public-mode
+// tests present the same Authorization header a live client would.
+func authToken(t *testing.T, app *tests.TestApp, collection, email string) string {
+	t.Helper()
+	col, err := app.FindCollectionByNameOrId(collection)
+	if err != nil {
+		t.Fatalf("find %s: %v", collection, err)
+	}
+	rec := pbcore.NewRecord(col)
+	rec.SetEmail(email)
+	rec.SetPassword("a-sufficiently-long-password")
+	rec.SetVerified(true)
+	if col.Name == "users" {
+		rec.Set("approved", true)
+	}
+	if err := app.Save(rec); err != nil {
+		t.Fatalf("save %s record: %v", collection, err)
+	}
+	tok, err := rec.NewAuthToken()
+	if err != nil {
+		t.Fatalf("mint auth token: %v", err)
+	}
+	return tok
+}
+
+func requestWithHeaders(t *testing.T, method, url, body string, headers map[string]string) *http.Response {
+	t.Helper()
+	req, err := http.NewRequest(method, url, strings.NewReader(body))
+	if err != nil {
+		t.Fatalf("new request %s: %v", url, err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	for k, v := range headers {
+		req.Header.Set(k, v)
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("%s %s: %v", method, url, err)
+	}
+	return resp
+}
+
+// TestPublicMode_UnauthenticatedIs401: on a non-loopback bind, EVERY route — the page included —
+// refuses an unauthenticated request. This is the whole point of deriving the mode from the bind
+// address: expose the port and the surface stops being open, with no flag to remember.
+func TestPublicMode_UnauthenticatedIs401(t *testing.T) {
+	srv, _, _ := newTestServerMode(t, func(context.Context) (Streamer, error) {
+		t.Fatal("no session may be built for an unauthenticated public-mode request")
+		return nil, nil
+	}, true)
+
+	cases := []struct {
+		method, path, body string
+	}{
+		{http.MethodGet, PathChat, ""},
+		{http.MethodPost, PathStream, `{"message":"hi"}`},
+		{http.MethodPost, PathReset, ``},
+	}
+	for _, c := range cases {
+		resp := requestWithHeaders(t, c.method, srv.URL+c.path, c.body, nil)
+		if resp.StatusCode != http.StatusUnauthorized {
+			t.Errorf("%s %s (public, no token): status = %d, want 401", c.method, c.path, resp.StatusCode)
+		}
+		resp.Body.Close()
+	}
+}
+
+// TestPublicMode_AuthenticatedPasses: an approved `users` token and a superuser token both work —
+// the operator's own admin credential needs no second account, and a hosted desk's members use
+// the approval-gated collection.
+func TestPublicMode_AuthenticatedPasses(t *testing.T) {
+	for _, collection := range []string{"users", pbcore.CollectionNameSuperusers} {
+		t.Run(collection, func(t *testing.T) {
+			fake := &fakeStreamer{events: scriptedTurn()}
+			srv, _, app := newTestServerMode(t, func(context.Context) (Streamer, error) { return fake, nil }, true)
+			tok := authToken(t, app, collection, "member-"+collection+"@desk.test")
+
+			resp := requestWithHeaders(t, http.MethodGet, srv.URL+PathChat, "",
+				map[string]string{"Authorization": tok})
+			if resp.StatusCode != http.StatusOK {
+				t.Fatalf("authenticated page: status = %d, want 200", resp.StatusCode)
+			}
+			resp.Body.Close()
+
+			// Same-origin POST (the page's own fetch) is accepted and streams.
+			resp = requestWithHeaders(t, http.MethodPost, srv.URL+PathStream, `{"message":"hi"}`,
+				map[string]string{"Authorization": tok, "Origin": srv.URL})
+			if resp.StatusCode != http.StatusOK {
+				t.Fatalf("authenticated same-origin stream: status = %d, want 200", resp.StatusCode)
+			}
+			if ct := resp.Header.Get("Content-Type"); !strings.HasPrefix(ct, "text/event-stream") {
+				t.Fatalf("Content-Type = %q, want text/event-stream", ct)
+			}
+			io.Copy(io.Discard, resp.Body)
+			resp.Body.Close()
+		})
+	}
+}
+
+// TestPublicMode_OriginIsSameOriginNotWildcard: in public mode the loopback allowlist would 403
+// every real request, so the rule becomes strict same-origin. It is NOT a wildcard: a foreign
+// origin — and a loopback origin, which on a hosted bind can only be a cross-site forgery — are
+// both still rejected, while an absent Origin (curl/API clients) is allowed as before.
+func TestPublicMode_OriginIsSameOriginNotWildcard(t *testing.T) {
+	fake := &fakeStreamer{events: scriptedTurn()}
+	srv, _, app := newTestServerMode(t, func(context.Context) (Streamer, error) { return fake, nil }, true)
+	tok := authToken(t, app, pbcore.CollectionNameSuperusers, "op@desk.test")
+
+	allowed := []string{"" /* absent */, srv.URL /* same origin */}
+	for _, origin := range allowed {
+		h := map[string]string{"Authorization": tok}
+		if origin != "" {
+			h["Origin"] = origin
+		}
+		resp := requestWithHeaders(t, http.MethodPost, srv.URL+PathStream, `{"message":"hi"}`, h)
+		if resp.StatusCode != http.StatusOK {
+			t.Errorf("public-mode origin %q: status = %d, want 200", origin, resp.StatusCode)
+		}
+		io.Copy(io.Discard, resp.Body)
+		resp.Body.Close()
+	}
+
+	rejected := []string{
+		"https://evil.example",
+		"http://127.0.0.1:9999",                                  // loopback is NOT a free pass on a hosted bind
+		strings.Replace(srv.URL, "127.0.0.1", "localhost", 1),    // a different host spelling is a different origin
+		strings.Replace(srv.URL, "http://", "https://", 1) + ":", // malformed
+	}
+	for _, origin := range rejected {
+		resp := requestWithHeaders(t, http.MethodPost, srv.URL+PathStream, `{"message":"hi"}`,
+			map[string]string{"Authorization": tok, "Origin": origin})
+		if resp.StatusCode != http.StatusForbidden {
+			t.Errorf("public-mode origin %q: status = %d, want 403", origin, resp.StatusCode)
+		}
+		resp.Body.Close()
+	}
+}
+
+// NOTE: the wildcard-CORS assertion that used to live here was a FALSE GREEN and has been moved
+// to cmd/deskkit's TestHardenPublicCORS. The middleware that emits Access-Control-Allow-Origin is
+// bound by the dependency's Serve() onto the serve router, NOT by apis.NewRouter — which is what
+// newTestServerMode builds — so a header assertion against this server could never observe the
+// wildcard and passed while the real binary emitted `Access-Control-Allow-Origin: *` on every
+// response. Assert response headers only where the middleware under test is actually bound.
+
+// TestLoopbackMode_UnchangedByPublicPlumbing: the local posture is byte-for-byte what it was —
+// no token required on any of the three routes, and the loopback-origin allowlist still applies.
+// This is the "default local deskkit serve behavior unchanged" assertion.
+func TestLoopbackMode_UnchangedByPublicPlumbing(t *testing.T) {
+	fake := &fakeStreamer{events: scriptedTurn()}
+	srv, _, _ := newTestServerMode(t, func(context.Context) (Streamer, error) { return fake, nil }, false)
+
+	resp := requestWithHeaders(t, http.MethodGet, srv.URL+PathChat, "", nil)
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("loopback page without a token: status = %d, want 200", resp.StatusCode)
+	}
+	resp.Body.Close()
+
+	resp = requestWithHeaders(t, http.MethodPost, srv.URL+PathStream, `{"message":"hi"}`,
+		map[string]string{"Origin": strings.Replace(srv.URL, "127.0.0.1", "localhost", 1)})
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("loopback stream from the localhost spelling: status = %d, want 200", resp.StatusCode)
+	}
+	io.Copy(io.Discard, resp.Body)
+	resp.Body.Close()
 }
