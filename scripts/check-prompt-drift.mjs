@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Prompt-copy drift guard. ADR 0015 (ADR 0015, DESK-37) rules
+// Prompt-copy drift guard. ADR 0015 (DESK-37) rules
 // git-is-truth for the librarian's system prompt: the //go:embed'd source
 // (librarian/templates/librarian-system-prompt.txt) is CANONICAL and the v1 spec quotes it
 // "verbatim" in a fenced block. This guard asserts those two version-controlled copies are

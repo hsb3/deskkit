@@ -257,7 +257,7 @@ desk files; the `apply-fix` boundary below still holds.
 
 The librarian's system prompt is a **re-seeded cache**, not the source of truth — the
 canonical copy is the version-controlled embed, and a runtime edit is ephemeral by rule
-(ADR 0015, git is truth; ADR 0015). To discard any
+(ADR 0015, git is truth). To discard any
 GUI/REST edits and restore the shipped prompt: open the admin console, delete the
 `librarian.system` row in the `prompts` collection, then run any `deskkit` command (or
 restart `serve`). The binary re-seeds the row byte-for-byte from the embed on the next run —

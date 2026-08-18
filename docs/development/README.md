@@ -57,6 +57,6 @@ unreleased drift; `check-changelog.mjs` gates a tag against a documented CHANGEL
 ## Canonical references
 
 - [`specs/pocket-librarian-v1-spec.md`](specs/pocket-librarian-v1-spec.md) — the librarian's build spec.
-- [`../decisions/`](../decisions/) — Architecture Decision Records (append-only; cited from code
-  and docs — their paths are kept stable).
+- Architecture Decision Records — on the project board as `DECISION` tasks (cited from code
+  and docs as a bare `ADR NNNN`; no path, no board id).
 - `../../_meta/build-brief.md` — the original build brief (repo shape, acceptance criteria).

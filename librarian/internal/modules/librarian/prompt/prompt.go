@@ -2,7 +2,7 @@
 // (spec §4.10/§6.1). This spine slice implements first-run seeding: the //go:embed'd
 // default (templates.SystemPrompt) is written into the prompts collection on first serve.
 //
-// Governance (ADR 0015, ADR 0015 — git is truth). The
+// Governance (ADR 0015 — git is truth). The
 // version-controlled embed is CANONICAL; the prompts row it seeds is a RE-SEEDED CACHE, not
 // the source of truth. A runtime GUI/REST edit to that row is ephemeral BY DESIGN — it does
 // not survive a store rebuild/re-seed, and clearing the row so the embed re-seeds is the

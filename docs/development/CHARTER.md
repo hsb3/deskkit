@@ -34,7 +34,8 @@ never by editing a shipped skill, template, or tool.
   files are exempt and may cite issues/identity freely.)
 - **One version, one repo.** Both products ship under the single root `VERSION`; a release tags
   that one version (SemVer policy: ADR 0005 (DESK-27)).
-- **Decisions are ADRs**, append-only, in [`decisions/`](../decisions/) and cited where they bind.
+- **Decisions are ADRs**, append-only, filed on the project board as `DECISION` tasks and cited
+  where they bind as a bare `ADR NNNN`.
 - **Scope is Claude Code only** in v1; OpenCode is a deferred, separate fan-out build.
 
 ## Direction settled for 1.0.0
@@ -63,4 +64,4 @@ These are decided; open build detail lives in the roadmap and issues, not here.
 | The docs map (using vs developing) | [`README.md`](README.md) |
 | The librarian's build spec | [`pocket-librarian-v1-spec.md`](specs/pocket-librarian-v1-spec.md) |
 | The PM system's build spec | [`pm-system-v1-spec.md`](specs/pm-system-v1-spec.md) |
-| Why a decision was made | [`decisions/`](../decisions/) |
+| Why a decision was made | the project board's `DECISION` tasks |

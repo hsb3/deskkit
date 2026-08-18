@@ -426,7 +426,7 @@ required.
 
 The `items.pointer` field is a **desk-relative file path** — never an issue URL and never an
 arbitrary locus. The grammar below was shipped before it was specified; this subsection is the
-normative definition **ADR 0010** (ADR 0010, DESK-32) ratifies, with no
+normative definition **ADR 0010** (DESK-32) ratifies, with no
 change to the shipped behavior it names.
 
 - **Form.** A pointer is a path relative to the desk root, optionally suffixed with an advisory
@@ -461,7 +461,7 @@ No code change: `Verdict`/`sectionFilePart` (`module.go`) and `DocRequirement`/
 existing, test-pinned behavior as-is.
 
 Issue and URL references are **not** gate pointers under this grammar — they are a
-cross-reference, typed per ADR 0011 (§7 R6.1; ADR 0011 (DESK-33)).
+cross-reference, typed per ADR 0011 (§7 R6.1; DESK-33).
 This section states only that boundary; the typed-reference contract itself lives in
 `schema/references.yaml` — a `{kind, target}` primitive with a closed `kind` enum (`issue`,
 `url`) and a validation guard in both lanes — where the qualifier is documented as read-time
