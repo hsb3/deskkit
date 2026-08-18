@@ -43,6 +43,7 @@ _meta/plans/_utils/__pycache__/
 **/.claude/agent-memory/
 .claude/*.lock
 .claude/**/.DS_Store
+.claude/handoff.stamp
 CLAUDE.local.md
 
 # >>> project-memory (managed) >>>

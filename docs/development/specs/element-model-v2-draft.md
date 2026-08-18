@@ -14,7 +14,7 @@ research proposal at `_meta/research/2026-07-design-session/platform/spec-elemen
 (frozen as provenance; the `_meta/` working desk was removed from the tree 2026-08 — the file
 lives in git history) after folding in ADR 0018's Q1–Q4 owner rulings and both adversarial
 reviews' 18 numbered gaps. It is **not finalized**: ADR 0009 holds the model draft "until its review
-fixes land and the simulations pass" (`docs/decisions/0009-platform-frame.md:49`). This document
+fixes land and the simulations pass" (ADR 0009, DESK-31). This document
 lands the review fixes and the rulings; finalization is gated on **`model-simulations` (#126)**._
 
 > **Naming note.** "v2" here is the **schema-track label** (ADR 0009's two-track split), not a
@@ -28,7 +28,7 @@ lands the review fixes and the rulings; finalization is gated on **`model-simula
 - **Resolves** `#125` (`element-model-revision`) — the fold-in of ADR 0018 + the two reviews.
 - **Blocks `model-simulations` (#126)** — ADR 0009's owner directive requires simulations against
   both the v1 and v2 data models before the v2 model is finalized
-  (`docs/decisions/0009-platform-frame.md:40-42`); `model-simulations` cannot walk a coherent v2
+  (ADR 0009, DESK-31); `model-simulations` cannot walk a coherent v2
   model until this revision exists, and `epic-schema-v2-track`'s child list sequences
   `model-simulations` after `element-model-revision`
   (`_meta/plans/epic-schema-v2-track/issue-body.md:19-20`).
@@ -369,7 +369,7 @@ new one. This keeps the v2 element model a *composition* of settled contracts, n
   unknown.** When the v2 element list becomes live PM `items.type` values, **every new element type
   inherits the identical `CreateItem`-time vocabulary check for free** — per 0012's own text, "the
   check reads the vocabulary as it stands at any time — schema v1 doctypes now, the v2 element list
-  when the two-track lands" (`docs/decisions/0012-item-type-validation.md:21-22`). The count in §12
+  when the two-track lands" (ADR 0012, DESK-34). The count in §12
   (32 doctypes) is that vocabulary as it stands today; the v2 elements extend it and are validated the
   same way.
 - **ADR 0013 — findings disposition** (a human-judgment axis orthogonal to workflow `state`, with

@@ -52,7 +52,7 @@ Both products ship under one version. The full runbook is [README.md](README.md)
 bump `VERSION` + the three manifests → move `[Unreleased]` CHANGELOG entries into a dated section
 → `make release-prep` → `git tag v<version> && git push --tags`. `make version-status` flags
 unreleased drift; `check-changelog.mjs` gates a tag against a documented CHANGELOG section
-([ADR 0005](../decisions/0005-versioning-and-changelog.md)).
+(ADR 0005, DESK-27).
 
 ## Canonical references
 

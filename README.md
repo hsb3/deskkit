@@ -181,5 +181,5 @@ for the full index.
 - **[docs/development/](docs/development/)** — the contributor overview: build/test gates, media regeneration, and how to cut a release.
 - `docs/development/specs/pocket-librarian-v1-spec.md` — the librarian's product and technical spec.
 - `docs/development/specs/pm-system-v1-spec.md` — the PM system's product and technical spec (core+modules refactor, PM module, gates, surfaces, plugin).
-- `docs/decisions/` — architecture decision records (interactive surface, multi-desk topology, store self-initialization, chat TUI, versioning policy, kit port, Charm v2 stack, PM core+modules architecture).
+- Architecture decision records (interactive surface, multi-desk topology, store self-initialization, chat TUI, versioning policy, kit port, Charm v2 stack, PM core+modules architecture) live on the project board as `DECISION` tasks, not in this repo; docs and code cite them as `ADR NNNN`.
 - **[CHANGELOG.md](CHANGELOG.md)** — what changed in each release.

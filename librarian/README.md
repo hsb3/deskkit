@@ -75,7 +75,7 @@ cwd-relative `pb_data/`. `--dir` is the explicit override. A command that can't 
 directory. Stores live outside the desk tree on purpose: the librarian must not index its own
 database, and SQLite inside an iCloud-synced desk folder is a corruption risk. `DESK_NAME`
 must be unique across the estate — it names the store's directory (design in
-`../docs/decisions/0002-multi-desk-topology-store-per-desk.md`).
+ADR 0002).
 
 Opening a store also runs a **desk open-guard**: if the store already has rows stamped with a
 `desk` different from the configured `DESK_NAME`, the command refuses to run, naming both
@@ -137,8 +137,8 @@ binary, against the desk's store (see "Where the store lives" above). It needs n
 ```
 
 That's the whole path from a built binary plus an API key to a live session — one
-command. (Design origin: `../docs/decisions/0001-interactive-surface-tui-first.md`,
-`../docs/decisions/0004-chat-full-screen-tui.md`.)
+command. (Design origin: ADR 0001,
+ADR 0004.)
 
 Needs an LLM provider and API key exactly like `agent` — see "Choosing the LLM and
 setting the API key" above.
@@ -205,7 +205,7 @@ README: `restore` is never exposed, `apply-fix` only runs when
 `serve` also mounts a self-contained session page at `http://127.0.0.1:8090/desk/chat` — a
 custom Go route serving a page embedded in the binary via `go:embed`, so there is no
 separate frontend build or toolchain needed at runtime (design origin:
-`../docs/decisions/0001-interactive-surface-tui-first.md`, option b). One visit is enough:
+ADR 0001, option b). One visit is enough:
 
 ```bash
 ./deskkit serve       # then open http://127.0.0.1:8090/desk/chat
@@ -257,7 +257,7 @@ desk files; the `apply-fix` boundary below still holds.
 
 The librarian's system prompt is a **re-seeded cache**, not the source of truth — the
 canonical copy is the version-controlled embed, and a runtime edit is ephemeral by rule
-(ADR 0015, git is truth; `../docs/decisions/0015-prompt-governance.md`). To discard any
+(ADR 0015, git is truth; ADR 0015). To discard any
 GUI/REST edits and restore the shipped prompt: open the admin console, delete the
 `librarian.system` row in the `prompts` collection, then run any `deskkit` command (or
 restart `serve`). The binary re-seeds the row byte-for-byte from the embed on the next run —
@@ -288,7 +288,7 @@ customization belongs in `_knowledge/` (the profile), never a DB prompt edit.
 document-gated work graph. Work items move through a rigid `queue → work → review → terminal`
 phase machine, and a phase advance is **refused until the document that phase requires exists and
 validates** against schema v1 — the same schema-v1 engine the librarian uses, reached through a
-narrow in-process seam (`docs/decisions/0008-pm-core-modules-architecture.md`).
+narrow in-process seam (ADR 0008).
 
 It is **on by default** (since 1.0; ADR 0008 amendment 2026-07-21). A fresh desk boots with the
 `pm` command group, the twelve PM MCP tools, and the five PM collections all present. To run a

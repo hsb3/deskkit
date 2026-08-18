@@ -84,7 +84,7 @@ specs under `librarian/internal/modules/pm/`):
 | `list_items` | no | filtered graph query |
 | `get_item` | no | one item + notes/deps/transitions/ancestors, including its `body` (the list/summary shape omits it) |
 | `create_item` | yes | accepts an optional long-form `body`; carries the optional actor fields below |
-| `update_item` | yes | accepts an optional `body` (omit to leave unchanged; pass an empty string to clear); carries the optional actor fields below; refused by a live foreign claim ([ADR 0020](../../decisions/0020-pm-claim-semantics.md)) |
+| `update_item` | yes | accepts an optional `body` (omit to leave unchanged; pass an empty string to clear); carries the optional actor fields below; refused by a live foreign claim (ADR 0020, DESK-41) |
 | `transition_item` | yes | carries the optional actor fields below; refused by a live foreign claim (ADR 0020) |
 | `block_item` / `unblock_item` | yes | carry the optional actor fields below; refused by a live foreign claim (ADR 0020) |
 | `add_note` | yes | carries the optional actor fields below |
@@ -219,7 +219,7 @@ and no librarian ride-alongs — and its stderr reads `modules: pm; 12 tool(s) e
 name) on a resolved desk and the process **exits 1** with an actionable stderr line — proving the
 fail-loud contract rather than a silent fallback.
 
-> **Drift-guard note.** The [ADR-0016](../../decisions/0016-ts-boundary-deskkit-proxy.md) tool-surface
+> **Drift-guard note.** The ADR-0016 tool-surface
 > drift guard's current framing is
 > **two axes / four combinations** (`LIBRARIAN_AUTONOMOUS_WRITES` × `PM_ENABLED` → 5/6/17/18); that
 > framing **predates module gating** and models only the `MCP_MODULES`-unset baseline. `MCP_MODULES`

@@ -426,7 +426,7 @@ required.
 
 The `items.pointer` field is a **desk-relative file path** — never an issue URL and never an
 arbitrary locus. The grammar below was shipped before it was specified; this subsection is the
-normative definition **ADR 0010** (`docs/decisions/0010-pointer-grammar.md`) ratifies, with no
+normative definition **ADR 0010** (ADR 0010, DESK-32) ratifies, with no
 change to the shipped behavior it names.
 
 - **Form.** A pointer is a path relative to the desk root, optionally suffixed with an advisory
@@ -461,7 +461,7 @@ No code change: `Verdict`/`sectionFilePart` (`module.go`) and `DocRequirement`/
 existing, test-pinned behavior as-is.
 
 Issue and URL references are **not** gate pointers under this grammar — they are a
-cross-reference, typed per ADR 0011 (§7 R6.1; `docs/decisions/0011-typed-reference-contract.md`).
+cross-reference, typed per ADR 0011 (§7 R6.1; ADR 0011 (DESK-33)).
 This section states only that boundary; the typed-reference contract itself lives in
 `schema/references.yaml` — a `{kind, target}` primitive with a closed `kind` enum (`issue`,
 `url`) and a validation guard in both lanes — where the qualifier is documented as read-time
@@ -578,7 +578,7 @@ honored by the holder (whose own writes proceed as normal) and lapses at its TTL
 on `release`. An expired or absent claim is treated as free. Cascade/auto-unblock (§3.5) is
 derived graph state driven by the transition hook, not a direct call, so it is unaffected by
 claims — a claim coordinates people/agents, not the graph's own derived state. See
-[ADR 0020](../../decisions/0020-pm-claim-semantics.md). This is the "enough to stop two desk agents
+ADR 0020 (DESK-41). This is the "enough to stop two desk agents
 double-working an item" bar (R2.6), not a distributed lock.
 
 ### 3.7 `notes` — lighter artifacts (R3.2)
@@ -1032,7 +1032,7 @@ than unit-tested), name the enforcing artifact and are called out in the note be
 | R2.4 typed edges, unblock_at, cascade | MUST | §3.4, §3.5 | `TestCascadeAuto`, `TestCascadeAutoReopen`, `TestCascadeManualAndPermanent`, `TestCascadeMultiBlocker`, `TestLinkIsBlockedByCanonicalizes` |
 | R2.5 append-only audit + actor attribution | MUST | §3.6 | `TestAuditTrail` |
 | R2.6 optimistic concurrency + claim TTL | SHOULD → adopted | §3.6 | `TestVersionMismatchRefused`, `TestClaimSemantics`, `TestClaimTTLFromDeskConfig`, `TestReleaseClearsClaim` |
-| R2.6 (ADR 0020) — claim authoritative over every direct mutation | MUST | §3.6 + [ADR 0020](../../decisions/0020-pm-claim-semantics.md) | `TestClaimGatesBlockUnblock`, `TestUpdateItemGatedByClaim`, `TestClaimSemantics` |
+| R2.6 (ADR 0020) — claim authoritative over every direct mutation | MUST | §3.6 + ADR 0020 (DESK-41) | `TestClaimGatesBlockUnblock`, `TestUpdateItemGatedByClaim`, `TestClaimSemantics` |
 | R3.1 server-enforced transitions, names what's missing | MUST | §4.1 | `TestGateRefusedThenSatisfied`, `TestIllegalEdgeRefusedBeforeGates`, `TestBlockedRefusesAdvanceOnly` |
 | R3.2 artifacts = librarian-validated documents | MUST | §4.4, §2.5; notes §3.7 | `TestGateFailsClosedWithoutValidator`, `TestEvaluate_StubValidator` (`.../pm/gates`) |
 | R3.3 gate rules in editable per-desk YAML + traits | MUST | §4.2 | `TestDeskConfigOverridesDefaults`, `TestTraitCompositionThroughFrontmatter`, `TestParseRules_SpecExample`, `TestEffective_TraitComposition` (`.../pm/gates`) |
@@ -1100,13 +1100,13 @@ flagged here for the foreman/owner to review; none is claimed as ruled.
 6. **Cascade `auto` vs `auto-reopen`** given the concrete standing-vs-one-shot semantics in §3.5.
 7. **Claim TTL default 30 min** (`PM_CLAIM_TTL` override), and version-token optimistic
    concurrency as the "light" concurrency bar (R2.6). Recorded as a durable build-contract
-   default in [ADR 0019](../../decisions/0019-durable-pm-defaults.md).
+   default in ADR 0019 (DESK-40).
 8. **`stalled` threshold default 14 days** in `get_context` (§5.2), configurable.
 9. **PM writes default autonomous-on** (§5.1): the real safety is the document gate on `advance`,
    not a write flag, so agents may drive the graph by default; a `PM_AUTONOMOUS_WRITES=false` desk
    can make agents read-only. Alternative: default off (mirror the librarian's `apply_fix` gate);
    rejected because graph mutation is the PM system's whole point and it writes no desk files.
-   Recorded as a durable build-contract default in [ADR 0019](../../decisions/0019-durable-pm-defaults.md).
+   Recorded as a durable build-contract default in ADR 0019 (DESK-40).
 10. **Realtime (R4.3) and secrets/concurrency SHOULDs adopted**, not argued down — each is
     cheap on the existing chassis (PB-native realtime; the seam; the version token). The R5.2
     portfolio read-only fan-out is NOT adopted in v1 — it is LATER (§9), with the enumerable

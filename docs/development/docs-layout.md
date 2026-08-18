@@ -24,7 +24,7 @@ honest. The distinction is the thing to internalize:
 | `docs/usage/` | User guides: `getting-started`, `librarian-guide`, `pm-guide`, `plugin-guide` | no |
 | `docs/development/` | Contributor docs: `CHARTER.md` (canonical direction), `README.md`, `install-and-build.md`, this file | no |
 | `docs/development/specs/` | The build specs — see the load-bearing table below | **YES** |
-| `docs/decisions/` | Architecture Decision Records (append-only) | cited widely; paths kept stable |
+| — | Architecture Decision Records moved to the project board as `DECISION` tasks (2026-08-18); nothing under `docs/` holds them now | cited widely as a bare `ADR NNNN` — never as a path or a board id |
 | `docs/assets/` | Rendered demo GIFs (generated from `scripts/vhs-tapes/*.tape`) | no |
 
 ## Load-bearing spec paths (read by CI gates or a test — do not move without repointing the reader)

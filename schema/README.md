@@ -36,14 +36,14 @@ install. Same word "version", disjoint mechanisms.
   emits, its status family, and required/optional fields. Product-neutral successor of the
   origin vault's `types:` model (0013 items 4 + 8). The contract as data; the runtime
   validation engine that consumes it is the PM-system build's job. Port + gap dispositions:
-  [`docs/decisions/0006-kit-port-schema-reconciliation.md`](../docs/decisions/0006-kit-port-schema-reconciliation.md).
+  ADR 0006.
 - `references.yaml` — the **reference dimension**: the typed cross-reference primitive both
   lanes share — a `{kind, target}` shape with a closed `kind` enum (seeded `issue`, `url`) and
   a raw `target` string. The desk-relative repo qualifier is documented as read-time-resolved
   from the profile (`repos.shorthand.issue_default`) and is never persisted. A validation guard
   lands in each lane (`librarian` `ReferenceVocab`/`ValidateReference`, `plugin`
   `validateReference`); no field migrates onto the shape yet. Contract + rationale:
-  [`docs/decisions/0011-typed-reference-contract.md`](../docs/decisions/0011-typed-reference-contract.md).
+  ADR 0011.
 - `paths.yaml` — the **filesystem path constants** both lanes read. Its `profile_root` key
   names the single directory that holds the personalization profile
   (`profile.{yaml,yml,json,md}`); each lane pins a per-lane constant to it (`plugin/core`

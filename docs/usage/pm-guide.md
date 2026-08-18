@@ -15,7 +15,7 @@ binary, one per-desk store, three surfaces (CLI, MCP, TUI) over one engine — p
 Claude Code plugin (`desk-persona`).
 
 Design and rationale: `../development/specs/pm-system-v1-spec.md` and
-`decisions/0008-pm-core-modules-architecture.md`.
+ADR 0008 (DESK-30).
 
 ## It's on by default — how to opt out
 
@@ -74,7 +74,7 @@ first startup, with one logged line — no desk loses its store across the renam
   of the item — transition, block, unblock, and update are all refused for a non-holder while the
   claim is live — until it lapses (default 30 min, `PM_CLAIM_TTL`) or the holder releases it; the
   holder's own writes proceed as normal. Cascade/auto-unblock is derived graph state, not a direct
-  call, so it is unaffected by claims. See [ADR 0020](../decisions/0020-pm-claim-semantics.md).
+  call, so it is unaffected by claims. See ADR 0020 (DESK-41).
 - **Audit:** every transition appends an immutable row; a refusal lands as a `gate_refused` audit
   entry. Every write records who acted via optional `actor`/`actor_kind`/`delegation_parent`
   fields (unset → actor `agent`, kind `agent`); the CLI instead defaults `--actor` to `$USER`,

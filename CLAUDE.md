@@ -4,6 +4,27 @@ This file guides coding agents working in this repo. For the project's canonical
 (what it is, what's settled for 1.0.0) see [`docs/development/CHARTER.md`](docs/development/CHARTER.md); if that page and
 this one ever disagree about direction, the charter wins.
 
+## Where the work lives
+
+Tracked work lives on the Kaneo board (project `DESK`), not in this repo — never create
+`backlog.md`, `TODO.md`, or a handoff file. The board replaced all three on 2026-08-18.
+
+**Cold start: read task `DESK-21` first** — the `HANDOFF`-labelled task in **Documents**, the
+lead lane. It is kept current in place rather than re-filed per session, and it is not work:
+never claim it, never move it out. Decisions are tasks labelled `DECISION` in the same lane;
+check them before contradicting one. Work comes from the top of **Up Next**; To Do is
+untriaged. The `kaneo@dotfiles-agents` plugin reads its config (`KANEO_*`) from
+`.claude/settings.local.json`, which is gitignored because the agent key is a credential.
+This repo works the board as `deskkit` — follow the kaneo skill's claim ritual before working
+a task.
+
+GitHub issues stay the intake and the public record. The repo is linked to the board, so open
+issues arrive in To Do, and branches move their own task: name one `desk-<taskNumber>`
+(optional hyphen-prefixed suffix) and push → In Progress, PR open → In Review, merge → Done.
+Board events also post to the Telegram topic `DESK`. The instance itself is operated from the
+`kaneo-ops` repo, whose runbook is the operational contract — nothing about the instance is
+configured from here.
+
 ## Project Overview
 
 **desk-standard is two products over one shared schema**, all identity-neutral — nothing shipped
@@ -40,12 +61,12 @@ plugins/           the marketplace-distributed bundles (a marketplace install co
   desk-persona/    the composed librarian+PM bundle: librarian-operator + pm-operator agents, 3 PM skills, SessionStart hook
 librarian/         Go lane — the deskkit binary; embedded PocketBase; CLI/MCP/TUI; verify.sh gate
 schema/            schema v1 — shared rule/structure source for both lanes
-docs/              specs, ADRs (docs/decisions/), the CHARTER, and using/developing guides
+docs/              specs, the CHARTER, and using/developing guides (ADRs live on the board)
 scripts/           repo-wide gate scripts (*.mjs) + record-media.sh
 tests/             signpost only — suites live with their products; see tests/README.md
 kits/ + kits.yaml  SOP template library + its drift-guarded manifest
-HANDOFF.md         session-to-session bridge: current standing + deep gotchas
-.claude/           agent config: skills/, agents/, rules/, memory/, settings.json (tracked policy)
+.claude/           agent config: skills/, agents/, rules/, memory/, settings.json (tracked policy),
+                   atelier.local.md (handoff lives on the DESK board, not in a file)
 .github/           CI workflows + issue/PR templates + dependabot
 Makefile           the canonical task interface — `make help` lists targets
 VERSION            single source of truth for the release version (both products ship off it)
@@ -162,7 +183,7 @@ This repo does not register its own MCP servers on itself — there is no root `
 none should be added. The tools this repo builds (the librarian, the PM module, the desk-standard
 plugin) are for coordinating *other* desks; that standard doesn't apply reflexively to the repo
 that builds it, and the coordination tooling must live outside it — on a desk built to operate on
-this repo, e.g. the paired executive desk (`HANDOFF.md` §0). In-repo verification instead
+this repo, e.g. the paired executive desk (DESK-21 §0). In-repo verification instead
 runs through `make verify` (`librarian/verify.sh`, a throwaway scratch desk) and `make e2e`, both
 of which stand up disposable desks rather than pointing the binary at this repo's own tree.
 `deskkit apply-fix` / `restore` stay `ask`-gated in `.claude/settings.json` regardless, matching
@@ -178,8 +199,8 @@ the librarian's supervised-write boundary wherever it runs.
 - **Doc paths are load-bearing — moving one means repointing its citations in the same change.**
   The build specs live in `docs/development/specs/` (`pocket-librarian-v1-spec.md`,
   `pm-system-v1-spec.md`, `tool-surface.md`, `agent-integration-contract-v1-spec.md`,
-  `element-model-v2-draft.md`) and are read by CI gates + a Go test; ADRs live in `docs/decisions/*`.
-  Both are cited from code, skills, and the neutrality allowlist. `scripts/check-doc-links.mjs` (in
+  `element-model-v2-draft.md`) and are read by CI gates + a Go test; they are cited from code,
+  skills, and the neutrality allowlist. `scripts/check-doc-links.mjs` (in
   `make check`) fails on any dangling doc/media citation across the published+shipped surface, so a
   move that forgets a citation is caught — see `docs/development/docs-layout.md` for the full layout
   contract (what lives where, what's load-bearing, and how the working desk differs).
@@ -189,8 +210,13 @@ the librarian's supervised-write boundary wherever it runs.
 
 - **[`docs/development/CHARTER.md`](docs/development/CHARTER.md)** — canonical page (what it is, 1.0.0 direction, precedence rule).
 - **[`docs/README.md`](docs/README.md)** — docs index, split Using vs Developing.
-- **[`docs/decisions/`](docs/decisions/)** — ADRs (append-only; cited where they bind).
-- **[`HANDOFF.md`](HANDOFF.md)** — session-to-session bridge: current standing + deep gotchas.
+- **Kaneo tasks labelled `DECISION`** (Documents lane) — the ADRs, `ADR 0001` = `DESK-23` through
+  `ADR 0022` = `DESK-43`, moved off disk on 2026-08-18. File a new decision as a board task, not as
+  a file; code and docs cite it as a bare `ADR NNNN`, because a board id may not ship in an
+  identity-neutral artifact. The deleted files are in git history (`git log -- docs/decisions/`).
+- **Kaneo task `DESK-21`** — session-to-session bridge: current standing + deep gotchas. On the
+  board, not in the repo (see "Where the work lives"); the pre-2026-08-18 file is in git history
+  (`git log -- HANDOFF.md`).
 - **[`CHANGELOG.md`](CHANGELOG.md)** — what changed per release.
 
 ## Keeping this file current

@@ -4,7 +4,7 @@
 # reference-shaped value in the store (graduation targets, gate pointers, and future refs).
 # A reference is { kind, target } — a closed `kind` enum plus a raw `target` string (the
 # reference exactly as authored, with no format constraint). This is the contract ADR 0011
-# ratifies (docs/decisions/0011-typed-reference-contract.md): it is specified now, and its
+# ratifies (ADR 0011): it is specified now, and its
 # field migrations ride the schema-v2 track — no field migrates onto the shape in this change.
 #
 # THE QUALIFIER IS NEVER PERSISTED. A bare reference (an issue number with no repo) is

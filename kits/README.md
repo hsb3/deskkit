@@ -8,7 +8,7 @@ Status: active
 origin vault per desk decision 0013 S4(a) (the SOP-kit port work order) and indexed by
 the root [`kits.yaml`](../kits.yaml) manifest. The frontmatter contract each kit emits lives in
 [`schema/doctypes.yaml`](../schema/doctypes.yaml) (schema v1's doc-type dimension); the port and
-its gap dispositions are recorded in [ADR 0006](../docs/decisions/0006-kit-port-schema-reconciliation.md).
+its gap dispositions are recorded in ADR 0006.
 
 **Structure.** Every kit has the guide/template/example (G/T/E) trio, except:
 
