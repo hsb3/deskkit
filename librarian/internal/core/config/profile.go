@@ -148,10 +148,6 @@ func ProfileScalar(profile map[string]any, dotted string) string {
 // can inspect the intermediate node.
 func IndexTree(m map[string]any, parts []string) any { return indexTree(m, parts) }
 
-// ScalarString is the exported wrapper over scalarString: it renders a profile leaf as its
-// substitutable scalar string, or "" for a map/list/nil.
-func ScalarString(v any) string { return scalarString(v) }
-
 // placeholderRe matches {{profile.<dotted.path>}} / {{env.<VAR>}} with an optional
 // `|| "default"` (M-05 substitution convention). Group 1 = kind, 2 = path/var,
 // 3 = the whole `|| "…"` clause (presence = has default), 4 = the default text.
