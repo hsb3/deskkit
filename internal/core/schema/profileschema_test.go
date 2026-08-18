@@ -17,7 +17,7 @@ func TestProfileSchemaEmbeddedCopy_MatchesRepoRoot(t *testing.T) {
 	if !ok {
 		t.Fatal("runtime.Caller failed")
 	}
-	// librarian/internal/core/schema -> repo root is four levels up.
+	// internal/core/schema -> repo root is three levels up.
 	repoRoot := filepath.Join(filepath.Dir(thisFile), "..", "..", "..")
 	canonical, err := os.ReadFile(filepath.Join(repoRoot, "schema", "profile.schema.yaml"))
 	if err != nil {
