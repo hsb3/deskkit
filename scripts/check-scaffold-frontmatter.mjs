@@ -1,5 +1,7 @@
 #!/usr/bin/env node
-// Frontmatter-conformance guard for shipped scaffold INSTRUMENT assets (desk-standard #80).
+// Frontmatter-conformance guard for shipped scaffold INSTRUMENT assets: a missing required key
+// here ships into every live desk instantiated from this asset, silently breaking that desk's
+// frontmatter contract.
 //
 // Most files under a skill's assets/ are standard-free scaffold TEMPLATES (K25) — exempt from
 // the frontmatter contract by design (e.g. desk-setup/assets/template/CLAUDE.md). But some
@@ -8,8 +10,7 @@
 // instantiated copy is clean by construction and never needs a one-off exemption (see
 // conventions-standard SKILL.md, "Frontmatter contract" + adherence-checklist rule 1).
 //
-// This guard fails if any listed instrument asset is missing a required universal frontmatter
-// key. It checks KEY PRESENCE only (schema/doctypes.yaml's `universal:` set + the desk-surface
+// Checks KEY PRESENCE only (schema/doctypes.yaml's `universal:` set + the desk-surface
 // `synopsis` requirement) — not value format — because these are still-templated assets that
 // intentionally ship bracket placeholders (e.g. `<YYYY-MM-DD>`) for a desk owner to fill in at
 // copy time; strict value validation is the deskkit's job against an instantiated desk.

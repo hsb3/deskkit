@@ -24,8 +24,8 @@
 //   node scripts/check-doc-links.mjs              scan; exit 1 on any dangling reference, 0 when clean
 //   node scripts/check-doc-links.mjs --self-test   prove the guard still flags a seeded dangler
 //
-// House pattern (matches check-query-kinds.mjs, check-tool-surface.mjs): plain Node, no deps, a
-// pure-function matcher shared by the live scan and the --self-test's synthetic filesystem.
+// House pattern (matches check-query-kinds.mjs): plain Node, no deps, a pure-function matcher
+// shared by the live scan and the --self-test's synthetic filesystem.
 
 import { readFileSync, existsSync, lstatSync } from "node:fs";
 import { execFileSync } from "node:child_process";

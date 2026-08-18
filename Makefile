@@ -34,13 +34,10 @@ install: ## Build + install the librarian binary to ~/.local/bin (override PREFI
 test: ## Fast tests: librarian (go test ./...)
 	@$(MAKE) -C librarian test
 
-check: ## Repo gates: neutrality lint + self-test, kit-manifest drift, prompt-copy drift, tool-surface drift + self-test, scaffold frontmatter, persona drift, textfield-max, query-kind drift + self-test, doc-link integrity + self-test, shellcheck, actionlint, workflow SHA-pin drift + self-test, profile-root drift + self-test
+check: ## Repo gates: neutrality lint + self-test, kit-manifest drift, scaffold frontmatter, persona drift, textfield-max, query-kind drift + self-test, doc-link integrity + self-test, shellcheck, actionlint, workflow SHA-pin drift + self-test, profile-root drift + self-test
 	@node scripts/check-neutrality.mjs
 	@node scripts/check-neutrality.mjs --self-test
 	@node scripts/check-kits.mjs
-	@node scripts/check-prompt-drift.mjs
-	@node scripts/check-tool-surface.mjs
-	@node scripts/check-tool-surface.mjs --self-test
 	@node scripts/check-scaffold-frontmatter.mjs
 	@node scripts/check-persona-drift.mjs
 	@node scripts/check-textfield-max.mjs

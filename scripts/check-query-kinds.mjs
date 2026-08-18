@@ -14,9 +14,9 @@
 // Why an .mjs guard and not a Go test: the kind list exists only as free-text strings — a
 // jsonschema struct-tag description and a spec-markdown quote — with no exported Go slice of
 // kinds to reflect on, and a Go test cannot cleanly read spec markdown. Every existing doc-vs-
-// source string-agreement guard in this repo is a `scripts/check-*.mjs` (check-prompt-drift.mjs,
-// check-tool-surface.mjs, check-workflow-pins.mjs); this follows the same house pattern: plain
-// Node, no deps, pure text-scan helpers, a `--self-test` mode that seeds an in-memory mismatch.
+// source string-agreement guard in this repo is a `scripts/check-*.mjs` (check-workflow-pins.mjs,
+// check-profile-root.mjs); this follows the same house pattern: plain Node, no deps, pure
+// text-scan helpers, a `--self-test` mode that seeds an in-memory mismatch.
 //
 //   node scripts/check-query-kinds.mjs             # scan the tree — FAIL on any drift
 //   node scripts/check-query-kinds.mjs --self-test  # prove the guard still detects seeded drift

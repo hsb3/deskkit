@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-// Version-sync drift guard. The repo carries one canonical version in the root VERSION file;
-// the shipped manifests must agree with it:
+// Version-sync drift guard: without it, a shipped manifest could silently disagree with the root
+// VERSION, so the marketplace listing and an installed plugin advertise two different version numbers:
 //   - plugins/desk-persona/.claude-plugin/plugin.json   (the installed desk-persona plugin)
 //   - .claude-plugin/marketplace.json                   (each plugins[].version in the marketplace)
 // Exits 1 (listing every disagreement) if any manifest differs from VERSION; exits 0 when all

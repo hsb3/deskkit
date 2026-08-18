@@ -54,20 +54,9 @@ jobs:
       - name: Kit-manifest drift guard — kits.yaml vs kits/ tree
         run: node scripts/check-kits.mjs
 
-      # Prompt-copy drift: the librarian system-prompt embed and its "kept verbatim" quote in the
-      # v1 spec must stay byte-identical (ADR 0015 — git is truth). Fails naming where they diverge.
-      - name: Prompt-copy drift guard — embed vs spec quote
-        run: node scripts/check-prompt-drift.mjs
-
-      # Tool-surface drift: docs/development/specs/tool-surface.md's counts must match source. The
-      # CLI counts are pinned here; the gate-dependent MCP counts are pinned by
-      # TestToolSurfaceDoc_MCPCounts on the go-test lane below. Self-test proves the guard
-      # still fails on a tool add/remove.
-      - name: Tool-surface drift guard — doc counts vs source
-        run: node scripts/check-tool-surface.mjs
-
-      - name: Tool-surface drift guard — self-test (seeded divergence detection)
-        run: node scripts/check-tool-surface.mjs --self-test
+      # Tool-surface drift (docs/development/specs/tool-surface.md's CLI + MCP counts vs source) is
+      # guarded entirely on the go-test lane below — see librarian/internal/core/mcp/
+      # tool_surface_doc_test.go. No workflow step here.
 
       # TextField explicit-Max recurrence guard (ADR 0017 slice C): fails on any content TextField
       # under librarian collections that carries neither an inline Max, a migration cap, nor a

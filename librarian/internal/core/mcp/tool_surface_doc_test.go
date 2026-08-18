@@ -1,14 +1,12 @@
 package mcp
 
-// Tool-surface drift guard (Go half). docs/development/specs/tool-surface.md is the
+// Tool-surface drift guard — the only one. docs/development/specs/tool-surface.md is the
 // authoritative, empirically derived map of every tool-bearing surface (ADR 0016: "tool-surface
-// truth lives in the tool-surface spec, pinned by a drift guard so counts can't rot again"). The
-// gate-dependent MCP counts are the part that is NOT statically obvious from source — they depend
-// on two independent env gates (LIBRARIAN_AUTONOMOUS_WRITES x PM_ENABLED) plus the MCP_MODULES
-// module axis — so the JS guard (scripts/check-tool-surface.mjs) deliberately does NOT
-// re-implement Go's gate arithmetic. This test is the other half: it READS the counts the doc
-// asserts and cross-checks each against the SAME toolcore gate the server registers, so the doc
-// and the source cannot silently diverge. It rides the existing `go test ./...` lane (make test).
+// truth lives in the tool-surface spec, pinned by a drift guard so counts can't rot again"). This
+// file is that guard whole: it READS every count the doc asserts and re-derives each from source —
+// the gate-dependent MCP totals from the SAME toolcore gate the server registers, the CLI base
+// count from the command registrations in cmd/deskkit/main.go — so the doc and the source cannot
+// silently diverge. It rides the existing `go test ./...` lane (make test).
 //
 // The counts asserted here are the LIVE totals the binary exposes, i.e. every registered module:
 // the always-on `profile` module (4 ungated read-only tools) plus the env-gated `librarian` and
@@ -18,9 +16,6 @@ package mcp
 // It pins the counts, not the doc's bytes, so an unrelated prose/row edit (e.g. re-wording the
 // `findings dispose` row) does NOT trip it — only a real count change (a tool added/removed
 // without a matching doc edit, or a doc edit without the matching source change) turns it RED.
-//
-// Companion: scripts/check-tool-surface.mjs pins the CLI (16 base) count and asserts THIS file's
-// presence, so removing the MCP-count guard fails `make check`.
 
 import (
 	"os"
@@ -51,8 +46,7 @@ type docSurfaceCounts struct {
 }
 
 // TestToolSurfaceDoc_MCPCounts is the drift guard: every MCP count the tool-surface spec states is
-// re-derived from toolcore's real gate and asserted equal. Named so the JS guard can assert this
-// file's presence by function name.
+// re-derived from toolcore's real gate and asserted equal.
 func TestToolSurfaceDoc_MCPCounts(t *testing.T) {
 	root := repoRootFrom(t)
 	docPath := filepath.Join(root, "docs", "development", "specs", "tool-surface.md")
@@ -121,6 +115,83 @@ func TestToolSurfaceDoc_MCPCounts(t *testing.T) {
 	// would pass if a tool moved between modules, which is the same drift by another name.
 	assertModuleNames(t, "pm-only mount", toolcore.SelectByModules(exposed, "pm"), pmtools.ToolNames())
 	assertModuleNames(t, "profile-only mount", toolcore.SelectByModules(exposed, "profile"), profiletools.ToolNames())
+}
+
+// TestToolSurfaceDoc_CLICount is the CLI leg of the same guard: the "N base" subcommand count the
+// tool-surface spec's Summary row states, re-derived by reading the real registration sites out of
+// cmd/deskkit/main.go — every app.RootCmd.AddCommand call (which includes the two framework system
+// commands, serve + superuser) plus the migratecmd registration. The `pm` group (registered
+// conditionally under PM_ENABLED) and cobra's auto-registered help/completion are excluded, exactly
+// as the doc's "N base (+ `pm` group under `PM_ENABLED`)" excludes them.
+func TestToolSurfaceDoc_CLICount(t *testing.T) {
+	root := repoRootFrom(t)
+
+	docPath := filepath.Join(root, "docs", "development", "specs", "tool-surface.md")
+	md, err := os.ReadFile(docPath)
+	if err != nil {
+		t.Fatalf("read %s: %v", docPath, err)
+	}
+	documented, ok := docCLICount(string(md))
+	if !ok {
+		t.Fatalf("tool-surface spec: found no parseable %q Summary row in %s — the doc's table shape "+
+			"changed; update the parser in tool_surface_doc_test.go alongside the doc", cliSummaryLabel, docPath)
+	}
+
+	mainPath := filepath.Join(root, "librarian", "cmd", "deskkit", "main.go")
+	src, err := os.ReadFile(mainPath)
+	if err != nil {
+		t.Fatalf("read %s: %v", mainPath, err)
+	}
+	adds := countLiveCalls(string(src), "app.RootCmd.AddCommand(")
+	if adds == 0 {
+		t.Fatalf("CLI surface: found 0 app.RootCmd.AddCommand( call sites in %s — the registration "+
+			"pattern moved and this guard is deriving nothing; fix the derivation, do not pin a constant", mainPath)
+	}
+	migrate := 0
+	if countLiveCalls(string(src), "migratecmd.MustRegister(") > 0 {
+		migrate = 1
+	}
+	derived := adds + migrate
+
+	if derived != documented {
+		t.Errorf("tool-surface drift: the tool-surface spec says the CLI surface = %d base, but "+
+			"cmd/deskkit/main.go derives %d (%d AddCommand + %d migratecmd) — a subcommand was "+
+			"added/removed without updating the doc (or vice versa); reconcile the two",
+			documented, derived, adds, migrate)
+	}
+}
+
+// countLiveCalls counts occurrences of a call site on lines that are not commented out. A plain
+// strings.Count over the whole file also matches a `// app.RootCmd.AddCommand(…)` line, so
+// commenting a registration out would slip past the guard unseen.
+// ponytail: line comments only, no /* */ handling — add it when a registration is ever block-commented.
+func countLiveCalls(src, call string) int {
+	n := 0
+	for _, line := range strings.Split(src, "\n") {
+		if strings.HasPrefix(strings.TrimSpace(line), "//") {
+			continue
+		}
+		n += strings.Count(line, call)
+	}
+	return n
+}
+
+// cliSummaryLabel keys the Summary-table row carrying the CLI base count.
+const cliSummaryLabel = "Librarian CLI subcommands"
+
+// docCLICount returns the base subcommand count the tool-surface spec's Summary row states. The
+// count cell reads "N base (+ …)", which firstIntCell already handles.
+func docCLICount(md string) (int, bool) {
+	for _, line := range strings.Split(md, "\n") {
+		cells := tableCells(line)
+		if len(cells) < 2 || !strings.Contains(cells[0], cliSummaryLabel) {
+			continue
+		}
+		if n, ok := firstIntCell(cells); ok {
+			return n, true
+		}
+	}
+	return 0, false
 }
 
 // assertModuleNames fails when a gated mount's exposed specs are not exactly the named set,
@@ -225,7 +296,7 @@ func tableCells(line string) []string {
 }
 
 // firstIntCell returns the value of the first cell after the label (index >= 1) whose leading
-// whitespace-delimited token parses as an integer (e.g. "5", or "16 base (+ …)" → 16).
+// whitespace-delimited token parses as an integer (e.g. "5", or "18 base (+ …)" → 18).
 func firstIntCell(cells []string) (int, bool) {
 	for i := 1; i < len(cells); i++ {
 		fields := strings.Fields(cells[i])

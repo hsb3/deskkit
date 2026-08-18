@@ -1019,8 +1019,8 @@ requirements-coverage acceptance criterion. Unqualified `Test…` names are Go t
 disposition is LATER, or which are architectural/doctrine (build- or policy-enforced rather
 than unit-tested), name the enforcing artifact and are called out in the note below the table.
 
-> **Correction (single-binary consolidation).** Three verifiers named below were retired with the
-> TypeScript lane and no longer exist: `plugin/desk-persona.test.ts` (R5.1, R5.3) and
+> **Correction (single-binary consolidation).** Two verifiers were retired with the TypeScript lane
+> and have been struck from the table below: `plugin/desk-persona.test.ts` (R5.1, R5.3) and
 > `scripts/check-core-purity.mjs` (R5.5) — the latter's subject, a harness-pure TS core, is gone.
 > The Go tests named alongside them still run. R5.3 identity-neutrality remains enforced by
 > `scripts/check-neutrality.mjs` in `make check` and CI.
@@ -1047,11 +1047,11 @@ than unit-tested), name the enforcing artifact and are called out in the note be
 | R4.2 get_context single-call cold-start | MUST | §5.2 | `GetContext` (`.../pm/engine/queries.go`) via `TestGetContext_FourSets`, `TestGetContext_ActiveOrdering`; cold-start observed by `TestAdoptionDryRun` |
 | R4.3 realtime events | SHOULD → adopted | §5.4 | `TestRealtime_EmitsOnTransitions` (`.../pm`) |
 | R4.4 autonomous queue-drain | LATER | §9 (constraint: claim + append-only sufficient) | LATER — deferred; not built, no test |
-| R5.1 in-repo complementary plugin + PM module | MUST | §6, §2.3 | `plugin/desk-persona.test.ts` (skills/agent/tool-reference suite), `TestGatedOnDeskHasPMSurfaces` (`.../pm/gatedon`) |
+| R5.1 in-repo complementary plugin + PM module | MUST | §6, §2.3 | `TestGatedOnDeskHasPMSurfaces` (`.../pm/gatedon`) |
 | R5.2 store-per-desk, config layering, open-guard | MUST | §2.1, §2.9, §3.1 desk field, §7 — built; **portfolio read-only fan-out: LATER (§9)**, with the v1 constraint that all desks stay enumerable under one XDG root so fan-out needs no schema/layout change | `TestStoreDir_EmbedsDeskName` (`.../core/store`), `TestCheckDeskGuard_MismatchOnFilesRowErrors` (`.../core/store`), `TestLoadDotEnvNeverOverrides` (`.../core/config`) |
-| R5.3 identity-neutral artifacts | MUST | §6.2 | `scripts/check-neutrality.mjs` lint (in `make check` + CI); `plugin/desk-persona.test.ts` neutrality assertions |
+| R5.3 identity-neutral artifacts | MUST | §6.2 | `scripts/check-neutrality.mjs` lint (in `make check` + CI) |
 | R5.4 single-binary posture | SHOULD → adopted | §2 (one binary, embedded PB) | Architectural — release cross-compile + `verify.sh`; no unit test |
-| R5.5 unified app+store, core+modules, 3 disciplines | MUST | §2 (whole section) | `TestNoLibrarianImports`, `TestNoSelfRegisteredMigrations`, `TestMigrations_MatchOwnedCollections` (`.../pm`); `scripts/check-core-purity.mjs` |
+| R5.5 unified app+store, core+modules, 3 disciplines | MUST | §2 (whole section) | `TestNoLibrarianImports`, `TestNoSelfRegisteredMigrations`, `TestMigrations_MatchOwnedCollections` (`.../pm`) |
 | R6.1 GitHub board stays truth; read-only linkage | MUST | §7 | `TestSpecs_NoDeskFileWrites` (`.../pm/tools`); board-linkage otherwise doctrine (§7), no automated test |
 | R6.2 librarian write boundary carries over | MUST | §7 | `TestSpecs_NoDeskFileWrites` (`.../pm/tools`) — PM tools write only the store, never desk files |
 | R6.3 secrets never in store | SHOULD → adopted | §7 | Doctrine (§7) — no automated test; see note below |

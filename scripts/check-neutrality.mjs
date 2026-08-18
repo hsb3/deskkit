@@ -20,7 +20,7 @@
 // A match PASSES (sanctioned escape) iff it is inside a {{profile.<path>}} / {{env.<VAR>}}
 // placeholder, or lives in an allowlisted path / token (schema/neutrality-lint.allow).
 //
-// Runs under plain Node (no deps, like check-core-purity.mjs):
+// Runs under plain Node (no deps), like the other scripts/ guards:
 //   node scripts/check-neutrality.mjs             scan the tree; exit 1 on any violation
 //   node scripts/check-neutrality.mjs --self-test seed a fixture + assert detection (AC5 down)
 //
