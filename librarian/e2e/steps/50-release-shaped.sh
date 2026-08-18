@@ -44,8 +44,11 @@ check "plugins/ holds exactly one shipped bundle (desk-persona)" "$RC"
   && grep -q '"mcp-serve"' "$BUNDLE/.mcp.json"
 check "bundle .mcp.json launches the deskkit binary (deskkit mcp-serve)" $?
 
-JS_COUNT=$(find "$E2E_REPO/plugins" -name '*.js' | wc -l | tr -d ' ')
-SCHEMA_COUNT=$(find "$E2E_REPO/plugins" -path '*/schema/*' -name '*.yaml' | wc -l | tr -d ' ')
+# JS in any module flavour (.js/.mjs/.cjs), and a schema copy ANYWHERE in the bundle — matched by
+# the canonical file NAMES rather than a schema/ path, so a copy dropped in another directory is
+# still caught while the desk-setup template's own profile.example.yaml stays legitimate.
+JS_COUNT=$(find "$E2E_REPO/plugins" \( -name '*.js' -o -name '*.mjs' -o -name '*.cjs' \) | wc -l | tr -d ' ')
+SCHEMA_COUNT=$(find "$E2E_REPO/plugins" \( -name 'profile.schema.yaml' -o -name 'references.yaml' \) | wc -l | tr -d ' ')
 [ "$JS_COUNT" = "0" ] && [ "$SCHEMA_COUNT" = "0" ]
 check "bundle is TS-free: no generated server.js and no bundled schema copies under plugins/" $?
 note "plugins/ .js files: $JS_COUNT; bundled schema yaml files: $SCHEMA_COUNT"

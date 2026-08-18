@@ -107,7 +107,7 @@ the exit code and has let a failing gate through before (incident, 2026-07-17).
 | `make check` | Repo gates: neutrality + self-test, kit-drift, prompt-drift, tool-surface drift + self-test, scaffold frontmatter, persona drift, textfield-max, query-kind drift + self-test, doc-link integrity + self-test, shellcheck, actionlint, workflow SHA-pin drift + self-test, profile-root drift + self-test |
 | `make verify` | Librarian integration gate — `librarian/verify.sh` (throwaway scratch desk) |
 | `make e2e` | End-to-end system-behaviour suite — whole system (cold-start → profile → librarian → PM → surfaces → release-shaped) on a throwaway desk; offline, no LLM key (`librarian/e2e/e2e.sh`) |
-| `make package` | Informational no-op — the bundle under `plugins/` is authored in place, nothing is generated |
+| `make package` | Informational no-op — this target generates nothing; the bundle's one generated file is written by `node scripts/check-persona-drift.mjs --write` |
 | `make install` | Build + install the `deskkit` binary to `~/.local/bin` (override `PREFIX=`) |
 | `node scripts/check-version-sync.mjs` | Assert root `VERSION` matches the shipped manifests |
 | `make version-status` | Advisory (non-blocking): unreleased product changes since the last tag |
@@ -119,14 +119,16 @@ reversible with `deskkit restore --by-path <path>`.
 
 ## Architecture notes
 
-### Copied artifacts — edit the source, not the copy
+### Generated and copied artifacts — edit the source, not the copy
 
-**Nothing under `plugins/` is generated.** The marketplace bundle is authored in place; `make
-package` generates nothing and only says so. What still needs care is the handful of files that
-are *copies of a canonical source*:
+**The marketplace bundle is authored in place with one exception:
+`plugins/desk-persona/agents/librarian-operator.md` is GENERATED** (it says so in a marker at its
+top — never hand-edit it). `make package` generates nothing and only says so. What needs care is
+the handful of files that are *derived from a canonical source*:
 
 | File | Source of truth | Guard |
 |---|---|---|
+| `plugins/desk-persona/agents/librarian-operator.md` | `librarian/templates/librarian-system-prompt.txt` — regenerate with `node scripts/check-persona-drift.mjs --write` | `node scripts/check-persona-drift.mjs` (`make check`) |
 | `librarian/internal/core/schema/profile.schema.yaml` | `schema/profile.schema.yaml` — `go:embed` can't reach outside the Go module, so the binary carries a copy | `TestProfileSchemaEmbeddedCopy_MatchesRepoRoot` (`make test`) |
 | `librarian/internal/core/schema/references.yaml` | `schema/references.yaml` — same reason | `TestReferencesEmbeddedCopy_MatchesRepoRoot` (`make test`) |
 | `kits/` tree | authored, but `kits.yaml` must match it | `node scripts/check-kits.mjs` |
@@ -146,6 +148,7 @@ the guards are byte-for-byte and fail loudly on a one-sided edit.
 | `docs/development/specs/tool-surface.md` counts match source (ADR 0016) | `scripts/check-tool-surface.mjs` (+ `--self-test`; MCP gated counts by `TestToolSurfaceDoc_MCPCounts` on `make test`) |
 | Scaffold instruments carry conformant frontmatter | `scripts/check-scaffold-frontmatter.mjs` |
 | Persona `librarian-operator` agent stays generated from the librarian prompt (ADR 0014/0015); PM surfaces are authored-in-place post-fold | `scripts/check-persona-drift.mjs` |
+| The shipped bundle's authored artifacts (`.mcp.json` modules, agent `tools:`, skill tool refs, inventory) name only real modules/tools | `TestBundle*` in `librarian/internal/core/mcp/bundle_shape_test.go` (`make test`) |
 | Content TextFields carry an explicit Max (ADR 0017) | `scripts/check-textfield-max.mjs` (+ `--self-test`) |
 | Spec query-kind list == CLI/MCP registry (types.go ↔ spec §5.6 ↔ query.go switch) | `scripts/check-query-kinds.mjs` (+ `--self-test`) |
 | Librarian Go tree stays gofmt-clean | `gofmt -l` via `make -C librarian fmt` (CI librarian lane) |
