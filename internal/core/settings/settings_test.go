@@ -10,8 +10,11 @@ import (
 func TestKeyHint(t *testing.T) {
 	cases := []struct{ key, want string }{
 		{"", ""},
-		{"ab", "ab"},
-		{"abcd", "abcd"},
+		// A key no longer than the hint yields no hint: the hint field is not Hidden, so a
+		// whole-key hint would publish the secret through every API response.
+		{"ab", ""},
+		{"abcd", ""},
+		{"abcde", "bcde"},
 		{"sk-ant-0123456789WXYZ", "WXYZ"},
 	}
 	for _, tc := range cases {

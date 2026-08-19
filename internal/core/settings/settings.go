@@ -56,9 +56,14 @@ type Settings struct {
 // The hook recomputes the stored hint with this on every write, so the hint always describes the
 // key actually stored — a browser-supplied hint is never trusted, because a client can send any
 // string it likes while storing a different key.
+//
+// A key no longer than the hint yields no hint at all. The hint field is NOT Hidden, so returning
+// a short key whole would publish the entire secret through every API response — the leak the
+// key's own hidden field exists to prevent. Real provider keys are far longer, but nothing
+// enforces that, so the floor is here rather than assumed.
 func KeyHint(key string) string {
 	if len(key) <= hintLen {
-		return key
+		return ""
 	}
 	return key[len(key)-hintLen:]
 }
