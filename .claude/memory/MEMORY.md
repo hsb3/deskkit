@@ -23,3 +23,4 @@ _Index format: one line per memory file — a markdown link to the topic file, t
 - [Parallel-brief scaffolding leak](parallel-brief-scaffolding-leak.md) — agent-authored .md batches can leak tool-call tags (`</content></invoke>`) at EOF; grep the whole set + raw-read last lines
 - [Railway UAT standing grant](railway-uat-standing-grant.md) — redeploy the hosted deskkit service without asking; it's the owner's UAT env and feeds his dev tasks
 - [Ruled ≠ shipped](ruled-not-shipped-overstatement.md) — an ADR Decision is a RULING, not a landed change; check build-plan/epic status before writing "fixed/shipped"
+- [Railway CLI deploy gotchas](railway-cli-deploy-gotchas.md) — env-var delete does not redeploy; a GitHub-outage deploy fails with zero build logs (SNAPSHOT_CODE hang), not an image fault
