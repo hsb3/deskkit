@@ -21,16 +21,12 @@ var secretShapedFieldPattern = regexp.MustCompile(`(?i)(secret|token|passwd|pass
 // QUALIFIED collection.field pair — never a bare field name, never a whole collection — so a
 // future settings.oauth_token still trips the guard untouched.
 //
-//   - settings.llm_api_key holds a real secret, by an OWNER RULING (2026-08-18) that supersedes
-//     R6.3 for this one field and no other. The reason is deployment-shaped: a hosted desk runs in
-//     a container where the machine-wide config file (the sanctioned at-rest home for the key)
-//     resolves under an XDG config home OUTSIDE the mounted data volume, so it is wiped on every
-//     redeploy; the store lives ON that volume. Without this field there is no way to give a
-//     hosted desk an API key from the browser, which is the capability the ruling bought.
-//     The field is defended in depth: the settings collection leaves every API rule nil
-//     (superuser-only), the field is declared Hidden, and a record-enrich hook re-hides it after
-//     PocketBase's own superuser unhide — proven over real HTTP by
-//     TestMigration0024_APIKeyNeverLeavesOverHTTP.
+//   - settings.llm_api_key holds a real secret. A hosted desk has nowhere else to put one: the
+//     machine-wide config file resolves under an XDG config home outside the mounted data volume
+//     and is wiped on every redeploy, while the store lives on that volume. The field is defended
+//     in depth — the settings collection leaves every API rule nil (superuser-only), the field is
+//     declared Hidden, and a record-enrich hook re-hides it after PocketBase's own superuser
+//     unhide, proven over real HTTP by TestMigration0024_APIKeyNeverLeavesOverHTTP.
 //   - settings.llm_api_key_hint is NOT a secret at all; it only matches the pattern by name. It
 //     holds at most the key's last four characters, recomputed server-side on every write, so a
 //     browser can show WHICH key is installed without ever receiving one.
