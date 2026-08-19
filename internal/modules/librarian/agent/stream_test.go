@@ -168,7 +168,7 @@ func errorStep(err error) streamStep {
 func installModel(t *testing.T, m model.ToolCallingChatModel) {
 	t.Helper()
 	orig := chatModelFactory
-	chatModelFactory = func(_ context.Context, _ *config.Config) (model.ToolCallingChatModel, error) {
+	chatModelFactory = func(_ context.Context, _ core.App, _ *config.Config) (model.ToolCallingChatModel, error) {
 		return m, nil
 	}
 	t.Cleanup(func() { chatModelFactory = orig })

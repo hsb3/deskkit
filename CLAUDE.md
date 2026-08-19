@@ -135,9 +135,11 @@ the exit code and has let a failing gate through before (incident, 2026-07-17).
 | `make release-prep` | Pre-tag gate (see order below) |
 
 There is ONE Makefile, at the repo root — the old per-lane Makefile was folded into it, so
-its targets are now plain root targets: `make build|test|vet|fmt|spa|serve|stop|gui|sweep|patrol|
-propose-fix|findings|summary|adoption|orphans|uncollapsed|clean|example-agent-loop` (`fmt` is the
-gofmt gate, also run in CI). `apply-fix` is deliberately **not** a target — it's supervised-only,
+its targets are now plain root targets: `make build|test|vet|fmt|shellcheck|spa|serve|stop|gui|
+sweep|patrol|propose-fix|findings|summary|adoption|orphans|uncollapsed|clean|media|
+example-agent-loop` (`fmt` is the gofmt gate, also run in CI; `media` records the demo assets via
+`scripts/record-media.sh`). That list plus the table above covers every target; `make help` is the
+authoritative list. `apply-fix` is deliberately **not** a target — it's supervised-only,
 run by hand, and every fix is reversible with `deskkit restore --by-path <path>`.
 `make example-agent-loop` runs `examples/agent-loop.sh`, which makes REAL billed LLM calls and is
 never part of CI; its free, offline sibling `examples/pm-walkthrough.sh` has no target — run it
@@ -205,8 +207,17 @@ guard and `init` do exactly this). Fail-closed behavior in `serve` paths needs a
 
 ## Configuration resolution
 
-Every resolved field wins on one of four legs, in this order: **env > per-desk
-`_knowledge/profile.*` > central config > built-in default** (`internal/core/config/config.go`).
+Every resolved field wins on one of five legs, in this order: **env > per-desk
+`_knowledge/profile.*` > store settings > central config > built-in default**
+(`internal/core/config/config.go`). The store leg is the `settings` collection — a migration-seeded
+singleton row (`internal/modules/librarian/collections/0024_settings.go`) holding
+`llm_provider`/`llm_model`/`llm_api_key`, written by the SPA's settings panel. It sits above the
+central file because the store is per-desk while the file is machine-wide, and below the profile
+because a desk's declared config still outranks runtime GUI state (decision: board task DESK-73,
+no ADR number — post-0022 decisions are filed board-side without one). The API key
+field is a PocketBase **hidden** TextField, so it is structurally absent from every API response
+rather than filtered by hand; `llm_api_key_hint` carries the display suffix and is recomputed
+server-side on save. Collection rules stay nil (superuser-only) — that IS the panel's auth posture.
 The central leg is `$XDG_CONFIG_HOME/deskkit/config.yaml` (falling back to `~/.config/deskkit/config.yaml`),
 a machine-wide file created 0600 in a 0700 dir via `deskkit config set/edit`. Only three fields
 read it: `LLM_PROVIDER` (`llm.provider`), `LLM_MODEL` (`llm.model`), and `DESK_NAME`
@@ -223,13 +234,16 @@ every resolved value with the leg that won.
 6. unresolvable `DESK_NAME` and no `--dir` → **exit 1** (serve/migrate included)
 
 **LLM provider/key** (only `agent`/`chat`/MCP-driven calls need it):
-- provider: `LLM_PROVIDER` env → `profile.models` → central `llm.provider` → `anthropic` (default)
-- model: `LLM_MODEL` env → `profile.models` → central `llm.model` → the built-in default model
+- provider: `LLM_PROVIDER` env → `profile.models` → store `llm_provider` → central `llm.provider` →
+  `anthropic` (default)
+- model: `LLM_MODEL` env → `profile.models` → store `llm_model` → central `llm.model` → the
+  built-in default model
 - key: the env var named by `LLM_API_KEY_ENV` / `secrets_ref.llm_api_key` (or the per-provider
-  default `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` / `GEMINI_API_KEY`) → else the central config's
-  `llm.api_key`. The key never lives on the `Config` struct — it resolves at use time
-  (`config.ResolveAPIKey`) — so setting it once via `deskkit config set llm.api_key <key>` is
-  enough to run `agent`/`chat` with zero env vars set.
+  default `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` / `GEMINI_API_KEY`) → else the store's
+  `llm_api_key` → else the central config's `llm.api_key`. The key never lives on the `Config`
+  struct — it resolves at use time (`config.ResolveAPIKey` / `ResolveAPIKeySettings`) — so setting
+  it once, via `deskkit config set llm.api_key <key>` OR the SPA settings panel, is enough to run
+  `agent`/`chat` with zero env vars set.
 - `LIBRARIAN_AUTONOMOUS_WRITES=true` gates `apply_fix` (checked at execution time)
 
 **Public-mode serve.** `serve`'s auth posture is derived from every resolved `--http`/`--https`

@@ -10,6 +10,7 @@ import (
 
 	"github.com/cloudwego/eino/components/model"
 	"github.com/cloudwego/eino/schema"
+	"github.com/pocketbase/pocketbase/core"
 	"github.com/pocketbase/pocketbase/tests"
 
 	"github.com/hsb3/deskkit/internal/core/config"
@@ -98,7 +99,7 @@ func newSessionTestEnv(t *testing.T) (*tests.TestApp, *config.Config) {
 func TestSession_MultiTurn(t *testing.T) {
 	fake := &fakeChatModel{}
 	orig := chatModelFactory
-	chatModelFactory = func(ctx context.Context, cfg *config.Config) (model.ToolCallingChatModel, error) {
+	chatModelFactory = func(ctx context.Context, app core.App, cfg *config.Config) (model.ToolCallingChatModel, error) {
 		return fake, nil
 	}
 	t.Cleanup(func() { chatModelFactory = orig })

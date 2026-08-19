@@ -10,6 +10,69 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html). See
 ADR 0005 (DESK-27)
 for why this policy exists.
 
+## [Unreleased]
+
+### Added
+
+- **Settings panel in the SPA** (DESK-66). Provider, model, and API key are now settable from the
+  browser instead of only `deskkit config set`. Settings live in a new `settings` collection — a
+  migration-seeded singleton — rather than in the central YAML file, because on a hosted desk the
+  central file resolves outside the mounted data volume and does not survive a redeploy. The key
+  is a PocketBase **hidden** field, so it is structurally absent from every API response instead of
+  being filtered by hand; a companion `llm_api_key_hint` holds the display suffix and is recomputed
+  server-side on save. Collection rules stay nil (superuser-only) — the database enforces the auth
+  posture, with no hand-rolled middleware. Provider and model render as dropdowns off a generated
+  catalog, each with a custom-value escape hatch. Decision: DESK-73.
+- **A store leg in config resolution.** The chain is now `env > per-desk profile > store settings >
+  central config > built-in default`. The store outranks the machine-wide central file because it
+  is per-desk; a desk's declared profile still outranks it. `deskkit config show` reports it like
+  any other leg.
+- **`GET /desk/models`** — the generated model catalog the panel's dropdowns read. Unauthenticated
+  in both bind modes (it carries no secrets and is needed before login). Regenerate with
+  `node scripts/gen-model-catalog.mjs`, which filters the models.dev catalog to tool-capable chat
+  models. Deliberately ungated by CI: its source is a remote API, and a network-dependent gate
+  would be flaky.
+- **`GET /desk/settings/resolved`** — reports which leg currently supplies each field, so the panel
+  can show a value as locked by an environment variable rather than accepting an edit that will
+  never take effect. Superuser-only on a public bind (401 without a token, 403 for a
+  `users`-collection token); never returns the key value.
+- **Container smoke in CI** — a path-filtered workflow running `scripts/docker-smoke.sh`, which had
+  never been wired to CI. Kept out of the required `ci` job.
+
+### Changed
+
+- **The hosted container no longer runs as root** (DESK-68). It starts as root only to hand the
+  data volume to a fixed unprivileged account, then replaces itself with that account via
+  `su-exec` before the app starts. The chown is unconditional on every boot: a conditional one
+  self-heals nothing, because `chown -R` writes the top directory first and continues past errors,
+  so an interrupted run leaves the contents root-owned and the next boot would serve a read-only
+  database behind a passing healthcheck. `DESK_ROOT=/` is refused before anything is mutated. No
+  `USER` directive, since the drop happens at runtime — the cost, now documented in
+  `docs/pattern.md`, is that `docker exec` lands as root and an orchestrator gating on
+  `runAsNonRoot` will reject the image.
+- `scripts/docker-smoke.sh` grew from 19 to 49 assertions, and now covers the case that actually
+  matters: a volume seeded with root-owned contents from a prior root-run container, asserting the
+  database migrates ownership and a row written before the handback is still readable after it. It
+  also asserts the serving process is not root, which nothing checked before.
+- Provider and model are re-resolved from the store when an agent session is created, so a change
+  saved in the panel takes effect without restarting the process. Applied to the chat session, the
+  claimer's run path, and session resume — all three read the same long-lived config and had the
+  same staleness.
+
+### Fixed
+
+- **`/admin` now redirects to the admin console at `/_/`** (DESK-55). It previously fell through to
+  the SPA's index fallback and silently rendered the app shell, which reads as "the console is
+  gone" rather than "wrong path".
+- The `desk-setup` template's `profile.example.yaml` no longer ships concrete `models:` and
+  `secrets_ref:` values. Their placeholders (`"<model-id>"`, `"<ENV_VAR_NAME>"`) are not rejected by
+  schema validation and are non-empty, so on a desk built from the template they won the profile
+  leg and pinned a garbage model id — and made the missing-key error name an environment variable
+  that cannot exist. Both blocks stay in the file, commented, as documentation.
+- `CLAUDE.md`'s target list omitted `media` and `shellcheck` (DESK-58). The ticket's stated symptom
+  — help text still naming the retired binary — no longer existed; the rename had already removed
+  it.
+
 ## [0.9.0] — 2026-08-18
 
 ### Added

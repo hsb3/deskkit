@@ -40,19 +40,20 @@ func (m *Mod) Configure(cfg *config.Config) { m.cfg = cfg }
 
 func (*Mod) Name() string { return "librarian" }
 
-// SchemaVersion is the highest migration sequence the librarian module declares (0023).
-func (*Mod) SchemaVersion() int { return 23 }
+// SchemaVersion is the highest migration sequence the librarian module declares (0024).
+func (*Mod) SchemaVersion() int { return 24 }
 
 // Enabled is always true: librarian is the base module (spec §2.7).
 func (*Mod) Enabled(*config.Config) bool { return true }
 
-// OwnedCollections lists every collection created by the librarian's 0001..0021 migrations
-// (enumerated from the migration bodies; see module_test.go's drift guard for the migrations
-// side). Unchanged by 0021, which adds a field to `files` rather than a new collection.
+// OwnedCollections lists every collection CREATED by the librarian's migrations (enumerated from
+// the migration bodies; see module_test.go's drift guard for the migrations side). Field-only and
+// alter-only migrations add nothing here — 0021 adds a field to `files`, and 0023 alters the
+// dependency's stock `users` collection rather than creating one.
 func (*Mod) OwnedCollections() []string {
 	return []string{
 		"files", "patrol_findings", "patrol_log", "revisions", "adoption_log",
-		"agent_runs", "messages", "tasks", "prompts", "feedback",
+		"agent_runs", "messages", "tasks", "prompts", "feedback", "settings",
 	}
 }
 
@@ -63,7 +64,7 @@ func (*Mod) Tools() []toolcore.ToolSpec { return tools.Specs() }
 // contributes no extra mounted views (spec §5.3 — the plug-point exists for other modules).
 func (*Mod) TUIViews(core.App, *config.Config) []tuiview.View { return nil }
 
-// Migrations lists the librarian's 0001..0021 migrations. All are SelfRegistered: their
+// Migrations lists the librarian's migrations, in sequence. All are SelfRegistered: their
 // bodies still call PocketBase's m.Register via their own init() (blank-imported by main via
 // internal/modules/librarian/collections), so Up/Down are nil here — this manifest exists for
 // stamp-by-observation (core/migrate.StampModules) and the drift test below, not to re-wire
@@ -78,7 +79,7 @@ func (*Mod) Migrations() []migrate.Migration {
 		"0016_patrol_findings_provenance", "0017_adoption_log_shrink_event",
 		"0018_files_doc_id", "0019_files_doctype_rename", "0020_content_field_caps",
 		"0021_files_content", "0022_agent_runs_archived",
-		"0023_users_approval",
+		"0023_users_approval", "0024_settings",
 	}
 	out := make([]migrate.Migration, len(basenames))
 	for i, b := range basenames {

@@ -8,7 +8,10 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/pocketbase/pocketbase/tests"
+
 	"github.com/hsb3/deskkit/internal/core/config"
+	"github.com/hsb3/deskkit/internal/core/settings"
 )
 
 // fakeAPIKey is a made-up, identity-neutral secret: long enough that MaskSecret shows a tail,
@@ -372,5 +375,109 @@ func TestReadOnlyCommandsCreateNoStore_Subprocess(t *testing.T) {
 			t.Fatalf("`deskkit %s` created %v under the data home; it must only read "+
 				"(main() must intercept it before PocketBase bootstraps a store)", label, names)
 		}
+	}
+}
+
+// seedStoreSettings materializes a REAL store at the resolved store path, carrying the given LLM
+// settings. It builds the store through the migration runner (so the settings collection and its
+// seeded singleton are the shipped ones), closes it, and copies the whole data dir into place —
+// `config show` then reads it exactly as it would read an operator's own desk.
+func seedStoreSettings(t *testing.T, provider, model, apiKey string) {
+	t.Helper()
+	app, err := tests.NewTestApp()
+	if err != nil {
+		t.Fatalf("tests.NewTestApp: %v", err)
+	}
+	rec, err := app.FindRecordById(settings.Collection, settings.RecordID)
+	if err != nil {
+		app.Cleanup()
+		t.Fatalf("find the seeded settings row: %v", err)
+	}
+	rec.Set(settings.FieldProvider, provider)
+	rec.Set(settings.FieldModel, model)
+	rec.Set(settings.FieldAPIKey, apiKey)
+	if err := app.Save(rec); err != nil {
+		app.Cleanup()
+		t.Fatalf("save settings: %v", err)
+	}
+	src := app.DataDir()
+	// Close the DB before copying: a live WAL would leave the copy missing the just-written row.
+	if err := app.ResetBootstrapState(); err != nil {
+		t.Fatalf("close the seeded store: %v", err)
+	}
+	dst := filepath.Join(os.Getenv("XDG_DATA_HOME"), "deskkit", os.Getenv("DESK_NAME"))
+	if err := os.CopyFS(dst, os.DirFS(src)); err != nil {
+		t.Fatalf("copy the seeded store into place: %v", err)
+	}
+	t.Cleanup(func() { _ = os.RemoveAll(src) })
+}
+
+// TestConfigShow_StoreLegBeatsCentral is the resolution-order proof at the display surface: with a
+// value in BOTH the desk's store and the machine-wide file, `config show` reports the store's — and
+// says so in the SOURCE column, so an operator can see which leg won.
+func TestConfigShow_StoreLegBeatsCentral(t *testing.T) {
+	isolate(t)
+	writeCentral(t, func(c *config.Central) {
+		c.LLM.Provider = "gemini"
+		c.LLM.Model = "model-from-central"
+		c.LLM.APIKey = fakeAPIKey
+	})
+	seedStoreSettings(t, "openai", "model-from-store", "sk-store-key-0000abcd")
+
+	out := runCmdOut(t, newConfigCmd(), "show")
+
+	for _, key := range []string{"LLM_PROVIDER", "LLM_MODEL"} {
+		row := showRow(t, out, key)
+		if row[len(row)-1] != "store" {
+			t.Errorf("%s won on %q, want the store leg:\n%s", key, row[len(row)-1], out)
+		}
+	}
+	if !strings.Contains(out, "model-from-store") || strings.Contains(out, "model-from-central") {
+		t.Errorf("`config show` must report the store's model, not the central one:\n%s", out)
+	}
+	if !strings.Contains(out, "(set, …abcd)") {
+		t.Errorf("the API key row must resolve to the store's key, masked:\n%s", out)
+	}
+	if strings.Contains(out, "sk-store-key-0000abcd") || strings.Contains(out, fakeAPIKey) {
+		t.Fatalf("`config show` printed a raw API key:\n%s", out)
+	}
+}
+
+// TestConfigShow_EnvAndProfileStillBeatStore: a value the operator exported, or one the desk
+// declares in its own profile, is not overridden by whatever a browser last wrote to the store.
+func TestConfigShow_EnvAndProfileStillBeatStore(t *testing.T) {
+	isolate(t)
+	seedStoreSettings(t, "openai", "model-from-store", "")
+	t.Setenv("LLM_MODEL", "model-from-env")
+
+	out := runCmdOut(t, newConfigCmd(), "show")
+
+	row := showRow(t, out, "LLM_MODEL")
+	if row[len(row)-1] != "env" {
+		t.Errorf("the store overrode the env leg (source %q):\n%s", row[len(row)-1], out)
+	}
+	if !strings.Contains(out, "model-from-env") {
+		t.Errorf("`config show` must report the env model:\n%s", out)
+	}
+	// The provider, which env does NOT set, still comes from the store — proving the two legs are
+	// resolved per field rather than all-or-nothing.
+	if row := showRow(t, out, "LLM_PROVIDER"); row[len(row)-1] != "store" {
+		t.Errorf("LLM_PROVIDER won on %q, want the store leg:\n%s", row[len(row)-1], out)
+	}
+}
+
+// TestConfigShow_NoStoreYetConsultsNothing: a desk whose store has never been created must not
+// have a "store" row invented for it — the command may only report a leg it actually consulted.
+func TestConfigShow_NoStoreYetConsultsNothing(t *testing.T) {
+	isolate(t)
+	out := runCmdOut(t, newConfigCmd(), "show")
+
+	for _, key := range []string{"LLM_PROVIDER", "LLM_MODEL"} {
+		if row := showRow(t, out, key); row[len(row)-1] == "store" {
+			t.Errorf("%s claims the store leg with no store on disk:\n%s", key, out)
+		}
+	}
+	if !strings.Contains(out, "env > profile > store > central > default") {
+		t.Errorf("`config show` must state the full precedence chain:\n%s", out)
 	}
 }

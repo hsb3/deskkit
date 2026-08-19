@@ -863,7 +863,11 @@ build (the D8 gate that already exists).
   writes documents.
 - **R6.3 — secrets never in the store (SHOULD — adopted).** The PM store holds pointers, never
   secret values; `_meta/secrets/` stays the secrets home. The `Config` struct already carries
-  nothing secret (verified), and PM adds no secret-bearing field.
+  nothing secret (verified), and PM adds no secret-bearing field. **Scope note:** this binds the
+  PM store. The core store took one deliberate exception — the `settings` collection's LLM API
+  key, so the browser panel can set a key on a hosted desk where no config file survives a
+  redeploy. It is a hidden field (never in an API response) behind superuser-only rules, and the
+  repo-wide secret-shape guard names that one field explicitly rather than relaxing its pattern.
 
 ---
 
