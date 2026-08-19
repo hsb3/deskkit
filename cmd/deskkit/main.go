@@ -32,6 +32,7 @@ import (
 	"github.com/hsb3/deskkit/internal/core/mcp"
 	"github.com/hsb3/deskkit/internal/core/migrate"
 	"github.com/hsb3/deskkit/internal/core/module"
+	"github.com/hsb3/deskkit/internal/core/settings"
 	"github.com/hsb3/deskkit/internal/core/spa"
 	"github.com/hsb3/deskkit/internal/core/store"
 	"github.com/hsb3/deskkit/internal/modules/librarian/agent"
@@ -255,6 +256,12 @@ func main() {
 		// token-gated — the admin console's shell-loads-data-doesn't stance.
 		spa.Register(e.Router, publicMode)
 
+		// The settings collection's write guards + the hook that re-hides the stored API key from
+		// every API response. Bound BEFORE e.Next() builds the mux, and deliberately OUTSIDE the
+		// cfgErr gate: a desk whose config has not resolved yet is exactly the desk an operator is
+		// about to configure from the browser, and the key must never leak on the way.
+		settings.BindHooks(e.App)
+
 		if cfgErr == nil {
 			// Desk open-guard: refuse to serve a store that already belongs to a different desk.
 			// gui re-execs `serve`, so it is covered here too. Print + os.Exit, never `return err`,
@@ -272,6 +279,12 @@ func main() {
 			}
 			if err := migrate.StampModules(e.App, moduleReg.MigrateModules()); err != nil {
 				app.Logger().Error("stamp module schema versions", "err", err)
+			}
+			// The store leg of config resolution — see requireConfig for why it is a second pass.
+			// Applied after migrations, so a store that just gained the settings collection is read
+			// through the same code path an already-migrated one is.
+			if err := config.ApplyStore(e.App, cfg); err != nil {
+				app.Logger().Error("read store settings", "err", err)
 			}
 			if err := desklib.EnsureIgnoreFile(cfg.IgnoreConfig, cfg.DeskRoot); err != nil {
 				app.Logger().Error("ensure .librarian-ignore", "err", err)
@@ -823,6 +836,14 @@ func requireConfig(app core.App, cfg *config.Config, cfgErr error) (*config.Conf
 	// + agent/chat/mcp-serve/gui RunE reaches first.
 	if err := store.CheckDeskGuard(app, cfg.DeskName); err != nil {
 		return nil, err
+	}
+	// The store leg of config resolution (env > profile > store > central > default). It runs HERE
+	// rather than inside config.Load because Load resolves before PocketBase bootstraps, when no
+	// store handle exists; this is the first point a one-shot command holds one. A store that
+	// cannot be read leaves the already-resolved legs standing — it logs rather than failing the
+	// command, matching the other non-gate store reads below.
+	if err := config.ApplyStore(app, cfg); err != nil {
+		app.Logger().Error("read store settings", "err", err)
 	}
 	// First-run auto-creation applies to every entry point, not just serve: one-shot CLI tools
 	// would otherwise fail closed on the missing default ignore file. A present-but-unreadable

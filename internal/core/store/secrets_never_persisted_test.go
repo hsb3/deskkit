@@ -2,6 +2,7 @@ package store
 
 import (
 	"regexp"
+	"strings"
 	"testing"
 
 	"github.com/pocketbase/pocketbase/tests"
@@ -16,12 +17,33 @@ import (
 // field like "api_key", "token", or "password" to any collection.
 var secretShapedFieldPattern = regexp.MustCompile(`(?i)(secret|token|passwd|password|api[_-]?key|apikey|access[_-]?key|private[_-]?key|credential|bearer)`)
 
+// sanctionedSecretShapedFields is the ONE narrowing of the R6.3/§7 invariant above, keyed by the
+// QUALIFIED collection.field pair — never a bare field name, never a whole collection — so a
+// future settings.oauth_token still trips the guard untouched.
+//
+//   - settings.llm_api_key holds a real secret. A hosted desk has nowhere else to put one: the
+//     machine-wide config file resolves under an XDG config home outside the mounted data volume
+//     and is wiped on every redeploy, while the store lives on that volume. The field is defended
+//     in depth — the settings collection leaves every API rule nil (superuser-only), the field is
+//     declared Hidden, and a record-enrich hook re-hides it after PocketBase's own superuser
+//     unhide, proven over real HTTP by TestMigration0024_APIKeyNeverLeavesOverHTTP.
+//   - settings.llm_api_key_hint is NOT a secret at all; it only matches the pattern by name. It
+//     holds at most the key's last four characters, recomputed server-side on every write, so a
+//     browser can show WHICH key is installed without ever receiving one.
+//
+// The pattern itself is deliberately untouched: widening it away would disarm the guard for every
+// collection, where a qualified exemption disarms it for exactly two fields that were reviewed.
+var sanctionedSecretShapedFields = map[string]bool{
+	"settings.llm_api_key":      true,
+	"settings.llm_api_key_hint": true,
+}
+
 // TestNoSecretShapedFieldsInStore is a schema-lint RECURRENCE GUARD for spec R6.3/§7: the store
 // holds pointers and env-var NAMES, never secret values; Config carries nothing secret; keys live
 // only in process env, read at provider-construction time. That invariant holds today by
-// construction — no collection field in either the librarian or pm module is named/typed to carry
-// a secret — so this test has nothing to catch right now. Its job is to fail loudly, forcing a
-// review, the moment someone later adds a secret-shaped field to any collection migration.
+// construction — with the single reviewed exception recorded in sanctionedSecretShapedFields — so
+// this test has nothing to catch right now. Its job is to fail loudly, forcing a review, the
+// moment someone later adds a secret-shaped field to any collection migration.
 func TestNoSecretShapedFieldsInStore(t *testing.T) {
 	app, err := tests.NewTestApp()
 	if err != nil {
@@ -64,6 +86,9 @@ func TestNoSecretShapedFieldsInStore(t *testing.T) {
 		checked++
 		for _, field := range col.Fields {
 			fieldName := field.GetName()
+			if sanctionedSecretShapedFields[col.Name+"."+fieldName] {
+				continue
+			}
 			if secretShapedFieldPattern.MatchString(fieldName) {
 				t.Errorf("collection %q field %q is secret-shaped — secrets must never be persisted in the store (spec R6.3/§7); store a pointer/env-var name instead",
 					col.Name, fieldName)
@@ -73,5 +98,34 @@ func TestNoSecretShapedFieldsInStore(t *testing.T) {
 
 	if checked == 0 {
 		t.Fatalf("no owned collections were checked — the lint would pass vacuously")
+	}
+}
+
+// TestSecretShapedGuardStillHasTeeth proves the narrowing above did not disarm the guard: the
+// pattern still matches the exempted names (so the exemption, not a weakened pattern, is what
+// lets them through), it still matches a plausible FUTURE secret field on the very same
+// collection, and the exemption map is qualified rather than bare-name — a "llm_api_key" landing
+// on any other collection is still caught.
+func TestSecretShapedGuardStillHasTeeth(t *testing.T) {
+	for qualified := range sanctionedSecretShapedFields {
+		coll, field, ok := strings.Cut(qualified, ".")
+		if !ok || coll == "" || field == "" {
+			t.Fatalf("exemption %q must be a qualified collection.field pair", qualified)
+		}
+		if !secretShapedFieldPattern.MatchString(field) {
+			t.Errorf("exemption %q is dead weight: the pattern no longer matches %q, which means "+
+				"the pattern itself was weakened instead of a field being exempted", qualified, field)
+		}
+	}
+
+	// A future secret-shaped field, on the exempted collection and elsewhere, must still trip.
+	for _, probe := range []string{"settings.oauth_token", "settings.client_secret", "files.llm_api_key"} {
+		if sanctionedSecretShapedFields[probe] {
+			t.Errorf("%q must not be exempt — the allowlist has been widened past its ruling", probe)
+		}
+		_, field, _ := strings.Cut(probe, ".")
+		if !secretShapedFieldPattern.MatchString(field) {
+			t.Errorf("secretShapedFieldPattern no longer matches %q — the guard has lost its teeth", field)
+		}
 	}
 }

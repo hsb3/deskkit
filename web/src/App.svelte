@@ -6,6 +6,7 @@
   import Login from './pages/Login.svelte'
   import Chat from './pages/Chat.svelte'
   import Browse from './pages/Browse.svelte'
+  import Settings from './pages/Settings.svelte'
 
   const nav = [
     { page: 'chat', label: 'Chat' },
@@ -13,6 +14,7 @@
     { page: 'findings', label: 'Findings' },
     { page: 'runs', label: 'Agent runs' },
     { page: 'pm', label: 'PM items' },
+    { page: 'settings', label: 'Settings' },
   ]
 
   onMount(() => {
@@ -37,6 +39,8 @@
     <section>
       {#if $route.page === 'chat'}
         <Chat />
+      {:else if $route.page === 'settings'}
+        <Settings />
       {:else if browsePages[$route.page]}
         <Browse config={browsePages[$route.page]} />
       {:else}

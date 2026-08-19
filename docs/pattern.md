@@ -34,11 +34,15 @@ Two separate resolution chains; do not conflate them.
 **Value precedence** (an individual setting — LLM provider, model, superuser email, …):
 
 ```
-env > per-desk profile (_knowledge/profile.yaml) > central config ($XDG_CONFIG_HOME/<app>/config.yaml) > default
+env > per-desk profile (_knowledge/profile.yaml) > store settings > central config ($XDG_CONFIG_HOME/<app>/config.yaml) > default
 ```
 
-The central config is the one place a secret (an LLM API key) may be stored at rest on the
-operator's own machine; it sits below the per-desk profile so a desk can still override it.
+A secret (an LLM API key) may be stored at rest in either of two places, and the choice is a
+deployment one. The central config is the operator's own machine; the store leg is the desk's
+own database, which is what a hosted deployment must use, because the central file resolves
+under the XDG config home — outside the mounted data volume, and wiped with the container —
+while the store sits on that volume. The store leg is per-desk, so it outranks the machine-wide
+central file; a desk that DECLARES a value in its profile still overrides both.
 
 **Store/desk location** (where the embedded database and the desk's files live), first match
 wins:
@@ -237,11 +241,43 @@ the existing desk and store rather than re-scaffolding.
 live under a single mounted volume, so one volume is the entire unit of persistence. A container
 restart against the same volume — same data, same accounts, nothing re-initialized.
 
+**Runs unprivileged, without a `USER` directive.** The image bakes in a fixed system account, and
+the Dockerfile deliberately carries no `USER` line. A `USER` directive only picks the account a
+process starts as; it cannot fix the ownership of a mounted volume, which routinely arrives owned
+by root (a fresh platform volume, or a tree an older root-running image left behind). Someone has
+to hand that volume over first, and only root can.
+
+So the container starts as root for exactly one step. The entrypoint creates and `chown -R`s the
+desk-root and store-dir trees to the unprivileged account, then replaces itself with that account
+via a small setuid-free exec-and-drop helper. The chown is unconditional on every boot, which is
+worth copying deliberately: sampling the top directory to skip an already-owned tree reads as a
+free optimisation and is a trap, because `chown -R` chowns the top first and continues past
+errors, so an interrupted or partly-failed run leaves the top owned and the contents not. A later
+boot would then skip, drop privilege, and serve a database it cannot write behind a passing
+healthcheck. Re-walking every time makes that state self-healing, and it is cheap (measured at a
+few thousand files in well under a second). No root process survives the drop, and
+first-boot scaffolding re-enters the same unprivileged process rather than running ahead of it. A
+chown that fails is fatal; the boot never falls back to serving as root.
+
+Everything the server writes lands inside those two chowned trees, with one exception outside the
+volume: the embedded HTTP framework spills oversized request bodies to the OS temp directory. A
+container's default sticky-bit `/tmp` already satisfies an unprivileged writer, so nothing extra
+needs chowning, but a read-only or locked-down `/tmp` breaks uploads. The drop is permanent for the
+life of the process.
+
+One thing worth measuring rather than assuming: a dropped process is normally barred from binding
+a port below 1024, but a container runtime can lift that floor, and Docker's default does exactly
+that (`net.ipv4.ip_unprivileged_port_start=0`). Measured on this image, an unprivileged PID 1 binds
+port 80 without complaint. Treat a low port as a property of the runtime, not of the image, and do
+not carry the assumption to a runtime that leaves the kernel floor in place.
+
 **Known, accepted limitations of this image** (state them, don't paper over them):
 
-- Runs as **root** inside the container. A fresh named volume is root-owned and the image has no
-  init system to chown-then-drop-privileges without adding a privilege-drop helper — accepted as
-  a stated trade-off, not a recommendation.
+- The image's own metadata still says it runs as root, because the drop happens at runtime and
+  the `User` field is empty. Two consequences: `docker exec` into the container lands as root, and
+  an orchestrator that gates on that field (Kubernetes `runAsNonRoot: true`) refuses the image
+  outright, since it cannot see that the entrypoint drops. That is the price of chown-then-drop
+  over a `USER` directive, and it is only worth paying where a mounted volume has to be adopted.
 - Built and smoke-tested on one CPU architecture locally; the Dockerfile itself is
   architecture-neutral (no hardcoded arch tag), but treat an untested architecture as unverified
   until it's actually built there.

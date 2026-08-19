@@ -145,12 +145,21 @@ Only the `agent` command (and an MCP client driving the tools) needs an LLM. `sw
 `patrol`, `propose-fix`, `apply-fix`, `restore`, and `query` are LLM-free — they run with no
 provider configured and no API key set.
 
-Provider and model resolve with precedence **env var → profile → central config → default**:
+Provider and model resolve with precedence **env var → profile → this desk's store → central
+config → default**:
 
-| Setting | Env var | Profile key (`_knowledge/profile.yaml`) | Central config key | Default |
-|---|---|---|---|---|
-| Provider | `LLM_PROVIDER` | `models.provider` | `llm.provider` | `anthropic` |
-| Model | `LLM_MODEL` | `models.model` | `llm.model` | `claude-haiku-4-5-20251001` |
+| Setting | Env var | Profile key (`_knowledge/profile.yaml`) | Store (browser Settings panel) | Central config key | Default |
+|---|---|---|---|---|---|
+| Provider | `LLM_PROVIDER` | `models.provider` | `llm_provider` | `llm.provider` | `anthropic` |
+| Model | `LLM_MODEL` | `models.model` | `llm_model` | `llm.model` | `claude-haiku-4-5-20251001` |
+
+The store leg is the desk's own singleton `settings` row, written from the browser Settings panel.
+It sits below the profile (a profile is the desk's declared, version-controlled intent, which a
+value typed into a browser must not silently override) and above the machine-wide central file (the
+store belongs to one desk). It exists for the hosted case, where the operator has no shell and the
+store is the only writable state that survives a redeploy. A provider or model saved there is
+picked up by the **next** chat session or agent run — each one re-resolves this chain as it builds
+its model, so no restart is needed.
 
 The central config is a machine-wide file at `$XDG_CONFIG_HOME/deskkit/config.yaml` (falling
 back to `~/.config/deskkit/config.yaml`), written 0600 in a 0700 dir and shared by every desk
@@ -161,8 +170,8 @@ Each provider reads its key from a fixed env var by default — `anthropic` → 
 `openai` → `OPENAI_API_KEY`, `gemini` → `GEMINI_API_KEY`. A profile's `secrets_ref.llm_api_key`
 (or the `LLM_API_KEY_ENV` env var) can redirect this: set it to the NAME of the env var that
 actually holds the key, and that var is read instead of the provider default. If that env var
-is unset, the key falls back to the central config's `llm.api_key` — the ONE place the key may
-be stored at rest. A missing key fails loud with an actionable message naming the exact var it
+is unset, the key falls back to this desk's store (where the browser Settings panel writes it) and
+then to the central config's `llm.api_key` — the only two places the key may be stored at rest. A missing key fails loud with an actionable message naming the exact var it
 looked for; nothing silently falls back beyond that one central leg.
 
 ```bash
@@ -335,6 +344,26 @@ needs no cross-origin allowlist), unless an explicit `--origins` allowlist is se
 that allowlist is preserved. On a loopback bind, that stock wildcard is left as it always was,
 matching the rule that local `serve` behavior stays unchanged. See [`../pattern.md`](../pattern.md)
 for the full reusable model behind this section.
+
+### Settings-panel endpoints
+
+Two read-only `GET` routes back the browser Settings panel. Neither ever returns an API key.
+
+- **`GET /desk/models`** — the model catalog the pickers render: the provider list, plus every
+  selectable model as an `id` (the exact string `LLM_MODEL` takes), a display `name`, and its
+  `provider`. Unauthenticated on both bind modes, deliberately — it carries no secrets, and the
+  panel needs it to populate its dropdowns before a login token exists. The catalog is generated
+  into the binary (`node scripts/gen-model-catalog.mjs`), so the route makes no outbound call.
+- **`GET /desk/settings/resolved`** — which leg currently wins for the provider, the model, and the
+  API key, in the same vocabulary `config show` prints (`env`, `profile`, `store`, `central`,
+  `default`; an empty source for a key that resolves nowhere). Provider and model report their
+  value alongside their source; the API key reports **only** its source — the response carries no
+  field that could hold the key value. That is what lets the panel distinguish a value it may edit
+  from one an environment variable already controls. The chain is re-resolved per request rather
+  than read from a process-start snapshot, so a save is reflected in the very next read. On a
+  public bind the route requires a superuser token: `401` with no token, `403` for a token from the
+  `users` collection (enough to chat, not enough to read the desk's configuration). On a loopback
+  bind it is unauthenticated, like the rest of that posture.
 
 ### SPA dev workflow
 

@@ -151,13 +151,17 @@ func (t argNormalizingTool) InvokableRun(ctx context.Context, argumentsInJSON st
 // so callers (the CLI) can print it; the full transcript is in the messages
 // collection either way.
 func Run(ctx context.Context, app core.App, cfg *config.Config, trigger, input string) (string, error) {
+	// Same per-run store re-resolve NewSession does: under serve the claimer drives Run from a
+	// long-lived Config, so a provider/model saved from the browser must reach the next run.
+	cfg = config.WithStore(app, cfg)
+
 	run, err := createAgentRun(app, trigger, input, cfg)
 	if err != nil {
 		return "", err
 	}
 	rc := &runCtx{app: app, cfg: cfg, runID: run.Id}
 
-	chatModel, err := chatModelFactory(ctx, cfg)
+	chatModel, err := chatModelFactory(ctx, app, cfg)
 	if err != nil {
 		return "", failRun(app, run, rc, err)
 	}

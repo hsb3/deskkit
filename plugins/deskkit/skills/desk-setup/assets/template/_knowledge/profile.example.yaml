@@ -44,13 +44,19 @@ machines:
     role: "primary"
     projects_root: "<repo-relative-or-~-relative-dir>"
 
-models:
-  provider: "anthropic"
-  model: "<model-id>"
-  alternates: ["<model-id>", "<model-id>"]
+# models / secrets_ref are COMMENTED OUT on purpose: both feed runtime config resolution, and
+# the profile leg outranks every leg below it (store, central config, built-in default). A copied
+# profile that still carries "<model-id>" would therefore win with a model id no provider knows,
+# and "<ENV_VAR_NAME>" would make the missing-key error name an env var that does not exist.
+# Left unset, each falls through to whatever the desk actually has configured. Uncomment and fill
+# only the lines this deployment really pins.
+# models:
+#   provider: "anthropic"        # anthropic | openai | gemini
+#   model: "<model-id>"
+#   alternates: ["<model-id>", "<model-id>"]
 
-secrets_ref:
-  llm_api_key: "<ENV_VAR_NAME>"
+# secrets_ref:
+#   llm_api_key: "<ENV_VAR_NAME>"
 
 preferences:
   commit_style: "<conventional | ...>"

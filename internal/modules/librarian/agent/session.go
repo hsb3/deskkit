@@ -54,13 +54,19 @@ type Session struct {
 // Run() does, and opens ONE agent_runs row (trigger "manual") for the whole session. On any
 // build failure the run row is failed like Run() does its pre-loop failures.
 func NewSession(ctx context.Context, app core.App, cfg *config.Config) (*Session, error) {
+	// Re-resolve the store leg HERE rather than trusting the process-wide Config: under serve that
+	// Config is a snapshot from process start, so a provider/model saved from the browser after
+	// boot would otherwise not reach a session until a restart. WithStore hands back a private copy,
+	// which then flows through the run row, the chat model, and the agent as one consistent set.
+	cfg = config.WithStore(app, cfg)
+
 	run, err := createAgentRun(app, "manual", "", cfg)
 	if err != nil {
 		return nil, err
 	}
 	rc := &runCtx{app: app, cfg: cfg, runID: run.Id}
 
-	chatModel, err := chatModelFactory(ctx, cfg)
+	chatModel, err := chatModelFactory(ctx, app, cfg)
 	if err != nil {
 		return nil, failRun(app, run, rc, err)
 	}

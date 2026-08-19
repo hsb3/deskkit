@@ -1,0 +1,67 @@
+name: container-smoke
+
+# Builds the image and runs scripts/docker-smoke.sh for real. This is the only gate that proves
+# BOOT-TIME behaviour of the shipped container: that the entrypoint hands the mounted volume to the
+# unprivileged account and permanently drops to it, that a pre-existing root-owned volume still
+# starts and serves, and that a public bind refuses without superuser prerequisites. None of that
+# is reachable from `go test`, and getting it wrong breaks a deployment rather than a build.
+#
+# Deliberately a SEPARATE workflow, not a step inside `ci`: `ci` is the one required check and
+# stays fast, and this lane only runs when something that can actually change the image changes.
+# Measured locally: ~37s for a cache-less image build, ~6s for the full 39-assertion smoke. Budget
+# a few minutes on a hosted runner (slower CPU, cold base-image pulls, uncached `npm ci`).
+#
+# The two `paths:` lists are duplicated on purpose: GitHub's workflow parser does not resolve YAML
+# anchors, so a `&anchor`/`*alias` pair that lints clean locally would silently not apply here.
+# Keep the two lists in sync by hand.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'Dockerfile'
+      - 'docker-entrypoint.sh'
+      - 'scripts/docker-smoke.sh'
+      - 'cmd/**'
+      - 'internal/**'
+      - 'templates/**'
+      - 'web/**'
+      - '.dockerignore'
+      - 'go.mod'
+      - 'go.sum'
+      - 'VERSION'
+      - '.github/workflows/container-smoke.yml'
+  pull_request:
+    paths:
+      - 'Dockerfile'
+      - 'docker-entrypoint.sh'
+      - 'scripts/docker-smoke.sh'
+      - 'cmd/**'
+      - 'internal/**'
+      - 'templates/**'
+      - 'web/**'
+      - '.dockerignore'
+      - 'go.mod'
+      - 'go.sum'
+      - 'VERSION'
+      - '.github/workflows/container-smoke.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: container-smoke-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  container-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      # Bare, never piped: a pipe masks the exit code and has let a failing gate through here
+      # before. The script builds the image itself and cleans up its own containers and volumes.
+      - name: Container smoke — build the image and assert the deployment contract
+        run: bash scripts/docker-smoke.sh

@@ -43,6 +43,15 @@ import (
 // PathBootstrap is the loopback-only token-mint endpoint the SPA calls on load.
 const PathBootstrap = "/desk/bootstrap"
 
+// PathAdmin is the path operators type for the admin console; the dependency serves it at
+// adminConsole. Without an explicit route the shell wildcard below swallows /admin and
+// renders the SPA instead, which reads as "the console is gone" rather than "wrong path".
+const PathAdmin = "/admin"
+
+// adminConsole is the dependency's own admin console mount. Trailing slash: the console's
+// asset URLs are relative, so redirecting to /_ (no slash) costs a second hop.
+const adminConsole = "/_/"
+
 //go:embed all:dist
 var distFS embed.FS
 
@@ -56,14 +65,29 @@ const placeholderHTML = `<!doctype html>
 (which runs the frontend build first), then restart <code>serve</code>.</p>
 </body></html>`
 
-// Register mounts the SPA on the serve router: the static shell on the root wildcard, and —
-// on a loopback bind only — the token bootstrap route. public mirrors the caller's derived
-// exposure mode (see cmd/deskkit's isPublicBind).
+// Register mounts the SPA on the serve router: the static shell on the root wildcard, the two
+// small read endpoints the settings panel needs (the model catalog, open in both modes; the
+// resolved-config report, superuser-gated in public mode), and — on a loopback bind only — the
+// token bootstrap route. public mirrors the caller's derived exposure mode (see cmd/deskkit's
+// isPublicBind).
 func Register(r *router.Router[*core.RequestEvent], public bool) {
 	sub, err := fs.Sub(distFS, "dist")
 	if err != nil {
 		// The dist directory is committed (via .gitkeep), so this cannot happen on a real build.
 		panic("spa: embedded dist missing: " + err.Error())
+	}
+	// Registered before the wildcard and matched ahead of it: a literal path beats
+	// /{path...} in the dependency's router, so this is the one /admin handler.
+	r.GET(PathAdmin, func(e *core.RequestEvent) error {
+		return e.Redirect(http.StatusFound, adminConsole)
+	})
+	r.GET(PathModels, models) // registered in both bind modes: no secrets, needed before login
+	// Registered in both modes, but gated in public: unlike the catalog this describes THIS
+	// desk's configuration, so a public bind narrows it to the operator's own credential —
+	// superusers only, not the member auth collection the chat surface also accepts.
+	resolved := r.GET(PathSettingsResolved, settingsResolved)
+	if public {
+		resolved.Bind(apis.RequireAuth(core.CollectionNameSuperusers))
 	}
 	if _, statErr := fs.Stat(sub, "index.html"); statErr == nil {
 		// indexFallback=true: unknown paths serve the shell, so the SPA's client-side routes

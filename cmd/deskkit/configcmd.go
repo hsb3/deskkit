@@ -14,6 +14,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/hsb3/deskkit/internal/core/config"
+	"github.com/hsb3/deskkit/internal/core/settings"
 )
 
 // newConfigCmd builds the `config` group: what is resolved, where each value came from, where
@@ -34,7 +35,7 @@ func newConfigCmd() *cobra.Command {
 func newConfigShowCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "show",
-		Short: "Print every resolved setting with the source that won (env, profile, central, default)",
+		Short: "Print every resolved setting with the source that won (env, profile, store, central, default)",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			return writeConfigShow(cmd.OutOrStdout())
@@ -224,7 +225,22 @@ func writeConfigShow(w io.Writer) error {
 	}
 
 	storeDir, locErr := resolveStoreLocation(cfg, nil)
-	if locErr != nil {
+	// The store leg of the precedence chain (env > profile > store > central > default). `config
+	// show` opens no store and creates nothing — a PocketBase bootstrap would MkdirAll the data dir
+	// and run system migrations against it — so the row is read straight out of an EXISTING
+	// data.db. A desk with no store yet simply has nothing on this leg, which is the honest answer
+	// rather than a guessed one.
+	var stored *settings.Settings
+	if locErr == nil {
+		var serr error
+		if stored, serr = settings.LoadFromDir(storeDir); serr != nil {
+			// Never silently drop a leg: an unreadable store would otherwise show as "no value
+			// stored", which is a different fact from "could not look".
+			fmt.Fprintf(w, "Could not read this desk's store settings: %v\n\n", serr)
+			stored = nil
+		}
+		config.ApplySettings(cfg, stored)
+	} else {
 		storeDir = "(unresolved: " + locErr.Error() + ")"
 	}
 	fmt.Fprintf(w, "Desk %q\n", cfg.DeskName)
@@ -236,11 +252,11 @@ func writeConfigShow(w io.Writer) error {
 	for _, r := range configRows(cfg) {
 		fmt.Fprintf(tw, "%s\t%s\t%s\n", r.key, r.value, r.source)
 	}
-	// The LLM API key is never held in Config: it resolves at use time from the named env var or
-	// the central file, so it gets its own row from the one resolver both surfaces call — always
-	// masked.
+	// The LLM API key is never held in Config: it resolves at use time from the named env var, this
+	// desk's store, or the central file, so it gets its own row from the one resolver both surfaces
+	// call — always masked.
 	envName := config.APIKeyEnvName(cfg)
-	key, keySource := config.ResolveAPIKey(envName)
+	key, keySource := config.ResolveAPIKeySettings(stored, envName)
 	if keySource == "" {
 		keySource = "(unresolved)"
 	}
@@ -249,7 +265,8 @@ func writeConfigShow(w io.Writer) error {
 		return err
 	}
 
-	fmt.Fprintf(w, "\nSOURCE is the leg that won: env > profile > central > default.\n")
+	fmt.Fprintf(w, "\nSOURCE is the leg that won: env > profile > store > central > default.\n")
+	fmt.Fprintf(w, "\"store\" is this desk's own settings, editable from the browser at `deskkit serve`.\n")
 	fmt.Fprintf(w, "Change a machine-wide value with `deskkit config set <key> <value>` (file: `deskkit config path`).\n")
 	fmt.Fprintf(w, "Browse this desk's data visually with `deskkit gui`.\n")
 	return nil

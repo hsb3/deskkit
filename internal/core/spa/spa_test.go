@@ -227,3 +227,38 @@ func TestBootstrap_AbsentInPublicMode(t *testing.T) {
 		t.Fatalf("public mode served a token from %s: %s", PathBootstrap, body)
 	}
 }
+
+// TestAdminRedirect pins that /admin — the path operators type — reaches the dependency's
+// admin console instead of being swallowed by the shell wildcard. Registered in both bind
+// modes: the console is the public-mode operator's only way in, so a public bind needs it
+// most. Deeper /admin/* paths stay with the wildcard; only the bare path is claimed.
+func TestAdminRedirect(t *testing.T) {
+	noFollow := &http.Client{
+		CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
+	}
+	for _, public := range []bool{false, true} {
+		srv, _ := newTestServer(t, public)
+
+		resp, err := noFollow.Get(srv.URL + PathAdmin)
+		if err != nil {
+			t.Fatalf("public=%v: GET %s: %v", public, PathAdmin, err)
+		}
+		resp.Body.Close()
+		if resp.StatusCode < 300 || resp.StatusCode > 399 {
+			t.Fatalf("public=%v: GET %s status = %d, want a 3xx redirect", public, PathAdmin, resp.StatusCode)
+		}
+		if loc := resp.Header.Get("Location"); loc != adminConsole {
+			t.Fatalf("public=%v: GET %s Location = %q, want %q", public, PathAdmin, loc, adminConsole)
+		}
+
+		// The wildcard still owns everything else: a client-side route must not redirect.
+		r2, err := noFollow.Get(srv.URL + "/documents")
+		if err != nil {
+			t.Fatalf("public=%v: GET /documents: %v", public, err)
+		}
+		r2.Body.Close()
+		if r2.StatusCode != http.StatusOK {
+			t.Fatalf("public=%v: GET /documents status = %d, want the shell's 200", public, r2.StatusCode)
+		}
+	}
+}

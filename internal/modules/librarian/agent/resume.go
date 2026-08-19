@@ -125,6 +125,10 @@ func ListConversations(app core.App, limit int, excludeRunID string, includeArch
 //
 // The returned Session leaves mu/busy/termErr zero — it is ready for its first resumed Turn.
 func ResumeSession(ctx context.Context, app core.App, cfg *config.Config, runID string) (*Session, []TranscriptEntry, error) {
+	// A resumed conversation rebuilds its model, so it re-resolves the store leg exactly as
+	// NewSession does — resuming after saving a new model must use the new model.
+	cfg = config.WithStore(app, cfg)
+
 	run, err := app.FindRecordById("agent_runs", runID)
 	if err != nil {
 		return nil, nil, err
@@ -134,7 +138,7 @@ func ResumeSession(ctx context.Context, app core.App, cfg *config.Config, runID 
 	// return the error unwrapped; unlike NewSession we do not fail the run row, because resume
 	// must not corrupt an already-finalized prior run just because reconstruction hiccuped.
 	rc := &runCtx{app: app, cfg: cfg, runID: run.Id}
-	chatModel, err := chatModelFactory(ctx, cfg)
+	chatModel, err := chatModelFactory(ctx, app, cfg)
 	if err != nil {
 		return nil, nil, err
 	}
