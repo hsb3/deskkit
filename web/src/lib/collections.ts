@@ -1,5 +1,7 @@
-// Read-only browse configuration per collection — browse never writes; writes stay
-// on the CLI/MCP tool core. Field lists mirror the Go migrations —
+// Browse configuration per collection. Browse never writes PocketBase rows directly:
+// the one edit it offers goes through the server's write-through route (POST
+// /desk/doc/write — record-original-first, reversible via `restore`), which owns the
+// disk write and the row update together. Field lists mirror the Go migrations —
 // unknown fields are simply not rendered, so a schema drift degrades, not breaks.
 
 export interface Column {

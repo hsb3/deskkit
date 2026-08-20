@@ -17,12 +17,14 @@ require (
 	github.com/cloudwego/eino-ext/components/model/claude v0.1.22
 	github.com/cloudwego/eino-ext/components/model/gemini v0.1.33
 	github.com/cloudwego/eino-ext/components/model/openai v0.1.13
+	github.com/fsnotify/fsnotify v1.7.0
 	github.com/google/jsonschema-go v0.4.3
 	github.com/mattn/go-isatty v0.0.22
 	github.com/modelcontextprotocol/go-sdk v1.6.1
 	github.com/pocketbase/dbx v1.12.0
 	github.com/pocketbase/pocketbase v0.39.6
 	github.com/spf13/cobra v1.10.2
+	github.com/spf13/pflag v1.0.10
 	google.golang.org/genai v1.36.0
 	gopkg.in/yaml.v3 v3.0.1
 )
@@ -75,7 +77,6 @@ require (
 	github.com/evanphx/json-patch v0.5.2 // indirect
 	github.com/fatih/color v1.19.0 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
-	github.com/fsnotify/fsnotify v1.7.0 // indirect
 	github.com/gabriel-vasile/mimetype v1.4.13 // indirect
 	github.com/ganigeorgiev/fexpr v0.5.0 // indirect
 	github.com/go-logr/logr v1.4.3 // indirect
@@ -116,7 +117,6 @@ require (
 	github.com/sirupsen/logrus v1.9.3 // indirect
 	github.com/slongfield/pyfmt v0.0.0-20220222012616-ea85ff4c361f // indirect
 	github.com/spf13/cast v1.10.0 // indirect
-	github.com/spf13/pflag v1.0.10 // indirect
 	github.com/standard-webhooks/standard-webhooks/libraries v0.0.1 // indirect
 	github.com/tidwall/gjson v1.18.0 // indirect
 	github.com/tidwall/match v1.1.1 // indirect

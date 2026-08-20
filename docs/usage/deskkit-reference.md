@@ -142,8 +142,8 @@ name the desk once, machine-wide, and keep the model settings in the same file.
 ## Choosing the LLM and setting the API key
 
 Only the `agent` command (and an MCP client driving the tools) needs an LLM. `sweep`,
-`patrol`, `propose-fix`, `apply-fix`, `restore`, and `query` are LLM-free — they run with no
-provider configured and no API key set.
+`patrol`, `propose-fix`, `apply-fix`, `restore`, `write-doc`, and `query` are LLM-free — they run
+with no provider configured and no API key set.
 
 Provider and model resolve with precedence **env var → profile → this desk's store → central
 config → default**:
@@ -278,8 +278,9 @@ placeholder page instead). One visit is enough:
 ./deskkit serve      # then open http://127.0.0.1:8090/
 ```
 
-v1 screens: **chat** (the same multi-turn agent loop as `chat`/the REPL above) and a **read-only
-browse** of documents (files), findings, agent runs with their messages, and PM items.
+v1 screens: **chat** (the same multi-turn agent loop as `chat`/the REPL above) and a **browse**
+of documents (files), findings, agent runs with their messages, and PM items. Browse is read-only
+except for one field: a document's `status`, which saves through the write-through path below.
 
 The chat screen on a fresh session — the composer, with a question typed but not yet sent. No
 conversation has happened here; sending needs an LLM key configured as above, and the browse
@@ -287,7 +288,16 @@ screens are shown in the root [`README.md`](../../README.md):
 
 ![The deskkit browser chat screen: an empty transcript with a question typed into the composer, not yet sent](../assets/spa-chat.png)
 
-Writes stay on the CLI/MCP tool core — nothing in the SPA calls a write tool. The former standalone
+Desk-content writes go through ONE door: `POST /desk/doc/write` (same route the `write-doc`
+subcommand's logic backs), which records the file's original to `revisions` first, writes the
+disk byte-exact, and updates the file's index row in the same operation — so every browser save
+is reversible with `restore --by-path <path>`. The save is compare-and-swap on the file's
+checksum: if the file changed on disk since the browser loaded it (an edit in your own editor —
+the normal case), the save is refused with the current content so nothing is ever clobbered;
+overwriting is an explicit second action. While `serve` runs, a filesystem watcher keeps the
+index following outside edits within seconds (`sweep` remains the manual fallback and full
+rebuild). In public mode the route requires auth exactly like the chat routes below. Beyond
+that one door, nothing in the SPA calls a write tool. The former standalone
 `/desk/chat` page (a single Go route serving embedded HTML) is removed; the URL still works,
 because the SPA's index fallback serves the same shell there, like any other client-side route.
 `POST /desk/chat/stream` and `POST /desk/chat/reset` are unchanged: same gated tool set and

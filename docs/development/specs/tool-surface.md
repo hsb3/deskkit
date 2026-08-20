@@ -204,7 +204,7 @@ an arbitrary cwd, so a cwd-only walk-up would find nothing in exactly the cases 
 
 | Surface | Count | Gate |
 |---|---:|---|
-| Librarian CLI subcommands | 18 base (+ `pm` group under `PM_ENABLED`) | — |
+| Librarian CLI subcommands | 19 base (+ `pm` group under `PM_ENABLED`) | — |
 | Librarian MCP — default | 9 | none |
 | Librarian MCP — `+LIBRARIAN_AUTONOMOUS_WRITES` | 10 | adds `apply_fix` |
 | Librarian MCP — `+PM_ENABLED` | 21 | adds 12 PM tools |
