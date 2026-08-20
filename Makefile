@@ -132,13 +132,16 @@ check: ## Repo gates: neutrality lint + self-test, kit-manifest drift, scaffold 
 	@node scripts/check-profile-root.mjs --self-test
 
 shellcheck: ## Lint every shell entry point (the single list — CI and the release gate call this target)
-	@shellcheck install.sh docker-entrypoint.sh verify.sh examples/*.sh sandbox/*.sh scripts/record-media.sh scripts/docker-smoke.sh e2e/e2e.sh e2e/lib.sh e2e/steps/*.sh
+	@shellcheck install.sh docker-entrypoint.sh verify.sh examples/*.sh sandbox/*.sh scripts/record-media.sh scripts/docker-smoke.sh e2e/e2e.sh e2e/lib.sh e2e/steps/*.sh e2e/spa/run.sh
 
 verify: ## Run the Phase-1 verify gate against a throwaway scratch desk (never a real store)
 	@bash verify.sh
 
 e2e: ## Run the end-to-end system-behaviour suite (whole system, throwaway desk; offline, no LLM key)
 	@bash e2e/e2e.sh
+
+spa-verify: ## Drive the embedded SPA in a real browser against a throwaway desk (needs playwright; see e2e/spa/README.md)
+	@bash e2e/spa/run.sh
 
 example-agent-loop: build ## Manual walkthrough: drive the REAL agent LLM loop end-to-end (REAL BILLED CALLS; needs ANTHROPIC_API_KEY; never in CI)
 	@bash examples/agent-loop.sh
