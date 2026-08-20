@@ -113,12 +113,14 @@ vet: ## go vet ./...
 fmt: ## Check gofmt formatting (fails and lists files if any need formatting)
 	@bash -c 'out="$$(gofmt -l .)"; if [ -n "$$out" ]; then echo "$$out"; exit 1; fi'
 
-check: ## Repo gates: neutrality lint + self-test, kit-manifest drift, scaffold frontmatter, persona drift, textfield-max, query-kind drift + self-test, doc-link integrity + self-test, shellcheck, actionlint, workflow SHA-pin drift + self-test, profile-root drift + self-test
+check: ## Repo gates: neutrality lint + self-test, kit-manifest drift, scaffold frontmatter, persona drift, version-bump + self-test, textfield-max, query-kind drift + self-test, doc-link integrity + self-test, shellcheck, actionlint, workflow SHA-pin drift + self-test, profile-root drift + self-test
 	@node scripts/check-neutrality.mjs
 	@node scripts/check-neutrality.mjs --self-test
 	@node scripts/check-kits.mjs
 	@node scripts/check-scaffold-frontmatter.mjs
 	@node scripts/check-persona-drift.mjs
+	@node scripts/check-version-bumped.mjs
+	@node scripts/check-version-bumped.mjs --self-test
 	@node scripts/check-textfield-max.mjs
 	@node scripts/check-query-kinds.mjs
 	@node scripts/check-query-kinds.mjs --self-test

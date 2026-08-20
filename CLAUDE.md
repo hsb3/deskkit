@@ -135,13 +135,14 @@ the exit code and has let a failing gate through before (incident, 2026-07-17).
 | `make setup` | `lefthook install` (git hooks) — there is no package-manager step |
 | `make build` | Build the SPA (`web/`, via npm) then the `deskkit` binary (version-stamped), embedding the SPA dist via `go:embed` |
 | `make test` | Fast unit tests: `go test ./...` at the repo root |
-| `make check` | Repo gates: neutrality + self-test, kit-drift, scaffold frontmatter, persona drift, textfield-max, query-kind drift + self-test, doc-link integrity + self-test, shellcheck, actionlint, workflow SHA-pin drift + self-test, profile-root drift + self-test |
+| `make check` | Repo gates: neutrality + self-test, kit-drift, scaffold frontmatter, persona drift, version-bump + self-test, textfield-max, query-kind drift + self-test, doc-link integrity + self-test, shellcheck, actionlint, workflow SHA-pin drift + self-test, profile-root drift + self-test |
 | `make verify` | Librarian integration gate — `verify.sh` (throwaway scratch desk) |
 | `make e2e` | End-to-end system-behaviour suite — whole system (cold-start → profile → librarian → PM → surfaces → release-shaped) on a throwaway desk; offline, no LLM key (`e2e/e2e.sh`) |
 | `make spa-verify` | SPA browser gate — drives the embedded SPA in a real Chromium against a throwaway desk, asserting against the bytes on disk as well as the DOM (`e2e/spa/run.sh`). Needs playwright installed once; **exits non-zero rather than skipping** when it is absent |
 | `make package` | Informational no-op — this target generates nothing; the bundle's one generated file is written by `node scripts/check-persona-drift.mjs --write` |
 | `make install` | Build + install the `deskkit` binary to `~/.local/bin` (override `PREFIX=`) |
 | `node scripts/check-version-sync.mjs` | Assert root `VERSION` matches the shipped manifests |
+| `node scripts/check-version-bumped.mjs` | Assert `VERSION` moved since the base branch — **every PR bumps it** (+ `--self-test`); self-skips off a PR |
 | `make version-status` | Advisory (non-blocking): unreleased product changes since the last tag |
 | `make release-prep` | Pre-tag gate (see order below) |
 
@@ -188,6 +189,7 @@ constraint survives the module move: `schema/` is a sibling of `internal/`, not 
 | Identity-neutrality (shipped tree) | `scripts/check-neutrality.mjs` (+ `--self-test`) |
 | Embedded schema copies stay byte-identical to `schema/` | `TestProfileSchemaEmbeddedCopy_MatchesRepoRoot` / `TestReferencesEmbeddedCopy_MatchesRepoRoot` (`make test`) |
 | `VERSION` == shipped manifests | `scripts/check-version-sync.mjs` |
+| Every PR bumps `VERSION` (owner's policy, 2026-08-20) | `scripts/check-version-bumped.mjs` (+ `--self-test`), in `make check` + CI |
 | `kits.yaml` == `kits/` tree | `scripts/check-kits.mjs` |
 | `docs/development/specs/tool-surface.md` counts (CLI + gated MCP) match source (ADR 0016) | `TestToolSurfaceDoc_*` in `internal/core/mcp/tool_surface_doc_test.go` (`make test`) |
 | Scaffold instruments carry conformant frontmatter | `scripts/check-scaffold-frontmatter.mjs` |

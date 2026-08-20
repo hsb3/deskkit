@@ -95,6 +95,13 @@ jobs:
       # Advisory only (never fails the build): nudges when user-facing changes have piled up
       # under the product tree since the last v* tag without a VERSION bump. The hard gate
       # (a documented CHANGELOG section for the tagged version) lives in release.yml.
+      # Every PR bumps the version (owner's policy, 2026-08-20). The advisory below counts drift;
+      # this refuses to let it accumulate in the first place. It self-skips off a PR.
+      - name: Version-bump guard — VERSION moved since the base branch (+ self-test)
+        run: |
+          node scripts/check-version-bumped.mjs "origin/${{ github.base_ref || 'main' }}"
+          node scripts/check-version-bumped.mjs --self-test
+
       - name: Version-status advisory (non-blocking)
         run: node scripts/check-version-status.mjs
 
