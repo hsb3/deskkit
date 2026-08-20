@@ -150,6 +150,20 @@ async function openDoc(term) {
   await untilVisible('.instance')
 }
 
+/** Enter the edit level and wait until it is actually usable.
+ *
+ * The two waits are one step because separating them is a trap: the form renders before the
+ * status picker has its options, since those are derived from the DRAFTED doctype and fetched.
+ * A call site that waits only for the form gets an empty `<select>`, and `selectOption` then
+ * spends its whole timeout reporting "did not find some options" — which reads as a broken
+ * picker rather than a race. That is exactly what CI caught on the two sites that had the
+ * shorter wait, so the wait lives here and no call site can forget it. */
+async function enterEdit() {
+  await page.keyboard.press('e')
+  await untilVisible('.edit')
+  await until(() => page.locator('.edit select').first().locator('option').count().then((n) => n > 0))
+}
+
 try {
   // --- shell ----------------------------------------------------------------------------
   await page.goto(BASE, { waitUntil: 'networkidle' })
@@ -211,11 +225,7 @@ try {
   // --- the status picker reads the document's own family ------------------------------------
   const familyOf = async (term, expected) => {
     await openDoc(term)
-    await page.keyboard.press('e')
-    await untilVisible('.edit')
-    // The picker is populated from the DRAFTED doctype, which is fetched — an empty option list
-    // means "not filled in yet", not "no statuses".
-    await until(() => page.locator('.edit select').first().locator('option').count().then((n) => n > 0))
+    await enterEdit()
     const opts = await page.locator('.edit select').first().locator('option').allInnerTexts()
     check(
       `the status picker offers the ${expected[0]}-family statuses for ${term}`,
@@ -231,9 +241,7 @@ try {
   const before = disk(rel)
 
   await openDoc('app-overhaul')
-  await page.keyboard.press('e')
-  await untilVisible('.edit')
-  await until(() => page.locator('.edit select').first().locator('option').count().then((n) => n > 0))
+  await enterEdit()
   await page.locator('.edit select').first().selectOption('paused')
   await page.keyboard.press('Meta+Enter')
   check('the save reaches disk within the timeout', await untilDiskChanges(rel, before))
@@ -248,15 +256,13 @@ try {
     saved.includes('Three templates cover the whole app'),
   )
 
-  await page.keyboard.press('e')
-  await untilVisible('.edit')
+  await enterEdit()
   await page.locator('.edit select').first().selectOption('active')
   await page.keyboard.press('Meta+Enter')
   await until(() => disk(rel) === before)
   check('setting the status back yields a byte-identical file', disk(rel) === before)
 
-  await page.keyboard.press('e')
-  await untilVisible('.edit')
+  await enterEdit()
   await page.locator('.edit select').first().selectOption('archived')
   await page.keyboard.press('Escape')
   await untilGone('.edit')
@@ -273,9 +279,7 @@ try {
   const relProtected = '_structure/decisions/0004-prose-editor-in-app.md'
   const protectedBefore = disk(relProtected)
   await openDoc('0004-prose-editor')
-  await page.keyboard.press('e')
-  await untilVisible('.edit')
-  await until(() => page.locator('.edit select').first().locator('option').count().then((n) => n > 0))
+  await enterEdit()
   await page.locator('.edit select').first().selectOption('accepted')
   await page.keyboard.press('Meta+Enter')
   await untilVisible('.instance .error')
