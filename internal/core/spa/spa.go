@@ -3,7 +3,10 @@
 // SPA is a read-plus-chat surface: browse screens read the store through PocketBase's own
 // REST API with the operator's superuser token, and the chat screen drives the same
 // stewardship session endpoints the pre-SPA standalone page used (see the sibling web
-// package). It opens no new write path: writes stay on the CLI/MCP tool core.
+// package). This package itself opens no write path; the one desk-content write the browser
+// can make is the web package's write-through route (`/desk/doc/write`), which
+// runs the same record-original-first path the CLI uses — the SPA never writes store rows
+// or disk directly.
 //
 // The dist tree is built by the repo's frontend build (`make build` runs it) and is NEVER
 // committed — only dist/.gitkeep is tracked, so a plain `go build` still compiles. A binary

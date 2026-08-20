@@ -14,6 +14,25 @@ for why this policy exists.
 
 ### Added
 
+- **The write-through path — one door from browser to disk** (DESK-78, SPA overhaul phase 0,
+  implementing the DESK-75 files-stay-authoritative ruling). `tools.WriteDoc` writes a desk
+  document to disk and updates its index row as one operation: original recorded to `revisions`
+  first (reversible via `restore --by-path`), byte-exact write via `desklib.WriteExact`, row
+  re-indexed in the same transaction. Compare-and-swap on the file's checksum: a save over a file
+  that changed underneath is refused with the current content returned — never overwritten, never
+  merged. Surfaces: the `write-doc` CLI subcommand, and `POST /desk/doc/write` for the SPA (public
+  mode: `apis.RequireAuth` + strict same-origin, exactly like the chat routes). Deliberately NOT an
+  MCP/agent tool — the autonomous write boundary stays `apply_fix`-only, gated.
+- **A desk-tree watcher under `serve`.** Outside edits are the normal case (the desk is authored
+  in external editors), so the index now follows the disk: fsnotify on the desk tree, debounced
+  single-file re-index, soft-delete on remove, one convergence sweep at start. Failure to start
+  degrades to manual `sweep`, never fails serve.
+- **SPA: a document's `status` is editable** on the Documents browse pane — the first field
+  through the write-through path, with a conflict view (refused save shows the disk's current
+  content; overwrite is an explicit second action) and live row updates via PocketBase realtime.
+- **`desklib.SetFrontmatterField`** — server-side single-field frontmatter edit preserving every
+  other byte, so browsers never rewrite YAML.
+
 - **Settings panel in the SPA** (DESK-66). Provider, model, and API key are now settable from the
   browser instead of only `deskkit config set`. Settings live in a new `settings` collection — a
   migration-seeded singleton — rather than in the central YAML file, because on a hosted desk the

@@ -16,6 +16,7 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"runtime"
 	"strings"
 
@@ -344,6 +345,24 @@ func main() {
 				webCleanup(context.Background())
 				return te.Next()
 			})
+
+			// Write-through route: the SPA's one door from browser to disk, same
+			// auth posture as the chat routes. Gated on cfgErr like them — the tool needs a
+			// desk root.
+			web.RegisterDocWrite(e.Router, e.App, cfg, publicMode)
+
+			// Desk watcher: outside edits are the normal case (files stay authoritative,
+			// decision 0009), so the index
+			// follows the disk while serve runs. Failure to start degrades to manual
+			// sweep — logged, never fatal.
+			if stopWatcher, werr := tools.StartWatcher(context.Background(), e.App, cfg); werr != nil {
+				app.Logger().Warn("desk watcher not started; `deskkit sweep` remains the fallback", "err", werr)
+			} else {
+				e.App.OnTerminate().BindFunc(func(te *core.TerminateEvent) error {
+					stopWatcher()
+					return te.Next()
+				})
+			}
 		} else {
 			app.Logger().Warn("config not resolved; wake layer (hooks/cron/claimer) not started", "err", cfgErr)
 		}
@@ -411,7 +430,7 @@ func main() {
 var storeTouchingCommands = map[string]bool{
 	"serve": true, "migrate": true, "superuser": true,
 	"sweep": true, "patrol": true, "propose-fix": true, "apply-fix": true,
-	"restore": true, "query": true, "record-feedback": true, "agent": true, "chat": true,
+	"restore": true, "write-doc": true, "query": true, "record-feedback": true, "agent": true, "chat": true,
 	"mcp-serve": true, "gui": true, "findings": true,
 }
 
@@ -456,6 +475,7 @@ var commandGroupIDs = map[string]string{
 	"propose-fix": groupFix,
 	"apply-fix":   groupFix,
 	"restore":     groupFix,
+	"write-doc":   groupFix,
 
 	"pm": groupWork,
 
@@ -979,6 +999,55 @@ func registerToolCommands(app *pocketbase.PocketBase, cfg *config.Config, cfgErr
 	restoreCmd.Flags().StringVar(&restoreRev, "revision", "", "the revisions row id to reverse")
 	restoreCmd.Flags().StringVar(&restorePath, "by-path", "", "resolve to the latest applied, unrestored revision for this path")
 	app.RootCmd.AddCommand(restoreCmd)
+
+	// write-doc (supervised write-through) — the same path the SPA's save uses:
+	// record original first, byte-exact write, row re-indexed, reversible via restore.
+	var writeSet []string
+	var writeBase, writeContentFile string
+	writeCmd := &cobra.Command{
+		Use:   "write-doc <path>",
+		Short: "Write one desk document (records the original; reversible via restore)",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			c, err := requireConfig(app, cfg, cfgErr)
+			if err != nil {
+				return err
+			}
+			in := &tools.WriteDocInput{Path: args[0], BaseChecksum: writeBase}
+			if writeContentFile != "" {
+				b, rerr := os.ReadFile(writeContentFile)
+				if rerr != nil {
+					return rerr
+				}
+				in.Content = string(b)
+			}
+			if len(writeSet) > 0 {
+				in.Set = map[string]string{}
+				for _, kv := range writeSet {
+					k, v, ok := strings.Cut(kv, "=")
+					if !ok {
+						return fmt.Errorf("--set wants key=value, got %q", kv)
+					}
+					in.Set[k] = v
+				}
+			}
+			// No --base means "against the file as it is right now": resolve the current
+			// checksum in-process. Scripts that want real compare-and-swap pass --base.
+			if in.BaseChecksum == "" {
+				raw, rerr := os.ReadFile(filepath.Join(c.DeskRoot, filepath.FromSlash(args[0])))
+				if rerr != nil {
+					return rerr
+				}
+				in.BaseChecksum = desklib.Checksum(raw)
+			}
+			res, serr := tools.WriteDoc(cmd.Context(), app, c, in)
+			return printJSON(cmd.OutOrStdout(), res, serr)
+		},
+	}
+	writeCmd.Flags().StringSliceVar(&writeSet, "set", nil, "frontmatter field edit, key=value (repeatable)")
+	writeCmd.Flags().StringVar(&writeBase, "base", "", "expected sha256 of the file before the write (compare-and-swap)")
+	writeCmd.Flags().StringVar(&writeContentFile, "content-file", "", "replace the whole document with this file's bytes")
+	app.RootCmd.AddCommand(writeCmd)
 
 	// query <kind>
 	var queryDays int

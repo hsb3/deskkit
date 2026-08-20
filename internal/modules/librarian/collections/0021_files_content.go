@@ -17,7 +17,10 @@ import (
 // mirrored from the sweep exclusion logic). PocketBase's TextField Max is measured in runes, so a
 // 1,000,000-rune body validates exactly at the cap.
 //
-// content is re-derivable by a fresh sweep from the desk tree alone — the store is disposable and
+// content is DERIVED, full stop: sweep sets it from the file unconditionally, so anything written
+// to this column by any other path is silently destroyed by the next sweep. Desk-content writes go
+// through the write-through path (tools.WriteDoc -> desklib.WriteExact) and never at this column.
+// It is re-derivable by a fresh sweep from the desk tree alone — the store is disposable and
 // desk files remain the source of truth (files-are-truth, decision 0009) — so it survives a store
 // rebuild. Applies to existing stores on the next migrate, and to fresh stores after 0001 creates
 // `files`. Idempotent: guard-before-add makes a re-run a no-op. DOWN removes the field.
