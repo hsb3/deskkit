@@ -47,11 +47,13 @@ belongs to the desks the tools stand up.
   - **`pm`** — a document-gated work graph, on by default (opt out with `PM_ENABLED=false`).
 
   Surfaces over that one core: **CLI**, an **MCP server** (`deskkit mcp-serve`, narrowed by
-  `MCP_MODULES`), a **chat TUI**, and a **browser SPA** at `/` on the embedded serve (chat, plus
-  browse of files/findings/agent runs/PM items with one writable field, a document's `status`,
-  saved through the write-through path — `tools.WriteDoc`: record-original-first, byte-exact,
-  reversible via `restore`, compare-and-swap on the file checksum; `/desk/chat` still resolves via the
-  SPA's index fallback). Admin console (`make gui`) serves PocketBase at
+  `MCP_MODULES`), a **chat TUI**, and a **browser SPA** at `/` on the embedded serve — a 34px
+  rail of work modes (Queue, Library, Patrol, Work, Agent, Config) that is also the app's
+  keyboard map (`web/src/lib/shell.ts` + `keys.ts`: every button has a key and every key has a
+  button), over chat plus browse of files/findings/agent runs/PM items with one writable field, a
+  document's `status`, saved through the write-through path — `tools.WriteDoc`:
+  record-original-first, byte-exact, reversible via `restore`, compare-and-swap on the file
+  checksum; `/desk/chat` still resolves via the SPA's index fallback. Admin console (`make gui`) serves PocketBase at
   `http://127.0.0.1:8090/_/`.
 - **`plugins/deskkit/`** — the ONE Claude Code plugin this marketplace ships: the agent-facing
   surface over that same binary. Seven skills (`desk-setup`, `conventions-standard`,
@@ -213,7 +215,9 @@ Every resolved field wins on one of five legs, in this order: **env > per-desk
 `_knowledge/profile.*` > store settings > central config > built-in default**
 (`internal/core/config/config.go`). The store leg is the `settings` collection — a migration-seeded
 singleton row (`internal/modules/librarian/collections/0024_settings.go`) holding
-`llm_provider`/`llm_model`/`llm_api_key`, written by the SPA's settings panel. It sits above the
+`llm_provider`/`llm_model`/`llm_api_key`, written by the SPA's settings panel. The same row also
+carries `sticky_finder` (`0025_settings_sticky_finder.go`), a browser preference no Go surface
+reads — it rides the row because a per-desk preference has to outlive the browser that set it. It sits above the
 central file because the store is per-desk while the file is machine-wide, and below the profile
 because a desk's declared config still outranks runtime GUI state (decision: board task DESK-73,
 no ADR number — post-0022 decisions are filed board-side without one). The API key

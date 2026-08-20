@@ -38,6 +38,12 @@ const (
 	FieldModel      = "llm_model"
 	FieldAPIKey     = "llm_api_key"
 	FieldAPIKeyHint = "llm_api_key_hint"
+
+	// FieldStickyFinder is a BROWSER preference, not a resolution leg: whether the finder pane
+	// stays minimised while you walk from one item to the next. No Go surface reads it — it
+	// rides this row because the row is the desk's one browser-writable settings store, and a
+	// per-desk preference has to outlive the browser that set it.
+	FieldStickyFinder = "sticky_finder"
 )
 
 // hintLen is how much of the key the visible hint may expose. Four characters is enough for an

@@ -14,6 +14,27 @@ for why this policy exists.
 
 ### Added
 
+- **The shell — a shortcut rail that is also the keyboard map** (SPA overhaul phase 1). The flat
+  four-link nav is replaced by a 34px rail carrying one button per WORK MODE and nothing else:
+  Queue, Library, Patrol, Work, Agent, Config (Kits and Desks are reached from Config; the queue
+  itself arrives with the inbox screens). The rail is navigation, window manager and shortcut
+  legend at once — every button has a key and every key has a button, so nothing is reachable
+  only one way and the whole app is drivable without a mouse: `⌘1`–`⌘6` modes, `⌘B` finder,
+  `⌘K` search (live, even mid-edit), `j`/`k` rows, `↵` open, `e` modify, `⌘↵` save, `esc` back
+  out exactly one level (editing → reading → finder). `Ctrl` stands in for `⌘` off a Mac. The map
+  lives in one table (`web/src/lib/keys.ts`) rather than scattered across components, because
+  that promise is only checkable if it does.
+- **Space follows engagement.** The finder is the whole screen while you are looking; opening an
+  item minimises it INTO its rail button, lit, so the way back is visible rather than remembered;
+  editing is that same allocation with different verbs and never navigates. Each mode's list also
+  gained a search box (the `⌘K` target), and the row the keyboard is on is always visible.
+- **A user setting: "keep the finder minimised between items"**, default on — with it on, `j`/`k`
+  walk a collection without reopening the list; off, moving on hands the screen back to the
+  finder. Stored per desk on the `settings` singleton (`sticky_finder`, migration 0025) and
+  toggled from the Config panel, which also picked up the Sign out button the old nav carried.
+- Legacy hashes (`#/documents`, `#/findings`, `#/pm`, `#/chat`, `#/runs`, `#/settings`) still
+  resolve, onto their new modes.
+
 - **The write-through path — one door from browser to disk** (DESK-78, SPA overhaul phase 0,
   implementing the DESK-75 files-stay-authoritative ruling). `tools.WriteDoc` writes a desk
   document to disk and updates its index row as one operation: original recorded to `revisions`

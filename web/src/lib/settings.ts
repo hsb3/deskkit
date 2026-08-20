@@ -18,6 +18,9 @@ export interface SettingsRecord {
   llm_provider: string
   llm_model: string
   llm_api_key_hint: string
+  /** Keep the finder minimised between items. Ruled a user setting, default on — so a store
+   * whose migrations predate the field reads as on rather than as off. */
+  sticky_finder: boolean
 }
 
 export interface ModelCatalogEntry {
@@ -95,6 +98,7 @@ export async function fetchSettings(): Promise<SettingsRecord | null> {
       llm_provider: String(rec.llm_provider ?? ''),
       llm_model: String(rec.llm_model ?? ''),
       llm_api_key_hint: String(rec.llm_api_key_hint ?? ''),
+      sticky_finder: Boolean(rec.sticky_finder ?? true),
     }
   } catch (e) {
     if (isNotFound(e)) return null
@@ -104,6 +108,25 @@ export async function fetchSettings(): Promise<SettingsRecord | null> {
 
 export async function saveSettings(id: string, patch: SettingsPatch): Promise<void> {
   await pb.collection('settings').update(id, patch)
+}
+
+/** The sticky-finder toggle saves on its own rather than riding the panel's form: it changes
+ * behaviour the moment it is flipped, and the form's Save is gated on a provider and model this
+ * preference has nothing to do with. */
+export async function saveStickyFinder(id: string, on: boolean): Promise<void> {
+  await pb.collection('settings').update(id, { sticky_finder: on })
+}
+
+/** The preference alone, for the shell to read at startup. Anything that goes wrong — no row, an
+ * older store, no permission — yields the ruled default rather than an error: a preference is
+ * never worth failing to boot over. */
+export async function fetchStickyFinder(): Promise<boolean> {
+  try {
+    const rec = await fetchSettings()
+    return rec ? rec.sticky_finder : true
+  } catch {
+    return true
+  }
 }
 
 /** GET /desk/models (internal/core/spa/catalog.go): unauthenticated, no secrets, registered in
