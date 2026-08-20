@@ -79,7 +79,8 @@ internal/          the whole runtime: core/ (store, config, mcp, schema, spa emb
 templates/         canonical prompt/text sources (librarian-system-prompt.txt generates the
                    librarian-operator agent) — inside the neutrality lint's scan scope
 verify.sh          the librarian integration gate (throwaway scratch desk) — `make verify`
-e2e/               end-to-end system-behaviour suite (throwaway desk, offline) — `make e2e`
+e2e/               end-to-end system-behaviour suite (throwaway desk, offline) — `make e2e`;
+                   e2e/spa/ is the browser gate — real Chromium over `serve` — `make spa-verify`
 sandbox/           sandbox-exec wrappers for the supervised write path
 examples/          two manual walkthrough harnesses + their README; never in CI.
                    pm-walkthrough.sh is free/offline; agent-loop.sh makes REAL billed LLM calls
@@ -137,6 +138,7 @@ the exit code and has let a failing gate through before (incident, 2026-07-17).
 | `make check` | Repo gates: neutrality + self-test, kit-drift, scaffold frontmatter, persona drift, textfield-max, query-kind drift + self-test, doc-link integrity + self-test, shellcheck, actionlint, workflow SHA-pin drift + self-test, profile-root drift + self-test |
 | `make verify` | Librarian integration gate — `verify.sh` (throwaway scratch desk) |
 | `make e2e` | End-to-end system-behaviour suite — whole system (cold-start → profile → librarian → PM → surfaces → release-shaped) on a throwaway desk; offline, no LLM key (`e2e/e2e.sh`) |
+| `make spa-verify` | SPA browser gate — drives the embedded SPA in a real Chromium against a throwaway desk, asserting against the bytes on disk as well as the DOM (`e2e/spa/run.sh`). Needs playwright installed once; **exits non-zero rather than skipping** when it is absent |
 | `make package` | Informational no-op — this target generates nothing; the bundle's one generated file is written by `node scripts/check-persona-drift.mjs --write` |
 | `make install` | Build + install the `deskkit` binary to `~/.local/bin` (override `PREFIX=`) |
 | `node scripts/check-version-sync.mjs` | Assert root `VERSION` matches the shipped manifests |
@@ -197,7 +199,7 @@ constraint survives the module move: `schema/` is a sibling of `internal/`, not 
 | A tagged release has a CHANGELOG section | `scripts/check-changelog.mjs` (release gate) |
 | Every workflow `uses:` stays SHA-pinned (no mutable `@vN` tag) | `scripts/check-workflow-pins.mjs` (+ `--self-test`) |
 | Profile root (`_knowledge`) pinned identically in `schema/paths.yaml` and the Go constant | `scripts/check-profile-root.mjs` (+ `--self-test`) |
-| Shell entry points stay lint-clean (install.sh, docker-entrypoint.sh, verify.sh, examples/*, sandbox/*, record-media, docker-smoke, e2e/*) | `shellcheck` via `make shellcheck` (CI + `make check`) |
+| Shell entry points stay lint-clean (install.sh, docker-entrypoint.sh, verify.sh, examples/*, sandbox/*, record-media, docker-smoke, e2e/*, e2e/spa/run.sh) | `shellcheck` via `make shellcheck` (CI + `make check`) |
 | Every cited doc/media path on the published+shipped surface resolves (no dangling links; incident 2026-07-24) | `scripts/check-doc-links.mjs` (+ `--self-test`) |
 
 ### Order-sensitive chains
@@ -296,8 +298,8 @@ none should be added. The tools this repo builds (the `deskkit` binary and the `
 plugin bundle) are for coordinating *other* desks; that standard doesn't apply reflexively to the
 repo that builds it, and the coordination tooling must live outside it — on a desk built to operate
 on this repo, e.g. the paired executive desk (DESK-21 §0). In-repo verification instead
-runs through `make verify` (`verify.sh`, a throwaway scratch desk) and `make e2e`, both
-of which stand up disposable desks rather than pointing the binary at this repo's own tree.
+runs through `make verify` (`verify.sh`, a throwaway scratch desk), `make e2e`, and `make spa-verify`, all of
+which stand up disposable desks rather than pointing the binary at this repo's own tree.
 `deskkit apply-fix` / `restore` stay `ask`-gated in `.claude/settings.json` regardless, matching
 the librarian's supervised-write boundary wherever it runs.
 

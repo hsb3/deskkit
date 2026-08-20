@@ -1,0 +1,9 @@
+{
+  "name": "deskkit-spa-checks",
+  "private": true,
+  "type": "module",
+  "description": "Browser-driven verification for the embedded SPA. Deliberately separate from web/: the SPA build and the container image run npm ci and have no use for a browser driver.",
+  "devDependencies": {
+    "playwright": "1.62.1"
+  }
+}
