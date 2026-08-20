@@ -39,13 +39,19 @@ describe('resolveKey', () => {
     expect(resolveKey({ key: 'o' }, false)).toEqual({ kind: 'body' })
   })
 
-  // Destructive, so it is a chord rather than a bare letter — and like the other chords it is
-  // deliberately NOT suppressed mid-edit: it arms a two-step confirm, so a stray press costs a
-  // second press, never a file.
-  it('maps the delete chord on either modifier, inside a field as well as outside', () => {
+  it('maps the delete chord on either modifier when nothing is being typed into', () => {
     expect(resolveKey(mod('Backspace'), false)).toEqual({ kind: 'delete' })
     expect(resolveKey({ key: 'Backspace', ctrlKey: true }, false)).toEqual({ kind: 'delete' })
-    expect(resolveKey(mod('Backspace'), true)).toEqual({ kind: 'delete' })
+  })
+
+  // Do NOT "fix" this back. Ctrl+Backspace is the standard delete-previous-word chord on
+  // Windows and Linux, and this map treats Control and Meta as one modifier — so a suppression
+  // exemption here would mean deleting a word in the search box arms a document delete, with
+  // App's preventDefault swallowing the native behaviour. ⌘↵, ⌘K and esc are exempt because
+  // each has a concrete reason to act on the field you are in; delete has none.
+  it('is inert inside a text field, because that chord already means delete-previous-word', () => {
+    expect(resolveKey(mod('Backspace'), true)).toBeNull()
+    expect(resolveKey({ key: 'Backspace', ctrlKey: true }, true)).toBeNull()
   })
 
   it('leaves a bare Backspace to the browser — deleting a character is not deleting a file', () => {
@@ -55,6 +61,7 @@ describe('resolveKey', () => {
 
   it('leaves unmapped and Alt-composed chords to the browser', () => {
     expect(resolveKey(mod('s'), false)).toBeNull()
+    expect(resolveKey(mod('Escape'), false)).toBeNull()
     expect(resolveKey({ key: 'x' }, false)).toBeNull()
     expect(resolveKey({ key: 'j', altKey: true }, false)).toBeNull()
     expect(resolveKey({ key: 'k', metaKey: true, altKey: true }, false)).toBeNull()

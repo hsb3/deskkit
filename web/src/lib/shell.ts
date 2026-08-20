@@ -66,6 +66,27 @@ export function outOf(l: Level): Level {
   return l === 'editing' ? 'reading' : 'finder'
 }
 
+/** Which levels each level-SCOPED action may fire at. Actions absent from this table fire at
+ * every level (mode switches, the finder toggle, search, j/k, esc).
+ *
+ * A table rather than an `if` inside each case, because a MISSING check is invisible: `delete`
+ * had none, so a stray ⌘⌫ while browsing the list armed a delete on whatever record was last
+ * opened — with its "Really delete?" button off screen, since that button only renders inside
+ * the instance. The two-step confirm only protects anything if the second step is visible.
+ */
+const FIRES_AT: Partial<Record<Action['kind'], Level[]>> = {
+  open: ['finder'],
+  modify: ['finder', 'reading'],
+  body: ['reading'],
+  save: ['editing'],
+  delete: ['reading', 'editing'],
+}
+
+/** May this action fire at this level? Unlisted actions are unrestricted. */
+export function mayFire(kind: Action['kind'], at: Level): boolean {
+  return FIRES_AT[kind]?.includes(at) ?? true
+}
+
 export const level = writable<Level>('finder')
 
 /** Where ⌘B returns you when you bring the finder back. Module-local because it is a detail of

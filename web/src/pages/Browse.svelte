@@ -45,7 +45,7 @@
   import { editorHref, fetchResolvedSettings } from '../lib/settings'
   import Icon from '../lib/Icon.svelte'
   import type { Action } from '../lib/keys'
-  import { MOD_LABEL, level, onAction, outOf, setLevel, stickyFinder } from '../lib/shell'
+  import { MOD_LABEL, level, mayFire, onAction, outOf, setLevel, stickyFinder } from '../lib/shell'
 
   let { config }: { config: BrowseConfig } = $props()
 
@@ -220,10 +220,16 @@
       saveError = ''
     }
     deleteArmed = false
+    // Landing back on the finder means there is no "this record" any more. Leaving one selected
+    // off screen is what let a delete arm against a document nobody was looking at.
+    if (next === 'finder') selected = null
     setLevel(next)
   }
 
   function handle(a: Action) {
+    // One gate, from the shell's table — never an `if` per case, because the case that forgets
+    // one is invisible until it deletes something.
+    if (!mayFire(a.kind, $level)) return
     switch (a.kind) {
       case 'search':
         searchEl?.focus()
@@ -236,7 +242,7 @@
         move(-1)
         break
       case 'open':
-        if ($level === 'finder') openCursor()
+        openCursor()
         break
       case 'modify':
         startEdit()
@@ -252,7 +258,7 @@
         remove()
         break
       case 'save':
-        if ($level === 'editing' && selected) save(checksumOf(config, selected))
+        if (selected) save(checksumOf(config, selected))
         break
       case 'back':
         back()
