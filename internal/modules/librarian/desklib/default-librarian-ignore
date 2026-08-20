@@ -4,6 +4,6 @@ _meta/secrets/
 CLAUDE.md
 _structure/decisions/
 _meta/HANDOFF.md
-.claude/memory/MEMORY.md
+.claude/
 _meta/
 _knowledge/

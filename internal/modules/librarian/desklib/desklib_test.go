@@ -198,3 +198,50 @@ func TestEnsureIgnoreFileAutoCreates(t *testing.T) {
 		t.Fatalf("EnsureIgnoreFile clobbered an existing file")
 	}
 }
+
+// A desk is routinely also a working repo, so the seeded ignore list has to keep the indexer
+// out of the places a repo keeps credentials. This asserts against the SHIPPED seed rather than
+// a copy of it: a hand-listed expectation would still pass after someone edited the real file,
+// which is the failure mode that let .claude/settings.local.json get indexed with its contents.
+func TestDefaultIgnore_CoversCredentialBearingPaths(t *testing.T) {
+	// Round-trip the shipped seed through the real loader rather than a test-local parser, so
+	// this exercises the same path a live desk does.
+	seed := filepath.Join(t.TempDir(), ".librarian-ignore")
+	if err := os.WriteFile(seed, []byte(DefaultIgnore()), 0o644); err != nil {
+		t.Fatalf("write seed: %v", err)
+	}
+	list, err := LoadIgnoreList(seed)
+	if err != nil {
+		t.Fatalf("load shipped default ignore: %v", err)
+	}
+
+	mustIgnore := []string{
+		".claude/settings.local.json", // agent config: holds API keys by convention
+		".claude/memory/MEMORY.md",
+		".claude/agents/x.md",
+		"_meta/secrets/anthropic.env",
+		"_meta/secrets/superuser.txt",
+		".git/config", // remote URLs can carry tokens
+		"logs/run.log",
+	}
+	for _, rel := range mustIgnore {
+		if !IsIgnored(rel, list) {
+			t.Errorf("the shipped default ignore does NOT cover %q — a sweep would index it", rel)
+		}
+	}
+
+	// The complement matters just as much: an over-broad rule that swallowed ordinary desk
+	// content would make the indexer useless, and nothing else here would catch that.
+	mustIndex := []string{
+		"specs/one-pager.md",
+		"journal/2026-01-01.md",
+		"claude-notes.md", // not under .claude/
+		".claudemap",      // shares a prefix but is not that directory
+		"projects/work.md",
+	}
+	for _, rel := range mustIndex {
+		if IsIgnored(rel, list) {
+			t.Errorf("the shipped default ignore wrongly covers %q — ordinary desk content", rel)
+		}
+	}
+}

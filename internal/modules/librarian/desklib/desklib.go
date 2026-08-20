@@ -19,8 +19,17 @@ import (
 // identity-neutral and protects the binding docs by default. `_knowledge/` is included
 // per the M-05 / build-brief punch-list #1 reconciliation (write-excluded / flag-only,
 // exactly as `_meta/` is) so the librarian never proposes a fix against a profile or
-// freeform-background file. Inline comments are deliberately absent: LoadIgnoreList only
-// strips whole-line `#` comments, so a trailing comment would corrupt an entry.
+// freeform-background file.
+//
+// `.claude/` is the WHOLE directory, not one file inside it: a desk is routinely also a
+// working repo, and that directory holds agent config including settings.local.json, which
+// carries credentials. Naming a single file there indexed the rest, secrets included.
+//
+// Entries are directory prefixes or exact paths only — IsIgnored does no glob matching — so
+// broader secret patterns (*.pem, nested .env) cannot be expressed here yet.
+//
+// Inline comments are deliberately absent: LoadIgnoreList only strips whole-line `#`
+// comments, so a trailing comment would corrupt an entry.
 //
 //go:embed default-librarian-ignore
 var defaultIgnore string
