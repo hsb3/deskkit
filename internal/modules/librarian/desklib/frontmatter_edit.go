@@ -51,9 +51,15 @@ func SetFrontmatterField(content []byte, key, value string) ([]byte, error) {
 			lines = append(lines[:i], append([]string{inserted}, lines[i:]...)...)
 			return []byte(strings.Join(lines, "\n")), nil
 		}
-		k, _, found := strings.Cut(line, ":")
+		k, v, found := strings.Cut(line, ":")
 		if !found || strings.TrimSpace(k) != key || strings.HasPrefix(strings.TrimSpace(line), "#") {
 			continue
+		}
+		// A block scalar (`key: |` / `key: >`, chomping variants included) is not a
+		// single-line edit: replacing the marker line would orphan its indented body.
+		switch strings.TrimSpace(v) {
+		case "|", "|-", "|+", ">", ">-", ">+":
+			return nil, fmt.Errorf("set frontmatter: key %q holds a block scalar, not a single-line value", key)
 		}
 		// A block-array key (empty value, `- item` lines follow) is not a scalar edit.
 		if i+1 < len(lines) && strings.TrimSpace(strings.TrimSuffix(lines[i+1], "\r")) != "" &&

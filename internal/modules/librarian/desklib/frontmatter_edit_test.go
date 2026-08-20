@@ -54,6 +54,8 @@ func TestSetFrontmatterField_Refusals(t *testing.T) {
 		{"no frontmatter", "# plain doc\n", "status", "x", "no frontmatter"},
 		{"unterminated fence", "---\nstatus: draft\n", "status", "x", "never closes"},
 		{"block array key", blockDoc, "refs", "x", "block array"},
+		{"block scalar pipe", "---\nnotes: |\n  line one\n  line two\n---\nbody\n", "notes", "x", "block scalar"},
+		{"block scalar folded chomped", "---\nnotes: >-\n  folded\n---\nbody\n", "notes", "x", "block scalar"},
 		{"multiline value", fmDoc, "status", "a\nb", "single line"},
 		{"empty key", fmDoc, " ", "x", "empty key"},
 	}
