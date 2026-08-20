@@ -189,7 +189,7 @@ constraint survives the module move: `schema/` is a sibling of `internal/`, not 
 | Identity-neutrality (shipped tree) | `scripts/check-neutrality.mjs` (+ `--self-test`) |
 | Embedded schema copies stay byte-identical to `schema/` | `TestProfileSchemaEmbeddedCopy_MatchesRepoRoot` / `TestReferencesEmbeddedCopy_MatchesRepoRoot` (`make test`) |
 | `VERSION` == shipped manifests | `scripts/check-version-sync.mjs` |
-| Every PR bumps `VERSION` (owner's policy, 2026-08-20) | `scripts/check-version-bumped.mjs` (+ `--self-test`), in `make check` + CI |
+| Every PR bumps `VERSION` (ruled; DESK-89) | `scripts/check-version-bumped.mjs` (+ `--self-test`), in `make check` + CI |
 | `kits.yaml` == `kits/` tree | `scripts/check-kits.mjs` |
 | `docs/development/specs/tool-surface.md` counts (CLI + gated MCP) match source (ADR 0016) | `TestToolSurfaceDoc_*` in `internal/core/mcp/tool_surface_doc_test.go` (`make test`) |
 | Scaffold instruments carry conformant frontmatter | `scripts/check-scaffold-frontmatter.mjs` |

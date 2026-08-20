@@ -1,10 +1,9 @@
 #!/usr/bin/env node
 // Version-bump guard: every PR must move the root VERSION.
 //
-// The policy this enforces (owner's call, 2026-08-20) is that a change worth merging is a change
-// worth naming, so the version moves with it rather than in a periodic sweep. The advisory
-// `version-status` target already counted the drift — it reached 15 commits and 72 product files
-// before anyone acted on it, which is what advisory buys you. This is the same fact as a gate.
+// A change worth merging is a change worth naming, so the version moves with the PR rather than in
+// a periodic sweep. The advisory `version-status` target reports the same drift without blocking on
+// it; this is that fact as a gate.
 //
 // Compares VERSION on HEAD against VERSION on the merge base with the base branch. Exits 1 when
 // they match, 0 when HEAD's is different. Off a PR (no base to diff against) it exits 0 with a
