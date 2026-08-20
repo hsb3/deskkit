@@ -103,7 +103,18 @@ if (isBump(baseVersion, head)) {
   process.exit(0);
 }
 
-console.error(`check-version-bumped: FAIL — VERSION is ${head}, same as ${baseRef} (${baseVersion}).`);
+// Three different faults reach here and they need three different sentences: "same as" is wrong
+// advice for a VERSION that does not parse, where bumping is not the fix.
+const malformed = [head, baseVersion].filter((v) => !parse(v));
+if (malformed.length) {
+  console.error(`check-version-bumped: FAIL — not a semver triple: ${malformed.map((v) => JSON.stringify(v)).join(", ")}.`);
+  console.error("");
+  console.error("VERSION must be MAJOR.MINOR.PATCH, digits only. Fix the malformed one, then bump.");
+} else if (head === baseVersion) {
+  console.error(`check-version-bumped: FAIL — VERSION is ${head}, same as ${baseRef}.`);
+} else {
+  console.error(`check-version-bumped: FAIL — VERSION went backwards: ${baseVersion} on ${baseRef}, ${head} here.`);
+}
 console.error("");
 console.error("Every PR bumps the version. Pick the smallest true one:");
 console.error("  patch  a fix or an internal change users will not notice");
