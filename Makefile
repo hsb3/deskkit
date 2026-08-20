@@ -33,7 +33,7 @@ PREFIX ?= $(HOME)/.local
 BINDIR := $(PREFIX)/bin
 
 .PHONY: help setup spa build install gui serve stop sweep patrol propose-fix findings summary \
-        adoption orphans uncollapsed test vet fmt check shellcheck verify e2e example-agent-loop \
+        adoption orphans uncollapsed test vet fmt check shellcheck verify e2e spa-verify example-agent-loop \
         package media clean version-status release-prep
 
 help: ## List targets

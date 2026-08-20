@@ -139,3 +139,18 @@ jobs:
 
       - name: Go — verify gate (integration; self-init, write-boundary, restore, open-guard)
         run: make verify
+
+      # ---- SPA lane ----
+      # The browser gate runs HERE rather than only on a developer's machine. Two phases of UI
+      # shipped on type-checks alone because the only verification was something someone had to
+      # remember to run; a gate that is not wired in is not a gate.
+      #
+      # It stays inside this one job on purpose — the file's whole design is a single aggregate
+      # check to mark required, and a second job would mean a second one.
+      - name: SPA — install the browser driver
+        run: |
+          npm ci --prefix e2e/spa
+          npx --prefix e2e/spa playwright install --with-deps chromium
+
+      - name: SPA — browser gate (real Chromium over serve; asserts against the bytes on disk)
+        run: make spa-verify

@@ -68,6 +68,54 @@ const check = (desc, okp) => {
 const note = (m) => console.log(`         ${m}`)
 const disk = (rel) => readFileSync(join(DESK, rel), 'utf8')
 
+// --- waiting -------------------------------------------------------------------------------
+// Every wait below is a CONDITION, never a sleep. A fixed sleep passes locally and then goes
+// flaky the first time CI is under load, and a flaky gate is one somebody eventually disables —
+// which would put us back where this suite started.
+const POLL_MS = 10_000
+
+/** Poll `fn` until it returns truthy, or give up. Returns whether it ever did — callers that
+ * care assert on it, callers that are merely settling the UI ignore it. */
+async function until(fn, timeout = POLL_MS) {
+  const deadline = Date.now() + timeout
+  for (;;) {
+    try {
+      if (await fn()) return true
+    } catch {
+      /* mid-render: the locator may not exist yet */
+    }
+    if (Date.now() > deadline) return false
+    await page.waitForTimeout(50)
+  }
+}
+
+const untilVisible = (sel, t) => until(() => page.locator(sel).isVisible(), t)
+const untilGone = (sel, t) => until(async () => !(await page.locator(sel).isVisible()), t)
+const untilHash = (h, t) => until(async () => (await page.evaluate(() => window.location.hash)) === h, t)
+/** Settle on a row count that has stopped changing.
+ *
+ * `differFrom` is load-bearing, not an optimisation: the list refetches asynchronously, so for
+ * the first few polls after a keystroke the count is still the OLD one and perfectly stable.
+ * Settling on stillness alone therefore returns the pre-search count and every later step acts
+ * on the wrong row. Pass the count this is expected to move away from.
+ *
+ * If it never moves, this times out and returns the unchanged count — so the caller's assertion
+ * fails honestly rather than hanging or passing. */
+async function untilRowsSettle(differFrom = null, t) {
+  let last = -1
+  let stable = 0
+  await until(async () => {
+    const n = await page.locator('.browse tbody tr').count()
+    stable = n === last ? stable + 1 : 0
+    last = n
+    if (differFrom !== null && n === differFrom) return false
+    return stable >= 3
+  }, t)
+  return last
+}
+/** Wait for the file at `rel` to differ from `was` — a save is not done when the button is. */
+const untilDiskChanges = (rel, was, t) => until(() => disk(rel) !== was, t)
+
 const browser = await chromium.launch()
 const page = await browser.newPage({ viewport: { width: 1440, height: 900 } })
 // Everything here talks to a local server, so nothing legitimate takes seconds. The default 30s
@@ -83,24 +131,23 @@ page.on('pageerror', (e) => pageErrors.push(e.message))
  * keys on the mode id), so the digit cannot bring the finder back from inside an edit. */
 async function openDoc(term) {
   await page.keyboard.press('Escape')
-  await page.waitForTimeout(200)
+  await untilGone('.edit', 2000)
   await page.keyboard.press('Escape')
-  await page.waitForTimeout(200)
-  if (!(await page.locator('.browse .list').isVisible().catch(() => false))) {
+  if (!(await untilVisible('.browse .list', 1500))) {
     await page.keyboard.press('Meta+b')
-    await page.waitForTimeout(400)
+    await untilVisible('.browse .list')
   }
-  await page.waitForSelector('.browse .list', { timeout: 5000 })
   await page.keyboard.press('Meta+k')
-  await page.waitForTimeout(150)
+  await until(() => page.locator('.search').evaluate((el) => el === document.activeElement))
   await page.locator('.search').fill(term)
-  await page.waitForTimeout(900)
+  // Wait for the row we came for, not merely for the list to stop moving: a stable list can
+  // still be the pre-search one.
+  await until(async () => (await page.locator('.browse tbody tr').first().innerText()).includes(term))
   await page.keyboard.press('Escape')
-  await page.waitForTimeout(200)
   await page.keyboard.press('j')
-  await page.waitForTimeout(150)
+  await until(() => page.locator('.browse tbody tr[aria-selected="true"]').count().then((n) => n > 0))
   await page.keyboard.press('Enter')
-  await page.waitForTimeout(800)
+  await untilVisible('.instance')
 }
 
 try {
@@ -113,17 +160,17 @@ try {
   const MODES = ['queue', 'library', 'patrol', 'work', 'agent', 'config']
   for (let i = 0; i < MODES.length; i++) {
     await page.keyboard.press(`Meta+${i + 1}`)
-    await page.waitForTimeout(900)
-    const hash = await page.evaluate(() => window.location.hash)
+    const hash = (await untilHash(`#/${MODES[i]}`))
+      ? `#/${MODES[i]}`
+      : await page.evaluate(() => window.location.hash)
     const len = (await page.locator('.shell').innerText()).trim().length
     check(`mode ${i + 1} (${MODES[i]}) navigates and renders`, hash === `#/${MODES[i]}` && len > 0)
   }
 
   // --- the finder ------------------------------------------------------------------------
   await page.keyboard.press('Meta+2')
-  await page.waitForTimeout(1000)
-  await page.waitForSelector('.browse .list', { timeout: 8000 })
-  const allRows = await page.locator('.browse tbody tr').count()
+  await untilVisible('.browse .list')
+  const allRows = await untilRowsSettle(0)
   check('the Library finder lists documents', allRows > 0)
 
   const previews = await page.locator('.preview-row').count()
@@ -131,24 +178,21 @@ try {
   note(`${previews} preview rows`)
 
   await page.keyboard.press('Meta+k')
-  await page.waitForTimeout(200)
+  await until(() => page.evaluate(() => (document.activeElement?.className ?? '').includes('search')))
   const focusedClass = await page.evaluate(() => document.activeElement?.className ?? '')
   check('the search shortcut focuses the search field', focusedClass.includes('search'))
 
   await page.locator('.search').fill('decision')
-  await page.waitForTimeout(900)
-  const narrowed = await page.locator('.browse tbody tr').count()
+  const narrowed = await untilRowsSettle(allRows)
   check('search narrows the list', narrowed > 0 && narrowed < allRows)
   note(`${allRows} rows -> ${narrowed} rows`)
 
   // --- space follows engagement -----------------------------------------------------------
   await page.keyboard.press('Escape')
-  await page.waitForTimeout(200)
   await page.keyboard.press('j')
-  await page.waitForTimeout(200)
+  await until(() => page.locator('.browse tbody tr[aria-selected="true"]').count().then((n) => n > 0))
   await page.keyboard.press('Enter')
-  await page.waitForTimeout(900)
-  check('opening an item shows the instance', (await page.locator('.instance').count()) > 0)
+  check('opening an item shows the instance', await untilVisible('.instance'))
   check(
     'the finder leaves the screen on open (it minimises into its rail button)',
     !(await page.locator('.browse .list').isVisible().catch(() => false)),
@@ -168,7 +212,10 @@ try {
   const familyOf = async (term, expected) => {
     await openDoc(term)
     await page.keyboard.press('e')
-    await page.waitForTimeout(600)
+    await untilVisible('.edit')
+    // The picker is populated from the DRAFTED doctype, which is fetched — an empty option list
+    // means "not filled in yet", not "no statuses".
+    await until(() => page.locator('.edit select').first().locator('option').count().then((n) => n > 0))
     const opts = await page.locator('.edit select').first().locator('option').allInnerTexts()
     check(
       `the status picker offers the ${expected[0]}-family statuses for ${term}`,
@@ -185,10 +232,11 @@ try {
 
   await openDoc('app-overhaul')
   await page.keyboard.press('e')
-  await page.waitForTimeout(600)
+  await untilVisible('.edit')
+  await until(() => page.locator('.edit select').first().locator('option').count().then((n) => n > 0))
   await page.locator('.edit select').first().selectOption('paused')
   await page.keyboard.press('Meta+Enter')
-  await page.waitForTimeout(1800)
+  check('the save reaches disk within the timeout', await untilDiskChanges(rel, before))
 
   const saved = disk(rel)
   check('saving writes through to the file on disk', /^status: paused$/m.test(saved))
@@ -201,17 +249,20 @@ try {
   )
 
   await page.keyboard.press('e')
-  await page.waitForTimeout(500)
+  await untilVisible('.edit')
   await page.locator('.edit select').first().selectOption('active')
   await page.keyboard.press('Meta+Enter')
-  await page.waitForTimeout(1800)
+  await until(() => disk(rel) === before)
   check('setting the status back yields a byte-identical file', disk(rel) === before)
 
   await page.keyboard.press('e')
-  await page.waitForTimeout(500)
+  await untilVisible('.edit')
   await page.locator('.edit select').first().selectOption('archived')
   await page.keyboard.press('Escape')
-  await page.waitForTimeout(700)
+  await untilGone('.edit')
+  // Deliberately NOT a poll: the assertion is that nothing EVER lands, so give a write the same
+  // grace a real save gets and then require the file to be untouched.
+  await page.waitForTimeout(1000)
   check('backing out of an edit reverts it; nothing reaches disk', disk(rel) === before)
 
   // --- the write boundary refuses, visibly --------------------------------------------------
@@ -223,10 +274,11 @@ try {
   const protectedBefore = disk(relProtected)
   await openDoc('0004-prose-editor')
   await page.keyboard.press('e')
-  await page.waitForTimeout(600)
+  await untilVisible('.edit')
+  await until(() => page.locator('.edit select').first().locator('option').count().then((n) => n > 0))
   await page.locator('.edit select').first().selectOption('accepted')
   await page.keyboard.press('Meta+Enter')
-  await page.waitForTimeout(1800)
+  await untilVisible('.instance .error')
   const refusal = await page.locator('.instance .error').first().innerText().catch(() => '')
   check('a refused write is shown to the user rather than swallowed', refusal.length > 0)
   note(refusal.replace(/\n/g, ' '))
@@ -237,7 +289,7 @@ try {
   const del = page.locator('.instance .verb.danger')
   const label1 = (await del.innerText()).trim()
   await del.click()
-  await page.waitForTimeout(500)
+  await until(async () => (await del.innerText()).trim() !== label1)
   const label2 = (await del.innerText()).trim()
   check('the first delete click arms a visible confirm rather than deleting', label1 !== label2)
   note(`${JSON.stringify(label1)} -> ${JSON.stringify(label2)}`)

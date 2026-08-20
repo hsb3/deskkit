@@ -14,6 +14,15 @@ the cheap half of the coverage for the price of a dependency.
 Several checks here read the file on disk after a save. That is the point of the suite, not a
 detail of it.
 
+## Where it runs
+
+In CI, inside the single `ci` job (`.github/workflows/ci.yml`), and locally via `make spa-verify`.
+Wiring it into CI is the point: two phases of UI shipped on type-checks alone because the only
+verification available was something a person had to remember to run.
+
+Every wait in `checks.mjs` is a condition, never a fixed sleep — a gate that goes flaky under CI
+load is a gate somebody eventually disables, which would put us back where we started.
+
 ## Prerequisite
 
 Playwright is **not** a dependency of `web/` — the SPA build and the container image run
