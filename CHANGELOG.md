@@ -12,8 +12,21 @@ for why this policy exists.
 
 ## [Unreleased]
 
+Nothing yet.
+
+## [0.10.0] — 2026-08-20
+
 ### Added
 
+- **A real-browser gate for the SPA** (`make spa-verify`, DESK-90). The browser app had no
+  behavioural verification: two phases shipped on type-checks and unit tests alone. The gate seeds
+  a throwaway desk, serves it, and drives the embedded SPA in a real Chromium — and a third of its
+  checks read the file on disk after a save, which is the half a DOM-only harness structurally
+  cannot cover and the half where the damage would have been. It runs in CI, not only on demand,
+  because a gate someone has to remember to run is the failure mode it exists to end. Playwright is
+  pinned in `e2e/spa/` and deliberately kept out of `web/`; when it is absent the gate exits
+  non-zero with the install commands rather than skipping, since a silent skip reads as "verified"
+  when nothing ran.
 - **The CRUD template, built once and proven on Library** (SPA overhaul phase 2). The finder is no
   longer a screen that happens to browse `files` — every collection is described declaratively and
   the component reads that description, so adding an entity is a config entry and nothing else.
