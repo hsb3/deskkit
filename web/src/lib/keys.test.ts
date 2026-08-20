@@ -26,7 +26,7 @@ describe('resolveKey', () => {
   })
 
   it('never steals a bare letter from someone who is typing', () => {
-    for (const key of ['j', 'k', 'e', 'Enter']) {
+    for (const key of ['j', 'k', 'e', 'o', 'Enter']) {
       expect(resolveKey({ key }, true)).toBeNull()
     }
   })
@@ -36,10 +36,32 @@ describe('resolveKey', () => {
     expect(resolveKey({ key: 'k' }, false)).toEqual({ kind: 'prev' })
     expect(resolveKey({ key: 'Enter' }, false)).toEqual({ kind: 'open' })
     expect(resolveKey({ key: 'e' }, false)).toEqual({ kind: 'modify' })
+    expect(resolveKey({ key: 'o' }, false)).toEqual({ kind: 'body' })
+  })
+
+  it('maps the delete chord on either modifier when nothing is being typed into', () => {
+    expect(resolveKey(mod('Backspace'), false)).toEqual({ kind: 'delete' })
+    expect(resolveKey({ key: 'Backspace', ctrlKey: true }, false)).toEqual({ kind: 'delete' })
+  })
+
+  // Do NOT "fix" this back. Ctrl+Backspace is the standard delete-previous-word chord on
+  // Windows and Linux, and this map treats Control and Meta as one modifier — so a suppression
+  // exemption here would mean deleting a word in the search box arms a document delete, with
+  // App's preventDefault swallowing the native behaviour. ⌘↵, ⌘K and esc are exempt because
+  // each has a concrete reason to act on the field you are in; delete has none.
+  it('is inert inside a text field, because that chord already means delete-previous-word', () => {
+    expect(resolveKey(mod('Backspace'), true)).toBeNull()
+    expect(resolveKey({ key: 'Backspace', ctrlKey: true }, true)).toBeNull()
+  })
+
+  it('leaves a bare Backspace to the browser — deleting a character is not deleting a file', () => {
+    expect(resolveKey({ key: 'Backspace' }, false)).toBeNull()
+    expect(resolveKey({ key: 'Backspace' }, true)).toBeNull()
   })
 
   it('leaves unmapped and Alt-composed chords to the browser', () => {
     expect(resolveKey(mod('s'), false)).toBeNull()
+    expect(resolveKey(mod('Escape'), false)).toBeNull()
     expect(resolveKey({ key: 'x' }, false)).toBeNull()
     expect(resolveKey({ key: 'j', altKey: true }, false)).toBeNull()
     expect(resolveKey({ key: 'k', metaKey: true, altKey: true }, false)).toBeNull()

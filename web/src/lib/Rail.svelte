@@ -1,9 +1,11 @@
 <script lang="ts">
   // The rail: the one element that never moves. It is the app's navigation, its window manager
-  // and its shortcut legend in the same 34px strip — which is why the buttons are labelled with
-  // their own keys. Every button here has a key and every key has a button; verbs and icons are
-  // a later, content-stage call, so the shapes carry the digits for now.
+  // and its shortcut legend in the same 34px strip. Every button here has a key and every key
+  // has a button — which is why the icon sits ABOVE the digit rather than replacing it: the
+  // glyph says what the mode is, the number says how to reach it without the mouse, and losing
+  // the number would quietly cost the rail its second job.
   import { MODES, MOD_LABEL, type Level } from './shell'
+  import Icon from './Icon.svelte'
 
   let {
     mode,
@@ -29,8 +31,11 @@
       aria-current={mode === m.id ? 'page' : undefined}
       aria-label={`${m.label} (${MOD_LABEL}${i + 1})`}
       title={`${m.label} — ${m.hint}  ·  ${MOD_LABEL}${i + 1}`}
-      onclick={() => onSelect(m.id)}>{i + 1}</button
+      onclick={() => onSelect(m.id)}
     >
+      <Icon name={m.icon} />
+      <span class="key">{i + 1}</span>
+    </button>
   {/each}
   <div class="spacer"></div>
   <!-- Where the finder went. Lit while it is minimised, so the way back is visible rather than
@@ -44,8 +49,11 @@
     title={finderAvailable
       ? `Finder — the list for this mode  ·  ${MOD_LABEL}B`
       : 'This mode has no finder'}
-    onclick={onFinder}>F</button
+    onclick={onFinder}
   >
+    <Icon name="finder" />
+    <span class="key">B</span>
+  </button>
 </nav>
 
 <style>
@@ -61,17 +69,24 @@
     gap: 0.25rem;
   }
   .btn {
-    width: 26px;
-    height: 26px;
+    width: 28px;
+    height: 30px;
     padding: 0;
     display: flex;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
-    font-size: 0.72rem;
+    gap: 1px;
     border-radius: 0.35rem;
     background: transparent;
     border: 1px solid transparent;
     color: var(--muted);
+  }
+  .key {
+    font-size: 0.55rem;
+    line-height: 1;
+    letter-spacing: 0.02em;
+    opacity: 0.85;
   }
   .btn:hover:not(:disabled) {
     background: color-mix(in srgb, var(--accent) 12%, transparent);

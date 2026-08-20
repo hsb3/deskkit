@@ -12,6 +12,7 @@
 // re-thread it.
 import { writable } from 'svelte/store'
 import type { Action } from './keys'
+import type { IconName } from './icons'
 
 /** A rail button: one distinct work mode and nothing else — that is the whole rule for what
  * earns one. `id` is the hash segment, so a link and a keystroke land in the same place. */
@@ -20,17 +21,20 @@ export interface Mode {
   label: string
   /** What this mode is for, in one line — the rail is 34px, so the words live in its tooltip. */
   hint: string
+  /** The glyph on the button. Decoration ABOVE the digit, never instead of it: the rail is the
+   * shortcut legend, so the number stays visible. */
+  icon: IconName
 }
 
 /** Rail order top to bottom, and therefore the ⌘1..⌘6 order. Kits and Desks are deliberately
  * absent: they are reached from Config, because neither is a distinct work mode. */
 export const MODES: Mode[] = [
-  { id: 'queue', label: 'Queue', hint: 'What needs you, across findings and work items' },
-  { id: 'library', label: 'Library', hint: 'The desk’s documents' },
-  { id: 'patrol', label: 'Patrol', hint: 'Findings the librarian has flagged' },
-  { id: 'work', label: 'Work', hint: 'The work graph' },
-  { id: 'agent', label: 'Agent', hint: 'The agent conversation and its runs' },
-  { id: 'config', label: 'Config', hint: 'This desk’s settings' },
+  { id: 'queue', label: 'Queue', hint: 'What needs you, across findings and work items', icon: 'queue' },
+  { id: 'library', label: 'Library', hint: 'The desk’s documents', icon: 'library' },
+  { id: 'patrol', label: 'Patrol', hint: 'Findings the librarian has flagged', icon: 'patrol' },
+  { id: 'work', label: 'Work', hint: 'The work graph', icon: 'work' },
+  { id: 'agent', label: 'Agent', hint: 'The agent conversation and its runs', icon: 'agent' },
+  { id: 'config', label: 'Config', hint: 'This desk’s settings', icon: 'config' },
 ]
 
 /** Hash segments the pre-rail SPA used. Kept so existing links and bookmarks still land
@@ -60,6 +64,27 @@ export type Level = 'finder' | 'reading' | 'editing'
  * the app is not something a keystroke gets to do. */
 export function outOf(l: Level): Level {
   return l === 'editing' ? 'reading' : 'finder'
+}
+
+/** Which levels each level-SCOPED action may fire at. Actions absent from this table fire at
+ * every level (mode switches, the finder toggle, search, j/k, esc).
+ *
+ * A table rather than an `if` inside each case, because a MISSING check is invisible: `delete`
+ * had none, so a stray ⌘⌫ while browsing the list armed a delete on whatever record was last
+ * opened — with its "Really delete?" button off screen, since that button only renders inside
+ * the instance. The two-step confirm only protects anything if the second step is visible.
+ */
+const FIRES_AT: Partial<Record<Action['kind'], Level[]>> = {
+  open: ['finder'],
+  modify: ['finder', 'reading'],
+  body: ['reading'],
+  save: ['editing'],
+  delete: ['reading', 'editing'],
+}
+
+/** May this action fire at this level? Unlisted actions are unrestricted. */
+export function mayFire(kind: Action['kind'], at: Level): boolean {
+  return FIRES_AT[kind]?.includes(at) ?? true
 }
 
 export const level = writable<Level>('finder')

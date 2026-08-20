@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { pickChoice, sourceLabel } from './settings'
+import { editorHref, pickChoice, sourceLabel } from './settings'
 
 describe('sourceLabel', () => {
   it('renders known resolution legs in plain language', () => {
@@ -31,5 +31,34 @@ describe('pickChoice', () => {
       custom: 'some-old-model',
     })
     expect(pickChoice('', ['anthropic', 'openai'])).toEqual({ choice: 'custom', custom: '' })
+  })
+})
+
+describe('editorHref', () => {
+  it('expands {abs} against the desk root, URL-encoded', () => {
+    expect(editorHref('obsidian://open?path={abs}', '/desks/ops', '_knowledge/a b.md')).toBe(
+      'obsidian://open?path=%2Fdesks%2Fops%2F_knowledge%2Fa%20b.md',
+    )
+  })
+
+  it('expands {path} as the desk-relative path, and both placeholders in one template', () => {
+    expect(editorHref('x://{path}?abs={abs}', '/root', 'notes/a.md')).toBe(
+      'x://notes%2Fa.md?abs=%2Froot%2Fnotes%2Fa.md',
+    )
+  })
+
+  it('does not double the separator when the desk root has a trailing slash', () => {
+    expect(editorHref('e://{abs}', '/root/', 'a.md')).toBe('e://%2Froot%2Fa.md')
+  })
+
+  it('falls back to the relative path when no desk root is known', () => {
+    expect(editorHref('e://{abs}', '', 'a.md')).toBe('e://a.md')
+  })
+
+  // '' is the signal not to render the Open-body verb at all: a desk that declares no editor
+  // gets no button, rather than a button that goes nowhere.
+  it('returns nothing when there is no template or no path', () => {
+    expect(editorHref('', '/root', 'a.md')).toBe('')
+    expect(editorHref('e://{abs}', '/root', '')).toBe('')
   })
 })

@@ -351,6 +351,11 @@ func main() {
 			// desk root.
 			web.RegisterDocWrite(e.Router, e.App, cfg, publicMode)
 
+			// Delete rides the same door and the same posture. It is reversible by
+			// construction — the original lands in the revisions ledger before the file
+			// leaves the disk — so `restore --by-path` reverses it byte-exact.
+			web.RegisterDocDelete(e.Router, e.App, cfg, publicMode)
+
 			// Desk watcher: outside edits are the normal case (files stay authoritative,
 			// decision 0009), so the index
 			// follows the disk while serve runs. Failure to start degrades to manual

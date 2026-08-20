@@ -17,6 +17,8 @@ export type Action =
   | { kind: 'open' }
   | { kind: 'modify' }
   | { kind: 'save' }
+  | { kind: 'body' }
+  | { kind: 'delete' }
   | { kind: 'back' }
 
 /** The parts of a KeyboardEvent this map reads. Declared structurally so tests can hand it a
@@ -35,11 +37,18 @@ export const MODE_KEY_COUNT = 6
 /**
  * Resolve one keystroke to an intent, or null to let the browser have it.
  *
- * `typing` is whether the keystroke landed in a text field. The bare keys (j/k/e/Enter) are
- * letters while you are typing and must not be stolen — but the modified ones are deliberately
- * NOT suppressed: ⌘K focuses search "from anywhere including mid-edit", ⌘↵ saves from inside the
- * field being edited, and ESC backs out of the edit that field belongs to. Those three are the
- * whole reason this takes a `typing` flag instead of just refusing to fire inside inputs.
+ * `typing` is whether the keystroke landed in a text field. The bare keys (j/k/e/o/Enter) are
+ * letters while you are typing and must not be stolen — and THREE modified ones are deliberately
+ * exempt from that suppression, each for a concrete reason: ⌘K focuses search "from anywhere
+ * including mid-edit", ⌘↵ saves from inside the field being edited, and ESC backs out of the
+ * edit that field belongs to. Those three are the whole reason this takes a `typing` flag
+ * instead of just refusing to fire inside inputs.
+ *
+ * The exemption is a short, closed list — ⌘⌫ is NOT on it. Ctrl+Backspace is the standard
+ * delete-previous-word chord on Windows and Linux, and Meta/Control are one modifier here, so
+ * exempting it would mean a user deleting a word in the search box arms a document delete
+ * instead (and App's preventDefault swallows the native behaviour). Delete has no reason to
+ * fire from inside an input the way the other three do.
  *
  * Meta and Control are treated as the same modifier so one map serves a Mac and everything else.
  * Alt-modified keystrokes are left alone: they compose characters.
@@ -61,11 +70,19 @@ export function resolveKey(e: KeyLike, typing: boolean): Action | null {
       case 'enter':
         return { kind: 'save' }
     }
-    return null // every other modified chord stays the browser's
+    // The delete chord is deliberately NOT in that switch. Ctrl+Backspace is the OS
+    // delete-previous-word shortcut, so unlike the three above it has no business firing inside
+    // a text field — it drops through to BELOW the typing guard instead. Every other modified
+    // chord stays the browser's.
+    if (e.key !== 'Backspace') return null
   }
 
   if (e.key === 'Escape') return { kind: 'back' }
   if (typing) return null
+
+  // Destructive, so it is a chord rather than a bare letter — and it arms the same two-step
+  // confirm the button does, so a stray press costs a second press, never a file.
+  if (mod) return e.key === 'Backspace' ? { kind: 'delete' } : null
 
   switch (e.key) {
     case 'j':
@@ -76,6 +93,8 @@ export function resolveKey(e: KeyLike, typing: boolean): Action | null {
       return { kind: 'open' }
     case 'e':
       return { kind: 'modify' }
+    case 'o':
+      return { kind: 'body' }
   }
   return null
 }

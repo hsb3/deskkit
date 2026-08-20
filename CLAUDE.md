@@ -50,8 +50,13 @@ belongs to the desks the tools stand up.
   `MCP_MODULES`), a **chat TUI**, and a **browser SPA** at `/` on the embedded serve — a 34px
   rail of work modes (Queue, Library, Patrol, Work, Agent, Config) that is also the app's
   keyboard map (`web/src/lib/shell.ts` + `keys.ts`: every button has a key and every key has a
-  button), over chat plus browse of files/findings/agent runs/PM items with one writable field, a
-  document's `status`, saved through the write-through path — `tools.WriteDoc`:
+  button), over chat plus browse of files/findings/agent runs/PM items. Every collection is
+  described declaratively in `web/src/lib/collections.ts` and the component reads that descriptor
+  rather than branching on a collection name — adding an entity is a config entry, which is the
+  design's own falsifiable test. A document's editable surface is its STRUCTURED part only
+  (`status`, `type`); the prose body hands off to the URL template the desk declares in
+  `preferences.editor_url`, because hardcoding an editor would ship a personalization. Writes and
+  deletes go through the write-through path — `tools.WriteDoc` / `tools.DeleteDoc`:
   record-original-first, byte-exact, reversible via `restore`, compare-and-swap on the file
   checksum; `/desk/chat` still resolves via the SPA's index fallback. Admin console (`make gui`) serves PocketBase at
   `http://127.0.0.1:8090/_/`.
@@ -251,6 +256,12 @@ every resolved value with the leg that won.
   it once, via `deskkit config set llm.api_key <key>` OR the SPA settings panel, is enough to run
   `agent`/`chat` with zero env vars set.
 - `LIBRARIAN_AUTONOMOUS_WRITES=true` gates `apply_fix` (checked at execution time)
+
+**Editor hand-off.** `EDITOR_URL` env → `profile.preferences.editor_url` → unset. It is a URL
+TEMPLATE, never a shell command — `{path}` (desk-relative) and `{abs}` (absolute) are substituted
+and the browser renders an anchor, so nothing shells out and no route executes anything. A desk
+that declares none simply gets no "open the body" control, which is also the hosted case.
+`GET /desk/settings/resolved` reports it alongside `desk_root` (needed to expand `{abs}`).
 
 **Public-mode serve.** `serve`'s auth posture is derived from every resolved `--http`/`--https`
 bind address, never from a flag: a loopback bind (`127.0.0.1`/`localhost`/`::1`/empty) is today's
