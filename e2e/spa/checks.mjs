@@ -197,11 +197,10 @@ try {
   const MODES = ['queue', 'library', 'patrol', 'work', 'agent', 'config']
   for (let i = 0; i < MODES.length; i++) {
     await page.keyboard.press(`Meta+${i + 1}`)
-    const hash = (await untilHash(`#/${MODES[i]}`))
-      ? `#/${MODES[i]}`
-      : await page.evaluate(() => window.location.hash)
+    const arrived = await untilHash(`#/${MODES[i]}`)
     const len = (await page.locator('.shell').innerText()).trim().length
-    check(`mode ${i + 1} (${MODES[i]}) navigates and renders`, hash === `#/${MODES[i]}` && len > 0)
+    check(`mode ${i + 1} (${MODES[i]}) navigates and renders`, arrived && len > 0)
+    if (!arrived) note(`hash is ${await page.evaluate(() => window.location.hash)}`)
   }
 
   // --- the finder ------------------------------------------------------------------------
