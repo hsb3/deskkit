@@ -1,8 +1,11 @@
 <script lang="ts">
   import { onMount } from 'svelte'
+  import { logout } from '../lib/pb'
+  import { stickyFinder } from '../lib/shell'
   import {
     fetchSettings,
     saveSettings,
+    saveStickyFinder,
     fetchCatalog,
     fetchResolvedSettings,
     sourceLabel,
@@ -25,6 +28,7 @@
   let modelChoice = $state('')
   let modelCustom = $state('')
   let apiKeyInput = $state('')
+  let stickyErr = $state('')
 
   let saving = $state(false)
   let saveMsg = $state('')
@@ -62,6 +66,7 @@
       if (rec) {
         recordId = rec.id
         apiKeyHint = rec.llm_api_key_hint
+        stickyFinder.set(rec.sticky_finder)
         seedProvider(rec.llm_provider || resolved?.provider.value || fallbackProvider, providers)
         seedModel(rec.llm_model || resolved?.model.value || '', catalog)
       } else {
@@ -80,6 +85,26 @@
   onMount(() => {
     load()
   })
+
+  /** Saves on the spot, and changes behaviour on the spot: the store is the durable copy, the
+   * shell store is what the finder is already reading. A failed write puts the switch back
+   * rather than leaving the screen disagreeing with the desk. */
+  async function toggleSticky(on: boolean) {
+    const previous = $stickyFinder
+    stickyFinder.set(on)
+    stickyErr = ''
+    if (!recordId) {
+      stickyFinder.set(previous)
+      stickyErr = 'This desk has no settings row yet — run a newer binary against it.'
+      return
+    }
+    try {
+      await saveStickyFinder(recordId, on)
+    } catch (e) {
+      stickyFinder.set(previous)
+      stickyErr = e instanceof Error ? e.message : String(e)
+    }
+  }
 
   async function save(evt: SubmitEvent) {
     evt.preventDefault()
@@ -180,12 +205,33 @@
         {/if}
       </div>
 
+      <div class="field">
+        <label for="sticky">Finder</label>
+        <label class="check">
+          <input
+            id="sticky"
+            type="checkbox"
+            checked={$stickyFinder}
+            onchange={(e) => toggleSticky(e.currentTarget.checked)}
+          />
+          Keep the finder minimised between items
+        </label>
+        <p class="source">
+          On, j/k walk from one item straight to the next. Off, moving on hands the screen back
+          to the list.
+        </p>
+        {#if stickyErr}<p class="error">{stickyErr}</p>{/if}
+      </div>
+
       {#if saveErr}<p class="error">{saveErr}</p>{/if}
       {#if saveMsg}<p class="success">{saveMsg}</p>{/if}
       <button class="primary" type="submit" disabled={saving || !providerValue || !modelValue}>
         {saving ? 'Saving…' : 'Save'}
       </button>
     </form>
+    <div class="session">
+      <button onclick={logout}>Sign out</button>
+    </div>
   {/if}
 </div>
 
@@ -246,6 +292,24 @@
     color: var(--accent);
     font-size: 0.85rem;
     margin: 0;
+  }
+  .check {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    font-size: 0.85rem;
+    color: var(--fg);
+  }
+  .check input {
+    width: auto;
+  }
+  .session {
+    margin-top: 1.4rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--border);
+  }
+  .session button {
+    font-size: 0.8rem;
   }
   .muted {
     color: var(--muted);

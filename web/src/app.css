@@ -71,3 +71,10 @@ th {
   color: var(--muted);
   font-weight: 600;
 }
+/* Keyboard focus must always be visible: the whole app is drivable without a mouse, so the
+   place a keystroke will land can never be invisible. */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 0.3rem;
+}

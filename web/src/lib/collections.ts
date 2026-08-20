@@ -20,6 +20,9 @@ export interface BrowseConfig {
   expand?: string
   /** Fields worth a full-width block in the detail pane (long prose/content). */
   detailBlocks: string[]
+  /** Fields the finder's search box matches, OR'd together. Omit and the box is not rendered:
+   * a search that silently matches nothing is worse than no search. */
+  search?: string[]
 }
 
 export const browsePages: Record<string, BrowseConfig> = {
@@ -36,6 +39,7 @@ export const browsePages: Record<string, BrowseConfig> = {
       { key: 'synopsis', label: 'Synopsis' },
     ],
     detailBlocks: ['synopsis', 'content'],
+    search: ['path', 'synopsis'],
   },
   findings: {
     collection: 'patrol_findings',
@@ -50,6 +54,7 @@ export const browsePages: Record<string, BrowseConfig> = {
       { key: 'detail', label: 'Detail' },
     ],
     detailBlocks: ['detail', 'proposed_fix', 'reason'],
+    search: ['rule', 'detail'],
   },
   runs: {
     collection: 'agent_runs',
@@ -65,6 +70,7 @@ export const browsePages: Record<string, BrowseConfig> = {
       { key: 'input_summary', label: 'Input' },
     ],
     detailBlocks: ['input_summary', 'output_summary', 'error'],
+    search: ['run_label', 'input_summary'],
   },
   pm: {
     collection: 'items',
@@ -80,5 +86,6 @@ export const browsePages: Record<string, BrowseConfig> = {
       { key: 'updated', label: 'Updated' },
     ],
     detailBlocks: ['body'],
+    search: ['title', 'body'],
   },
 }

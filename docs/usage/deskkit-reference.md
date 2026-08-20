@@ -278,13 +278,41 @@ placeholder page instead). One visit is enough:
 ./deskkit serve      # then open http://127.0.0.1:8090/
 ```
 
-v1 screens: **chat** (the same multi-turn agent loop as `chat`/the REPL above) and a **browse**
-of documents (files), findings, agent runs with their messages, and PM items. Browse is read-only
-except for one field: a document's `status`, which saves through the write-through path below.
+**The rail.** One 34px strip down the left edge holds one button per work mode and nothing
+else — Queue, Library, Patrol, Work, Agent, Config (Kits and Desks are reached from Config, and
+the queue itself arrives with the inbox screens). It is the app's navigation, its window manager
+and its shortcut legend at once: every button has a key and every key has a button, so nothing
+is reachable only one way and the whole app is drivable without a mouse.
 
-The chat screen on a fresh session — the composer, with a question typed but not yet sent. No
+| Key | What it does |
+|---|---|
+| `⌘1`–`⌘6` (`Ctrl` off a Mac) | Jump to a work mode — the rail, top to bottom |
+| `⌘B` | Toggle the finder; the same target as its `F` rail button |
+| `⌘K` | Focus the search box from anywhere, including mid-edit |
+| `j` / `k` | Next / previous row |
+| `↵` | Open the row the cursor is on |
+| `e` | Modify the open item |
+| `⌘↵` | Save |
+| `esc` | Back out exactly one level: editing → reading → finder |
+
+**Space follows engagement.** These are not panes sharing a screen. While you are looking for
+something the finder IS the screen; once you open an item the finder minimises into its rail
+button (lit, so the way back is visible), and editing is that same allocation with different
+verbs. What happens when you walk to the next item with `j`/`k` is the one user setting here:
+**Keep the finder minimised between items**, in Config, default on — on, `j`/`k` walk the
+collection without reopening the list; off, moving on hands the screen back to the finder. It is
+stored per desk (the `settings` singleton), so a second browser opening the same desk behaves
+the same way.
+
+Behind the modes: **Agent** is the multi-turn agent loop (the same one as `chat`/the REPL above),
+with its runs and their messages on a second tab; **Library**, **Patrol** and **Work** browse
+documents (files), findings and PM items. Browsing is read-only except for one field: a
+document's `status`, which saves through the write-through path below.
+
+The chat surface on a fresh session — the composer, with a question typed but not yet sent. No
 conversation has happened here; sending needs an LLM key configured as above, and the browse
-screens are shown in the root [`README.md`](../../README.md):
+screens are shown in the root [`README.md`](../../README.md). (Both sets of shots predate the
+rail and show the old flat nav.)
 
 ![The deskkit browser chat screen: an empty transcript with a question typed into the composer, not yet sent](../assets/spa-chat.png)
 

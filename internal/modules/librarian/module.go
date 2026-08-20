@@ -40,8 +40,8 @@ func (m *Mod) Configure(cfg *config.Config) { m.cfg = cfg }
 
 func (*Mod) Name() string { return "librarian" }
 
-// SchemaVersion is the highest migration sequence the librarian module declares (0024).
-func (*Mod) SchemaVersion() int { return 24 }
+// SchemaVersion is the highest migration sequence the librarian module declares (0025).
+func (*Mod) SchemaVersion() int { return 25 }
 
 // Enabled is always true: librarian is the base module (spec §2.7).
 func (*Mod) Enabled(*config.Config) bool { return true }
@@ -79,7 +79,7 @@ func (*Mod) Migrations() []migrate.Migration {
 		"0016_patrol_findings_provenance", "0017_adoption_log_shrink_event",
 		"0018_files_doc_id", "0019_files_doctype_rename", "0020_content_field_caps",
 		"0021_files_content", "0022_agent_runs_archived",
-		"0023_users_approval", "0024_settings",
+		"0023_users_approval", "0024_settings", "0025_settings_sticky_finder",
 	}
 	out := make([]migrate.Migration, len(basenames))
 	for i, b := range basenames {
