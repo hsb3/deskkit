@@ -201,6 +201,15 @@ properties:
       register:
         description: "Preferred communication register."
         type: string
+      editor_url:
+        description: >-
+          Optional URL TEMPLATE handing a document off to whatever editor this desk is written
+          in. Nothing shells out: a surface renders it as a link and the operating system
+          resolves the scheme, so an unset value simply means no hand-off is offered. Two
+          placeholders are substituted, each URL-encoded — {path} (the desk-relative path) and
+          {abs} (the absolute path). Shaped like "some-editor://open?path={abs}"; there is no
+          default, because which editor a desk is written in is a deployment fact.
+        type: string
 
   custom:
     description: "Open-ended escape hatch: ad-hoc keys agents add without a schema bump."

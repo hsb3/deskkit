@@ -30,10 +30,29 @@ type resolvedSecret struct {
 }
 
 // resolvedResponse is the wire shape PathSettingsResolved returns.
+//
+// EditorURL and DeskRoot ride this endpoint rather than a route of their own because it is
+// already THE resolved-configuration report, and the browser needs the two together: it expands
+// the editor template's {abs} placeholder itself, so a template paired with a desk root fetched
+// separately could describe two different desks.
 type resolvedResponse struct {
-	Provider resolvedField  `json:"provider"`
-	Model    resolvedField  `json:"model"`
-	APIKey   resolvedSecret `json:"api_key"`
+	Provider  resolvedField  `json:"provider"`
+	Model     resolvedField  `json:"model"`
+	APIKey    resolvedSecret `json:"api_key"`
+	EditorURL resolvedField  `json:"editor_url"`
+	DeskRoot  resolvedField  `json:"desk_root"`
+}
+
+// unsetIsSourceless normalizes a field no leg actually supplied. The resolver marks an
+// all-empty chain "default", which is true of its own mechanism but false as a report: there is
+// no default editor for it to have won. Reporting an empty source instead keeps the panel from
+// rendering "default" next to a blank value, and the key stays PRESENT so the browser reads
+// "unset" from a value it has rather than from an absent-field branch.
+func unsetIsSourceless(f resolvedField) resolvedField {
+	if f.Value == "" {
+		f.Source = ""
+	}
+	return f
 }
 
 // settingsResolved re-resolves the LLM configuration chain PER REQUEST rather than reading a
@@ -63,5 +82,9 @@ func settingsResolved(e *core.RequestEvent) error {
 		Provider: resolvedField{Value: cfg.LLMProvider, Source: cfg.Sources["LLM_PROVIDER"]},
 		Model:    resolvedField{Value: cfg.LLMModel, Source: cfg.Sources["LLM_MODEL"]},
 		APIKey:   resolvedSecret{Source: keySource},
+		EditorURL: unsetIsSourceless(resolvedField{
+			Value: cfg.EditorURL, Source: cfg.Sources["EDITOR_URL"]}),
+		DeskRoot: unsetIsSourceless(resolvedField{
+			Value: cfg.DeskRoot, Source: cfg.Sources["DESK_ROOT"]}),
 	})
 }

@@ -26,7 +26,7 @@ describe('resolveKey', () => {
   })
 
   it('never steals a bare letter from someone who is typing', () => {
-    for (const key of ['j', 'k', 'e', 'Enter']) {
+    for (const key of ['j', 'k', 'e', 'o', 'Enter']) {
       expect(resolveKey({ key }, true)).toBeNull()
     }
   })
@@ -36,6 +36,21 @@ describe('resolveKey', () => {
     expect(resolveKey({ key: 'k' }, false)).toEqual({ kind: 'prev' })
     expect(resolveKey({ key: 'Enter' }, false)).toEqual({ kind: 'open' })
     expect(resolveKey({ key: 'e' }, false)).toEqual({ kind: 'modify' })
+    expect(resolveKey({ key: 'o' }, false)).toEqual({ kind: 'body' })
+  })
+
+  // Destructive, so it is a chord rather than a bare letter — and like the other chords it is
+  // deliberately NOT suppressed mid-edit: it arms a two-step confirm, so a stray press costs a
+  // second press, never a file.
+  it('maps the delete chord on either modifier, inside a field as well as outside', () => {
+    expect(resolveKey(mod('Backspace'), false)).toEqual({ kind: 'delete' })
+    expect(resolveKey({ key: 'Backspace', ctrlKey: true }, false)).toEqual({ kind: 'delete' })
+    expect(resolveKey(mod('Backspace'), true)).toEqual({ kind: 'delete' })
+  })
+
+  it('leaves a bare Backspace to the browser — deleting a character is not deleting a file', () => {
+    expect(resolveKey({ key: 'Backspace' }, false)).toBeNull()
+    expect(resolveKey({ key: 'Backspace' }, true)).toBeNull()
   })
 
   it('leaves unmapped and Alt-composed chords to the browser', () => {

@@ -161,6 +161,7 @@ func configRows(cfg *config.Config) []configRow {
 		row("SECRETS_DIR", cfg.SecretsDir),
 		row("HANDOFF_PATH", cfg.HandoffPath),
 		row("IGNORE_CONFIG", cfg.IgnoreConfig),
+		row("EDITOR_URL", cfg.EditorURL),
 
 		row("LLM_PROVIDER", cfg.LLMProvider),
 		row("LLM_MODEL", cfg.LLMModel),

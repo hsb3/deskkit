@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { writeDocField } from './docwrite'
+import { deleteDoc, writeDocField } from './docwrite'
 
 function stubFetch(status: number, body: unknown) {
   const spy = vi.fn(async () => new Response(JSON.stringify(body), { status }))
@@ -58,5 +58,50 @@ describe('writeDocField', () => {
       vi.fn(async () => new Response('<html>nope', { status: 500 })),
     )
     await expect(writeDocField('a.md', 'old', { status: 'x' }, null)).rejects.toThrow('HTTP 500')
+  })
+})
+
+describe('deleteDoc', () => {
+  it('posts the path and the checksum it is staked on, and reports the removal', async () => {
+    const spy = stubFetch(200, { outcome: 'deleted', path: 'a.md', revision_id: 'r9' })
+    const res = await deleteDoc('a.md', 'old', 'tok')
+    expect(res.outcome).toBe('deleted')
+    expect(res.revision_id).toBe('r9')
+    const [url, init] = spy.mock.calls[0] as unknown as [string, RequestInit]
+    expect(url).toBe('/desk/doc/delete')
+    expect(init.method).toBe('POST')
+    expect(JSON.parse(String(init.body))).toEqual({ path: 'a.md', base_checksum: 'old' })
+    expect(init.headers).toEqual({ 'Content-Type': 'application/json', Authorization: 'tok' })
+  })
+
+  it('sends no set map — a delete names a file, it does not edit fields', async () => {
+    const spy = stubFetch(200, { outcome: 'deleted', path: 'a.md' })
+    await deleteDoc('a.md', 'old', null)
+    const [, init] = spy.mock.calls[0] as unknown as [string, RequestInit]
+    expect(JSON.parse(String(init.body))).not.toHaveProperty('set')
+    expect(init.headers).toEqual({ 'Content-Type': 'application/json' })
+  })
+
+  it('returns a 409 as a conflict with the disk state, so nothing was removed', async () => {
+    stubFetch(409, { current_checksum: 'disk', current_content: 'still here' })
+    const res = await deleteDoc('a.md', 'stale', null)
+    expect(res.outcome).toBe('conflict')
+    expect(res.path).toBe('a.md')
+    expect(res.current_checksum).toBe('disk')
+  })
+
+  it("throws the server's refusal verbatim — a write-protected path is not a bug", async () => {
+    stubFetch(400, { error: 'delete_doc: a.md is write-protected (.librarian-ignore)' })
+    await expect(deleteDoc('a.md', 'old', null)).rejects.toThrow(
+      'delete_doc: a.md is write-protected (.librarian-ignore)',
+    )
+  })
+
+  it('names the verb when the error body is not JSON', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response('<html>nope', { status: 500 })),
+    )
+    await expect(deleteDoc('a.md', 'old', null)).rejects.toThrow('delete failed (HTTP 500)')
   })
 })

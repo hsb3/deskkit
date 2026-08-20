@@ -17,6 +17,8 @@ export type Action =
   | { kind: 'open' }
   | { kind: 'modify' }
   | { kind: 'save' }
+  | { kind: 'body' }
+  | { kind: 'delete' }
   | { kind: 'back' }
 
 /** The parts of a KeyboardEvent this map reads. Declared structurally so tests can hand it a
@@ -35,7 +37,7 @@ export const MODE_KEY_COUNT = 6
 /**
  * Resolve one keystroke to an intent, or null to let the browser have it.
  *
- * `typing` is whether the keystroke landed in a text field. The bare keys (j/k/e/Enter) are
+ * `typing` is whether the keystroke landed in a text field. The bare keys (j/k/e/o/Enter) are
  * letters while you are typing and must not be stolen — but the modified ones are deliberately
  * NOT suppressed: ⌘K focuses search "from anywhere including mid-edit", ⌘↵ saves from inside the
  * field being edited, and ESC backs out of the edit that field belongs to. Those three are the
@@ -60,6 +62,10 @@ export function resolveKey(e: KeyLike, typing: boolean): Action | null {
         return { kind: 'search' }
       case 'enter':
         return { kind: 'save' }
+      // Destructive, so it is a modified chord rather than a bare letter — and it arms the same
+      // two-step confirm the button does, so a stray press costs a second press, never a file.
+      case 'backspace':
+        return { kind: 'delete' }
     }
     return null // every other modified chord stays the browser's
   }
@@ -76,6 +82,8 @@ export function resolveKey(e: KeyLike, typing: boolean): Action | null {
       return { kind: 'open' }
     case 'e':
       return { kind: 'modify' }
+    case 'o':
+      return { kind: 'body' }
   }
   return null
 }

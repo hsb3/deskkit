@@ -2,7 +2,7 @@
   import { onMount } from 'svelte'
   import { auth, initAuth } from './lib/pb'
   import { route } from './lib/router'
-  import { browsePages } from './lib/collections'
+  import { browsePages, type BrowseConfig } from './lib/collections'
   import { fetchStickyFinder } from './lib/settings'
   import { isTyping, resolveKey } from './lib/keys'
   import {
@@ -36,18 +36,19 @@
     agentView = $route.page === 'runs' ? 'runs' : 'thread'
   })
 
-  /** Which browse config the screen is showing, if any. Finder-ness is a property of what is on
-   * screen rather than of the mode: Agent has no finder on its thread and one on its runs. */
+  /** Which browse config the screen is showing, if any — a table, not a chain, so a new browse
+   * screen is one line here and a config entry. Finder-ness is a property of what is on screen
+   * rather than of the mode, which is why Agent's key carries its view: Agent has no finder on
+   * its thread and one on its runs. */
+  const MODE_BROWSE: Record<string, BrowseConfig> = {
+    library: browsePages.documents,
+    patrol: browsePages.findings,
+    work: browsePages.pm,
+    'agent:runs': browsePages.runs,
+  }
+
   const browseConfig = $derived(
-    modeId === 'library'
-      ? browsePages.documents
-      : modeId === 'patrol'
-        ? browsePages.findings
-        : modeId === 'work'
-          ? browsePages.pm
-          : modeId === 'agent' && agentView === 'runs'
-            ? browsePages.runs
-            : null,
+    MODE_BROWSE[modeId === 'agent' ? `agent:${agentView}` : modeId] ?? null,
   )
 
   function goto(id: string) {
@@ -133,7 +134,7 @@
           </div>
         {/if}
         <div class="spacer"></div>
-        <span class="legend">{MOD_LABEL}1–{MOD_LABEL}6 modes · {MOD_LABEL}B finder · {MOD_LABEL}K search · j/k rows · ↵ open · e modify · {MOD_LABEL}↵ save · esc back</span>
+        <span class="legend">{MOD_LABEL}1–{MOD_LABEL}6 modes · {MOD_LABEL}B finder · {MOD_LABEL}K search · j/k rows · ↵ open · e modify · o body · {MOD_LABEL}↵ save · {MOD_LABEL}⌫ delete · esc revert</span>
       </header>
       <div class="body">
         {#if browseConfig}

@@ -14,6 +14,34 @@ for why this policy exists.
 
 ### Added
 
+- **The CRUD template, built once and proven on Library** (SPA overhaul phase 2). The finder is no
+  longer a screen that happens to browse `files` — every collection is described declaratively and
+  the component reads that description, so adding an entity is a config entry and nothing else.
+  That claim is the design's own falsifiable test, so it is asserted by a unit test that derives a
+  second writable collection's behaviour from config alone with no component change. Three
+  allocations of the one screen: looking (the finder IS the screen, rows carrying a preview line),
+  examining (the finder minimises into its lit rail button), changing (the same allocation, verbs
+  swapped to save / revert / delete). `esc` out of an edit IS revert.
+- **A document's structured surface is editable, its prose is not.** `status` and `type` are
+  editable through the write-through route; the status picker is FAMILY-AWARE, deriving its legal
+  values from the doctype — and from the *drafted* doctype, so changing a document's type
+  re-derives its legal statuses in the same interaction. A status left stranded by a type change is
+  kept and marked, never silently dropped or auto-corrected.
+- **`GET /desk/doctypes`** — the doc-type vocabulary (status families, per-type required/optional
+  frontmatter) served from the embedded schema. Unauthenticated on both bind modes, like
+  `/desk/models`: it carries no desk data. Lists are always present, never null.
+- **`POST /desk/doc/delete`** — delete through the same door and the same auth posture as the write
+  route, and reversible by construction: the original lands in the revisions ledger BEFORE the file
+  leaves the disk, so `deskkit restore --by-path` reverses it byte-exact. Write-protected paths
+  (`.librarian-ignore`) are refused, and a stale checksum is a 409 like any other write.
+- **`preferences.editor_url` in the profile schema** — the desk names where its prose gets written,
+  as a URL template (`{path}` / `{abs}`), and the browser renders an anchor. Nothing shells out; a
+  desk that declares none gets no control. Reported by `GET /desk/settings/resolved` and by
+  `deskkit config show`.
+- **Icons on the rail**, hand-written SVG with no new dependency — and the digit stays visible
+  beneath each glyph, because losing it would cost the rail its second job as the shortcut legend.
+  `o` opens the body, `⌘⌫` arms the same two-step delete confirm the button uses.
+
 - **The shell — a shortcut rail that is also the keyboard map** (SPA overhaul phase 1). The flat
   four-link nav is replaced by a 34px rail carrying one button per WORK MODE and nothing else:
   Queue, Library, Patrol, Work, Agent, Config (Kits and Desks are reached from Config; the queue

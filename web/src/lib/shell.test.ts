@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { get } from 'svelte/store'
 import { MODES, dispatch, level, onAction, resolveMode, setLevel, toggleFinder } from './shell'
+import { ICONS } from './icons'
 
 beforeEach(() => setLevel('finder'))
 
@@ -56,5 +57,23 @@ describe('the action bus', () => {
     off()
     expect(dispatch({ kind: 'next' })).toBe(false)
     expect(seen).toHaveBeenCalledTimes(1)
+  })
+})
+
+// The rail is the app's navigation AND its shortcut legend. The icon pass added the first job's
+// glyph; this is the check that it never gets to cost the second one.
+describe('the rail buttons', () => {
+  it('gives every mode a glyph that actually exists', () => {
+    for (const m of MODES) {
+      expect(m.icon, m.id).toBeTruthy()
+      expect(ICONS[m.icon], m.id).toBeTruthy()
+    }
+  })
+
+  it('draws every glyph on the same 24x24 grid, so they line up at rail size', () => {
+    for (const [name, d] of Object.entries(ICONS)) {
+      expect(d, name).toMatch(/^[MmLlHhVvAaCcQqZz0-9 .,-]+$/)
+      for (const n of d.match(/\d+(\.\d+)?/g) ?? []) expect(Number(n), `${name}: ${n}`).toBeLessThanOrEqual(24)
+    }
   })
 })

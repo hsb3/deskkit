@@ -45,6 +45,7 @@ type Config struct {
 	SecretsDir          string        // SECRETS_DIR
 	IgnoreConfig        string        // IGNORE_CONFIG (default <DeskRoot>/.librarian-ignore)
 	HandoffPath         string        // HANDOFF_PATH
+	EditorURL           string        // EDITOR_URL / preferences.editor_url — URL TEMPLATE handing a document off to the desk's editor ({path}/{abs} placeholders). Empty = no hand-off offered; nothing shells out, a surface renders it as a link.
 	AutonomousWrites    bool          // LIBRARIAN_AUTONOMOUS_WRITES (registration-time gate, §5.4)
 	ClaimerPollInterval time.Duration // CLAIMER_POLL_INTERVAL (§2.4; Phase 2)
 	LLMProvider         string        // LLM_PROVIDER
@@ -139,8 +140,12 @@ func Load() (*Config, error) {
 		JournalDir:   r.pick("JOURNAL_DIR", ps("desk.paths.journal"), "", "journal"),
 		SecretsDir:   r.pick("SECRETS_DIR", ps("desk.paths.secrets"), "", "_meta/secrets"),
 		HandoffPath:  r.pick("HANDOFF_PATH", ps("desk.paths.handoff"), "", "_meta/HANDOFF.md"),
-		LLMProvider:  r.pick("LLM_PROVIDER", ps("models.provider"), central.LLM.Provider, "anthropic"),
-		LLMModel:     r.pick("LLM_MODEL", ps("models.model"), central.LLM.Model, "claude-haiku-4-5-20251001"),
+		// No default and no central leg: which editor a desk is written in is a deployment
+		// fact, so an identity-neutral binary has nothing to fall back on. Unset simply means
+		// no hand-off is offered.
+		EditorURL:   r.pick("EDITOR_URL", ps("preferences.editor_url"), "", ""),
+		LLMProvider: r.pick("LLM_PROVIDER", ps("models.provider"), central.LLM.Provider, "anthropic"),
+		LLMModel:    r.pick("LLM_MODEL", ps("models.model"), central.LLM.Model, "claude-haiku-4-5-20251001"),
 		// secrets_ref.llm_api_key names (never contains) the env var holding the API key.
 		// Env still wins so an operator can override the indirection without a profile edit.
 		LLMAPIKeyEnv: r.pick("LLM_API_KEY_ENV", ps("secrets_ref.llm_api_key"), "", ""),

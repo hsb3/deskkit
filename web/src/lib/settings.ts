@@ -48,6 +48,13 @@ export interface ResolvedSettings {
   provider: ResolvedField
   model: ResolvedField
   api_key: { source: ResolvedSource }
+  /** URL template for handing a document's body to where the operator actually writes it —
+   * e.g. `obsidian://open?path={abs}`. Absent/empty on a desk that declares no editor, and the
+   * Open-body verb then does not render at all. Optional on the type because an older binary's
+   * /desk/settings/resolved has no such key. */
+  editor_url?: ResolvedField
+  /** The desk's absolute root, needed to expand `{abs}` from a desk-relative path. */
+  desk_root?: ResolvedField
 }
 
 export interface SettingsPatch {
@@ -82,6 +89,19 @@ export function sourceLabel(source: string | undefined): string {
 export function pickChoice(value: string, knownIds: string[]): { choice: string; custom: string } {
   if (value && knownIds.includes(value)) return { choice: value, custom: '' }
   return { choice: 'custom', custom: value }
+}
+
+/** Expand an editor URL template against one document. Nothing shells out: the browser renders
+ * an anchor and the OS resolves the scheme, so the two placeholders are URL-encoded, not shell-
+ * quoted. Returns '' when there is no template or no path, which is the signal not to render
+ * the verb at all. */
+export function editorHref(template: string, deskRoot: string, path: string): string {
+  if (!template || !path) return ''
+  const root = deskRoot.replace(/\/+$/, '')
+  const abs = root ? `${root}/${path}` : path
+  return template
+    .replaceAll('{path}', encodeURIComponent(path))
+    .replaceAll('{abs}', encodeURIComponent(abs))
 }
 
 function isNotFound(e: unknown): boolean {

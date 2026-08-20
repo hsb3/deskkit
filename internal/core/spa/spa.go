@@ -85,6 +85,9 @@ func Register(r *router.Router[*core.RequestEvent], public bool) {
 		return e.Redirect(http.StatusFound, adminConsole)
 	})
 	r.GET(PathModels, models) // registered in both bind modes: no secrets, needed before login
+	// Same posture as the catalog, and for the same reason: the doc-type vocabulary describes
+	// the schema the binary ships, not this desk's contents, so it is open in both modes.
+	r.GET(PathDoctypes, doctypes)
 	// Registered in both modes, but gated in public: unlike the catalog this describes THIS
 	// desk's configuration, so a public bind narrows it to the operator's own credential —
 	// superusers only, not the member auth collection the chat surface also accepts.
