@@ -26,7 +26,15 @@
 
   // Agent is a thread, but its runs have to stay reachable — they are not a work mode of their
   // own (nothing else earns a rail button), so they live inside this one.
-  let agentView = $state<'thread' | 'runs'>($route.page === 'runs' ? 'runs' : 'thread')
+  let agentView = $state<'thread' | 'runs'>('thread')
+
+  // Which tab a hash lands on is re-derived on every hash change, not just at mount: the old
+  // `#/runs` link has to work when it arrives mid-session too (back/forward, a pasted URL), and
+  // arriving at Agent by any other route means the thread. Clicking the tabs does not touch the
+  // hash, so this leaves a hand-picked tab alone.
+  $effect(() => {
+    agentView = $route.page === 'runs' ? 'runs' : 'thread'
+  })
 
   /** Which browse config the screen is showing, if any. Finder-ness is a property of what is on
    * screen rather than of the mode: Agent has no finder on its thread and one on its runs. */
