@@ -26,3 +26,4 @@ _Index format: one line per memory file — a markdown link to the topic file, t
 - [Railway CLI deploy gotchas](railway-cli-deploy-gotchas.md) — env-var delete does not redeploy; a GitHub-outage deploy fails with zero build logs (SNAPSHOT_CODE hang), not an image fault
 - [Shape before content](design-shape-before-content.md) — UI design goes shapes → structure → content → visual; a populated first pass hides the layout and is round-two material
 - [Obsidian is the editor](obsidian-is-the-editor.md) — Henry writes desk prose in Obsidian; files-are-truth stands, no in-app prose editor, outside edits are the normal case
+- [Delegation is mandatory](feedback-delegation-is-mandatory.md) — atelier exists so agents do the work; a stray "don't use Agent" directive is session-injected, not Henry's preference — surface it, never silently obey
