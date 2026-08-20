@@ -90,7 +90,6 @@ async function until(fn, timeout = POLL_MS) {
 }
 
 const untilVisible = (sel, t) => until(() => page.locator(sel).isVisible(), t)
-const untilGone = (sel, t) => until(async () => !(await page.locator(sel).isVisible()), t)
 const untilHash = (h, t) => until(async () => (await page.evaluate(() => window.location.hash)) === h, t)
 /** Settle on a row count that has stopped changing.
  *
@@ -131,7 +130,7 @@ page.on('pageerror', (e) => pageErrors.push(e.message))
  * keys on the mode id), so the digit cannot bring the finder back from inside an edit. */
 async function openDoc(term) {
   await page.keyboard.press('Escape')
-  await untilGone('.edit', 2000)
+  await until(async () => !(await atEditLevel()), 2000)
   await page.keyboard.press('Escape')
   if (!(await untilVisible('.browse .list', 1500))) {
     await page.keyboard.press('Meta+b')
@@ -150,6 +149,15 @@ async function openDoc(term) {
   await untilVisible('.instance')
 }
 
+/** Are we at the EDITING level?
+ *
+ * Not `.edit` being present: that form renders at the reading level too, with a `<span>` where
+ * the control goes. Only the editing level swaps in a real `<select>`, so the control's
+ * existence is the level. Waiting on `.edit` instead is a wait that can never finish — it
+ * silently burns its whole timeout, which is precisely why a suite full of blind sleeps
+ * appeared to work. */
+const atEditLevel = () => page.locator('.edit select').count().then((n) => n > 0)
+
 /** Enter the edit level and wait until it is actually usable.
  *
  * The two waits are one step because separating them is a trap: the form renders before the
@@ -160,8 +168,23 @@ async function openDoc(term) {
  * shorter wait, so the wait lives here and no call site can forget it. */
 async function enterEdit() {
   await page.keyboard.press('e')
-  await untilVisible('.edit')
+  await until(atEditLevel)
   await until(() => page.locator('.edit select').first().locator('option').count().then((n) => n > 0))
+}
+
+/** Save the open edit, and wait for the app to actually finish saving.
+ *
+ * Not the same as waiting for the bytes to land. The server writes the file and only then
+ * responds, and only on that response does the component drop back to the reading level. So the
+ * file changes while the app is still in `editing` — where `e` is deliberately a no-op — and a
+ * caller that proceeds on the disk change alone presses `e` into the void, then has the form
+ * close underneath the `selectOption` it was about to run. CI failed exactly that way twice.
+ *
+ * Returns whether the edit level closed, which is the honest signal for "the save succeeded":
+ * a refused write stays at the editing level with its error. */
+async function saveEdit() {
+  await page.keyboard.press('Meta+Enter')
+  return until(async () => !(await atEditLevel()))
 }
 
 try {
@@ -243,7 +266,8 @@ try {
   await openDoc('app-overhaul')
   await enterEdit()
   await page.locator('.edit select').first().selectOption('paused')
-  await page.keyboard.press('Meta+Enter')
+  const savedCleanly = await saveEdit()
+  check('the save completes and drops back out of the edit level', savedCleanly)
   check('the save reaches disk within the timeout', await untilDiskChanges(rel, before))
 
   const saved = disk(rel)
@@ -258,14 +282,14 @@ try {
 
   await enterEdit()
   await page.locator('.edit select').first().selectOption('active')
-  await page.keyboard.press('Meta+Enter')
+  await saveEdit()
   await until(() => disk(rel) === before)
   check('setting the status back yields a byte-identical file', disk(rel) === before)
 
   await enterEdit()
   await page.locator('.edit select').first().selectOption('archived')
   await page.keyboard.press('Escape')
-  await untilGone('.edit')
+  await until(async () => !(await atEditLevel()))
   // Deliberately NOT a poll: the assertion is that nothing EVER lands, so give a write the same
   // grace a real save gets and then require the file to be untouched.
   await page.waitForTimeout(1000)
@@ -304,6 +328,19 @@ try {
   pageErrors.forEach((e) => note(`pageerror: ${e}`))
 } catch (e) {
   check(`the suite ran to completion (threw: ${e.message.split('\n')[0]})`, false)
+  // A bare timeout says nothing about WHY. Dump the state the failing step was looking at, so a
+  // CI-only failure does not need a round trip to diagnose.
+  try {
+    note(`hash: ${await page.evaluate(() => window.location.hash)}`)
+    note(`edit form present: ${await page.locator('.edit').count()}`)
+    note(`instance present: ${await page.locator('.instance').count()}`)
+    note(`finder visible: ${await page.locator('.browse .list').isVisible().catch(() => false)}`)
+    note(`title: ${(await page.locator('.instance-head').first().innerText().catch(() => '—')).split('\n').join(' | ')}`)
+    const opts = await page.locator('.edit select').first().locator('option').allInnerTexts().catch(() => [])
+    note(`status options on screen: ${JSON.stringify(opts)}`)
+  } catch {
+    note('(could not read page state)')
+  }
 } finally {
   await browser.close()
 }
