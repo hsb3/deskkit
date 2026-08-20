@@ -14,6 +14,25 @@ for why this policy exists.
 
 Nothing yet.
 
+## [0.11.0] — 2026-08-20
+
+### Fixed
+
+- **The seeded ignore boundary missed `.claude/`, so a sweep indexed agent config —
+  credentials included.** The default list named one file inside that directory
+  (`.claude/memory/MEMORY.md`) and therefore covered nothing else in it. A desk is routinely also
+  a working repo, and `.claude/settings.local.json` is where agent credentials live by
+  convention — this project gitignores its own copy for exactly that reason. Found on a live
+  desk with the file's full contents in the store's retrieval index, queryable through the
+  records API. The entry is now the whole directory. A test asserts the property against the
+  SHIPPED seed rather than a copy of it, and fails naming the exact path if the rule is
+  weakened. Entries are directory prefixes or exact paths only — `IsIgnored` does no glob
+  matching — so broader patterns (`*.pem`, nested `.env`) still cannot be expressed.
+
+  **This reaches new desks only.** `EnsureIgnoreFile` leaves an existing `.librarian-ignore`
+  untouched (spec §10.1 — the file is the operator's once created), so an existing desk keeps
+  its old boundary and must be updated by hand.
+
 ## [0.10.0] — 2026-08-20
 
 ### Added
