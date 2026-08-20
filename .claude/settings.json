@@ -14,5 +14,13 @@
       "Bash(actionlint:*)",
       "Bash(deskkit:*)"
     ]
+  },
+  "env": {
+    "CONTEXT_WATERMARK_SOFT": "250000",
+    "CONTEXT_WATERMARK_HARD": "350000",
+    "DELEGATION_WATERMARK_SOFT": "50"
+  },
+  "enabledPlugins": {
+    "kaneo@dotfiles-agents": true
   }
 }
