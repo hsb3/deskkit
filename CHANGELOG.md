@@ -10,7 +10,28 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html). See
 ADR 0005 (DESK-27)
 for why this policy exists.
 
-## [Unreleased]
+## [0.11.2] — 2026-08-22
+
+### Security
+
+- **A sweep no longer stores the body of anything on the desk's ignore list — the fix v0.11.0
+  claimed and did not deliver.** The ignore list was a WRITE boundary only: `sweep` never
+  consulted it, so a desk indexed `.claude/settings.local.json` — credentials included — with
+  its full contents in `files.content`, which feeds `query search` and the records API. Now
+  every content-indexing path (`sweep` and the watcher's single-file reindex) loads the list
+  fail-closed — an unreadable list refuses the operation rather than indexing past a broken
+  boundary — and stores no body for a matching path. Matching rows are still *indexed as
+  metadata* (path, checksum, git meta, frontmatter): the list also write-protects the binding
+  docs (decisions, handoff, `CLAUDE.md`), and patrol must keep flagging what it may not edit,
+  a contract `verify.sh` enforces (ruled on the board, 2026-08-22).
+
+  **Retroactive:** a rule that starts matching an already-indexed row clears that row's stored
+  content on the next sweep, so existing stores self-heal — run `deskkit sweep` once after
+  upgrading. There is still no purge path for anything else (`deskkit` has no "forget this
+  file"); the remedy for a store that must forget more than content remains deleting the store.
+  Gated by tests derived from the shipped seed (proven to fail with the boundary removed) and
+  an end-to-end check that credential-shaped files are unreachable through `query search` on
+  the real binary.
 
 ### Changed
 
@@ -27,14 +48,16 @@ for why this policy exists.
 
 ### Fixed
 
-- **The seeded ignore boundary missed `.claude/`, so a sweep indexed agent config —
-  credentials included.** The default list named one file inside that directory
-  (`.claude/memory/MEMORY.md`) and therefore covered nothing else in it. A desk is routinely also
-  a working repo, and `.claude/settings.local.json` is where agent credentials live by
-  convention — this project gitignores its own copy for exactly that reason. Found on a live
-  desk with the file's full contents in the store's retrieval index, queryable through the
-  records API. The entry is now the whole directory. A test asserts the property against the
-  SHIPPED seed rather than a copy of it, and fails naming the exact path if the rule is
+- **The seeded ignore list's `.claude/` entry was one file wide — the WRITE boundary now covers
+  the whole directory.** ⚠️ *Corrected 2026-08-22: this entry originally claimed the change
+  stopped a sweep from indexing agent config. It did not — the ignore list was a write boundary
+  only, `sweep` never consulted it, and sweeps kept indexing `.claude/settings.local.json`
+  (credentials included) into the searchable store. The indexing fix landed later; see the
+  Security entry above.* What this release actually changed: the default list named
+  `.claude/memory/MEMORY.md` and therefore write-protected nothing else in that directory; the
+  entry is now the whole directory, so the librarian's write tools (`write_doc`, `delete_doc`,
+  `propose_fix`, `apply_fix`) refuse everything under it. A test asserts the property against
+  the SHIPPED seed rather than a copy of it, and fails naming the exact path if the rule is
   weakened. Entries are directory prefixes or exact paths only — `IsIgnored` does no glob
   matching — so broader patterns (`*.pem`, nested `.env`) still cannot be expressed.
 

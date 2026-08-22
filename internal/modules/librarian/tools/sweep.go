@@ -30,6 +30,17 @@ func Sweep(ctx context.Context, app core.App, cfg *config.Config, in *SweepInput
 	}
 	dirMap := cfg.EntityDirMap()
 
+	// The ignore list is a CONTENT boundary for sweep (ruled on the board, 2026-08-22): matches
+	// are still indexed as rows — patrol must be able to flag the write-protected binding docs
+	// (the F-IGN contract in verify.sh) — but their bodies are never stored, because
+	// files.content feeds search and the list covers credential-bearing paths (.claude/,
+	// _meta/secrets/). Loaded fail-closed like the write tools (§10.1): an unreadable list
+	// refuses the whole sweep rather than indexing past a broken boundary.
+	ignoreList, err := desklib.LoadIgnoreList(cfg.IgnoreConfig)
+	if err != nil {
+		return nil, fmt.Errorf("sweep: ignore list unreadable, refusing to sweep: %w", err)
+	}
+
 	relPaths, err := walkDeskFiles(root)
 	if err != nil {
 		return nil, err
@@ -69,7 +80,7 @@ func Sweep(ctx context.Context, app core.App, cfg *config.Config, in *SweepInput
 		matched := make(map[string]bool, len(existingList)) // record ids claimed this sweep
 		idClaimedBy := make(map[string]string)              // frontmatter id -> first rel that used it
 		for _, rel := range relPaths {
-			row, serr := scanFile(root, rel, dirMap, cfg.SecretsDir, cfg.DeskName)
+			row, serr := scanFile(root, rel, dirMap, cfg.SecretsDir, cfg.DeskName, ignoreList)
 			if serr != nil {
 				// Filesystem read errors on an individual file are recorded and skipped
 				// (do not abort the sweep, spec §5.1 Errors).
@@ -339,7 +350,7 @@ func walkDeskFiles(root string) ([]string, error) {
 // scanFile builds the fileRow for one desk file (spec §5.1 point 2, ported from
 // sweep.py scan_file). dir_kind is derived for EVERY file, not just .md (matches the PoC:
 // dir_kind_for is called unconditionally in scan_file's return, outside the .md branch).
-func scanFile(root, rel string, dirMap map[string]string, secretsDir, deskName string) (fileRow, error) {
+func scanFile(root, rel string, dirMap map[string]string, secretsDir, deskName string, ignoreList []string) (fileRow, error) {
 	abs := filepath.Join(root, filepath.FromSlash(rel))
 	raw, err := os.ReadFile(abs)
 	if err != nil {
@@ -372,12 +383,18 @@ func scanFile(root, rel string, dirMap map[string]string, secretsDir, deskName s
 		// exactly the >40-line case R5 flags).
 		row.GraduatedTo = graduationMarker(text)
 	}
-	// Content indexing (§5.6 retrieval/search). A file under the desk's configured SECRETS_DIR is a
-	// secret home and is NEVER indexed — mirrors the meta/secrets exclusion boundary (isMetaPath's
-	// secrets clause). Otherwise, only UTF-8 text is stored (a binary/non-UTF-8 file indexes to ""),
-	// truncated rune-safe to the collection's content cap so a very large file never overflows the
-	// TextField Max. content is re-derivable by a fresh sweep (store is disposable; files-are-truth).
+	// Content indexing (§5.6 retrieval/search). A file under the desk's configured SECRETS_DIR or
+	// matching the ignore list is NEVER content-indexed: the row exists (patrol still flags
+	// write-protected paths — flag-only), but the body stays out of the store, because content
+	// feeds search and those paths carry secrets and credentials. A rule that starts matching an
+	// EXISTING row clears its stored content on the next sweep — fileRowDiffers compares content,
+	// so stored-body → "" re-persists. Otherwise, only UTF-8 text is stored (a binary/non-UTF-8
+	// file indexes to ""), truncated rune-safe to the collection's content cap so a very large
+	// file never overflows the TextField Max. content is re-derivable by a fresh sweep (store is
+	// disposable; files-are-truth).
 	switch {
+	case desklib.IsIgnored(rel, ignoreList):
+		row.Content = ""
 	case secretsDir != "" && pathOrSubtree(rel, secretsDir):
 		row.Content = ""
 	case utf8.Valid(raw):

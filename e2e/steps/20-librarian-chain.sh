@@ -16,6 +16,15 @@ section "20 · librarian sweep → patrol → fix → restore"
 
 seed_librarian_fixtures
 
+# --- ignore-list content boundary (DESK-95): credential-shaped files on the desk ------------
+# init seeded the desk's ignore file from the embedded defaults, which cover .claude/ and
+# _meta/secrets/. Their bodies must never reach files.content (which feeds `query search`);
+# the rows themselves may exist (patrol flags write-protected paths — flag-only).
+SENTINEL="e2e-sentinel-never-indexed-$$"
+mkdir -p "$E2E_DESK/.claude" "$E2E_DESK/_meta/secrets"
+printf 'fake_credential: %s\n' "$SENTINEL" > "$E2E_DESK/.claude/settings.local.json"
+printf 'FAKE_KEY=%s\n' "$SENTINEL" > "$E2E_DESK/_meta/secrets/x.env"
+
 # --- capture original bytes BEFORE any fix (needed for the restore assertions) -------------
 SHA_R1=$(shasum -a 256 "$E2E_DESK/tasks/r1-missing-fm.md" | awk '{print $1}')
 SHA_R3=$(shasum -a 256 "$E2E_DESK/analyses/r3-type-task.md" | awk '{print $1}')
@@ -26,6 +35,22 @@ RC=$?
 CREATED=$(printf '%s' "$SW" | jq -r '.created' 2>/dev/null)
 [ "$RC" -eq 0 ] && [ -n "$CREATED" ] && [ "$CREATED" -ge 2 ]
 check "sweep indexes the seeded fixtures (created=$CREATED)" $?
+
+# --- the content boundary held: nothing on the ignore list is content-indexed ---------------
+HITS=$(dk query search --term "$SENTINEL" | jq -r '.matches | length' 2>/dev/null)
+[ "$HITS" = "0" ]
+check "ignore-listed bodies are unreachable through query search (hits=$HITS)" $?
+
+# found=true is asserted alongside empty content so a query failure cannot read as a pass:
+# the row must EXIST (flag-only keeps metadata rows) and its stored body must be empty.
+CRED=$(dk query content --path ".claude/settings.local.json")
+SEC=$(dk query content --path "_meta/secrets/x.env")
+CRED_FOUND=$(printf '%s' "$CRED" | jq -r '.found' 2>/dev/null)
+SEC_FOUND=$(printf '%s' "$SEC" | jq -r '.found' 2>/dev/null)
+CRED_CONTENT=$(printf '%s' "$CRED" | jq -r '.content' 2>/dev/null)
+SEC_CONTENT=$(printf '%s' "$SEC" | jq -r '.content' 2>/dev/null)
+[ "$CRED_FOUND" = "true" ] && [ "$SEC_FOUND" = "true" ] && [ -z "$CRED_CONTENT" ] && [ -z "$SEC_CONTENT" ]
+check "ignore-listed rows exist but carry no stored content (found=$CRED_FOUND/$SEC_FOUND)" $?
 
 # --- patrol: flag R1 (missing frontmatter) and R3 (type/location mismatch) ----------------
 PAT=$(dk patrol)

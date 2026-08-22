@@ -182,7 +182,14 @@ func cleanDeskRel(p string) (string, error) {
 // the single-file equivalent of one Sweep loop iteration, shared by write_doc and the
 // watcher. Identity matching mirrors Sweep: doc_id first (rename survival), path fallback.
 func indexOneFile(app core.App, cfg *config.Config, rel string) error {
-	row, err := scanFile(cfg.DeskRoot, rel, cfg.EntityDirMap(), cfg.SecretsDir, cfg.DeskName)
+	// Same content boundary as Sweep, and for the same reason: the watcher routes OUTSIDE
+	// edits through here, so without this reload an edit to an ignore-listed file would
+	// re-index the body sweep just refused to store. Fail closed like every other consumer.
+	ignoreList, err := desklib.LoadIgnoreList(cfg.IgnoreConfig)
+	if err != nil {
+		return fmt.Errorf("index: ignore list unreadable, refusing to index: %w", err)
+	}
+	row, err := scanFile(cfg.DeskRoot, rel, cfg.EntityDirMap(), cfg.SecretsDir, cfg.DeskName, ignoreList)
 	if err != nil {
 		return err
 	}
