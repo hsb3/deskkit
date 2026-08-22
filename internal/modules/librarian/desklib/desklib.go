@@ -236,6 +236,8 @@ func EnsureIgnoreFile(cfgPath, deskRoot string) (migrated bool, err error) {
 	if err := os.MkdirAll(filepath.Dir(cfgPath), 0o755); err != nil {
 		return false, err
 	}
+	// The migration source is always the desk-root default location, regardless of where
+	// cfgPath points: a legacy desk could only ever have had the file there by default.
 	if legacy := filepath.Join(deskRoot, ".librarian-ignore"); legacy != cfgPath {
 		if _, lerr := os.Stat(legacy); lerr == nil {
 			if err := os.Rename(legacy, cfgPath); err != nil {

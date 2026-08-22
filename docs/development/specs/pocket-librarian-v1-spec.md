@@ -311,7 +311,7 @@ home. `internal/` keeps them un-importable from outside the module.
 │   └── provider/
 │       └── adapter.go       # newChatModel factory: anthropic|openai|gemini (§6.3)
 ├── templates/               # frontmatter-universal.md, pointer-stub.md — //go:embed (§5, §11)
-├── .deskkitignore        # auto-created from embedded defaults on first run (§10.1)
+├── .deskkitignore           # auto-created from embedded defaults on first run (§10.1)
 ├── Makefile                 # task interface (§9.5)
 ├── go.mod
 └── go.sum
