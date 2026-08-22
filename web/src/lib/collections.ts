@@ -5,6 +5,14 @@
 // inside the component is a function below, so it can be asserted against a config the component
 // has never seen.
 //
+// SCOPE — read before extending an entry. The claim above covers genuine CRUD collections, and
+// `documents` is the only entry at its designed shape. `findings`, `runs` and `pm` are read-only
+// stand-ins: the design gives each of them a DIFFERENT template (findings and the landing queue
+// are an inbox; agent runs fold inline into the thread; work items get a phase board with a gate
+// panel). Those three entries are meant to be replaced by their real surfaces, not grown into
+// them — adding an `edit` block to `findings` would build the wrong screen convincingly. Check
+// the board first.
+//
 // Browse never writes PocketBase rows directly: the edits it offers go through the server's
 // write-through routes (POST /desk/doc/write, POST /desk/doc/delete — record-original-first,
 // reversible via `restore`), which own the disk write and the row update together. Field lists
