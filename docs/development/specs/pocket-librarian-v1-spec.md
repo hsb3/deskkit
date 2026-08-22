@@ -1410,9 +1410,15 @@ type QueryInput struct {
 
 **Content indexing (sweep-side, §5.1).** `search`/`content` read the `files.content` column that
 `sweep` populates from each file's body. Sweep indexes **only UTF-8 text**, never a file under the
-desk's configured `SECRETS_DIR` (the secret-home boundary — mirrors the meta/secrets exclusion), and
-truncates rune-safe to the column cap (1,000,000 chars). The body is re-derivable by a fresh sweep,
-so the store stays disposable (files-are-truth).
+desk's configured `SECRETS_DIR` (the secret-home boundary — mirrors the meta/secrets exclusion),
+**never a file matching the ignore list** (the list is a *content* boundary for indexing: matching
+rows keep their metadata — path, checksum, git meta, frontmatter — so patrol can still flag
+write-protected paths, but their bodies never reach the store, because the list covers
+credential-bearing paths like `.claude/`). Every content-indexing path (sweep and the watcher's
+single-file reindex) loads the list **fail-closed** (§10.1): unreadable list, no indexing. A rule
+that starts matching an already-indexed row clears that row's stored content on the next sweep.
+Text is truncated rune-safe to the column cap (1,000,000 chars). The body is re-derivable by a
+fresh sweep, so the store stays disposable (files-are-truth).
 
 In the agentic version, `query` is the tool the model calls to ground answers over the index — it
 never writes.

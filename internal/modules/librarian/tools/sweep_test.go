@@ -4,10 +4,13 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/pocketbase/dbx"
 	"github.com/pocketbase/pocketbase/core"
+
+	"github.com/hsb3/deskkit/internal/modules/librarian/desklib"
 )
 
 func TestDirKindForRoot(t *testing.T) {
@@ -247,7 +250,7 @@ func scanTempMD(t *testing.T, name, content string) fileRow {
 		t.Fatalf("write: %v", err)
 	}
 	dirMap := map[string]string{"decision": "_structure/decisions", "task": "tasks", "analysis": "analyses", "journal": "journal"}
-	row, err := scanFile(root, name, dirMap, "_meta/secrets", "testdesk")
+	row, err := scanFile(root, name, dirMap, "_meta/secrets", "testdesk", nil)
 	if err != nil {
 		t.Fatalf("scanFile(%q): %v", name, err)
 	}
@@ -388,7 +391,7 @@ func TestScanFileContentBinaryExcluded(t *testing.T) {
 		t.Fatalf("write: %v", err)
 	}
 	dirMap := map[string]string{"decision": "_structure/decisions", "task": "tasks", "analysis": "analyses", "journal": "journal"}
-	row, err := scanFile(root, rel, dirMap, "_meta/secrets", "testdesk")
+	row, err := scanFile(root, rel, dirMap, "_meta/secrets", "testdesk", nil)
 	if err != nil {
 		t.Fatalf("scanFile: %v", err)
 	}
@@ -568,5 +571,117 @@ func TestSweep_DuplicateIDFilesFindingNoMerge(t *testing.T) {
 	}
 	if len(findings) == 0 {
 		t.Fatalf("a duplicate frontmatter id must file a patrol-visible finding")
+	}
+}
+
+// --- the ignore list is a CONTENT boundary for sweep ---
+
+// TestSweep_IgnoreListIsAContentBoundary — the content-boundary gate. Every entry of the SHIPPED ignore
+// seed gets a sentinel-bearing file; after a sweep none of their bodies may be in the store,
+// while a non-ignored control file's body must be — so the test fails when the blanking is
+// removed (sentinel indexed) AND when it over-blankets (control empty). Expectations are
+// DERIVED from the shipped seed via LoadIgnoreList, never a hand-copied list. The named rows
+// still EXIST: patrol must be able to flag write-protected paths (flag-only, the F-IGN
+// contract in verify.sh), so only content is withheld, never the row.
+func TestSweep_IgnoreListIsAContentBoundary(t *testing.T) {
+	app, cfg := newTestEnv(t)
+	ctx := context.Background()
+
+	// Replace the test env's empty ignore file with the SHIPPED seed.
+	if err := os.WriteFile(cfg.IgnoreConfig, []byte(desklib.DefaultIgnore()), 0o644); err != nil {
+		t.Fatalf("write shipped seed: %v", err)
+	}
+	entries, err := desklib.LoadIgnoreList(cfg.IgnoreConfig)
+	if err != nil {
+		t.Fatalf("load shipped seed: %v", err)
+	}
+
+	const sentinel = "SENTINEL-CREDENTIAL-DO-NOT-INDEX"
+	var seeded []string
+	for _, entry := range entries {
+		rel := entry
+		if strings.HasSuffix(entry, "/") {
+			rel = entry + "seeded-secret.md"
+		}
+		mustWriteFile(t, cfg.DeskRoot, rel, "---\nsynopsis: x\n---\n"+sentinel+"\n")
+		seeded = append(seeded, rel)
+	}
+	// Two credential-bearing paths, both covered by shipped entries (.claude/, _meta/secrets/).
+	for _, rel := range []string{".claude/settings.local.json", "_meta/secrets/x.env"} {
+		if !desklib.IsIgnored(rel, entries) {
+			t.Fatalf("shipped seed no longer covers %s — the credential boundary regressed", rel)
+		}
+		mustWriteFile(t, cfg.DeskRoot, rel, sentinel+"\n")
+		seeded = append(seeded, rel)
+	}
+	const control = "notes/control.md"
+	mustWriteFile(t, cfg.DeskRoot, control, "---\nsynopsis: c\n---\nindexable body\n")
+
+	if _, err := Sweep(ctx, app, cfg, &SweepInput{}); err != nil {
+		t.Fatalf("sweep: %v", err)
+	}
+
+	for _, rel := range seeded {
+		rec, _ := app.FindFirstRecordByFilter("files", "path = {:p}", dbx.Params{"p": rel})
+		if rec == nil {
+			continue // .git/ and logs/ are walk-pruned entirely — no row is also no content
+		}
+		if got := rec.GetString("content"); got != "" {
+			t.Errorf("%s is on the shipped ignore list but its content was indexed (%d bytes)", rel, len(got))
+		}
+	}
+	// Flag-only stays alive: a write-protected path keeps its metadata row…
+	if rec, _ := app.FindFirstRecordByFilter("files", "path = {:p}", dbx.Params{"p": ".claude/settings.local.json"}); rec == nil {
+		t.Fatalf(".claude/settings.local.json must keep a metadata row (patrol flag-only)")
+	}
+	// …and the control proves the test can tell stored from blanked.
+	rec, _ := app.FindFirstRecordByFilter("files", "path = {:p}", dbx.Params{"p": control})
+	if rec == nil || !strings.Contains(rec.GetString("content"), "indexable body") {
+		t.Fatalf("non-ignored control file must carry content — the boundary over-blanked")
+	}
+}
+
+// TestSweep_NewIgnoreRuleClearsStoredContent — the retroactive half of the boundary: a rule
+// that starts matching an EXISTING row clears its stored body on the next sweep (content is in
+// COMPARE_FIELDS, so stored → "" re-persists), protecting already-swept desks, not only fresh
+// ones. The row itself survives — the file is still on disk, so soft-delete would be wrong.
+func TestSweep_NewIgnoreRuleClearsStoredContent(t *testing.T) {
+	app, cfg := newTestEnv(t)
+	ctx := context.Background()
+
+	const rel = ".claude/settings.local.json"
+	mustWriteFile(t, cfg.DeskRoot, rel, "top secret\n")
+	if _, err := Sweep(ctx, app, cfg, &SweepInput{}); err != nil {
+		t.Fatalf("sweep 1: %v", err)
+	}
+	if firstFileRow(t, app, rel).GetString("content") == "" {
+		t.Fatalf("precondition: with an empty ignore list the body must be stored")
+	}
+
+	if err := os.WriteFile(cfg.IgnoreConfig, []byte(".claude/\n"), 0o644); err != nil {
+		t.Fatalf("add rule: %v", err)
+	}
+	if _, err := Sweep(ctx, app, cfg, &SweepInput{}); err != nil {
+		t.Fatalf("sweep 2: %v", err)
+	}
+	rec := firstFileRow(t, app, rel)
+	if got := rec.GetString("content"); got != "" {
+		t.Fatalf("a newly-matching rule must clear stored content on the next sweep, still holds %q", got)
+	}
+	if rec.GetBool("deleted") {
+		t.Fatalf("the file is still on disk — its row must stay live, not soft-deleted")
+	}
+}
+
+// TestSweep_UnreadableIgnoreListFailsClosed — sweep refuses to run past a broken boundary,
+// exactly like the write tools (§10.1): an error out, no partial index.
+func TestSweep_UnreadableIgnoreListFailsClosed(t *testing.T) {
+	app, cfg := newTestEnv(t)
+	mustWriteFile(t, cfg.DeskRoot, "notes/a.md", "body\n")
+	if err := os.Remove(cfg.IgnoreConfig); err != nil {
+		t.Fatalf("remove ignore file: %v", err)
+	}
+	if _, err := Sweep(context.Background(), app, cfg, &SweepInput{}); err == nil {
+		t.Fatalf("sweep must fail closed when the ignore list is unreadable")
 	}
 }
