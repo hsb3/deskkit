@@ -33,13 +33,13 @@ sha() { shasum -a 256 "$1" | awk '{print $1}'; }
 
 # snapshot mirrors sweep's walkDeskFiles pruning (.git/, logs/, pb_*) so it stays an independent
 # oracle for "the same files with the same bytes", not a re-read of the DB the tools populate.
-# .librarian-ignore prunes too: the first tool invocation creates it, so counting it would fail
+# .deskkitignore prunes too: the first tool invocation creates it, so counting it would fail
 # the as-seeded and rebuild comparisons.
 snapshot() {
   # Portable across GNU/BSD find+xargs: no `xargs -r` (GNU-only "no run if empty" — BSD
   # xargs lacks it and would otherwise invoke shasum with zero args, which reads stdin and
   # blocks), no `find -quit` (GNU-only).
-  local prune=( -name '.git' -o -name 'logs' -o -name 'pb_*' -o -name '.librarian-ignore' )
+  local prune=( -name '.git' -o -name 'logs' -o -name 'pb_*' -o -name '.deskkitignore' )
   local first
   first=$(find "$WORK" -mindepth 1 \( "${prune[@]}" \) -prune -o -type f -print 2> /dev/null | head -n 1)
   if [ -z "$first" ]; then

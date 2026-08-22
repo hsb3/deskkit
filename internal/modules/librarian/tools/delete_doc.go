@@ -67,7 +67,7 @@ func DeleteDoc(ctx context.Context, app core.App, cfg *config.Config, in *Delete
 		return nil, fmt.Errorf("delete_doc: ignore list unreadable, refusing to delete: %w", ignoreErr)
 	}
 	if desklib.IsIgnored(rel, ignoreList) {
-		return nil, fmt.Errorf("delete_doc: %s is write-protected (.librarian-ignore)", rel)
+		return nil, fmt.Errorf("delete_doc: %s is write-protected (.deskkitignore)", rel)
 	}
 
 	// Existing regular file only — Lstat so a symlink pointing out of the desk is refused

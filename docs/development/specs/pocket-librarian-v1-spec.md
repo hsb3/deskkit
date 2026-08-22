@@ -311,7 +311,7 @@ home. `internal/` keeps them un-importable from outside the module.
 │   └── provider/
 │       └── adapter.go       # newChatModel factory: anthropic|openai|gemini (§6.3)
 ├── templates/               # frontmatter-universal.md, pointer-stub.md — //go:embed (§5, §11)
-├── .librarian-ignore        # auto-created from embedded defaults on first run (§10.1)
+├── .deskkitignore        # auto-created from embedded defaults on first run (§10.1)
 ├── Makefile                 # task interface (§9.5)
 ├── go.mod
 └── go.sum
@@ -428,7 +428,7 @@ walking up from the working directory and never overrides an already-set process
 | `ANALYSES_DIR` | `analyses` | Configurable path constant; entity-dir map key `analysis` (§5.1). |
 | `JOURNAL_DIR` | `journal` | Configurable path constant; entity-dir map key `journal` (§5.1). |
 | `SECRETS_DIR` | `_meta/secrets` | Configurable path constant (§11). |
-| `IGNORE_CONFIG` | `<DESK_ROOT>/.librarian-ignore` | Path to the operator-editable ignore list; single source of truth for write-protection. |
+| `IGNORE_CONFIG` | `<DESK_ROOT>/.deskkitignore` | Path to the operator-editable ignore list; single source of truth for write-protection. |
 | `HANDOFF_PATH` | `_meta/HANDOFF.md` | Configurable target for the R6 staleness rule (§5.2). Identity-neutral. |
 | `LIBRARIAN_AUTONOMOUS_WRITES` | `false` | Registration-time gate (§5.4): when `false`, the autonomous `serve` agent gets no `apply_fix` tool. |
 | `CLAIMER_POLL_INTERVAL` | `5s` | Task-claimer poll cadence (§2.4). |
@@ -640,7 +640,7 @@ reproducible across rebuilds). All API rules left nil ⇒ **superuser-only** (no
 Index: `idx_prompts_key_active` on `(key, active)` — the load path is "the active row for this
 key"; optional `idx_prompts_key_version` on `(key, version)` for history browsing.
 
-**Seeding & load (mirrors the `.librarian-ignore` auto-create, §10.1).** On first run, if no row
+**Seeding & load (mirrors the `.deskkitignore` auto-create, §10.1).** On first run, if no row
 exists for `key = "librarian.system"`, the binary inserts one from the embedded default
 (`content` = the verbatim §6.1 text, `version = 1`, `active = true`) — the collection is **seeded,
 never user-required**. At run start the agent loads the active, highest-`version` row (§6.1) and
@@ -787,7 +787,7 @@ prompts.Fields.Add(&core.AutodateField{Name: "created", OnCreate: true})
 prompts.Fields.Add(&core.AutodateField{Name: "updated", OnCreate: true, OnUpdate: true})
 prompts.AddIndex("idx_prompts_key_active", false, "key, active", "")
 if err := app.Save(prompts); err != nil { return err }
-// The default row is SEEDED at first run, not in the migration (mirrors the .librarian-ignore
+// The default row is SEEDED at first run, not in the migration (mirrors the .deskkitignore
 // auto-create, §10.1) — see seedSystemPrompt in §6.1.
 ```
 
@@ -1528,7 +1528,7 @@ the active row from the `prompts` collection (§4.10) — the `active == true` r
 `key = "librarian.system"`, highest `version` — and interpolates the concrete desk facts
 (`DESK_NAME`, paths) from config. If the collection has no active row it FALLS BACK to the embedded
 default, which is also the seed written into `prompts` on first run (mirroring the
-`.librarian-ignore` auto-create, §10.1). The embedded default names no person, org, repo, or issue.
+`.deskkitignore` auto-create, §10.1). The embedded default names no person, org, repo, or issue.
 Its text is not reproduced here — read it at `templates/librarian-system-prompt.txt`, the
 canonical `//go:embed`'d source (embedded by `var embeddedSystemPrompt`, below).
 
@@ -1560,7 +1560,7 @@ func systemPrompt(ctx context.Context, app core.App, cfg *Config) string {
 }
 
 // seedSystemPrompt runs once on first serve/init: if no row exists for the key, insert the embedded
-// default as version 1, active. Mirrors the .librarian-ignore auto-create (§10.1) — seeded, not
+// default as version 1, active. Mirrors the .deskkitignore auto-create (§10.1) — seeded, not
 // user-required.
 func seedSystemPrompt(app core.App) error {
     if _, err := app.FindFirstRecordByFilter("prompts", "key = {:k}",
@@ -2141,15 +2141,19 @@ API keys and the superuser password come from the environment (`.env` discovered
 from cwd, never overriding an already-set env var). Nothing secret is compiled in. Per the desk
 convention the secrets home is `_meta/secrets/` (configurable via `SECRETS_DIR`); the binary itself
 reads only env + the ignore config file. The ignore config (`IGNORE_CONFIG`, default
-`<DESK_ROOT>/.librarian-ignore`) is the single source of truth for write-protection and is
+`<DESK_ROOT>/.deskkitignore`) is the single source of truth for write-protection and is
 operator-editable.
 
 **Embedded defaults + auto-create.** The default ignore contents below (including the binding-doc
 protections `CLAUDE.md` / `_structure/decisions/` / `_meta/HANDOFF.md`) are **embedded in the
-binary** via `//go:embed`. On `init`/first run, if `<DESK_ROOT>/.librarian-ignore` (or the
-`IGNORE_CONFIG` path) does not exist, the binary **auto-creates it from the embedded defaults** so
-the boundary is present before any tool can write. The embedded copy is the seed for the on-disk
-file, never a silent runtime substitute for it (see fail-closed).
+binary** via `//go:embed`. On `init`/first run, if `<DESK_ROOT>/.deskkitignore` (or the
+`IGNORE_CONFIG` path) does not exist, the binary first **renames a legacy
+`<DESK_ROOT>/.librarian-ignore` in place** (byte-identical, logged at info) — otherwise the
+auto-create would silently replace an operator's tuned rules with stock defaults — and only when
+neither name exists **auto-creates it from the embedded defaults** so the boundary is present
+before any tool can write. When both names exist the new one wins untouched (never a union). The
+embedded copy is the seed for the on-disk file, never a silent runtime substitute for it (see
+fail-closed).
 
 **Fail-closed on a missing/unreadable ignore file (safety boundary).** The ignore list is loaded
 **ahead of the apply path** (before any read/plan/write in `propose_fix` §5.3 and re-loaded in
@@ -2400,7 +2404,7 @@ Each is a default chosen to make the spec build-ready with zero clarifications.
   embedded default ships verbatim as its seed (§4.10/§6.1/§10.1).** The prompt names the role, the five
   tools, the boundary, and "query before proposing a fix"; concrete desk facts are interpolated from
   config. The embedded default is `//go:embed`'d and seeded into `prompts` on first run (mirroring the
-  `.librarian-ignore` auto-create, §10.1); at run start the agent loads the active row (highest
+  `.deskkitignore` auto-create, §10.1); at run start the agent loads the active row (highest
   `version`), falling back to the embedded default when none exists; GUI/REST edits take effect on the
   next run with version history retained. **Why:** the model needs a concrete, buildable prompt, and
   storing it as **data — not baked-in code** — realizes the identity-neutral / data-surface posture
@@ -2464,8 +2468,11 @@ Each is a default chosen to make the spec build-ready with zero clarifications.
 - **Decision: superuser-unset is non-fatal (§10.3).** `serve` runs without an admin account; the
   bootstrap/`migrate up` path creates one only if both `PB_SUPERUSER_*` env vars are set. **Why:**
   identity-neutral first-run — the binary never invents a credential.
-- **Decision: ignore-config filename defaults to `.librarian-ignore` (§10.1).** The PoC used
-  `librarian-ignore.txt`; the Go build standardizes on the dotfile name (still overridable via
+- **Decision: ignore-config filename defaults to `.deskkitignore` (§10.1).** The PoC used
+  `librarian-ignore.txt`; the Go build first standardized on the dotfile `.librarian-ignore`,
+  later renamed to `.deskkitignore` (the conventional `.<tool>ignore` form — first run renames
+  a legacy `.librarian-ignore` in place, byte-identical, so tuned rules survive; when both
+  names exist the new one wins untouched) (still overridable via
   `IGNORE_CONFIG`). **Why:** a single documented default; the dotfile convention keeps it out of
   the way while remaining operator-editable.
 - **Decision: initial/supervised runs execute inside an OS-level sandbox (§10.5).** Default is a

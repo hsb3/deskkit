@@ -80,7 +80,7 @@ func newSessionTestEnv(t *testing.T) (*tests.TestApp, *config.Config) {
 		AnalysesDir:  "analyses",
 		JournalDir:   "journal",
 		SecretsDir:   "_meta/secrets",
-		IgnoreConfig: filepath.Join(deskRoot, ".librarian-ignore"),
+		IgnoreConfig: filepath.Join(deskRoot, ".deskkitignore"),
 		HandoffPath:  "_meta/HANDOFF.md",
 		LLMProvider:  "openai", // any non-anthropic value avoids the streaming tool-call checker
 		LLMModel:     "test-model",

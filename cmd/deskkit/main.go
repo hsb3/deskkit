@@ -287,11 +287,13 @@ func main() {
 			if err := config.ApplyStore(e.App, cfg); err != nil {
 				app.Logger().Error("read store settings", "err", err)
 			}
-			if err := desklib.EnsureIgnoreFile(cfg.IgnoreConfig, cfg.DeskRoot); err != nil {
-				app.Logger().Error("ensure .librarian-ignore", "err", err)
+			if migrated, err := desklib.EnsureIgnoreFile(cfg.IgnoreConfig, cfg.DeskRoot); err != nil {
+				app.Logger().Error("ensure .deskkitignore", "err", err)
+			} else if migrated {
+				app.Logger().Info("migrated legacy .librarian-ignore to .deskkitignore (content preserved)")
 			}
 		} else {
-			app.Logger().Warn("config not fully resolved; skipping .librarian-ignore auto-create", "err", cfgErr)
+			app.Logger().Warn("config not fully resolved; skipping .deskkitignore auto-create", "err", cfgErr)
 		}
 		if err := prompt.Seed(e.App); err != nil {
 			app.Logger().Error("seed system prompt", "err", err)
@@ -873,8 +875,10 @@ func requireConfig(app core.App, cfg *config.Config, cfgErr error) (*config.Conf
 	// First-run auto-creation applies to every entry point, not just serve: one-shot CLI tools
 	// would otherwise fail closed on the missing default ignore file. A present-but-unreadable
 	// file still fails closed in desklib.
-	if err := desklib.EnsureIgnoreFile(cfg.IgnoreConfig, cfg.DeskRoot); err != nil {
+	if migrated, err := desklib.EnsureIgnoreFile(cfg.IgnoreConfig, cfg.DeskRoot); err != nil {
 		return nil, err
+	} else if migrated {
+		app.Logger().Info("migrated legacy .librarian-ignore to .deskkitignore (content preserved)")
 	}
 	// Seed the editable system prompt here too, not only under serve: a desk driven purely via
 	// one-shot CLI + MCP would never materialize the prompts row, leaving "edit the system prompt

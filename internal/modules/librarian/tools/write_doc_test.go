@@ -140,7 +140,7 @@ func TestWriteDoc_Refusals(t *testing.T) {
 	mustWriteFile(t, cfg.DeskRoot, "_meta/HANDOFF.md", wdDoc)
 	base := desklib.Checksum([]byte(wdDoc))
 
-	// Write-protected path (.librarian-ignore).
+	// Write-protected path (.deskkitignore).
 	if err := os.WriteFile(cfg.IgnoreConfig, []byte("_meta/\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}

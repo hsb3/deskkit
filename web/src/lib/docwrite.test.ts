@@ -46,9 +46,9 @@ describe('writeDocField', () => {
   })
 
   it("throws the server's error text on a 400", async () => {
-    stubFetch(400, { error: 'write_doc: a.md is write-protected (.librarian-ignore)' })
+    stubFetch(400, { error: 'write_doc: a.md is write-protected (.deskkitignore)' })
     await expect(writeDocField('a.md', 'old', { status: 'x' }, null)).rejects.toThrow(
-      'write_doc: a.md is write-protected (.librarian-ignore)',
+      'write_doc: a.md is write-protected (.deskkitignore)',
     )
   })
 
@@ -91,9 +91,9 @@ describe('deleteDoc', () => {
   })
 
   it("throws the server's refusal verbatim — a write-protected path is not a bug", async () => {
-    stubFetch(400, { error: 'delete_doc: a.md is write-protected (.librarian-ignore)' })
+    stubFetch(400, { error: 'delete_doc: a.md is write-protected (.deskkitignore)' })
     await expect(deleteDoc('a.md', 'old', null)).rejects.toThrow(
-      'delete_doc: a.md is write-protected (.librarian-ignore)',
+      'delete_doc: a.md is write-protected (.deskkitignore)',
     )
   })
 

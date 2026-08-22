@@ -9,7 +9,7 @@
       "name": "deskkit",
       "source": "./plugins/deskkit",
       "description": "Coding agents drift from a project's own conventions and lose track of where work stands between sessions. This plugin checks a desk's documents against its own rules and applies fixes, drives tasks through a document-gated work graph, and briefs a fresh session at cold start — over one MCP server, two operator agents, and a set of skills. Personalize via the desk profile and desk_config, never by editing shipped definitions.",
-      "version": "0.11.2",
+      "version": "0.11.3",
       "author": {
         "name": "Henry Burden"
       }

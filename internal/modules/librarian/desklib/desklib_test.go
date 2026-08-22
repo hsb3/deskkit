@@ -174,8 +174,8 @@ func TestGitNewestCommitExcluding(t *testing.T) {
 
 func TestEnsureIgnoreFileAutoCreates(t *testing.T) {
 	root := t.TempDir()
-	cfgPath := filepath.Join(root, ".librarian-ignore")
-	if err := EnsureIgnoreFile(cfgPath, root); err != nil {
+	cfgPath := filepath.Join(root, ".deskkitignore")
+	if _, err := EnsureIgnoreFile(cfgPath, root); err != nil {
 		t.Fatalf("EnsureIgnoreFile: %v", err)
 	}
 	b, err := os.ReadFile(cfgPath)
@@ -190,7 +190,7 @@ func TestEnsureIgnoreFileAutoCreates(t *testing.T) {
 	if err := os.WriteFile(cfgPath, []byte(edited), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if err := EnsureIgnoreFile(cfgPath, root); err != nil {
+	if _, err := EnsureIgnoreFile(cfgPath, root); err != nil {
 		t.Fatalf("second EnsureIgnoreFile: %v", err)
 	}
 	b, _ = os.ReadFile(cfgPath)
@@ -206,7 +206,7 @@ func TestEnsureIgnoreFileAutoCreates(t *testing.T) {
 func TestDefaultIgnore_CoversCredentialBearingPaths(t *testing.T) {
 	// Round-trip the shipped seed through the real loader rather than a test-local parser, so
 	// this exercises the same path a live desk does.
-	seed := filepath.Join(t.TempDir(), ".librarian-ignore")
+	seed := filepath.Join(t.TempDir(), ".deskkitignore")
 	if err := os.WriteFile(seed, []byte(DefaultIgnore()), 0o644); err != nil {
 		t.Fatalf("write seed: %v", err)
 	}
@@ -243,5 +243,70 @@ func TestDefaultIgnore_CoversCredentialBearingPaths(t *testing.T) {
 		if IsIgnored(rel, list) {
 			t.Errorf("the shipped default ignore wrongly covers %q — ordinary desk content", rel)
 		}
+	}
+}
+
+// TestEnsureIgnoreFile_MigratesLegacyName — the rename gate: a desk holding only a tuned
+// legacy `.librarian-ignore` must end up with a `.deskkitignore` holding byte-identical
+// content and no legacy file. Without the migration branch the auto-create seeds stock
+// defaults beside the operator's tuned rules and silently orphans them — this fails on
+// both counts if that branch is removed (defaults at the new name, legacy still present).
+func TestEnsureIgnoreFile_MigratesLegacyName(t *testing.T) {
+	root := t.TempDir()
+	tuned := "# operator rules\nmy-private-dir/\n"
+	legacy := filepath.Join(root, ".librarian-ignore")
+	if err := os.WriteFile(legacy, []byte(tuned), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	migrated, err := EnsureIgnoreFile("", root)
+	if err != nil {
+		t.Fatalf("EnsureIgnoreFile: %v", err)
+	}
+	if !migrated {
+		t.Fatalf("the one-time migration must be reported so callers can log it")
+	}
+	b, err := os.ReadFile(filepath.Join(root, ".deskkitignore"))
+	if err != nil {
+		t.Fatalf("migrated file missing: %v", err)
+	}
+	if string(b) != tuned {
+		t.Fatalf("migrated content is not byte-identical to the operator's rules: %q", b)
+	}
+	if _, err := os.Stat(legacy); !os.IsNotExist(err) {
+		t.Fatalf("legacy .librarian-ignore must be gone after the migration")
+	}
+
+	// Idempotent: the next call sees the new file and does nothing.
+	migrated2, err := EnsureIgnoreFile("", root)
+	if err != nil || migrated2 {
+		t.Fatalf("second call must be a plain no-op (migrated=%v err=%v)", migrated2, err)
+	}
+}
+
+// TestEnsureIgnoreFile_NewNameWinsWhenBothPresent — two live files is a worse end state than
+// either name: when both exist the new file wins untouched and the legacy file is left alone
+// (never unioned, never clobbered — the operator can see and resolve the leftover).
+func TestEnsureIgnoreFile_NewNameWinsWhenBothPresent(t *testing.T) {
+	root := t.TempDir()
+	newContent := "new-rules/\n"
+	oldContent := "old-rules/\n"
+	if err := os.WriteFile(filepath.Join(root, ".deskkitignore"), []byte(newContent), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, ".librarian-ignore"), []byte(oldContent), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	migrated, err := EnsureIgnoreFile("", root)
+	if err != nil || migrated {
+		t.Fatalf("both present: no migration, no error (migrated=%v err=%v)", migrated, err)
+	}
+	b, _ := os.ReadFile(filepath.Join(root, ".deskkitignore"))
+	if string(b) != newContent {
+		t.Fatalf("the new file must win untouched, got %q", b)
+	}
+	if ob, _ := os.ReadFile(filepath.Join(root, ".librarian-ignore")); string(ob) != oldContent {
+		t.Fatalf("the legacy file must be left alone, got %q", ob)
 	}
 }

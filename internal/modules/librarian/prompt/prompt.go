@@ -28,7 +28,7 @@ func Embedded() string { return templates.SystemPrompt }
 
 // Seed inserts the embedded default into the prompts collection on first run, if and only
 // if no row already exists for key "librarian.system" (spec §4.10 "Seeding & load",
-// mirroring the .librarian-ignore auto-create). Idempotent: a second call is a no-op once
+// mirroring the .deskkitignore auto-create). Idempotent: a second call is a no-op once
 // a row exists. GUI/REST edits are never clobbered.
 //
 // Per ADR 0015 the seeded row is a re-seeded cache, not canonical: deleting it (e.g. via the
