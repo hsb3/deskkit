@@ -43,7 +43,7 @@ type Config struct {
 	AnalysesDir         string        // ANALYSES_DIR
 	JournalDir          string        // JOURNAL_DIR
 	SecretsDir          string        // SECRETS_DIR
-	IgnoreConfig        string        // IGNORE_CONFIG (default <DeskRoot>/.librarian-ignore)
+	IgnoreConfig        string        // IGNORE_CONFIG (default <DeskRoot>/.deskkitignore)
 	HandoffPath         string        // HANDOFF_PATH
 	EditorURL           string        // EDITOR_URL / preferences.editor_url — URL TEMPLATE handing a document off to the desk's editor ({path}/{abs} placeholders). Empty = no hand-off offered; nothing shells out, a surface renders it as a link.
 	AutonomousWrites    bool          // LIBRARIAN_AUTONOMOUS_WRITES (registration-time gate, §5.4)
@@ -180,7 +180,7 @@ func Load() (*Config, error) {
 	// "default" is the value/source disagreement this map exists to prevent.
 	c.IgnoreConfig = r.pick("IGNORE_CONFIG", "", "", "")
 	if c.IgnoreConfig == "" && c.DeskRoot != "" {
-		c.IgnoreConfig = filepath.Join(c.DeskRoot, ".librarian-ignore")
+		c.IgnoreConfig = filepath.Join(c.DeskRoot, ".deskkitignore")
 		r.mark("IGNORE_CONFIG", r.sources["DESK_ROOT"])
 	}
 

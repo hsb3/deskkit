@@ -55,7 +55,7 @@ func newWriteTestServer(t *testing.T, public bool) (*httptest.Server, *tests.Tes
 		AnalysesDir:  "analyses",
 		JournalDir:   "journal",
 		SecretsDir:   "_meta/secrets",
-		IgnoreConfig: filepath.Join(deskRoot, ".librarian-ignore"),
+		IgnoreConfig: filepath.Join(deskRoot, ".deskkitignore"),
 		HandoffPath:  "_meta/HANDOFF.md",
 	}
 	if err := os.WriteFile(cfg.IgnoreConfig, []byte("# empty — nothing ignored\n"), 0o644); err != nil {

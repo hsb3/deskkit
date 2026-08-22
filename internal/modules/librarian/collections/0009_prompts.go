@@ -9,7 +9,7 @@ import (
 // prompts (spec §4.10) — the editable, versioned system prompt data surface. Stable id
 // assigned so the seeded embedded default is reproducible across rebuilds. No relations;
 // order-independent. The default ROW is seeded at first run (prompt.Seed), not here —
-// mirroring the .librarian-ignore auto-create.
+// mirroring the .deskkitignore auto-create.
 func init() {
 	m.Register(func(app core.App) error {
 		c := core.NewBaseCollection("prompts")

@@ -74,7 +74,7 @@ func WriteDoc(ctx context.Context, app core.App, cfg *config.Config, in *WriteDo
 		return nil, fmt.Errorf("write_doc: ignore list unreadable, refusing to write: %w", ignoreErr)
 	}
 	if desklib.IsIgnored(rel, ignoreList) {
-		return nil, fmt.Errorf("write_doc: %s is write-protected (.librarian-ignore)", rel)
+		return nil, fmt.Errorf("write_doc: %s is write-protected (.deskkitignore)", rel)
 	}
 
 	// Existing regular file only — Lstat so a symlink pointing out of the desk is refused,

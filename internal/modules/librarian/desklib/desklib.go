@@ -15,7 +15,7 @@ import (
 	"strings"
 )
 
-// defaultIgnore is the embedded seed for a desk's .librarian-ignore (spec §10.1). It is
+// defaultIgnore is the embedded seed for a desk's .deskkitignore (spec §10.1). It is
 // identity-neutral and protects the binding docs by default. `_knowledge/` is included
 // per the M-05 / build-brief punch-list #1 reconciliation (write-excluded / flag-only,
 // exactly as `_meta/` is) so the librarian never proposes a fix against a profile or
@@ -31,7 +31,7 @@ import (
 // Inline comments are deliberately absent: LoadIgnoreList only strips whole-line `#`
 // comments, so a trailing comment would corrupt an entry.
 //
-//go:embed default-librarian-ignore
+//go:embed default-deskkitignore
 var defaultIgnore string
 
 // Checksum returns the lowercase sha256 hex of raw bytes (spec §5.1 checksum field).
@@ -217,21 +217,36 @@ func Ignored(rel, cfgPath string) (bool, error) {
 
 // EnsureIgnoreFile auto-creates the ignore boundary from the embedded defaults on first
 // run if it is absent (spec §10.1), so the boundary exists before any tool can write.
-// The embedded copy is the seed for the on-disk file, never a silent runtime substitute
-// (that path is Ignored's fail-closed behavior). An existing file is left untouched.
-func EnsureIgnoreFile(cfgPath, deskRoot string) error {
+// Before seeding, a legacy `.librarian-ignore` in the desk root is RENAMED to the new name,
+// byte-identical — without this branch the auto-create would silently replace an operator's
+// tuned rules with stock defaults and nothing would say so, which is worse than a hard
+// break. The returned bool reports that one-time migration so callers can log it. The
+// embedded copy is the seed for the on-disk file, never a silent runtime substitute (that
+// path is Ignored's fail-closed behavior). An existing file is left untouched, and when
+// both names exist the new one wins untouched — never a union of the two.
+func EnsureIgnoreFile(cfgPath, deskRoot string) (migrated bool, err error) {
 	if cfgPath == "" {
-		cfgPath = filepath.Join(deskRoot, ".librarian-ignore")
+		cfgPath = filepath.Join(deskRoot, ".deskkitignore")
 	}
 	if _, err := os.Stat(cfgPath); err == nil {
-		return nil // already present
+		return false, nil // already present
 	} else if !os.IsNotExist(err) {
-		return err // a real stat error (permissions) — surface it
+		return false, err // a real stat error (permissions) — surface it
 	}
 	if err := os.MkdirAll(filepath.Dir(cfgPath), 0o755); err != nil {
-		return err
+		return false, err
 	}
-	return os.WriteFile(cfgPath, []byte(defaultIgnore), 0o644)
+	// The migration source is always the desk-root default location, regardless of where
+	// cfgPath points: a legacy desk could only ever have had the file there by default.
+	if legacy := filepath.Join(deskRoot, ".librarian-ignore"); legacy != cfgPath {
+		if _, lerr := os.Stat(legacy); lerr == nil {
+			if err := os.Rename(legacy, cfgPath); err != nil {
+				return false, err
+			}
+			return true, nil
+		}
+	}
+	return false, os.WriteFile(cfgPath, []byte(defaultIgnore), 0o644)
 }
 
 // DefaultIgnore returns the embedded default ignore contents (for tests / tooling).

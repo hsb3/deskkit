@@ -9,7 +9,7 @@
 // with `current_checksum` as the new base, never automatic.
 //
 // A 400 is the server refusing, and its text is the answer — "…is write-protected
-// (.librarian-ignore)" for a path the desk protects, or the frontmatter editor declining a
+// (.deskkitignore)" for a path the desk protects, or the frontmatter editor declining a
 // block array. Those are correct behaviours, so the message is thrown verbatim for the surface
 // to show; there is deliberately no client-side guard second-guessing them.
 

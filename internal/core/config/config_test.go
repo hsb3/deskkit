@@ -80,7 +80,7 @@ func TestLoadEnvProvidesIdentity(t *testing.T) {
 	if cfg.DecisionsDir != "_structure/decisions" {
 		t.Errorf("DecisionsDir default = %q", cfg.DecisionsDir)
 	}
-	if want := filepath.Join(dir, ".librarian-ignore"); cfg.IgnoreConfig != want {
+	if want := filepath.Join(dir, ".deskkitignore"); cfg.IgnoreConfig != want {
 		t.Errorf("IgnoreConfig = %q, want %q", cfg.IgnoreConfig, want)
 	}
 	if cfg.LLMProvider != "anthropic" || cfg.LLMModel != "claude-haiku-4-5-20251001" {

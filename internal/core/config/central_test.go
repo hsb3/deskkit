@@ -410,7 +410,7 @@ func TestIgnoreConfigSourceFollowsDeskRoot(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if want := filepath.Join(cfg.DeskRoot, ".librarian-ignore"); cfg.IgnoreConfig != want {
+	if want := filepath.Join(cfg.DeskRoot, ".deskkitignore"); cfg.IgnoreConfig != want {
 		t.Fatalf("IgnoreConfig = %q, want the DeskRoot-derived %q", cfg.IgnoreConfig, want)
 	}
 	if got, deskRoot := cfg.Sources["IGNORE_CONFIG"], cfg.Sources["DESK_ROOT"]; got != deskRoot {

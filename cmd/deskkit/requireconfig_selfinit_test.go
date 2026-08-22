@@ -60,7 +60,7 @@ func TestRequireConfig_SelfInitsAndIsIdempotent(t *testing.T) {
 	cfg := &config.Config{
 		DeskRoot:     deskRoot,
 		DeskName:     "selfinit-test",
-		IgnoreConfig: filepath.Join(deskRoot, ".librarian-ignore"),
+		IgnoreConfig: filepath.Join(deskRoot, ".deskkitignore"),
 	}
 	setModuleReg(t, cfg)
 
@@ -103,7 +103,7 @@ func TestSweep_SelfInitsNeverMigratedStore(t *testing.T) {
 	cfg := &config.Config{
 		DeskRoot:     deskRoot,
 		DeskName:     "selfinit-sweep-test",
-		IgnoreConfig: filepath.Join(deskRoot, ".librarian-ignore"),
+		IgnoreConfig: filepath.Join(deskRoot, ".deskkitignore"),
 	}
 	setModuleReg(t, cfg)
 

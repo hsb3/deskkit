@@ -10,6 +10,20 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html). See
 ADR 0005 (DESK-27)
 for why this policy exists.
 
+## [0.11.3] — 2026-08-22
+
+### Changed
+
+- **`.librarian-ignore` is now `.deskkitignore`** — the conventional `.<tool>ignore` form
+  (`.gitignore`, `.dockerignore`, …), and the last place the retired "librarian" module name sat
+  in a user's face. On first run the binary **renames an existing `.librarian-ignore` in place,
+  byte-identical** (logged at info), so an operator's tuned rules survive the upgrade — without
+  that branch the auto-create would have silently replaced them with stock defaults, which is
+  worse than a hard break. When both names exist the new one wins untouched (never a union).
+  Proven by a gate that fails on both counts with the migration branch removed. `IGNORE_CONFIG`
+  still overrides the path; error messages, the spec, and the SPA's error-text fixtures all
+  follow the new name.
+
 ## [0.11.2] — 2026-08-22
 
 ### Security

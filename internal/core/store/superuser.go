@@ -1,6 +1,6 @@
 // Package bootstrap holds first-run, serve-time provisioning helpers that consume secrets
 // from the environment (never from Config). It is the DB-facing analog of desklib's
-// filesystem first-run auto-create (the .librarian-ignore boundary): idempotent, safe to
+// filesystem first-run auto-create (the .deskkitignore boundary): idempotent, safe to
 // run on every serve.
 package store
 

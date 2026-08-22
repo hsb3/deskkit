@@ -38,7 +38,7 @@ func newDeleteTestServer(t *testing.T, public bool) (*httptest.Server, *tests.Te
 		AnalysesDir:  "analyses",
 		JournalDir:   "journal",
 		SecretsDir:   "_meta/secrets",
-		IgnoreConfig: deskRoot + "/.librarian-ignore",
+		IgnoreConfig: deskRoot + "/.deskkitignore",
 		HandoffPath:  "_meta/HANDOFF.md",
 	}
 	if err := os.WriteFile(cfg.IgnoreConfig, []byte("# empty — nothing ignored\n"), 0o644); err != nil {
