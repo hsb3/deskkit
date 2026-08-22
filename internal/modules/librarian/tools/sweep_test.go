@@ -574,9 +574,9 @@ func TestSweep_DuplicateIDFilesFindingNoMerge(t *testing.T) {
 	}
 }
 
-// --- DESK-95: the ignore list is a CONTENT boundary for sweep ---
+// --- the ignore list is a CONTENT boundary for sweep ---
 
-// TestSweep_IgnoreListIsAContentBoundary — the DESK-95 gate. Every entry of the SHIPPED ignore
+// TestSweep_IgnoreListIsAContentBoundary — the content-boundary gate. Every entry of the SHIPPED ignore
 // seed gets a sentinel-bearing file; after a sweep none of their bodies may be in the store,
 // while a non-ignored control file's body must be — so the test fails when the blanking is
 // removed (sentinel indexed) AND when it over-blankets (control empty). Expectations are
@@ -606,7 +606,7 @@ func TestSweep_IgnoreListIsAContentBoundary(t *testing.T) {
 		mustWriteFile(t, cfg.DeskRoot, rel, "---\nsynopsis: x\n---\n"+sentinel+"\n")
 		seeded = append(seeded, rel)
 	}
-	// The two paths DESK-95 names, both covered by shipped entries (.claude/, _meta/secrets/).
+	// Two credential-bearing paths, both covered by shipped entries (.claude/, _meta/secrets/).
 	for _, rel := range []string{".claude/settings.local.json", "_meta/secrets/x.env"} {
 		if !desklib.IsIgnored(rel, entries) {
 			t.Fatalf("shipped seed no longer covers %s — the credential boundary regressed", rel)
@@ -641,7 +641,7 @@ func TestSweep_IgnoreListIsAContentBoundary(t *testing.T) {
 	}
 }
 
-// TestSweep_NewIgnoreRuleClearsStoredContent — the retroactive answer DESK-95 demanded: a rule
+// TestSweep_NewIgnoreRuleClearsStoredContent — the retroactive half of the boundary: a rule
 // that starts matching an EXISTING row clears its stored body on the next sweep (content is in
 // COMPARE_FIELDS, so stored → "" re-persists), protecting already-swept desks, not only fresh
 // ones. The row itself survives — the file is still on disk, so soft-delete would be wrong.

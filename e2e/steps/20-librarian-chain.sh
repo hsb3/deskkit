@@ -16,7 +16,7 @@ section "20 · librarian sweep → patrol → fix → restore"
 
 seed_librarian_fixtures
 
-# --- ignore-list content boundary (DESK-95): credential-shaped files on the desk ------------
+# --- ignore-list content boundary: credential-shaped files on the desk ------------
 # init seeded the desk's ignore file from the embedded defaults, which cover .claude/ and
 # _meta/secrets/. Their bodies must never reach files.content (which feeds `query search`);
 # the rows themselves may exist (patrol flags write-protected paths — flag-only).
