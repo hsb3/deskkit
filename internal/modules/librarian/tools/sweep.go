@@ -30,8 +30,8 @@ func Sweep(ctx context.Context, app core.App, cfg *config.Config, in *SweepInput
 	}
 	dirMap := cfg.EntityDirMap()
 
-	// The ignore list is a CONTENT boundary for sweep : matches
-	// are still indexed as rows — patrol must be able to flag the write-protected binding docs
+	// The ignore list is a CONTENT boundary for sweep: matches are still indexed as
+	// rows — patrol must be able to flag the write-protected binding docs
 	// (the F-IGN contract in verify.sh) — but their bodies are never stored, because
 	// files.content feeds search and the list covers credential-bearing paths (.claude/,
 	// _meta/secrets/). Loaded fail-closed like the write tools (§10.1): an unreadable list
