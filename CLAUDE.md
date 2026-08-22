@@ -53,7 +53,12 @@ belongs to the desks the tools stand up.
   button), over chat plus browse of files/findings/agent runs/PM items. Every collection is
   described declaratively in `web/src/lib/collections.ts` and the component reads that descriptor
   rather than branching on a collection name — adding an entity is a config entry, which is the
-  design's own falsifiable test. A document's editable surface is its STRUCTURED part only
+  design's own falsifiable test. **That test is scoped: it holds for genuine CRUD collections.
+  Only Library (`documents`) is at its designed shape today** — the `findings`, `runs` and `pm`
+  entries are read-only stand-ins for surfaces the design gives a different template (findings
+  and the landing queue are an INBOX; agent runs fold into the THREAD; work items get a phase
+  board), so those three entries are meant to be REPLACED, not extended. Check the board before
+  building on one. A document's editable surface is its STRUCTURED part only
   (`status`, `type`); the prose body hands off to the URL template the desk declares in
   `preferences.editor_url`, because hardcoding an editor would ship a personalization. Writes and
   deletes go through the write-through path — `tools.WriteDoc` / `tools.DeleteDoc`:

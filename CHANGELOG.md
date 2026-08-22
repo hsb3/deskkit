@@ -12,7 +12,16 @@ for why this policy exists.
 
 ## [Unreleased]
 
-Nothing yet.
+### Changed
+
+- **The SPA's "adding an entity is a config entry" claim now states its scope, in both places a
+  builder reads it.** The claim is true for genuine CRUD collections, and `documents` is the only
+  browse entry at its designed shape. `findings`, `runs` and `pm` are read-only stand-ins for
+  surfaces the design gives a *different* template — findings and the landing queue are an inbox,
+  agent runs fold inline into the thread, work items get a phase board with a gate panel — so
+  those three entries are meant to be replaced, not grown. Unqualified, the claim reads as licence
+  to add an `edit` block to `findings` and build the wrong screen convincingly. Comments only, in
+  `CLAUDE.md` and the header of `web/src/lib/collections.ts`; no behaviour changes.
 
 ## [0.11.0] — 2026-08-20
 
